@@ -15,7 +15,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ['user', id],
     queryFn: async () => {
-      const res = await api.get(`/accounts/v1/admin/users/${id}`);
+      const res = await api.get(`/admin/v1/users/${id}`);
       return res.data;
     },
   });
@@ -23,7 +23,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const { data: balances, isLoading: balancesLoading } = useQuery<{ data: Balance[] }>({
     queryKey: ['user-balances', id],
     queryFn: async () => {
-      const res = await api.get(`/accounts/v1/admin/users/${id}/balances`);
+      const res = await api.get(`/admin/v1/users/${id}/balances`);
       return res.data;
     },
   });
@@ -31,7 +31,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const { data: activity, isLoading: activityLoading } = useQuery<{ data: Activity[] }>({
     queryKey: ['user-activity', id],
     queryFn: async () => {
-      const res = await api.get(`/accounts/v1/admin/users/${id}/activity`);
+      const res = await api.get(`/admin/v1/users/${id}/activity`);
       return res.data;
     },
   });

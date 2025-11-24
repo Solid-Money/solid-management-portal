@@ -29,7 +29,7 @@ export default function UsersTable() {
         page: filters.page.toString(),
         limit: filters.limit.toString(),
       });
-      const res = await api.get(`/accounts/v1/admin/users?${params}`);
+      const res = await api.get(`/admin/v1/users?${params}`);
       return res.data;
     },
   });
