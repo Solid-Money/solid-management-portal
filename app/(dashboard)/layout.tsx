@@ -1,6 +1,6 @@
 'use client';
 
-import { User } from 'lucide-react';
+import { User, LogOut } from 'lucide-react';
 import { useAuth } from '@/components/auth-provider';
 
 export default function DashboardLayout({
@@ -8,10 +8,13 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { user, signOut } = useAuth();
 
-  const { user } = useAuth();
-
-
+  const handleSignOut = async () => {
+    if (confirm('Are you sure you want to sign out?')) {
+      await signOut();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -28,6 +31,13 @@ export default function DashboardLayout({
                 <User className="h-4 w-4 mr-2" />
                 {user?.email}
               </div>
+              <button
+                onClick={handleSignOut}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </button>
             </div>
           </div>
         </div>
