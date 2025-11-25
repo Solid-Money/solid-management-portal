@@ -5,10 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { User, UsersResponse, UserFilters } from '@/types';
 import { ChevronLeft, ChevronRight, ArrowUpDown, Search, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/hooks/use-debounce';
 
 export default function UsersTable() {
+  const router = useRouter();
   const [filters, setFilters] = useState<UserFilters>({
     search: '',
     sort: 'createdAt',
@@ -89,27 +90,28 @@ export default function UsersTable() {
                     </div>
                   </th>
                 ))}
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">View</span>
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center">
+                  <td colSpan={4} className="px-6 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
                     No users found
                   </td>
                 </tr>
               ) : (
                 data?.data.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-50">
+                  <tr
+                    key={user._id}
+                    onClick={() => router.push(`/users/${user._id}`)}
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {user.username}
                     </td>
@@ -121,14 +123,6 @@ export default function UsersTable() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link
-                        href={`/users/${user._id}`}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        View
-                      </Link>
                     </td>
                   </tr>
                 ))
