@@ -77,11 +77,11 @@ export default function UsersTable() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Username', 'Email', 'Wallet Address', 'Created At'].map((header) => (
+                {['Username', 'Email', 'Wallet Address', 'Total Balance', 'Savings Balance', 'Card Balance', 'Wallet Balance', 'Referral Code', 'Created At'].map((header) => (
                   <th
                     key={header}
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort(header.toLowerCase().replace(' ', ''))}
                   >
                     <div className="flex items-center space-x-1">
@@ -95,13 +95,13 @@ export default function UsersTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center">
+                  <td colSpan={9} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-4 text-center text-gray-500">
                     No users found
                   </td>
                 </tr>
@@ -112,16 +112,39 @@ export default function UsersTable() {
                     onClick={() => router.push(`/users/${user._id}`)}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {user.username}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.email}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
                       {user.walletAddress || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                      {user.totalBalance !== undefined
+                        ? `$${user.totalBalance.toFixed(2)}`
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.savingsBalance !== undefined
+                        ? `$${user.savingsBalance.toFixed(2)}`
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.cardBalance !== undefined
+                        ? `$${user.cardBalance.toFixed(2)}`
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.walletBalance !== undefined
+                        ? `$${user.walletBalance.toFixed(2)}`
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
+                      {user.referralCode || '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                   </tr>

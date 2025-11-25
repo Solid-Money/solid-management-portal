@@ -6,6 +6,11 @@ export interface User {
   createdAt: string;
   status?: string;
   country?: string;
+  totalBalance?: number;
+  savingsBalance?: number;
+  cardBalance?: number;
+  walletBalance?: number;
+  referralCode?: string;
 }
 
 export interface UsersResponse {
