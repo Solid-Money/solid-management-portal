@@ -36,10 +36,20 @@ export interface Balance {
 
 export interface Activity {
   id: string;
+  _id: string;
   type: string;
-  amount: number;
-  currency: string;
+  amount: string;
+  symbol: string;
   createdAt: string;
-  description?: string;
+  title?: string;
+  shortTitle?: string;
+  status: string;
+  chainId?: number;
+  hash?: string;
+  url?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  timestamp?: string;
+  metadata?: Record<string, any>;
 }
 

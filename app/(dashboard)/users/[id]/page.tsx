@@ -28,7 +28,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     },
   });
 
-  const { data: activity, isLoading: activityLoading } = useQuery<{ data: Activity[] }>({
+  const { data: activity, isLoading: activityLoading } = useQuery<{ docs: Activity[] }>({
     queryKey: ['user-activity', id],
     queryFn: async () => {
       const res = await api.get(`/admin/v1/users/${id}/activity`);
@@ -88,7 +88,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <BalancesCard balances={balances?.data || []} />
-        <ActivityList activities={activity?.data || []} />
+        <ActivityList activities={activity?.docs || []} />
       </div>
     </div>
   );
