@@ -1,19 +1,25 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
-import { User, UsersResponse, UserFilters } from '@/types';
-import { ChevronLeft, ChevronRight, ArrowUpDown, Search, Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useDebounce } from '@/hooks/use-debounce';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { User, UsersResponse, UserFilters } from "@/types";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  Search,
+  Loader2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export default function UsersTable() {
   const router = useRouter();
   const [filters, setFilters] = useState<UserFilters>({
-    search: '',
-    sort: 'createdAt',
-    order: 'desc',
+    search: "",
+    sort: "createdAt",
+    order: "desc",
     page: 1,
     limit: 10,
   });
@@ -21,7 +27,7 @@ export default function UsersTable() {
   const debouncedSearch = useDebounce(filters.search, 500);
 
   const { data, isLoading, isError } = useQuery<UsersResponse>({
-    queryKey: ['users', { ...filters, search: debouncedSearch }],
+    queryKey: ["users", { ...filters, search: debouncedSearch }],
     queryFn: async () => {
       const params = new URLSearchParams({
         search: debouncedSearch,
@@ -39,7 +45,7 @@ export default function UsersTable() {
     setFilters((prev) => ({
       ...prev,
       sort: field,
-      order: prev.sort === field && prev.order === 'desc' ? 'asc' : 'desc',
+      order: prev.sort === field && prev.order === "desc" ? "asc" : "desc",
     }));
   };
 
@@ -77,12 +83,24 @@ export default function UsersTable() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Username', 'Email', 'Wallet Address', 'Total Balance', 'Savings Balance', 'Card Balance', 'Wallet Balance', 'Referral Code', 'Created At'].map((header) => (
+                {[
+                  "Username",
+                  "Email",
+                  "Wallet Address",
+                  "Total Balance",
+                  "Savings Balance",
+                  "Card Balance",
+                  "Wallet Balance",
+                  "Referred By",
+                  "Created At",
+                ].map((header) => (
                   <th
                     key={header}
                     scope="col"
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort(header.toLowerCase().replace(' ', ''))}
+                    onClick={() =>
+                      handleSort(header.toLowerCase().replace(" ", ""))
+                    }
                   >
                     <div className="flex items-center space-x-1">
                       <span>{header}</span>
@@ -101,7 +119,10 @@ export default function UsersTable() {
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center text-gray-500">
+                  <td
+                    colSpan={9}
+                    className="px-4 py-4 text-center text-gray-500"
+                  >
                     No users found
                   </td>
                 </tr>
@@ -119,30 +140,44 @@ export default function UsersTable() {
                       {user.email}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                      {user.walletAddress || '-'}
+                      {user.walletAddress || "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-semibold">
                       {user.totalBalance !== undefined
                         ? `$${user.totalBalance.toFixed(2)}`
-                        : '-'}
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.savingsBalance !== undefined
                         ? `$${user.savingsBalance.toFixed(2)}`
-                        : '-'}
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.cardBalance !== undefined
                         ? `$${user.cardBalance.toFixed(2)}`
-                        : '-'}
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.walletBalance !== undefined
                         ? `$${user.walletBalance.toFixed(2)}`
-                        : '-'}
+                        : "-"}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
-                      {user.referralCode || '-'}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.referredBy ? (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (user.referredBy) {
+                              router.push(`/users/${user.referredBy.id}`);
+                            }
+                          }}
+                          className="text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer font-medium"
+                        >
+                          {user.referredBy.username}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleDateString()}
@@ -153,21 +188,32 @@ export default function UsersTable() {
             </tbody>
           </table>
         </div>
-        
+
         {data && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(data.meta.page - 1) * data.meta.limit + 1}</span> to{' '}
+                  Showing{" "}
                   <span className="font-medium">
-                    {Math.min(data.meta.page * data.meta.limit, data.meta.total)}
-                  </span>{' '}
-                  of <span className="font-medium">{data.meta.total}</span> results
+                    {(data.meta.page - 1) * data.meta.limit + 1}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-medium">
+                    {Math.min(
+                      data.meta.page * data.meta.limit,
+                      data.meta.total
+                    )}
+                  </span>{" "}
+                  of <span className="font-medium">{data.meta.total}</span>{" "}
+                  results
                 </p>
               </div>
               <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <nav
+                  className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                  aria-label="Pagination"
+                >
                   <button
                     onClick={() => handlePageChange(filters.page - 1)}
                     disabled={filters.page === 1}

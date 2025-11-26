@@ -11,6 +11,10 @@ export interface User {
   cardBalance?: number;
   walletBalance?: number;
   referralCode?: string;
+  referredBy?: {
+    id: string;
+    username: string;
+  } | null;
 }
 
 export interface UsersResponse {
