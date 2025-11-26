@@ -5,7 +5,7 @@ export interface User {
   walletAddress?: string;
   createdAt: string;
   status?: string;
-  country?: string;
+  country?: string | null;
   totalBalance?: number;
   savingsBalance?: number;
   cardBalance?: number;
