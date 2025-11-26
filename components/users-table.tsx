@@ -67,6 +67,7 @@ export default function UsersTable() {
       cardbalance: 'cardBalance',
       walletbalance: 'walletBalance',
       referredby: 'referredBy',
+      country: 'country',
       createdat: 'createdAt',
     };
     const normalized = header.toLowerCase().replace(/\s+/g, '');
@@ -108,6 +109,7 @@ export default function UsersTable() {
                   "Card Balance",
                   "Wallet Balance",
                   "Referred By",
+                  "Country",
                   "Created At",
                 ].map((header) => (
                   <th
@@ -129,14 +131,14 @@ export default function UsersTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center">
+                  <td colSpan={10} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     No users found
@@ -204,6 +206,9 @@ export default function UsersTable() {
                       ) : (
                         "-"
                       )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.country || "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleString(undefined, {
