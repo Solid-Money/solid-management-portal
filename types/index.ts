@@ -14,6 +14,7 @@ export interface User {
   referredBy?: {
     id: string;
     username: string;
+    referralCode: string;
   } | null;
 }
 
