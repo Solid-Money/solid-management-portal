@@ -57,6 +57,22 @@ export default function UsersTable() {
     setFilters((prev) => ({ ...prev, page: newPage }));
   };
 
+  const getSortField = (header: string): string => {
+    const fieldMap: Record<string, string> = {
+      username: 'username',
+      email: 'email',
+      walletaddress: 'walletAddress',
+      totalbalance: 'totalBalance',
+      savingsbalance: 'savingsBalance',
+      cardbalance: 'cardBalance',
+      walletbalance: 'walletBalance',
+      referredby: 'referredBy',
+      createdat: 'createdAt',
+    };
+    const normalized = header.toLowerCase().replace(/\s+/g, '');
+    return fieldMap[normalized] || normalized;
+  };
+
   if (isError) {
     return <div className="text-red-500">Error loading users</div>;
   }
@@ -99,7 +115,7 @@ export default function UsersTable() {
                     scope="col"
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() =>
-                      handleSort(header.toLowerCase().replace(" ", ""))
+                      handleSort(getSortField(header))
                     }
                   >
                     <div className="flex items-center space-x-1">
@@ -164,23 +180,39 @@ export default function UsersTable() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.referredBy ? (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (user.referredBy) {
-                              router.push(`/users/${user.referredBy.id}`);
-                            }
-                          }}
-                          className="text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer font-medium"
-                        >
-                          {user.referredBy.username}
-                        </span>
+                        <div className="flex flex-col">
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (user.referredBy) {
+                                router.push(`/users/${user.referredBy.id}`);
+                              }
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer font-medium"
+                          >
+                            {user.referredBy.username}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(user.createdAt).toLocaleString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
                       ) : (
                         "-"
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                      {new Date(user.createdAt).toLocaleString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </td>
                   </tr>
                 ))
