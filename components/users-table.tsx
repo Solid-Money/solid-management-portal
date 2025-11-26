@@ -69,6 +69,7 @@ export default function UsersTable() {
       referredby: 'referredBy',
       country: 'country',
       createdat: 'createdAt',
+      lastactivity: 'lastActivityTimestamp',
     };
     const normalized = header.toLowerCase().replace(/\s+/g, '');
     return fieldMap[normalized] || normalized;
@@ -111,6 +112,7 @@ export default function UsersTable() {
                   "Referred By",
                   "Referral Code Used",
                   "Country",
+                  "Last Activity",
                   "Created At",
                 ].map((header) => (
                   <th
@@ -132,14 +134,14 @@ export default function UsersTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-4 text-center">
+                  <td colSpan={12} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={12}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     No users found
@@ -213,6 +215,17 @@ export default function UsersTable() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.country || "-"}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.lastActivityTimestamp
+                        ? new Date(user.lastActivityTimestamp).toLocaleString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleString(undefined, {

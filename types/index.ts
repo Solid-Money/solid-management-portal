@@ -16,6 +16,7 @@ export interface User {
     username: string;
     referralCode: string;
   } | null;
+  lastActivityTimestamp?: string | null;
 }
 
 export interface UsersResponse {
