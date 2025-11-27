@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { User, UsersResponse, UserFilters } from "@/types";
+import { UsersResponse, UserFilters } from "@/types";
 import {
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Search,
   Loader2,
 } from "lucide-react";
@@ -114,21 +116,35 @@ export default function UsersTable() {
                   "Country",
                   "Last Activity",
                   "Created At",
-                ].map((header) => (
-                  <th
-                    key={header}
-                    scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() =>
-                      handleSort(getSortField(header))
-                    }
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>{header}</span>
-                      <ArrowUpDown className="h-4 w-4" />
-                    </div>
-                  </th>
-                ))}
+                ].map((header) => {
+                  const sortField = getSortField(header);
+                  const isActive = filters.sort === sortField;
+                  return (
+                    <th
+                      key={header}
+                      scope="col"
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors ${
+                        isActive
+                          ? "bg-indigo-50 text-indigo-700"
+                          : "text-gray-500"
+                      }`}
+                      onClick={() => handleSort(sortField)}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>{header}</span>
+                        {isActive ? (
+                          filters.order === "asc" ? (
+                            <ArrowUp className="h-4 w-4" />
+                          ) : (
+                            <ArrowDown className="h-4 w-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-4 w-4 opacity-40" />
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
