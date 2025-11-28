@@ -58,6 +58,7 @@ export default function UsersTable() {
       ...prev,
       sort: field,
       order: prev.sort === field && prev.order === "desc" ? "asc" : "desc",
+      page: 1,
     }));
   };
 
