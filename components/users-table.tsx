@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { UsersResponse, UserFilters } from "@/types";
@@ -12,6 +12,8 @@ import {
   ArrowDown,
   Search,
   Loader2,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -25,6 +27,14 @@ export default function UsersTable() {
     page: 1,
     limit: 10,
   });
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (copiedAddress) {
+      const timer = setTimeout(() => setCopiedAddress(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copiedAddress]);
 
   const debouncedSearch = useDebounce(filters.search, 500);
 
@@ -69,12 +79,28 @@ export default function UsersTable() {
       cardbalance: 'cardBalance',
       walletbalance: 'walletBalance',
       referredby: 'referredBy',
+      referralcodeused: 'referralCodeUsed',
       country: 'country',
       createdat: 'createdAt',
       lastactivity: 'lastActivityTimestamp',
     };
     const normalized = header.toLowerCase().replace(/\s+/g, '');
     return fieldMap[normalized] || normalized;
+  };
+
+  const truncateAddress = (address: string): string => {
+    if (!address || address.length < 12) return address;
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const copyToClipboard = async (text: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAddress(text);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
   };
 
   if (isError) {
@@ -176,8 +202,27 @@ export default function UsersTable() {
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.email}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                      {user.walletAddress || "-"}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.walletAddress ? (
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-xs">
+                            {truncateAddress(user.walletAddress)}
+                          </span>
+                          <button
+                            onClick={(e) => copyToClipboard(user.walletAddress!, e)}
+                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            title="Copy address"
+                          >
+                            {copiedAddress === user.walletAddress ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-semibold">
                       {user.totalBalance !== undefined
@@ -227,7 +272,7 @@ export default function UsersTable() {
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
-                      {user.referredBy?.referralCode || "-"}
+                      {user.referralCodeUsed || "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.country || "-"}
@@ -306,6 +351,14 @@ export default function UsersTable() {
           </div>
         )}
       </div>
+
+      {/* Toast notification */}
+      {copiedAddress && (
+        <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
+          <Check className="h-4 w-4 text-green-400" />
+          <span className="text-sm">Address copied</span>
+        </div>
+      )}
     </div>
   );
 }
