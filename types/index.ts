@@ -33,7 +33,7 @@ export interface UsersResponse {
 export interface UserFilters {
   search: string;
   sort: string;
-  order: 'asc' | 'desc';
+  order: "asc" | "desc";
   page: number;
   limit: number;
 }
@@ -65,3 +65,74 @@ export interface Activity {
   metadata?: Record<string, any>;
 }
 
+export interface AdminActivity {
+  _id: string;
+  type: string;
+  status: string;
+  amount: string;
+  symbol: string;
+  chainId?: number;
+  hash?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  user?: {
+    _id: string;
+    username: string;
+  };
+  depositType?: "REGULAR" | "DIRECT" | null;
+  createdAt: string;
+}
+
+export interface AdminActivitiesResponse {
+  data: AdminActivity[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface ActivityFilters {
+  type: string;
+  depositType: string;
+  status: string;
+  sort: string;
+  order: "asc" | "desc";
+  page: number;
+  limit: number;
+}
+
+export const ACTIVITY_TYPES = [
+  { value: "", label: "All Types" },
+  { value: "deposit", label: "Deposit" },
+  { value: "withdraw", label: "Withdraw" },
+  { value: "send", label: "Send" },
+  { value: "swap", label: "Swap" },
+  { value: "bridge", label: "Bridge" },
+  { value: "bridge_deposit", label: "Bridge Deposit" },
+  { value: "card_transaction", label: "Card Transaction" },
+  { value: "mercuryo_transaction", label: "Mercuryo Transaction" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "unstake", label: "Unstake" },
+  { value: "cancel_withdraw", label: "Cancel Withdraw" },
+  { value: "wrap", label: "Wrap" },
+  { value: "unwrap", label: "Unwrap" },
+  { value: "merkl_claim", label: "Merkl Claim" },
+  { value: "card_welcome_bonus", label: "Card Welcome Bonus" },
+] as const;
+
+export const DEPOSIT_TYPES = [
+  { value: "", label: "All Deposit Types" },
+  { value: "REGULAR", label: "Regular" },
+  { value: "DIRECT", label: "Direct" },
+] as const;
+
+export const ACTIVITY_STATUSES = [
+  { value: "", label: "All Statuses" },
+  { value: "pending", label: "Pending" },
+  { value: "processing", label: "Processing" },
+  { value: "success", label: "Success" },
+  { value: "failed", label: "Failed" },
+  { value: "cancelled", label: "Cancelled" },
+] as const;
