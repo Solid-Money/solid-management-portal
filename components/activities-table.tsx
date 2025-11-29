@@ -161,7 +161,7 @@ export default function ActivitiesTable() {
       {/* Filters */}
       <div className="flex flex-wrap gap-4">
         <select
-          className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+          className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           value={filters.type}
           onChange={(e) => handleFilterChange("type", e.target.value)}
         >
@@ -176,7 +176,7 @@ export default function ActivitiesTable() {
           filters.type === "bridge" ||
           filters.type === "bridge_deposit") && (
           <select
-            className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
             value={filters.depositType}
             onChange={(e) => handleFilterChange("depositType", e.target.value)}
           >
@@ -189,7 +189,7 @@ export default function ActivitiesTable() {
         )}
 
         <select
-          className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+          className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           value={filters.status}
           onChange={(e) => handleFilterChange("status", e.target.value)}
         >
