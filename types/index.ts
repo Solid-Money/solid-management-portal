@@ -138,4 +138,6 @@ export const ACTIVITY_STATUSES = [
   { value: "success", label: "Success" },
   { value: "failed", label: "Failed" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "expired", label: "Expired" },
+  { value: "refunded", label: "Refunded" },
 ] as const;
