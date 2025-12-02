@@ -21,7 +21,7 @@ export default function DashboardLayout({
 
   const navItems = [
     { href: '/users', label: 'Users', icon: Users },
-    { href: '/activities', label: 'Activities', icon: Activity },
+    { href: '/activity', label: 'Activity', icon: Activity },
   ];
 
   return (

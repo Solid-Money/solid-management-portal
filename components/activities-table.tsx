@@ -22,6 +22,29 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+const TRANSACTION_DETAILS: Record<
+  string,
+  { sign: "+" | "-" | "✕" | "⊘"; category: string }
+> = {
+  deposit: { sign: "+", category: "Savings account" },
+  unstake: { sign: "-", category: "Savings account" },
+  withdraw: { sign: "-", category: "Savings account" },
+  send: { sign: "-", category: "Wallet transfer" },
+  bridge: { sign: "-", category: "External wallet transfer" },
+  cancel_withdraw: { sign: "-", category: "Savings account" },
+  bridge_deposit: { sign: "-", category: "External wallet transfer" },
+  bridge_transfer: { sign: "+", category: "Bank deposit" },
+  bank_transfer: { sign: "+", category: "Bank deposit" },
+  card_transaction: { sign: "-", category: "Card deposit" },
+  mercuryo_transaction: { sign: "+", category: "Bank deposit" },
+  swap: { sign: "+", category: "Wallet transfer" },
+  wrap: { sign: "+", category: "Wallet transfer" },
+  unwrap: { sign: "+", category: "Wallet transfer" },
+  merkl_claim: { sign: "+", category: "Reward" },
+  card_welcome_bonus: { sign: "+", category: "Reward" },
+  deposit_bonus: { sign: "+", category: "Reward" },
+};
+
 export default function ActivitiesTable() {
   const router = useRouter();
   const [filters, setFilters] = useState<ActivityFilters>({
@@ -138,6 +161,8 @@ export default function ActivitiesTable() {
     return typeObj?.label || type;
   };
 
+  const getTransactionDetails = (type: string) => TRANSACTION_DETAILS[type];
+
   const getChainName = (chainId?: number) => {
     if (!chainId) return "-";
     const chains: Record<number, string> = {
@@ -208,6 +233,8 @@ export default function ActivitiesTable() {
               <tr>
                 {[
                   "Type",
+                  "Title",
+                  "Tx Type",
                   "Amount",
                   "Symbol",
                   "Status",
@@ -258,14 +285,14 @@ export default function ActivitiesTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-4 text-center">
+                  <td colSpan={13} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={13}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     No activities found
@@ -279,6 +306,20 @@ export default function ActivitiesTable() {
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {getTypeLabel(activity.type)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      {activity.shortTitle || activity.title || "-"}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      {(() => {
+                        const txDetails = getTransactionDetails(activity.type);
+                        if (!txDetails) return "-";
+                        return (
+                          <span className="text-gray-600">
+                            {txDetails.category}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
                       {activity.amount}
@@ -474,4 +515,3 @@ export default function ActivitiesTable() {
     </div>
   );
 }
-

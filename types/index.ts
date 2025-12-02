@@ -71,6 +71,8 @@ export interface AdminActivity {
   status: string;
   amount: string;
   symbol: string;
+  title?: string;
+  shortTitle?: string;
   chainId?: number;
   hash?: string;
   fromAddress?: string;
