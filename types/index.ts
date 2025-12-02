@@ -77,6 +77,7 @@ export interface AdminActivity {
   hash?: string;
   fromAddress?: string;
   toAddress?: string;
+  failureReason?: string | null;
   user?: {
     _id: string;
     username: string;

@@ -75,7 +75,8 @@ export default function ActivitiesTable() {
         order: filters.order,
       });
       if (filters.type) params.append("type", filters.type);
-      if (filters.depositType) params.append("depositType", filters.depositType);
+      if (filters.depositType)
+        params.append("depositType", filters.depositType);
       if (filters.status) params.append("status", filters.status);
 
       const res = await api.get(`/admin/v1/activities?${params}`);
@@ -179,7 +180,14 @@ export default function ActivitiesTable() {
     return <div className="text-red-500">Error loading activities</div>;
   }
 
-  const sortableHeaders = ["Type", "Amount", "Symbol", "Status", "Chain", "Created At"];
+  const sortableHeaders = [
+    "Type",
+    "Amount",
+    "Symbol",
+    "Status",
+    "Chain",
+    "Created At",
+  ];
 
   return (
     <div className="space-y-4">
@@ -244,6 +252,7 @@ export default function ActivitiesTable() {
                   "From",
                   "To",
                   "Deposit Type",
+                  "Failure Reason",
                   "Created At",
                 ].map((header) => {
                   const sortField = getSortField(header);
@@ -285,14 +294,14 @@ export default function ActivitiesTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-4 text-center">
+                  <td colSpan={14} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={13}
+                    colSpan={14}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     No activities found
@@ -440,6 +449,14 @@ export default function ActivitiesTable() {
                       ) : (
                         "-"
                       )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
+                      {activity.status === "failed" &&
+                      (activity.type === "deposit" ||
+                        activity.type === "bridge" ||
+                        activity.type === "bridge_deposit")
+                        ? activity.failureReason || "-"
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {new Date(activity.createdAt).toLocaleString(undefined, {
