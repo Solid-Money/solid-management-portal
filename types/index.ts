@@ -117,7 +117,7 @@ export const ACTIVITY_TYPES = [
   { value: "card_transaction", label: "Card Transaction" },
   { value: "mercuryo_transaction", label: "Mercuryo Transaction" },
   { value: "bank_transfer", label: "Bank Transfer" },
-  { value: "unstake", label: "Unstake" },
+  { value: "unstake", label: "Withdraw" },
   { value: "cancel_withdraw", label: "Cancel Withdraw" },
   { value: "wrap", label: "Wrap" },
   { value: "unwrap", label: "Unwrap" },
