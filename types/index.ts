@@ -142,3 +142,30 @@ export const ACTIVITY_STATUSES = [
   { value: "expired", label: "Expired" },
   { value: "refunded", label: "Refunded" },
 ] as const;
+
+export interface ChainBalance {
+  chainId: number;
+  chainName: string;
+  gasBalance: string;
+  gasThreshold: string;
+  gasStatus: "OK" | "LOW" | "CRITICAL" | "N/A";
+  gasTokenSymbol: string;
+  usdcBalance: string;
+  usdcThreshold: string;
+  usdcStatus: "OK" | "LOW" | "CRITICAL" | "N/A";
+  usdcAddress: string;
+  needsTopUp: boolean;
+  topUpRecommendation?: string;
+}
+
+export interface WalletInfo {
+  name: string;
+  description: string;
+  address: string;
+  chains: ChainBalance[];
+}
+
+export interface WalletStatusResponse {
+  wallets: WalletInfo[];
+  lastUpdated: string;
+}
