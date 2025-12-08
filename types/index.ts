@@ -112,6 +112,7 @@ export const ACTIVITY_TYPES = [
   { value: "deposit", label: "Deposit" },
   { value: "withdraw", label: "Withdraw" },
   { value: "send", label: "Send" },
+  { value: "receive", label: "Receive" },
   { value: "swap", label: "Swap" },
   { value: "bridge", label: "Bridge" },
   { value: "bridge_deposit", label: "Bridge Deposit" },
