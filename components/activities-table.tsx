@@ -177,6 +177,7 @@ export default function ActivitiesTable() {
       137: "Polygon",
       42161: "Arbitrum",
       8453: "Base",
+      122: 'Fuse'
     };
     return chains[chainId] || `Chain ${chainId}`;
   };
