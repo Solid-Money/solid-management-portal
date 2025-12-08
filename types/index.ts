@@ -84,6 +84,7 @@ export interface AdminActivity {
   };
   depositType?: "REGULAR" | "DIRECT" | null;
   createdAt: string;
+  timestamp?: string;
 }
 
 export interface AdminActivitiesResponse {

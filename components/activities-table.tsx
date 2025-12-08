@@ -51,7 +51,7 @@ export default function ActivitiesTable() {
     type: "",
     depositType: "",
     status: "",
-    sort: "createdAt",
+    sort: "timestamp",
     order: "desc",
     page: 1,
     limit: 20,
@@ -119,6 +119,7 @@ export default function ActivitiesTable() {
       symbol: "symbol",
       status: "status",
       chain: "chainId",
+      date: "timestamp",
       createdat: "createdAt",
     };
     const normalized = header.toLowerCase().replace(/\s+/g, "");
@@ -190,7 +191,7 @@ export default function ActivitiesTable() {
     "Symbol",
     "Status",
     "Chain",
-    "Created At",
+    "Date",
   ];
 
   return (
@@ -257,7 +258,7 @@ export default function ActivitiesTable() {
                   "To",
                   "Deposit Type",
                   "Failure Reason",
-                  "Created At",
+                  "Date",
                 ].map((header) => {
                   const sortField = getSortField(header);
                   const isSortable = sortableHeaders.includes(header);
@@ -463,13 +464,26 @@ export default function ActivitiesTable() {
                         : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(activity.createdAt).toLocaleString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {activity.timestamp
+                        ? new Date(
+                            Number(activity.timestamp) * 1000
+                          ).toLocaleString(undefined, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : new Date(activity.createdAt).toLocaleString(
+                            undefined,
+                            {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
                     </td>
                   </tr>
                 ))
