@@ -184,7 +184,9 @@ export default function WalletsTable() {
             <div className="flex items-center gap-1.5">
               <code
                 className={`text-xs px-1.5 py-0.5 rounded ${
-                  isCritical ? "bg-red-100" : "bg-gray-100"
+                  isCritical
+                    ? "bg-red-100 text-red-900"
+                    : "bg-gray-100 text-gray-700"
                 }`}
               >
                 {truncateAddress(chain.usdcAddress)}
