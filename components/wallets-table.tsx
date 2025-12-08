@@ -119,6 +119,37 @@ export default function WalletsTable() {
       }
     };
 
+    // Build helper text for LOW/CRITICAL statuses
+    const getTopUpHelperText = () => {
+      if (!isCritical && !isLow) return null;
+
+      const needs: string[] = [];
+      if (
+        hasGas &&
+        (chain.gasStatus === "LOW" || chain.gasStatus === "CRITICAL")
+      ) {
+        needs.push(`${chain.gasThreshold} ${chain.gasTokenSymbol}`);
+      }
+      if (
+        hasUsdc &&
+        (chain.usdcStatus === "LOW" || chain.usdcStatus === "CRITICAL")
+      ) {
+        needs.push(`${chain.usdcThreshold} USDC`);
+      }
+
+      if (needs.length === 0) return null;
+
+      return (
+        <div
+          className={`text-xs mt-1 ${
+            isCritical ? "text-red-600 font-medium" : "text-yellow-600"
+          }`}
+        >
+          💡 Send at least {needs.join(" and ")} on {chain.chainName}
+        </div>
+      );
+    };
+
     return (
       <tr key={chain.chainId} className={rowClasses}>
         <td
@@ -126,12 +157,17 @@ export default function WalletsTable() {
             isCritical ? "text-red-900 font-medium" : "text-gray-900"
           }`}
         >
-          {chain.chainName}
-          {isCritical && (
-            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white animate-pulse">
-              URGENT
-            </span>
-          )}
+          <div>
+            <div className="flex items-center">
+              {chain.chainName}
+              {isCritical && (
+                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white animate-pulse">
+                  URGENT
+                </span>
+              )}
+            </div>
+            {getTopUpHelperText()}
+          </div>
         </td>
         <td className="px-4 py-2 text-sm">
           {hasGas ? (
