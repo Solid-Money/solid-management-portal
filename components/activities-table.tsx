@@ -464,26 +464,23 @@ export default function ActivitiesTable() {
                         : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {activity.timestamp
-                        ? new Date(
-                            Number(activity.timestamp) * 1000
-                          ).toLocaleString(undefined, {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : new Date(activity.createdAt).toLocaleString(
-                            undefined,
-                            {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )}
+                      {(() => {
+                        const timestamp = activity.timestamp
+                          ? Number(activity.timestamp)
+                          : 0;
+                        const dateToUse =
+                          timestamp > 0
+                            ? new Date(timestamp * 1000)
+                            : new Date(activity.createdAt);
+
+                        return dateToUse.toLocaleString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                      })()}
                     </td>
                   </tr>
                 ))
