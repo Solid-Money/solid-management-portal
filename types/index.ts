@@ -170,3 +170,72 @@ export interface WalletStatusResponse {
   wallets: WalletInfo[];
   lastUpdated: string;
 }
+
+// Card Transactions
+export interface CardTransactionCashback {
+  status: string;
+  fuseAmount?: string;
+  fuseUsdPrice?: string;
+  payoutTxHash?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+}
+
+export interface CardTransaction {
+  _id: string;
+  transactionId: string;
+  cardAccountId: string;
+  customerId: string;
+  amount: string;
+  billingAmount: string;
+  originalAmount: string;
+  settledAmount?: string;
+  currency: string;
+  category: string;
+  status: string;
+  createdAt: string;
+  authorizedAt?: string;
+  postedAt?: string;
+  updatedAt: string;
+  merchantName?: string;
+  merchantLocation?: string;
+  merchantCategoryCode: string;
+  transactionDescription: string;
+  cashback?: CardTransactionCashback;
+}
+
+export interface CardTransactionsResponse {
+  data: CardTransaction[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface CardTransactionFilters {
+  status: string;
+  sort: string;
+  order: "asc" | "desc";
+  page: number;
+  limit: number;
+}
+
+export const CARD_TRANSACTION_STATUSES = [
+  { value: "", label: "All Statuses" },
+  { value: "pending", label: "Pending" },
+  { value: "authorized", label: "Authorized" },
+  { value: "posted", label: "Posted" },
+  { value: "declined", label: "Declined" },
+  { value: "denied", label: "Denied" },
+  { value: "reversed", label: "Reversed" },
+] as const;
+
+export const CASHBACK_STATUSES = [
+  { value: "", label: "All" },
+  { value: "Pending", label: "Pending" },
+  { value: "Paid", label: "Paid" },
+  { value: "Failed", label: "Failed" },
+  { value: "PermanentlyFailed", label: "Permanently Failed" },
+] as const;

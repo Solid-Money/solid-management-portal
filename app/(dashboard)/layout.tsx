@@ -1,6 +1,13 @@
 "use client";
 
-import { User, LogOut, Users, Activity, Wallet } from "lucide-react";
+import {
+  User,
+  LogOut,
+  Users,
+  Activity,
+  Wallet,
+  CreditCard,
+} from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -22,6 +29,11 @@ export default function DashboardLayout({
   const navItems = [
     { href: "/users", label: "Users", icon: Users },
     { href: "/activity", label: "Activity", icon: Activity },
+    {
+      href: "/card-transactions",
+      label: "Card Transactions",
+      icon: CreditCard,
+    },
     { href: "/wallets", label: "Wallets", icon: Wallet },
   ];
 
