@@ -226,6 +226,8 @@ export const CARD_TRANSACTION_STATUSES = [
   { value: "", label: "All Statuses" },
   { value: "pending", label: "Pending" },
   { value: "authorized", label: "Authorized" },
+  { value: "approved", label: "Approved" },
+  { value: "settled", label: "Settled" },
   { value: "posted", label: "Posted" },
   { value: "declined", label: "Declined" },
   { value: "denied", label: "Denied" },
