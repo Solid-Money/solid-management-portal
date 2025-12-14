@@ -259,6 +259,7 @@ export default function ActivitiesTable() {
                   "To",
                   "Deposit Type",
                   "Failure Reason",
+                  "Sponsored Gas Fee",
                   "Date",
                 ].map((header) => {
                   const sortField = getSortField(header);
@@ -463,6 +464,9 @@ export default function ActivitiesTable() {
                         activity.type === "bridge_deposit")
                         ? activity.failureReason || "-"
                         : "-"}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {activity.totalFeeUSD ? `$${activity.totalFeeUSD}` : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {(() => {

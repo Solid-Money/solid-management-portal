@@ -83,6 +83,7 @@ export interface AdminActivity {
     username: string;
   };
   depositType?: "REGULAR" | "DIRECT" | null;
+  totalFeeUSD?: string;
   createdAt: string;
   timestamp?: string;
 }
