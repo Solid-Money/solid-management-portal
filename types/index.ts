@@ -20,6 +20,11 @@ export interface User {
   lastActivityTimestamp?: string | null;
 }
 
+export interface ReferralSearchResponse {
+  referrer: User | null;
+  referredUsers: User[];
+}
+
 export interface UsersResponse {
   data: User[];
   meta: {

@@ -7,6 +7,7 @@ import {
   Activity,
   Wallet,
   CreditCard,
+  UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
@@ -28,6 +29,7 @@ export default function DashboardLayout({
 
   const navItems = [
     { href: "/users", label: "Users", icon: Users },
+    { href: "/referrals", label: "Referrals", icon: UserPlus },
     { href: "/activity", label: "Activity", icon: Activity },
     {
       href: "/card-transactions",
