@@ -1,4 +1,14 @@
+import { Suspense } from "react";
 import ReferralLookup from "@/components/referral-lookup";
+import { Loader2 } from "lucide-react";
+
+function ReferralLookupFallback() {
+  return (
+    <div className="flex justify-center py-12">
+      <Loader2 className="animate-spin h-8 w-8 text-indigo-600" />
+    </div>
+  );
+}
 
 export default function ReferralsPage() {
   return (
@@ -8,7 +18,9 @@ export default function ReferralsPage() {
           Referral Lookup
         </h1>
       </div>
-      <ReferralLookup />
+      <Suspense fallback={<ReferralLookupFallback />}>
+        <ReferralLookup />
+      </Suspense>
     </div>
   );
 }
