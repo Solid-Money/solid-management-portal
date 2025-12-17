@@ -110,6 +110,56 @@ export default function UserDetailPage({
                 {user.country || "-"}
               </dd>
             </div>
+            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt className="text-sm font-medium text-gray-500">
+                Safe Address
+              </dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
+                {user.safeAddress || "-"}
+              </dd>
+            </div>
+            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt className="text-sm font-medium text-gray-500">
+                Referral Code
+              </dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
+                {user.referralCode || "-"}
+              </dd>
+            </div>
+            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt className="text-sm font-medium text-gray-500">
+                Referral Code Used
+              </dt>
+              <dd className="mt-1 text-sm sm:mt-0 sm:col-span-2">
+                {user.referralCodeUsed ? (
+                  <Link
+                    href={`/referrals?code=${encodeURIComponent(
+                      user.referralCodeUsed
+                    )}`}
+                    className="font-mono text-indigo-600 hover:text-indigo-800 hover:underline"
+                  >
+                    {user.referralCodeUsed}
+                  </Link>
+                ) : (
+                  <span className="text-gray-900">-</span>
+                )}
+              </dd>
+            </div>
+            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt className="text-sm font-medium text-gray-500">Referred By</dt>
+              <dd className="mt-1 text-sm sm:mt-0 sm:col-span-2">
+                {user.referredBy ? (
+                  <Link
+                    href={`/users/${user.referredBy.id}`}
+                    className="text-indigo-600 hover:text-indigo-800 hover:underline"
+                  >
+                    {user.referredBy.username}
+                  </Link>
+                ) : (
+                  <span className="text-gray-900">-</span>
+                )}
+              </dd>
+            </div>
           </dl>
         </div>
       </div>

@@ -3,6 +3,7 @@ export interface User {
   email: string;
   username: string;
   walletAddress?: string;
+  safeAddress?: string;
   createdAt: string;
   status?: string;
   country?: string | null;

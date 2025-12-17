@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ReferralSearchResponse, User } from "@/types";
@@ -13,24 +13,41 @@ import {
   UserCircle,
   AlertCircle,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
 
 export default function ReferralLookup() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [referralCode, setReferralCode] = useState("");
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
+  // Prefill from URL query param
+  useEffect(() => {
+    const codeFromUrl = searchParams.get("code");
+    const usernameFromUrl = searchParams.get("username");
+    if (codeFromUrl) {
+      setReferralCode(codeFromUrl.toUpperCase());
+    } else if (usernameFromUrl) {
+      setReferralCode(usernameFromUrl);
+    }
+  }, [searchParams]);
+
   const debouncedCode = useDebounce(referralCode, 500);
+
+  // Detect if input looks like a referral code (uppercase, short) or a username
+  const isLikelyReferralCode = /^[A-Z0-9]+$/.test(debouncedCode);
 
   const { data, isLoading, isError, error } = useQuery<ReferralSearchResponse>({
     queryKey: ["referral-lookup", debouncedCode],
     queryFn: async () => {
-      const res = await api.get(
-        `/admin/v1/users/by-referral-code?referralCode=${encodeURIComponent(
-          debouncedCode
-        )}`
-      );
+      const params = new URLSearchParams();
+      if (isLikelyReferralCode) {
+        params.set("referralCode", debouncedCode);
+      } else {
+        params.set("username", debouncedCode);
+      }
+      const res = await api.get(`/admin/v1/users/by-referral-code?${params}`);
       return res.data;
     },
     enabled: debouncedCode.length >= 3,
@@ -63,13 +80,13 @@ export default function ReferralLookup() {
           <input
             type="text"
             className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg"
-            placeholder="Enter referral code..."
+            placeholder="Enter referral code or username..."
             value={referralCode}
-            onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+            onChange={(e) => setReferralCode(e.target.value)}
           />
         </div>
         <p className="mt-2 text-sm text-gray-500">
-          Enter at least 3 characters to search
+          Search by referral code (e.g., ALICE1) or username (e.g., test_diana)
         </p>
       </div>
 

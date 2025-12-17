@@ -72,20 +72,20 @@ export default function UsersTable() {
 
   const getSortField = (header: string): string => {
     const fieldMap: Record<string, string> = {
-      username: 'username',
-      email: 'email',
-      walletaddress: 'walletAddress',
-      totalbalance: 'totalBalance',
-      savingsbalance: 'savingsBalance',
-      cardbalance: 'cardBalance',
-      walletbalance: 'walletBalance',
-      referredby: 'referredBy',
-      referralcodeused: 'referralCodeUsed',
-      country: 'country',
-      createdat: 'createdAt',
-      lastactivity: 'lastActivityTimestamp',
+      username: "username",
+      email: "email",
+      walletaddress: "walletAddress",
+      totalbalance: "totalBalance",
+      savingsbalance: "savingsBalance",
+      cardbalance: "cardBalance",
+      walletbalance: "walletBalance",
+      referredby: "referredBy",
+      referralcodeused: "referralCodeUsed",
+      country: "country",
+      createdat: "createdAt",
+      lastactivity: "lastActivityTimestamp",
     };
-    const normalized = header.toLowerCase().replace(/\s+/g, '');
+    const normalized = header.toLowerCase().replace(/\s+/g, "");
     return fieldMap[normalized] || normalized;
   };
 
@@ -100,7 +100,7 @@ export default function UsersTable() {
       await navigator.clipboard.writeText(text);
       setCopiedAddress(text);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      console.error("Failed to copy:", err);
     }
   };
 
@@ -210,7 +210,9 @@ export default function UsersTable() {
                             {truncateAddress(user.walletAddress)}
                           </span>
                           <button
-                            onClick={(e) => copyToClipboard(user.walletAddress!, e)}
+                            onClick={(e) =>
+                              copyToClipboard(user.walletAddress!, e)
+                            }
                             className="p-1 hover:bg-gray-100 rounded transition-colors"
                             title="Copy address"
                           >
@@ -260,42 +262,79 @@ export default function UsersTable() {
                             {user.referredBy.username}
                           </span>
                           <span className="text-xs text-gray-400">
-                            {new Date(user.createdAt).toLocaleString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {new Date(user.createdAt).toLocaleString(
+                              undefined,
+                              {
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
                           </span>
                         </div>
                       ) : (
                         "-"
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
-                      {user.referralCodeUsed || "-"}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      {user.referralCodeUsed ? (
+                        <div className="flex items-center gap-1">
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(
+                                `/referrals?code=${encodeURIComponent(
+                                  user.referralCodeUsed!
+                                )}`
+                              );
+                            }}
+                            className="font-mono text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                          >
+                            {user.referralCodeUsed}
+                          </span>
+                          <button
+                            onClick={(e) =>
+                              copyToClipboard(user.referralCodeUsed!, e)
+                            }
+                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            title="Copy referral code"
+                          >
+                            {copiedAddress === user.referralCodeUsed ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.country || "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.lastActivityTimestamp
-                        ? new Date(user.lastActivityTimestamp).toLocaleString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                        ? new Date(user.lastActivityTimestamp).toLocaleString(
+                            undefined,
+                            {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )
                         : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
                       })}
                     </td>
                   </tr>
