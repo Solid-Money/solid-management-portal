@@ -15,11 +15,12 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
 
 export default function UsersTable() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [filters, setFilters] = useState<UserFilters>({
     search: "",
     sort: "createdAt",
@@ -28,6 +29,14 @@ export default function UsersTable() {
     limit: 10,
   });
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  // Prefill search from URL query param
+  useEffect(() => {
+    const searchFromUrl = searchParams.get("search");
+    if (searchFromUrl) {
+      setFilters((prev) => ({ ...prev, search: searchFromUrl, page: 1 }));
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (copiedAddress) {
@@ -284,7 +293,7 @@ export default function UsersTable() {
                             onClick={(e) => {
                               e.stopPropagation();
                               router.push(
-                                `/referrals?code=${encodeURIComponent(
+                                `/users?search=${encodeURIComponent(
                                   user.referralCodeUsed!
                                 )}`
                               );

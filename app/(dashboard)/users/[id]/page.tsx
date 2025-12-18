@@ -133,7 +133,7 @@ export default function UserDetailPage({
               <dd className="mt-1 text-sm sm:mt-0 sm:col-span-2">
                 {user.referralCodeUsed ? (
                   <Link
-                    href={`/referrals?code=${encodeURIComponent(
+                    href={`/users?search=${encodeURIComponent(
                       user.referralCodeUsed
                     )}`}
                     className="font-mono text-indigo-600 hover:text-indigo-800 hover:underline"
