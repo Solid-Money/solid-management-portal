@@ -131,6 +131,8 @@ export const ACTIVITY_TYPES = [
   { value: "unwrap", label: "Unwrap" },
   { value: "merkl_claim", label: "Merkl Claim" },
   { value: "card_welcome_bonus", label: "Card Welcome Bonus" },
+  { value: "deposit_bonus", label: "Deposit Bonus" },
+  { value: "bridge_transfer", label: "Bridge Transfer" },
 ] as const;
 
 export const DEPOSIT_TYPES = [
