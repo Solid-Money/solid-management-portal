@@ -210,6 +210,10 @@ export interface CardTransaction {
   merchantCategoryCode: string;
   transactionDescription: string;
   cashback?: CardTransactionCashback;
+  user?: {
+    _id: string;
+    username: string;
+  };
 }
 
 export interface CardTransactionsResponse {

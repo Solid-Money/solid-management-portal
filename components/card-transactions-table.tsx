@@ -20,6 +20,7 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 
 export default function CardTransactionsTable() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -198,6 +199,9 @@ export default function CardTransactionsTable() {
                 </div>
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Username
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Merchant
               </th>
               <th
@@ -232,13 +236,13 @@ export default function CardTransactionsTable() {
           <tbody className="bg-white divide-y divide-gray-200">
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center">
+                <td colSpan={8} className="px-4 py-8 text-center">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto text-indigo-600" />
                 </td>
               </tr>
             ) : data?.data.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                   No card transactions found
                 </td>
               </tr>
@@ -250,6 +254,18 @@ export default function CardTransactionsTable() {
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                     {formatDate(tx.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    {tx.user ? (
+                      <Link
+                        href={`/users/${tx.user._id}`}
+                        className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+                      >
+                        {tx.user.username}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     <div className="font-medium">
