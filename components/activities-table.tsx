@@ -21,6 +21,11 @@ import {
   Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 const TRANSACTION_DETAILS: Record<
   string,
@@ -195,6 +200,31 @@ export default function ActivitiesTable() {
     "Date",
   ];
 
+  const showDepositColumns =
+    filters.type === "deposit" || filters.type === "bridge_deposit";
+
+  const baseHeaders = [
+    "Type",
+    "Title",
+    "Tx Type",
+    "Amount",
+    "Symbol",
+    "Status",
+    "User",
+    "Chain",
+    "Hash",
+    "From",
+    "To",
+  ];
+
+  const depositHeaders = ["Deposit Type", "Failure Reason", "Sponsored Gas Fee"];
+
+  const tableHeaders = showDepositColumns
+    ? [...baseHeaders, ...depositHeaders, "Date"]
+    : [...baseHeaders, "Date"];
+
+  const columnCount = tableHeaders.length;
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -245,23 +275,7 @@ export default function ActivitiesTable() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {[
-                  "Type",
-                  "Title",
-                  "Tx Type",
-                  "Amount",
-                  "Symbol",
-                  "Status",
-                  "User",
-                  "Chain",
-                  "Hash",
-                  "From",
-                  "To",
-                  "Deposit Type",
-                  "Failure Reason",
-                  "Sponsored Gas Fee",
-                  "Date",
-                ].map((header) => {
+                {tableHeaders.map((header) => {
                   const sortField = getSortField(header);
                   const isSortable = sortableHeaders.includes(header);
                   const isActive = filters.sort === sortField;
@@ -301,14 +315,14 @@ export default function ActivitiesTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={14} className="px-4 py-4 text-center">
+                  <td colSpan={columnCount} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={14}
+                    colSpan={columnCount}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     No activities found
@@ -439,35 +453,82 @@ export default function ActivitiesTable() {
                         "-"
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {(activity.type === "deposit" ||
-                        activity.type === "bridge" ||
-                        activity.type === "bridge_deposit") &&
-                      activity.depositType ? (
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            activity.depositType === "DIRECT"
-                              ? "bg-purple-100 text-purple-800"
-                              : "bg-blue-100 text-blue-800"
-                          }`}
-                        >
-                          {activity.depositType}
-                        </span>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                      {activity.status === "failed" &&
-                      (activity.type === "deposit" ||
-                        activity.type === "bridge" ||
-                        activity.type === "bridge_deposit")
-                        ? activity.failureReason || "-"
-                        : "-"}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {activity.totalFeeUSD ? `$${activity.totalFeeUSD}` : "-"}
-                    </td>
+                    {showDepositColumns && (
+                      <>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {(activity.type === "deposit" ||
+                            activity.type === "bridge" ||
+                            activity.type === "bridge_deposit") &&
+                          activity.depositType ? (
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                activity.depositType === "DIRECT"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {activity.depositType}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
+                          {activity.status === "failed" &&
+                          (activity.type === "deposit" ||
+                            activity.type === "bridge" ||
+                            activity.type === "bridge_deposit")
+                            ? activity.failureReason || "-"
+                            : "-"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {activity.totalFeeUSD ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help underline decoration-dotted underline-offset-2">
+                                  ${activity.totalFeeUSD}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-gray-900 text-white p-3 space-y-1">
+                                <div className="font-semibold mb-2">Fee Breakdown:</div>
+                                {activity.permitTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Permit: ${activity.permitTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.transferTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Transfer: ${activity.transferTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.approvalTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Approval: ${activity.approvalTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.bridgeTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Bridge: ${activity.bridgeTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.bridgeTxSendingAssetFeeUSD && (
+                                  <div className="text-xs">
+                                    Bridge Sending Asset: ${activity.bridgeTxSendingAssetFeeUSD}
+                                  </div>
+                                )}
+                                {activity.depositTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Deposit: ${activity.depositTxFeeUSD}
+                                  </div>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                      </>
+                    )}
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {(() => {
                         const timestamp = activity.timestamp
