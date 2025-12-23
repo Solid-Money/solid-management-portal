@@ -21,6 +21,11 @@ import {
   Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 const TRANSACTION_DETAILS: Record<
   string,
@@ -477,7 +482,50 @@ export default function ActivitiesTable() {
                             : "-"}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {activity.totalFeeUSD ? `$${activity.totalFeeUSD}` : "-"}
+                          {activity.totalFeeUSD ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help underline decoration-dotted underline-offset-2">
+                                  ${activity.totalFeeUSD}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-gray-900 text-white p-3 space-y-1">
+                                <div className="font-semibold mb-2">Fee Breakdown:</div>
+                                {activity.permitTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Permit: ${activity.permitTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.transferTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Transfer: ${activity.transferTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.approvalTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Approval: ${activity.approvalTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.bridgeTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Bridge: ${activity.bridgeTxFeeUSD}
+                                  </div>
+                                )}
+                                {activity.bridgeTxSendingAssetFeeUSD && (
+                                  <div className="text-xs">
+                                    Bridge Sending Asset: ${activity.bridgeTxSendingAssetFeeUSD}
+                                  </div>
+                                )}
+                                {activity.depositTxFeeUSD && (
+                                  <div className="text-xs">
+                                    Deposit: ${activity.depositTxFeeUSD}
+                                  </div>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            "-"
+                          )}
                         </td>
                       </>
                     )}
