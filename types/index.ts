@@ -89,6 +89,13 @@ export interface AdminActivity {
     username: string;
   };
   depositType?: "REGULAR" | "DIRECT" | null;
+  totalFeeUSD?: string;
+  permitTxFeeUSD?: string;
+  transferTxFeeUSD?: string;
+  approvalTxFeeUSD?: string;
+  bridgeTxFeeUSD?: string;
+  bridgeTxSendingAssetFeeUSD?: string;
+  depositTxFeeUSD?: string;
   createdAt: string;
   timestamp?: string;
 }
