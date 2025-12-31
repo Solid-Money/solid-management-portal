@@ -4,7 +4,7 @@ import React from "react";
 import { Activity, TRANSACTION_DETAILS, TransactionStatus, TransactionDirection, TransactionType } from "@/types";
 import { cn, formatNumber } from "@/lib/utils";
 import { TokenIcon } from "./token-icon";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 
 interface ActivityItemProps {
   activity: Activity;
@@ -116,6 +116,9 @@ export const ActivityItem = ({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {isPending || isProcessing ? (
+              <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+            ) : null}
             <span className="text-sm text-gray-400 font-medium">
               {description}
             </span>

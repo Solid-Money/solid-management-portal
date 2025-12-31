@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Activity } from "@/types";
 import { groupTransactionsByTime, ActivityGroup, TimeGroupHeaderData, cn } from "@/lib/utils";
 import { ActivityItem } from "./activity/activity-item";
 import { ActivityGroupHeader } from "./activity/activity-group-header";
-import { RefreshCcw, Filter } from "lucide-react";
+import { Filter, ChevronDown, Check } from "lucide-react";
 
 export default function ActivityList({
   activities,
@@ -13,6 +13,19 @@ export default function ActivityList({
   activities: Activity[];
 }) {
   const [showStuck, setShowStuck] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const groupedActivities = useMemo(() => {
     // Sort activities descending (newest first) before grouping
@@ -30,21 +43,65 @@ export default function ActivityList({
         <h3 className="text-lg leading-6 font-semibold text-gray-900">
           Recent Activity
         </h3>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowStuck(!showStuck)}
-            className={cn(
-              "p-2 rounded-lg transition-colors border",
-              showStuck 
-                ? "bg-indigo-50 border-indigo-200 text-indigo-600" 
-                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+        <div className="flex items-center gap-3">
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shadow-sm",
+                showStuck
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                  : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+              )}
+            >
+              <Filter
+                className={cn(
+                  "h-3.5 w-3.5",
+                  showStuck ? "text-indigo-500" : "text-gray-400"
+                )}
+              />
+              {showStuck ? "All Activity (Admin)" : "Clean (User View)"}
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isDropdownOpen && "rotate-180")} />
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white border border-gray-100 shadow-xl z-50 py-1 overflow-hidden animate-in fade-in-0 zoom-in-95 origin-top-right">
+                <div className="px-3 py-2 border-b border-gray-50 mb-1">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                    Display Settings
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowStuck(false);
+                    setIsDropdownOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50",
+                    !showStuck ? "text-indigo-600" : "text-gray-600"
+                  )}
+                >
+                  <span>Clean (User View)</span>
+                  {!showStuck && <Check className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowStuck(true);
+                    setIsDropdownOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50",
+                    showStuck ? "text-indigo-600" : "text-gray-600"
+                  )}
+                >
+                  <span>All Activity (Admin)</span>
+                  {showStuck && <Check className="h-3.5 w-3.5" />}
+                </button>
+              </div>
             )}
-            title={showStuck ? "Showing all" : "Showing user view"}
-          >
-            <Filter className="h-4 w-4" />
-          </button>
-          <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-            {activities.length} transactions
+          </div>
+          <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full whitespace-nowrap">
+            {activities.length} total
           </span>
         </div>
       </div>
