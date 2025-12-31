@@ -39,7 +39,9 @@ export default function UserDetailPage({
   }>({
     queryKey: ["user-activity", id],
     queryFn: async () => {
-      const res = await api.get(`/admin/v1/users/${id}/activity`);
+      const res = await api.get(`/admin/v1/users/${id}/activity`, {
+        params: { limit: 100 },
+      });
       return res.data;
     },
   });
@@ -57,8 +59,8 @@ export default function UserDetailPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-4">
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
+      <div className="flex items-center space-x-4 mb-6">
         <Link href="/users" className="text-gray-500 hover:text-gray-700">
           <ArrowLeft className="h-6 w-6" />
         </Link>
@@ -76,97 +78,93 @@ export default function UserDetailPage({
         </span>
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            User Details
-          </h3>
-        </div>
-        <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
-          <dl className="sm:divide-y sm:divide-gray-200">
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Email</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {user.email}
-              </dd>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
+        <div className="lg:col-span-5 space-y-6 overflow-y-auto pr-2">
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden sm:rounded-xl">
+            <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
+              <h3 className="text-base leading-6 font-semibold text-gray-900">
+                User Details
+              </h3>
             </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">
-                Wallet Address
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
-                {user.walletAddress || "-"}
-              </dd>
+            <div className="px-4 py-4">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">Email</dt>
+                  <dd className="mt-1 text-sm text-gray-900 truncate">
+                    {user.email}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    Wallet Address
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-900 font-mono truncate">
+                    {user.walletAddress || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase">Joined</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {new Date(user.createdAt).toLocaleDateString()}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase">Country</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {user.country || "-"}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    Safe Address
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-900 font-mono truncate">
+                    {user.safeAddress || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    Referral Code
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-900 font-mono">
+                    {user.referralCode || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    Code Used
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-900 font-mono">
+                    {user.referralCodeUsed || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    Referred By
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-900 truncate">
+                    {user.referredBy ? (
+                      <Link
+                        href={`/users/${user.referredBy.id}`}
+                        className="text-indigo-600 hover:text-indigo-800 hover:underline"
+                      >
+                        {user.referredBy.username}
+                      </Link>
+                    ) : (
+                      "-"
+                    )}
+                  </dd>
+                </div>
+              </dl>
             </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Joined</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {new Date(user.createdAt).toLocaleString()}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Country</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {user.country || "-"}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">
-                Safe Address
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
-                {user.safeAddress || "-"}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">
-                Referral Code
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
-                {user.referralCode || "-"}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">
-                Referral Code Used
-              </dt>
-              <dd className="mt-1 text-sm sm:mt-0 sm:col-span-2">
-                {user.referralCodeUsed ? (
-                  <Link
-                    href={`/users?search=${encodeURIComponent(
-                      user.referralCodeUsed
-                    )}`}
-                    className="font-mono text-indigo-600 hover:text-indigo-800 hover:underline"
-                  >
-                    {user.referralCodeUsed}
-                  </Link>
-                ) : (
-                  <span className="text-gray-900">-</span>
-                )}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Referred By</dt>
-              <dd className="mt-1 text-sm sm:mt-0 sm:col-span-2">
-                {user.referredBy ? (
-                  <Link
-                    href={`/users/${user.referredBy.id}`}
-                    className="text-indigo-600 hover:text-indigo-800 hover:underline"
-                  >
-                    {user.referredBy.username}
-                  </Link>
-                ) : (
-                  <span className="text-gray-900">-</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <BalancesCard balances={balances?.data || []} />
-        <ActivityList activities={activity?.docs || []} />
+          <BalancesCard balances={balances?.data || []} />
+        </div>
+
+        <div className="lg:col-span-7 h-full min-h-0">
+          <ActivityList activities={activity?.docs || []} />
+        </div>
       </div>
     </div>
   );

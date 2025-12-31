@@ -110,6 +110,148 @@ export interface AdminActivitiesResponse {
   };
 }
 
+export enum TransactionType {
+  DEPOSIT = "deposit",
+  UNSTAKE = "unstake",
+  WITHDRAW = "withdraw",
+  SEND = "send",
+  RECEIVE = "receive",
+  BRIDGE = "bridge",
+  CANCEL_WITHDRAW = "cancel_withdraw",
+  BRIDGE_DEPOSIT = "bridge_deposit",
+  BRIDGE_TRANSFER = "bridge_transfer",
+  BANK_TRANSFER = "bank_transfer",
+  CARD_TRANSACTION = "card_transaction",
+  MERCURYO_TRANSACTION = "mercuryo_transaction",
+  SWAP = "swap",
+  WRAP = "wrap",
+  UNWRAP = "unwrap",
+  MERKL_CLAIM = "merkl_claim",
+  CARD_WELCOME_BONUS = "card_welcome_bonus",
+  DEPOSIT_BONUS = "deposit_bonus",
+  FAST_WITHDRAW = "fast_withdraw",
+}
+
+export enum TransactionStatus {
+  PENDING = "pending",
+  PROCESSING = "processing",
+  SUCCESS = "success",
+  FAILED = "failed",
+  CANCELLED = "cancelled",
+  EXPIRED = "expired",
+  REFUNDED = "refunded",
+}
+
+export enum TransactionDirection {
+  IN = "+",
+  OUT = "-",
+  FAILED = "✕",
+  CANCELLED = "⊘",
+}
+
+export enum TransactionCategory {
+  SAVINGS_ACCOUNT = "Savings account",
+  FAST_WITHDRAW = "Fast withdraw",
+  WALLET_TRANSFER = "Wallet transfer",
+  EXTERNAL_WALLET_TRANSFER = "External wallet transfer",
+  BANK_DEPOSIT = "Bank deposit",
+  CARD_DEPOSIT = "Card deposit",
+  REWARD = "Reward",
+  SEND = "Send",
+  SWAP = "Swap",
+  WRAP = "Wrap",
+  UNWRAP = "Unwrap",
+  MERKL_CLAIM = "Merkl claim",
+  CARD_WELCOME_BONUS = "Card welcome bonus",
+  DEPOSIT_BONUS = "Deposit bonus",
+  RECEIVE = "Receive",
+}
+
+export interface TransactionDetails {
+  sign: TransactionDirection;
+  category: TransactionCategory;
+}
+
+export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
+  {
+    [TransactionType.DEPOSIT]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.UNSTAKE]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.WITHDRAW]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.SEND]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.WALLET_TRANSFER,
+    },
+    [TransactionType.RECEIVE]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.RECEIVE,
+    },
+    [TransactionType.BRIDGE]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.EXTERNAL_WALLET_TRANSFER,
+    },
+    [TransactionType.CANCEL_WITHDRAW]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.BRIDGE_DEPOSIT]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.EXTERNAL_WALLET_TRANSFER,
+    },
+    [TransactionType.BRIDGE_TRANSFER]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.BANK_DEPOSIT,
+    },
+    [TransactionType.BANK_TRANSFER]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.BANK_DEPOSIT,
+    },
+    [TransactionType.CARD_TRANSACTION]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.CARD_DEPOSIT,
+    },
+    [TransactionType.MERCURYO_TRANSACTION]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.BANK_DEPOSIT,
+    },
+    [TransactionType.SWAP]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.SWAP,
+    },
+    [TransactionType.WRAP]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.SWAP,
+    },
+    [TransactionType.UNWRAP]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.SWAP,
+    },
+    [TransactionType.MERKL_CLAIM]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.REWARD,
+    },
+    [TransactionType.CARD_WELCOME_BONUS]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.REWARD,
+    },
+    [TransactionType.DEPOSIT_BONUS]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.REWARD,
+    },
+    [TransactionType.FAST_WITHDRAW]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+  };
+
 export interface ActivityFilters {
   type: string;
   depositType: string;
