@@ -9,6 +9,8 @@ import {
   ACTIVITY_TYPES,
   DEPOSIT_TYPES,
   ACTIVITY_STATUSES,
+  TRANSACTION_DETAILS,
+  TransactionType,
 } from "@/types";
 import {
   ChevronLeft,
@@ -21,29 +23,6 @@ import {
   Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-const TRANSACTION_DETAILS: Record<
-  string,
-  { sign: "+" | "-" | "✕" | "⊘"; category: string }
-> = {
-  deposit: { sign: "+", category: "Savings account" },
-  unstake: { sign: "-", category: "Savings account" },
-  withdraw: { sign: "-", category: "Savings account" },
-  send: { sign: "-", category: "Wallet transfer" },
-  bridge: { sign: "-", category: "External wallet transfer" },
-  cancel_withdraw: { sign: "-", category: "Savings account" },
-  bridge_deposit: { sign: "-", category: "External wallet transfer" },
-  bridge_transfer: { sign: "+", category: "Bank deposit" },
-  bank_transfer: { sign: "+", category: "Bank deposit" },
-  card_transaction: { sign: "-", category: "Card deposit" },
-  mercuryo_transaction: { sign: "+", category: "Bank deposit" },
-  swap: { sign: "+", category: "Wallet transfer" },
-  wrap: { sign: "+", category: "Wallet transfer" },
-  unwrap: { sign: "+", category: "Wallet transfer" },
-  merkl_claim: { sign: "+", category: "Reward" },
-  card_welcome_bonus: { sign: "+", category: "Reward" },
-  deposit_bonus: { sign: "+", category: "Reward" },
-};
 
 export default function ActivitiesTable() {
   const router = useRouter();
@@ -167,7 +146,8 @@ export default function ActivitiesTable() {
     return typeObj?.label || type;
   };
 
-  const getTransactionDetails = (type: string) => TRANSACTION_DETAILS[type];
+  const getTransactionDetails = (type: string) =>
+    TRANSACTION_DETAILS[type as TransactionType];
 
   const getChainName = (chainId?: number) => {
     if (!chainId) return "-";

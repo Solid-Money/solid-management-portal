@@ -1,62 +1,102 @@
 "use client";
 
+import React, { useMemo, useState } from "react";
 import { Activity } from "@/types";
+import { groupTransactionsByTime, ActivityGroup, TimeGroupHeaderData, cn } from "@/lib/utils";
+import { ActivityItem } from "./activity/activity-item";
+import { ActivityGroupHeader } from "./activity/activity-group-header";
+import { RefreshCcw, Filter } from "lucide-react";
 
 export default function ActivityList({
   activities,
 }: {
   activities: Activity[];
 }) {
+  const [showStuck, setShowStuck] = useState(false);
+
+  const groupedActivities = useMemo(() => {
+    // Sort activities descending (newest first) before grouping
+    const sorted = [...activities].sort((a, b) => {
+      const timeA = a.timestamp ? parseInt(a.timestamp) * 1000 : new Date(a.createdAt).getTime();
+      const timeB = b.timestamp ? parseInt(b.timestamp) * 1000 : new Date(b.createdAt).getTime();
+      return timeB - timeA;
+    });
+    return groupTransactionsByTime(sorted, showStuck);
+  }, [activities, showStuck]);
+
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-      <div className="px-4 py-5 sm:px-6">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">
+    <div className="bg-white shadow-sm overflow-hidden sm:rounded-xl border border-gray-100 h-full flex flex-col">
+      <div className="px-4 py-5 sm:px-6 flex justify-between items-center bg-gray-50/50 shrink-0">
+        <h3 className="text-lg leading-6 font-semibold text-gray-900">
           Recent Activity
         </h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowStuck(!showStuck)}
+            className={cn(
+              "p-2 rounded-lg transition-colors border",
+              showStuck 
+                ? "bg-indigo-50 border-indigo-200 text-indigo-600" 
+                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+            )}
+            title={showStuck ? "Showing all" : "Showing user view"}
+          >
+            <Filter className="h-4 w-4" />
+          </button>
+          <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+            {activities.length} transactions
+          </span>
+        </div>
       </div>
-      <div className="border-t border-gray-200">
+      <div className="border-t border-gray-100 overflow-y-auto flex-1">
         {activities.length === 0 ? (
-          <div className="p-4 text-gray-500 text-center">No activity found</div>
+          <div className="p-12 text-gray-400 text-center flex flex-col items-center gap-2">
+            <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center">
+              <span className="text-2xl">📁</span>
+            </div>
+            <p className="text-sm font-medium">No activity found for this user</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-gray-200">
-            {activities.map((activity) => (
-              <li key={activity.id} className="px-4 py-4 sm:px-6">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-indigo-600 truncate">
-                    {activity.shortTitle || activity.title || activity.type}
-                  </div>
-                  <div className="ml-2 flex-shrink-0 flex">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        activity.status === "success"
-                          ? "bg-green-100 text-green-800"
-                          : activity.status === "failed"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {activity.amount} {activity.symbol}
-                    </span>
-                  </div>
+          <div className="flex flex-col">
+            {groupedActivities.map((group, index) => {
+              if (group.type === ActivityGroup.HEADER) {
+                const headerData = group.data as TimeGroupHeaderData;
+                return (
+                  <ActivityGroupHeader
+                    key={headerData.key}
+                    title={headerData.title}
+                    isPending={headerData.status === "pending"}
+                  />
+                );
+              }
+
+              const activity = group.data as Activity;
+              
+              // Determine if this is the first or last in its visual group (between headers)
+              let isFirstInGroup = false;
+              let isLastInGroup = false;
+
+              // Check if previous item was a header or if it's the first item overall
+              if (index === 0 || groupedActivities[index - 1].type === ActivityGroup.HEADER) {
+                isFirstInGroup = true;
+              }
+
+              // Check if next item is a header or if it's the last item overall
+              if (index === groupedActivities.length - 1 || groupedActivities[index + 1].type === ActivityGroup.HEADER) {
+                isLastInGroup = true;
+              }
+
+              return (
+                <div key={activity.id || activity._id} className="px-4 py-1">
+                  <ActivityItem
+                    activity={activity}
+                    isFirst={isFirstInGroup}
+                    isLast={isLastInGroup}
+                  />
                 </div>
-                <div className="mt-2 sm:flex sm:justify-between">
-                  <div className="sm:flex">
-                    <p className="flex items-center text-sm text-gray-500">
-                      {activity.type.replace(/_/g, " ")}
-                      {activity.hash && (
-                        <span className="ml-2 text-xs font-mono text-gray-400">
-                          {activity.hash.slice(0, 10)}...
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                    <p>{new Date(activity.createdAt).toLocaleString()}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

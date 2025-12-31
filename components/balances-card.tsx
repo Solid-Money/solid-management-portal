@@ -5,46 +5,54 @@ import { Wallet, CreditCard, PiggyBank } from "lucide-react";
 
 export default function BalancesCard({ balances }: { balances: Balance[] }) {
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-      <div className="px-4 py-5 sm:px-6">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">
+    <div className="bg-white shadow-sm border border-gray-100 overflow-hidden sm:rounded-xl">
+      <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
+        <h3 className="text-base leading-6 font-semibold text-gray-900">
           Balances
         </h3>
       </div>
-      <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
+      <div className="px-4 py-4">
         {balances.length === 0 ? (
-          <div className="p-4 text-gray-500 text-center">No balances found</div>
+          <div className="p-4 text-gray-400 text-center text-sm">No balances found</div>
         ) : (
-          <dl className="sm:divide-y sm:divide-gray-200">
+          <div className="space-y-4">
             {balances.map((balance, index) => (
               <div
                 key={index}
-                className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6"
+                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
               >
-                <dt className="text-sm font-medium text-gray-500 flex items-center">
-                  {balance.accountType === "savings" ? (
-                    <PiggyBank className="h-5 w-5 mr-2 text-green-500" />
-                  ) : balance.accountType === "card" ? (
-                    <CreditCard className="h-5 w-5 mr-2 text-blue-500" />
-                  ) : (
-                    <Wallet className="h-5 w-5 mr-2 text-gray-500" />
-                  )}
-                  {balance.currency}{" "}
-                  {balance.accountType ? `(${balance.accountType})` : ""}
-                </dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                  <div className="flex justify-between">
-                    <span>Total: {balance.total}</span>
-                    {balance.accountType === "card" && (
-                      <span className="text-gray-500 text-xs">
-                        (Avail: {balance.available}, Pend: {balance.pending})
-                      </span>
+                <div className="flex items-center">
+                  <div className="p-2 rounded-full bg-white shadow-sm mr-3">
+                    {balance.accountType === "savings" ? (
+                      <PiggyBank className="h-5 w-5 text-emerald-500" />
+                    ) : balance.accountType === "card" ? (
+                      <CreditCard className="h-5 w-5 text-blue-500" />
+                    ) : (
+                      <Wallet className="h-5 w-5 text-gray-500" />
                     )}
                   </div>
-                </dd>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {balance.currency}
+                    </p>
+                    <p className="text-xs text-gray-500 capitalize">
+                      {balance.accountType || "Wallet"}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-900">
+                    {balance.total} {balance.currency}
+                  </p>
+                  {balance.accountType === "card" && (
+                    <p className="text-[10px] text-gray-500">
+                      Avail: {balance.available} | Pend: {balance.pending}
+                    </p>
+                  )}
+                </div>
               </div>
             ))}
-          </dl>
+          </div>
         )}
       </div>
     </div>
