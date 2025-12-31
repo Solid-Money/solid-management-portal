@@ -137,10 +137,16 @@ export const ActivityItem = ({
         )}
       </div>
 
-      <div className="flex flex-col items-end gap-1 ml-4">
+      <div className="flex flex-col items-end gap-1 ml-4 shrink-0">
         <span className={cn("text-base font-semibold", statusTextColor)}>
-          {statusSign}
-          {formatNumber(parseFloat(amount), 2)} {symbol}
+          {(isExpired || isFailed || isRefunded) && (!amount || parseFloat(amount) === 0) ? (
+            <span className="capitalize">{status}</span>
+          ) : (
+            <>
+              {statusSign}
+              {formatNumber(parseFloat(amount || "0"), 2)} {symbol}
+            </>
+          )}
         </span>
         {hash && (
           <span className="text-[10px] font-mono text-gray-600 truncate max-w-[100px]">

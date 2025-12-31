@@ -85,15 +85,13 @@ export const groupTransactionsByTime = (
         const isPending = tx.status === TransactionStatus.PENDING;
         const isCancelled = tx.status === TransactionStatus.CANCELLED;
         const isFailed = tx.status === TransactionStatus.FAILED;
-        const isExpired = tx.status === TransactionStatus.EXPIRED;
         const isStuck = isTransactionStuck(tx.timestamp || "");
         
         // Hide stuck pending or cancelled
         if ((isPending && isStuck) || isCancelled) return false;
 
-        // Hide failed/expired with 0 amount (abandoned attempts)
-        const hasNoAmount = !tx.amount || tx.amount === "0" || parseFloat(tx.amount) === 0;
-        if ((isFailed || isExpired) && hasNoAmount) return false;
+        // Match app's specific filter: hide FAILED records that were actually just expired sessions
+        if (isFailed && tx.metadata?.reason === "expired") return false;
 
         return true;
       });
