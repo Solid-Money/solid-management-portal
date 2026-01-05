@@ -5,6 +5,7 @@ import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { validateUserDomain, getAllowedDomain } from '@/lib/auth';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[AuthProvider] Signing out unauthorized user');
           await signOut(auth);
           setUser(null);
-          alert(
+          toast.error(
             `Access denied. Only @${getAllowedDomain()} accounts are allowed.`
           );
           routerRef.current.push('/login');

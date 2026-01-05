@@ -330,7 +330,7 @@ export default function CardTransactionsTable() {
                       </span>
                       <button
                         onClick={(e) => copyToClipboard(tx.transactionId, e)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-gray-400 hover:text-gray-600 cursor-pointer"
                       >
                         {copiedId === tx.transactionId ? (
                           <Check className="h-3 w-3 text-green-500" />

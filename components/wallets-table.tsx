@@ -12,9 +12,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function WalletsTable() {
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [expandedWallets, setExpandedWallets] = useState<Set<string>>(
     new Set()
   );
@@ -28,11 +28,15 @@ export default function WalletsTable() {
     refetchInterval: 60000, // Refetch every minute
   });
 
-  const copyToClipboard = (text: string, e: React.MouseEvent) => {
+  const copyToClipboard = async (text: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopiedAddress(text);
-    setTimeout(() => setCopiedAddress(null), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard");
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      toast.error("Failed to copy");
+    }
   };
 
   const truncateAddress = (address: string): string => {
@@ -229,13 +233,9 @@ export default function WalletsTable() {
               </code>
               <button
                 onClick={(e) => copyToClipboard(chain.usdcAddress, e)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 cursor-pointer"
               >
-                {copiedAddress === chain.usdcAddress ? (
-                  <Check className="h-3 w-3 text-green-600" />
-                ) : (
                   <Copy className="h-3 w-3" />
-                )}
               </button>
             </div>
           )}
@@ -382,13 +382,9 @@ export default function WalletsTable() {
                         </code>
                         <button
                           onClick={(e) => copyToClipboard(wallet.address, e)}
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-gray-400 hover:text-gray-600 cursor-pointer"
                         >
-                          {copiedAddress === wallet.address ? (
-                            <Check className="h-4 w-4 text-green-600" />
-                          ) : (
                             <Copy className="h-4 w-4" />
-                          )}
                         </button>
                       </div>
                     </div>

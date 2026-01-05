@@ -7,24 +7,40 @@ import {
   Activity,
   Wallet,
   CreditCard,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import ConfirmationModal from "@/components/ui/confirmation-modal";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
+  const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
 
   const handleSignOut = async () => {
-    if (confirm("Are you sure you want to sign out?")) {
+    setIsSignOutModalOpen(false);
       await signOut();
-    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will be redirected by AuthProvider
+  }
 
   const navItems = [
     { href: "/users", label: "Users", icon: Users },
@@ -35,6 +51,7 @@ export default function DashboardLayout({
       icon: CreditCard,
     },
     { href: "/wallets", label: "Wallets", icon: Wallet },
+    { href: "/whats-new", label: "What's New", icon: Sparkles },
   ];
 
   return (
@@ -74,8 +91,8 @@ export default function DashboardLayout({
                 {user?.email}
               </div>
               <button
-                onClick={handleSignOut}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                onClick={() => setIsSignOutModalOpen(true)}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors cursor-pointer"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
@@ -86,6 +103,15 @@ export default function DashboardLayout({
       </nav>
 
       <main className="mx-auto py-6 px-4 sm:px-6 lg:px-8">{children}</main>
+
+      <ConfirmationModal
+        isOpen={isSignOutModalOpen}
+        title="Sign Out"
+        message="Are you sure you want to sign out?"
+        confirmText="Sign Out"
+        onConfirm={handleSignOut}
+        onCancel={() => setIsSignOutModalOpen(false)}
+      />
     </div>
   );
 }

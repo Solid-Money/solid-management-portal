@@ -48,7 +48,7 @@ export default function ActivityList({
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shadow-sm",
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shadow-sm cursor-pointer",
                 showStuck
                   ? "bg-indigo-50 border-indigo-200 text-indigo-700"
                   : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
@@ -77,7 +77,7 @@ export default function ActivityList({
                     setIsDropdownOpen(false);
                   }}
                   className={cn(
-                    "w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50",
+                    "w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50 cursor-pointer",
                     !showStuck ? "text-indigo-600" : "text-gray-600"
                   )}
                 >
@@ -90,7 +90,7 @@ export default function ActivityList({
                     setIsDropdownOpen(false);
                   }}
                   className={cn(
-                    "w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50",
+                    "w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50 cursor-pointer",
                     showStuck ? "text-indigo-600" : "text-gray-600"
                   )}
                 >

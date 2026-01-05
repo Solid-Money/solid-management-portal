@@ -23,6 +23,7 @@ import {
   Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Tooltip,
   TooltipTrigger,
@@ -40,14 +41,6 @@ export default function ActivitiesTable() {
     page: 1,
     limit: 20,
   });
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (copiedAddress) {
-      const timer = setTimeout(() => setCopiedAddress(null), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [copiedAddress]);
 
   const { data, isLoading, isError } = useQuery<AdminActivitiesResponse>({
     queryKey: ["activities", filters],
@@ -119,9 +112,10 @@ export default function ActivitiesTable() {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedAddress(text);
+      toast.success("Copied to clipboard");
     } catch (err) {
       console.error("Failed to copy:", err);
+      toast.error("Failed to copy");
     }
   };
 
@@ -371,14 +365,10 @@ export default function ActivitiesTable() {
                           </span>
                           <button
                             onClick={(e) => copyToClipboard(activity.hash!, e)}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy hash"
                           >
-                            {copiedAddress === activity.hash ? (
-                              <Check className="h-3 w-3 text-green-500" />
-                            ) : (
                               <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
-                            )}
                           </button>
                         </div>
                       ) : (
@@ -395,14 +385,10 @@ export default function ActivitiesTable() {
                             onClick={(e) =>
                               copyToClipboard(activity.fromAddress!, e)
                             }
-                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy address"
                           >
-                            {copiedAddress === activity.fromAddress ? (
-                              <Check className="h-3 w-3 text-green-500" />
-                            ) : (
                               <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
-                            )}
                           </button>
                         </div>
                       ) : (
@@ -419,14 +405,10 @@ export default function ActivitiesTable() {
                             onClick={(e) =>
                               copyToClipboard(activity.toAddress!, e)
                             }
-                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy address"
                           >
-                            {copiedAddress === activity.toAddress ? (
-                              <Check className="h-3 w-3 text-green-500" />
-                            ) : (
                               <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
-                            )}
                           </button>
                         </div>
                       ) : (
@@ -563,7 +545,7 @@ export default function ActivitiesTable() {
                   <button
                     onClick={() => handlePageChange(filters.page - 1)}
                     disabled={filters.page === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">Previous</span>
                     <ChevronLeft className="h-5 w-5" aria-hidden="true" />
@@ -571,7 +553,7 @@ export default function ActivitiesTable() {
                   <button
                     onClick={() => handlePageChange(filters.page + 1)}
                     disabled={filters.page >= data.meta.totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">Next</span>
                     <ChevronRight className="h-5 w-5" aria-hidden="true" />
@@ -582,14 +564,6 @@ export default function ActivitiesTable() {
           </div>
         )}
       </div>
-
-      {/* Toast notification */}
-      {copiedAddress && (
-        <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
-          <Check className="h-4 w-4 text-green-400" />
-          <span className="text-sm">Copied to clipboard</span>
-        </div>
-      )}
     </div>
   );
 }

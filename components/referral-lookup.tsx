@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
+import { toast } from "sonner";
 
 export default function ReferralLookup() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [referralCode, setReferralCode] = useState("");
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
   // Prefill from URL query param
   useEffect(() => {
@@ -57,10 +57,10 @@ export default function ReferralLookup() {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedAddress(text);
-      setTimeout(() => setCopiedAddress(null), 2000);
+      toast.success("Copied to clipboard");
     } catch (err) {
       console.error("Failed to copy:", err);
+      toast.error("Failed to copy");
     }
   };
 
@@ -243,13 +243,9 @@ export default function ReferralLookup() {
                                 onClick={(e) =>
                                   copyToClipboard(user.walletAddress!, e)
                                 }
-                                className="p-1 hover:bg-gray-100 rounded"
+                                className="p-1 hover:bg-gray-100 rounded cursor-pointer"
                               >
-                                {copiedAddress === user.walletAddress ? (
-                                  <Check className="h-3 w-3 text-green-500" />
-                                ) : (
                                   <Copy className="h-3 w-3 text-gray-400" />
-                                )}
                               </button>
                             </div>
                           ) : (
@@ -334,14 +330,6 @@ export default function ReferralLookup() {
             )}
           </div>
         </>
-      )}
-
-      {/* Toast */}
-      {copiedAddress && (
-        <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
-          <Check className="h-4 w-4 text-green-400" />
-          <span className="text-sm">Address copied</span>
-        </div>
       )}
     </div>
   );

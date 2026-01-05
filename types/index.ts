@@ -402,3 +402,19 @@ export const CASHBACK_STATUSES = [
   { value: "Failed", label: "Failed" },
   { value: "PermanentlyFailed", label: "Permanently Failed" },
 ] as const;
+
+export interface WhatsNewStep {
+  imageUrl: string;
+  title: string;
+  text: string;
+}
+
+export interface WhatsNew {
+  _id: string;
+  steps: WhatsNewStep[];
+  isActive: boolean;
+  showOnLoad: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { auth } from './firebase';
+import { toast } from 'sonner';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:5009',
@@ -37,6 +38,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       console.error('[API] Unauthorized request - token may be invalid or expired');
+      toast.error('Session expired. Please sign in again.');
+    } else {
+      const message = error.response?.data?.message || error.message || 'An unexpected error occurred';
+      toast.error(message);
     }
     return Promise.reject(error);
   }

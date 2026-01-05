@@ -4,22 +4,21 @@ import { useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getAllowedDomain } from '@/lib/auth';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleGoogleSignIn = async () => {
     console.log('[Login] Sign in button clicked');
     
     if (!auth) {
       console.error('[Login] Firebase auth is not initialized');
-      setError('Firebase authentication is not configured');
+      toast.error('Firebase authentication is not configured');
       return;
     }
 
     setLoading(true);
-    setError(null);
     console.log('[Login] Starting Google sign-in flow...');
 
     try {
@@ -45,11 +44,11 @@ export default function LoginPage() {
       console.error('[Login] Error message:', error.message);
       
       if (error.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in cancelled');
+        toast.error('Sign-in cancelled');
       } else if (error.code === 'auth/popup-blocked') {
-        setError('Pop-up was blocked. Please allow pop-ups for this site.');
+        toast.error('Pop-up was blocked. Please allow pop-ups for this site.');
       } else {
-        setError('Failed to sign in. Please try again.');
+        toast.error('Failed to sign in. Please try again.');
       }
       setLoading(false);
     }
@@ -68,22 +67,10 @@ export default function LoginPage() {
         </div>
         
         <div className="mt-8 space-y-6">
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {error}
-                  </h3>
-                </div>
-              </div>
-            </div>
-          )}
-          
           <button
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {loading ? (
               <span className="flex items-center">

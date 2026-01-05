@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface TokenIconProps {
@@ -49,20 +50,21 @@ export const TokenIcon = ({
   size = 44,
   className,
 }: TokenIconProps) => {
-  if (logoUrl) {
+  const [error, setError] = useState(false);
+
+  if (logoUrl && !error) {
     return (
-      <img
+      <Image
         src={logoUrl}
         alt={symbol || "Token"}
         width={size}
         height={size}
         className={cn("rounded-full", className)}
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = "none";
-        }}
+        onError={() => setError(true)}
       />
     );
   }
+
 
   // Fallback for common tokens if logoUrl is missing
   const getCommonLogo = (sym?: string) => {
@@ -82,9 +84,9 @@ export const TokenIcon = ({
   const commonLogo = getCommonLogo(symbol);
   if (commonLogo) {
     return (
-      <img
+      <Image
         src={commonLogo}
-        alt={symbol}
+        alt={symbol || "Token"}
         width={size}
         height={size}
         className={cn("rounded-full", className)}
