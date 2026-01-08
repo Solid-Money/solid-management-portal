@@ -13,7 +13,6 @@ import {
   Search,
   Loader2,
   Copy,
-  Check,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -219,7 +218,7 @@ export default function UsersTable() {
                             className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy address"
                           >
-                              <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                            <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
                           </button>
                         </div>
                       ) : (
@@ -227,24 +226,28 @@ export default function UsersTable() {
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-semibold">
-                      {user.totalBalance !== undefined
+                      {user.totalBalance !== undefined &&
+                      user.totalBalance !== null
                         ? `$${user.totalBalance.toFixed(2)}`
-                        : "-"}
+                        : "$0.00"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {user.savingsBalance !== undefined
+                      {user.savingsBalance !== undefined &&
+                      user.savingsBalance !== null
                         ? `$${user.savingsBalance.toFixed(2)}`
-                        : "-"}
+                        : "$0.00"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {user.cardBalance !== undefined
+                      {user.cardBalance !== undefined &&
+                      user.cardBalance !== null
                         ? `$${user.cardBalance.toFixed(2)}`
-                        : "-"}
+                        : "$0.00"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {user.walletBalance !== undefined
+                      {user.walletBalance !== undefined &&
+                      user.walletBalance !== null
                         ? `$${user.walletBalance.toFixed(2)}`
-                        : "-"}
+                        : "$0.00"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.referredBy ? (
@@ -299,7 +302,7 @@ export default function UsersTable() {
                             className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy referral code"
                           >
-                              <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                            <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
                           </button>
                         </div>
                       ) : (
