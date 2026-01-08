@@ -8,6 +8,7 @@ import {
   Wallet,
   CreditCard,
   Sparkles,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
@@ -51,6 +52,7 @@ export default function DashboardLayout({
       icon: CreditCard,
     },
     { href: "/wallets", label: "Wallets", icon: Wallet },
+    { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/whats-new", label: "What's New", icon: Sparkles },
   ];
 
