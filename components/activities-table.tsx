@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import {
@@ -20,15 +20,10 @@ import {
   ArrowDown,
   Loader2,
   Copy,
-  Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
+import SponsoredGasFee from "@/components/sponsored-gas-fee";
 
 export default function ActivitiesTable() {
   const router = useRouter();
@@ -77,9 +72,9 @@ export default function ActivitiesTable() {
       page: 1,
       // Reset depositType if type is changed to one that doesn't support it
       ...(key === "type" &&
-      value !== "deposit" &&
-      value !== "bridge" &&
-      value !== "bridge_deposit"
+        value !== "deposit" &&
+        value !== "bridge" &&
+        value !== "bridge_deposit"
         ? { depositType: "" }
         : {}),
     }));
@@ -174,10 +169,7 @@ export default function ActivitiesTable() {
     "Date",
   ];
 
-  const showDepositColumns =
-    filters.type === "deposit" || filters.type === "bridge_deposit";
-
-  const baseHeaders = [
+  const tableHeaders = [
     "Type",
     "Title",
     "Tx Type",
@@ -189,13 +181,11 @@ export default function ActivitiesTable() {
     "Hash",
     "From",
     "To",
+    "Deposit Type",
+    "Sponsored Gas Fee",
+    "Failure Reason",
+    "Date"
   ];
-
-  const depositHeaders = ["Deposit Type", "Failure Reason", "Sponsored Gas Fee"];
-
-  const tableHeaders = showDepositColumns
-    ? [...baseHeaders, ...depositHeaders, "Date"]
-    : [...baseHeaders, "Date"];
 
   const columnCount = tableHeaders.length;
 
@@ -218,18 +208,18 @@ export default function ActivitiesTable() {
         {(filters.type === "deposit" ||
           filters.type === "bridge" ||
           filters.type === "bridge_deposit") && (
-          <select
-            className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-            value={filters.depositType}
-            onChange={(e) => handleFilterChange("depositType", e.target.value)}
-          >
-            {DEPOSIT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        )}
+            <select
+              className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              value={filters.depositType}
+              onChange={(e) => handleFilterChange("depositType", e.target.value)}
+            >
+              {DEPOSIT_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          )}
 
         <select
           className="block px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -257,15 +247,13 @@ export default function ActivitiesTable() {
                     <th
                       key={header}
                       scope="col"
-                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        isSortable
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${isSortable
                           ? "cursor-pointer hover:bg-gray-100 transition-colors"
                           : ""
-                      } ${
-                        isActive
+                        } ${isActive
                           ? "bg-indigo-50 text-indigo-700"
                           : "text-gray-500"
-                      }`}
+                        }`}
                       onClick={() => isSortable && handleSort(sortField)}
                     >
                       <div className="flex items-center space-x-1">
@@ -368,7 +356,7 @@ export default function ActivitiesTable() {
                             className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy hash"
                           >
-                              <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                            <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
                           </button>
                         </div>
                       ) : (
@@ -388,7 +376,7 @@ export default function ActivitiesTable() {
                             className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy address"
                           >
-                              <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                            <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
                           </button>
                         </div>
                       ) : (
@@ -408,89 +396,41 @@ export default function ActivitiesTable() {
                             className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
                             title="Copy address"
                           >
-                              <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                            <Copy className="h-3 w-3 text-gray-400 hover:text-gray-600" />
                           </button>
                         </div>
                       ) : (
                         "-"
                       )}
                     </td>
-                    {showDepositColumns && (
-                      <>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {(activity.type === "deposit" ||
-                            activity.type === "bridge" ||
-                            activity.type === "bridge_deposit") &&
-                          activity.depositType ? (
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                activity.depositType === "DIRECT"
-                                  ? "bg-purple-100 text-purple-800"
-                                  : "bg-blue-100 text-blue-800"
-                              }`}
-                            >
-                              {activity.depositType}
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                          {activity.status === "failed" &&
-                          (activity.type === "deposit" ||
-                            activity.type === "bridge" ||
-                            activity.type === "bridge_deposit")
-                            ? activity.failureReason || "-"
-                            : "-"}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {activity.totalFeeUSD ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help underline decoration-dotted underline-offset-2">
-                                  ${activity.totalFeeUSD}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-gray-900 text-white p-3 space-y-1">
-                                <div className="font-semibold mb-2">Fee Breakdown:</div>
-                                {activity.permitTxFeeUSD && (
-                                  <div className="text-xs">
-                                    Permit: ${activity.permitTxFeeUSD}
-                                  </div>
-                                )}
-                                {activity.transferTxFeeUSD && (
-                                  <div className="text-xs">
-                                    Transfer: ${activity.transferTxFeeUSD}
-                                  </div>
-                                )}
-                                {activity.approvalTxFeeUSD && (
-                                  <div className="text-xs">
-                                    Approval: ${activity.approvalTxFeeUSD}
-                                  </div>
-                                )}
-                                {activity.bridgeTxFeeUSD && (
-                                  <div className="text-xs">
-                                    Bridge: ${activity.bridgeTxFeeUSD}
-                                  </div>
-                                )}
-                                {activity.bridgeTxSendingAssetFeeUSD && (
-                                  <div className="text-xs">
-                                    Bridge Sending Asset: ${activity.bridgeTxSendingAssetFeeUSD}
-                                  </div>
-                                )}
-                                {activity.depositTxFeeUSD && (
-                                  <div className="text-xs">
-                                    Deposit: ${activity.depositTxFeeUSD}
-                                  </div>
-                                )}
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                      </>
-                    )}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {(activity.type === "deposit" ||
+                        activity.type === "bridge" ||
+                        activity.type === "bridge_deposit") &&
+                        activity.depositType ? (
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${activity.depositType === "DIRECT"
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-blue-100 text-blue-800"
+                            }`}
+                        >
+                          {activity.depositType}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      <SponsoredGasFee activity={activity} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
+                      {activity.status === "failed" &&
+                        (activity.type === "deposit" ||
+                          activity.type === "bridge" ||
+                          activity.type === "bridge_deposit")
+                        ? activity.failureReason || "-"
+                        : "-"}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {(() => {
                         const timestamp = activity.timestamp
