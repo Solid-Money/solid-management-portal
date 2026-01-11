@@ -11,11 +11,6 @@ const isEmpty = (value?: string | null): boolean => {
   return value === null || value === undefined;
 };
 
-const isZero = (value?: string | null): boolean => {
-  if (isEmpty(value)) return false;
-  return parseFloat(value!) === 0;
-};
-
 const formatUSD = (fee?: string | null, feeUSD?: string | null): string => {
   if (isEmpty(fee) && isEmpty(feeUSD)) {
     return "";
@@ -24,12 +19,12 @@ const formatUSD = (fee?: string | null, feeUSD?: string | null): string => {
   const feeUSDNum = feeUSD ? parseFloat(feeUSD) : 0;
   const feeNum = fee ? parseFloat(fee) : 0;
   
-  if (isZero(feeUSD) && feeNum > 0) {
+  if (feeUSDNum < 0.01 && feeNum > 0) {
     return "<$0.01";
   }
   
-  if (feeUSDNum > 0 && feeUSD) {
-    return `$${feeUSD}`;
+  if (feeUSDNum >= 0.01) {
+    return `$${feeUSDNum.toFixed(2)}`;
   }
   
   return "";
