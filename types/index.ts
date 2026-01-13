@@ -19,6 +19,11 @@ export interface User {
   } | null;
   referralCodeUsed?: string | null;
   lastActivityTimestamp?: string | null;
+  bridgeCustomers?: {
+    bridgeCustomerId: string;
+    kycStatus: string;
+    createdAt: string;
+  }[];
 }
 
 export interface ReferralSearchResponse {

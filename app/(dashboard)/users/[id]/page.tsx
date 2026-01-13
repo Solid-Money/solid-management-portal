@@ -89,6 +89,12 @@ export default function UserDetailPage({
             <div className="px-4 py-4">
               <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">User ID</dt>
+                  <dd className="mt-1 text-sm text-gray-900 font-mono truncate">
+                    {user._id}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
                   <dt className="text-xs font-medium text-gray-500 uppercase">Email</dt>
                   <dd className="mt-1 text-sm text-gray-900 truncate">
                     {user.email}
@@ -120,6 +126,47 @@ export default function UserDetailPage({
                   </dt>
                   <dd className="mt-1 text-sm text-gray-900 font-mono truncate">
                     {user.safeAddress || "-"}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    Bridge Customers
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {user.bridgeCustomers && user.bridgeCustomers.length > 0 ? (
+                      <div className="space-y-2">
+                        {user.bridgeCustomers.map((customer) => (
+                          <div
+                            key={customer.bridgeCustomerId}
+                            className="flex items-center gap-2 font-mono"
+                          >
+                            <a
+                              href={`https://dashboard.bridge.xyz/app/customers/${customer.bridgeCustomerId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800 hover:underline truncate"
+                            >
+                              {customer.bridgeCustomerId}
+                            </a>
+                            <span
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${
+                                customer.kycStatus === "approved"
+                                  ? "bg-green-100 text-green-800"
+                                  : customer.kycStatus === "under_review"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : customer.kycStatus === "rejected"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {customer.kycStatus}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      "-"
+                    )}
                   </dd>
                 </div>
                 <div>
