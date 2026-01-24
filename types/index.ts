@@ -430,3 +430,80 @@ export interface WhatsNew {
   updatedAt: string;
 }
 
+// Rewards Configuration Types
+export interface TierThresholds {
+  tier1: { min: number; max: number };
+  tier2: { min: number; max: number };
+  tier3: { min: number };
+}
+
+export interface TierCashbackConfig {
+  percentage: number;
+  monthlyCap: number;
+}
+
+export interface CashbackConfig {
+  enabled: boolean;
+  settlementDays: number;
+  tier1: TierCashbackConfig;
+  tier2: TierCashbackConfig;
+  tier3: TierCashbackConfig;
+}
+
+export interface TierDepositBoostConfig {
+  eligibleAmount: number;
+  maxBonus: number;
+}
+
+export interface DepositBoostConfig {
+  enabled: boolean;
+  percentage: number;
+  settlementDays: number;
+  tier1: TierDepositBoostConfig;
+  tier2: TierDepositBoostConfig;
+  tier3: TierDepositBoostConfig;
+}
+
+export interface TierSubscriptionDiscountConfig {
+  percentage: number;
+  serviceLimit: number;
+}
+
+export interface SubscriptionDiscountConfig {
+  enabled: boolean;
+  eligibleServices: string[];
+  tier1: TierSubscriptionDiscountConfig;
+  tier2: TierSubscriptionDiscountConfig;
+  tier3: TierSubscriptionDiscountConfig;
+}
+
+export interface FuseStakingConfig {
+  enabled: boolean;
+  tier2Amount: number;
+  tier3Amount: number;
+}
+
+export interface ReferralConfig {
+  recurringEnabled: boolean;
+  boostEnabled: boolean;
+  recurringPercentage: number;
+  boostPercentage: number;
+}
+
+export interface PointsEarningConfig {
+  cardSpendEnabled: boolean;
+  swapEnabled: boolean;
+  holdingFundsEnabled: boolean;
+  cardSpendPointsPerDollar: number;
+  swapPointsPerDollar: number;
+  holdingFundsMultiplier: number;
+}
+
+export interface FullRewardsConfig {
+  tiers: TierThresholds;
+  points: PointsEarningConfig;
+  cashback: CashbackConfig;
+  subscriptionDiscount: SubscriptionDiscountConfig;
+  fuseStaking: FuseStakingConfig;
+  referral: ReferralConfig;
+}
