@@ -264,7 +264,7 @@ export default function CardTransactionsTable() {
                         {tx.user.username}
                       </Link>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-gray-400 italic">Deleted User</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
