@@ -395,7 +395,6 @@ export default function RewardsConfigPage() {
       "FUSE Staking",
       "fuse-staking",
       {
-        enabled: config.fuseStaking.enabled,
         tier2Amount: Number(config.fuseStaking.tier2Amount),
         tier3Amount: Number(config.fuseStaking.tier3Amount),
       },
@@ -1010,13 +1009,7 @@ export default function RewardsConfigPage() {
           description="Alternative path to unlock higher tiers by staking FUSE tokens"
           icon={<Wallet className="h-5 w-5 text-orange-600" />}
         >
-          <ToggleField
-            label="FUSE Staking Enabled"
-            value={config.fuseStaking.enabled}
-            onChange={(v) => updateConfig("fuseStaking", "enabled", v)}
-            tooltip="Allow users to unlock tiers by staking FUSE tokens instead of earning points"
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InputField
               label="Tier 2 FUSE Amount"
               value={config.fuseStaking.tier2Amount}

@@ -478,7 +478,6 @@ export interface SubscriptionDiscountConfig {
 }
 
 export interface FuseStakingConfig {
-  enabled: boolean;
   tier2Amount: number;
   tier3Amount: number;
 }
