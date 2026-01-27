@@ -489,6 +489,12 @@ export interface ReferralConfig {
   boostPercentage: number;
 }
 
+export interface CardWelcomeBonusConfig {
+  enabled: boolean;
+  percentage: number;
+  cap: number;
+}
+
 export interface PointsEarningConfig {
   cardSpendEnabled: boolean;
   swapEnabled: boolean;
@@ -505,4 +511,5 @@ export interface FullRewardsConfig {
   subscriptionDiscount: SubscriptionDiscountConfig;
   fuseStaking: FuseStakingConfig;
   referral: ReferralConfig;
+  cardWelcomeBonus: CardWelcomeBonusConfig;
 }

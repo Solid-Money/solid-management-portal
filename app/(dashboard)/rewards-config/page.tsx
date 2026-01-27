@@ -15,6 +15,7 @@ import {
   Calendar,
   Wallet,
   HelpCircle,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
@@ -438,6 +439,21 @@ export default function RewardsConfigPage() {
     );
   };
 
+  const saveCardWelcomeBonusConfig = async () => {
+    if (!config) return;
+
+    await saveSection(
+      "Card Welcome Bonus",
+      "card-welcome-bonus",
+      {
+        enabled: config.cardWelcomeBonus.enabled,
+        percentage: Number(config.cardWelcomeBonus.percentage),
+        cap: Number(config.cardWelcomeBonus.cap),
+      },
+      "cardWelcomeBonus",
+    );
+  };
+
   const clearCache = async () => {
     try {
       await api.post("/admin/v1/rewards-config/clear-cache");
@@ -857,6 +873,59 @@ export default function RewardsConfigPage() {
           >
             <Save className="h-4 w-4 mr-2" />
             Save Cashback Config
+          </button>
+        </ConfigSection>
+
+        {/* Card Welcome Bonus */}
+        <ConfigSection
+          title="Card Welcome Bonus"
+          description="Bonus for users who make their first deposit via card (borrow deposits)"
+          icon={<CreditCard className="h-5 w-5 text-blue-600" />}
+        >
+          <div className="space-y-4">
+            <ToggleField
+              label="Card Welcome Bonus Enabled"
+              value={config.cardWelcomeBonus.enabled}
+              onChange={(v) => updateConfig("cardWelcomeBonus", "enabled", v)}
+              tooltip="Enable or disable welcome bonus for card deposits"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField
+                label="Bonus Percentage"
+                value={
+                  (config.cardWelcomeBonus.percentage as any) === ""
+                    ? ""
+                    : config.cardWelcomeBonus.percentage * 100
+                }
+                onChange={(v) =>
+                  handleNumericUpdate("cardWelcomeBonus", "percentage", v, true)
+                }
+                type="number"
+                suffix="%"
+                step="0.1"
+                disabled={!config.cardWelcomeBonus.enabled}
+                tooltip="Percentage bonus applied to card deposits"
+              />
+              <InputField
+                label="Lifetime Cap"
+                value={config.cardWelcomeBonus.cap}
+                onChange={(v) =>
+                  handleNumericUpdate("cardWelcomeBonus", "cap", v)
+                }
+                type="number"
+                suffix="$"
+                disabled={!config.cardWelcomeBonus.enabled}
+                tooltip="Maximum total bonus a user can earn from card welcome bonus (lifetime)"
+              />
+            </div>
+          </div>
+          <button
+            onClick={saveCardWelcomeBonusConfig}
+            disabled={saving || !hasChanges("cardWelcomeBonus")}
+            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Card Welcome Bonus Config
           </button>
         </ConfigSection>
 
