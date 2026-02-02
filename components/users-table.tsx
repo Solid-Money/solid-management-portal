@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { UsersResponse, UserFilters } from "@/types";
@@ -21,21 +21,17 @@ import { toast } from "sonner";
 export default function UsersTable() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Initialize search from URL query param
+  const initialSearch = searchParams.get("search") || "";
+
   const [filters, setFilters] = useState<UserFilters>({
-    search: "",
+    search: initialSearch,
     sort: "createdAt",
     order: "desc",
     page: 1,
     limit: 10,
   });
-
-  // Prefill search from URL query param
-  useEffect(() => {
-    const searchFromUrl = searchParams.get("search");
-    if (searchFromUrl) {
-      setFilters((prev) => ({ ...prev, search: searchFromUrl, page: 1 }));
-    }
-  }, [searchParams]);
 
   const debouncedSearch = useDebounce(filters.search, 500);
 

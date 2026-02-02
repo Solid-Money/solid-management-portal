@@ -34,10 +34,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log('[AuthProvider] Initializing auth listener');
-    
+
     if (!auth) {
       console.error('[AuthProvider] Firebase auth not initialized');
-      setLoading(false);
+      // Defer setState to avoid calling it synchronously in effect
+      setTimeout(() => setLoading(false), 0);
       return;
     }
 
@@ -99,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthProvider] Cleaning up auth listener');
       unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSignOut = useCallback(async () => {

@@ -26,7 +26,6 @@ export const ActivityItem = ({
     status,
     timestamp,
     createdAt,
-    metadata,
     hash,
     url,
   } = activity;

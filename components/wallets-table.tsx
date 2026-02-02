@@ -6,7 +6,6 @@ import { WalletStatusResponse, WalletInfo, ChainBalance } from "@/types";
 import {
   Loader2,
   Copy,
-  Check,
   AlertCircle,
   CheckCircle,
   AlertTriangle,
@@ -52,19 +51,6 @@ export default function WalletsTable() {
       newExpanded.add(walletName);
     }
     setExpandedWallets(newExpanded);
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "OK":
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case "LOW":
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-      case "CRITICAL":
-        return <AlertCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return null;
-    }
   };
 
   const getStatusBadge = (status: string) => {
