@@ -513,3 +513,26 @@ export interface FullRewardsConfig {
   referral: ReferralConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
 }
+
+// Campaign Types
+export type CampaignStatus = "Draft" | "Active" | "Paused" | "Ended";
+
+export interface Campaign {
+  _id: string;
+  name: string;
+  description?: string;
+  country?: string;
+  venueName?: string;
+  venueLocation?: string;
+  merchantName: string;
+  cashbackPercentage: number;
+  maxDailyCashback: number;
+  isInstant: boolean;
+  startDate: string;
+  endDate: string;
+  emailTemplateId?: number;
+  status: CampaignStatus;
+  totalCashbackPaid: number;
+  createdAt: string;
+  updatedAt: string;
+}

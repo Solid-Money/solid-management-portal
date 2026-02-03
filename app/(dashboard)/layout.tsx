@@ -10,6 +10,7 @@ import {
   Sparkles,
   BarChart3,
   Gift,
+  Megaphone,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
@@ -54,6 +55,7 @@ export default function DashboardLayout({
     },
     { href: "/wallets", label: "Wallets", icon: Wallet },
     { href: "/rewards-config", label: "Rewards", icon: Gift },
+    { href: "/campaigns", label: "Campaigns", icon: Megaphone },
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/whats-new", label: "What's New", icon: Sparkles },
   ];
