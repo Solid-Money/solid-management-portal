@@ -11,6 +11,7 @@ import {
   BarChart3,
   Gift,
   Megaphone,
+  Terminal,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
@@ -30,7 +31,7 @@ export default function DashboardLayout({
 
   const handleSignOut = async () => {
     setIsSignOutModalOpen(false);
-      await signOut();
+    await signOut();
   };
 
   if (loading) {
@@ -57,6 +58,7 @@ export default function DashboardLayout({
     { href: "/rewards-config", label: "Rewards", icon: Gift },
     { href: "/campaigns", label: "Campaigns", icon: Megaphone },
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
+    { href: "/scripts", label: "Scripts", icon: Terminal },
     { href: "/whats-new", label: "What's New", icon: Sparkles },
   ];
 
