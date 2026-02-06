@@ -14,7 +14,7 @@ export default function ScriptsPage() {
       setLoading(true);
       setResult(null);
 
-      const response = await api.post("/admin/cohort-snapshots/trigger", {});
+      const response = await api.post("/admin/v1/cohort-snapshots/trigger", {});
 
       toast.success("Cohort snapshot calculation triggered successfully");
       setResult(response.data);
