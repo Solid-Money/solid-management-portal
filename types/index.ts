@@ -324,6 +324,10 @@ export interface ChainBalance {
   usdcThreshold: string;
   usdcStatus: "OK" | "LOW" | "CRITICAL" | "N/A";
   usdcAddress: string;
+  usdtBalance?: string;
+  usdtThreshold?: string;
+  usdtStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  usdtAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
