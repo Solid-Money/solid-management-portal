@@ -85,9 +85,15 @@ export default function WalletsTable() {
   const renderChainRow = (chain: ChainBalance) => {
     const hasGas = chain.gasStatus !== "N/A";
     const hasUsdc = chain.usdcStatus !== "N/A";
+    const hasUsdt = chain.usdtStatus !== undefined && chain.usdtStatus !== "N/A";
     const isCritical =
-      chain.gasStatus === "CRITICAL" || chain.usdcStatus === "CRITICAL";
-    const isLow = chain.gasStatus === "LOW" || chain.usdcStatus === "LOW";
+      chain.gasStatus === "CRITICAL" ||
+      chain.usdcStatus === "CRITICAL" ||
+      chain.usdtStatus === "CRITICAL";
+    const isLow =
+      chain.gasStatus === "LOW" ||
+      chain.usdcStatus === "LOW" ||
+      chain.usdtStatus === "LOW";
 
     const rowClasses = isCritical
       ? "border-t border-red-300 bg-red-50"
@@ -139,6 +145,13 @@ export default function WalletsTable() {
         (chain.usdcStatus === "LOW" || chain.usdcStatus === "CRITICAL")
       ) {
         needs.push(`${chain.usdcThreshold} USDC`);
+      }
+      if (
+        hasUsdt &&
+        chain.usdtThreshold != null &&
+        (chain.usdtStatus === "LOW" || chain.usdtStatus === "CRITICAL")
+      ) {
+        needs.push(`${chain.usdtThreshold} USDT`);
       }
 
       if (needs.length === 0) return null;
@@ -240,6 +253,50 @@ export default function WalletsTable() {
             </div>
           )}
         </td>
+        <td className="px-4 py-2 text-sm">
+          {hasUsdt ? (
+            <div className="flex items-center gap-1.5">
+              {getStatusWithText(chain.usdtStatus!)}
+              <span
+                className={
+                  chain.usdtStatus === "CRITICAL"
+                    ? "text-red-900 font-bold"
+                    : chain.usdtStatus === "LOW"
+                    ? "text-yellow-700 font-medium"
+                    : "text-green-700"
+                }
+              >
+                {parseFloat(chain.usdtBalance ?? "0").toFixed(2)} USDT
+              </span>
+              <span className="text-gray-400 text-xs">
+                / {chain.usdtThreshold}
+              </span>
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </td>
+        <td className="px-4 py-2 text-sm">
+          {chain.usdtAddress && (
+            <div className="flex items-center gap-1.5">
+              <code
+                className={`text-xs px-1.5 py-0.5 rounded ${
+                  isCritical
+                    ? "bg-red-100 text-red-900"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {truncateAddress(chain.usdtAddress)}
+              </code>
+              <button
+                onClick={(e) => copyToClipboard(chain.usdtAddress!, e)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                  <Copy className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </td>
       </tr>
     );
   };
@@ -297,10 +354,15 @@ export default function WalletsTable() {
           const isExpanded = expandedWallets.has(wallet.name);
           const hasCritical = wallet.chains.some(
             (chain) =>
-              chain.gasStatus === "CRITICAL" || chain.usdcStatus === "CRITICAL"
+              chain.gasStatus === "CRITICAL" ||
+              chain.usdcStatus === "CRITICAL" ||
+              chain.usdtStatus === "CRITICAL"
           );
           const hasLow = wallet.chains.some(
-            (chain) => chain.gasStatus === "LOW" || chain.usdcStatus === "LOW"
+            (chain) =>
+              chain.gasStatus === "LOW" ||
+              chain.usdcStatus === "LOW" ||
+              chain.usdtStatus === "LOW"
           );
           const needsTopUp = wallet.chains.some((chain) => chain.needsTopUp);
           const isAllOk = !hasCritical && !hasLow;
@@ -422,6 +484,12 @@ export default function WalletsTable() {
                         </th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                           USDC Address
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          USDT
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          USDT Address
                         </th>
                       </tr>
                     </thead>
