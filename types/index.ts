@@ -310,6 +310,13 @@ export const ACTIVITY_TYPES = [
   { value: "card_welcome_bonus", label: "Card Welcome Bonus" },
   { value: "deposit_bonus", label: "Deposit Bonus" },
   { value: "bridge_transfer", label: "Bridge Transfer" },
+  { value: "borrow_and_deposit_to_card", label: "Borrow & Deposit to Card" },
+  { value: "card_withdrawal", label: "Card Withdrawal" },
+  { value: "fast_withdraw", label: "Fast Withdraw" },
+  {
+    value: "repay_and_withdraw_collateral",
+    label: "Repay & Withdraw Collateral",
+  },
 ] as const;
 
 export const DEPOSIT_TYPES = [
