@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 interface ConfirmationModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
   confirmText?: string;
@@ -39,7 +39,7 @@ export default function ConfirmationModal({
         </div>
 
         <div className="p-6">
-          <p className="text-gray-600">{message}</p>
+          <div className="text-gray-600">{message}</div>
         </div>
 
         <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3">
