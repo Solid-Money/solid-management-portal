@@ -123,28 +123,28 @@ export interface AdminActivitiesResponse {
 }
 
 export enum TransactionType {
-  DEPOSIT = 'deposit',
-  UNSTAKE = 'unstake',
-  WITHDRAW = 'withdraw',
-  SEND = 'send',
-  RECEIVE = 'receive', // Incoming token/native transfers from external sources
-  BRIDGE = 'bridge',
-  CANCEL_WITHDRAW = 'cancel_withdraw',
-  BRIDGE_DEPOSIT = 'bridge_deposit',
-  BORROW_AND_DEPOSIT_TO_CARD = 'borrow_and_deposit_to_card',
-  BRIDGE_TRANSFER = 'bridge_transfer',
-  BANK_TRANSFER = 'bank_transfer',
-  CARD_TRANSACTION = 'card_transaction',
-  CARD_WITHDRAWAL = 'card_withdrawal',
-  MERCURYO_TRANSACTION = 'mercuryo_transaction',
-  SWAP = 'swap',
-  WRAP = 'wrap',
-  UNWRAP = 'unwrap',
-  MERKL_CLAIM = 'merkl_claim',
-  CARD_WELCOME_BONUS = 'card_welcome_bonus',
-  DEPOSIT_BONUS = 'deposit_bonus',
-  FAST_WITHDRAW = 'fast_withdraw',
-  REPAY_AND_WITHDRAW_COLLATERAL = 'repay_and_withdraw_collateral',
+  DEPOSIT = "deposit",
+  UNSTAKE = "unstake",
+  WITHDRAW = "withdraw",
+  SEND = "send",
+  RECEIVE = "receive", // Incoming token/native transfers from external sources
+  BRIDGE = "bridge",
+  CANCEL_WITHDRAW = "cancel_withdraw",
+  BRIDGE_DEPOSIT = "bridge_deposit",
+  BORROW_AND_DEPOSIT_TO_CARD = "borrow_and_deposit_to_card",
+  BRIDGE_TRANSFER = "bridge_transfer",
+  BANK_TRANSFER = "bank_transfer",
+  CARD_TRANSACTION = "card_transaction",
+  CARD_WITHDRAWAL = "card_withdrawal",
+  MERCURYO_TRANSACTION = "mercuryo_transaction",
+  SWAP = "swap",
+  WRAP = "wrap",
+  UNWRAP = "unwrap",
+  MERKL_CLAIM = "merkl_claim",
+  CARD_WELCOME_BONUS = "card_welcome_bonus",
+  DEPOSIT_BONUS = "deposit_bonus",
+  FAST_WITHDRAW = "fast_withdraw",
+  REPAY_AND_WITHDRAW_COLLATERAL = "repay_and_withdraw_collateral",
 }
 
 export enum TransactionStatus {
@@ -171,6 +171,7 @@ export enum TransactionCategory {
   EXTERNAL_WALLET_TRANSFER = "External wallet transfer",
   BANK_DEPOSIT = "Bank deposit",
   CARD_DEPOSIT = "Card deposit",
+  CARD_WITHDRAWAL = "Card withdraw",
   REWARD = "Reward",
   SEND = "Send",
   SWAP = "Swap",
@@ -233,6 +234,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.OUT,
       category: TransactionCategory.CARD_DEPOSIT,
     },
+    [TransactionType.CARD_WITHDRAWAL]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.CARD_WITHDRAWAL,
+    },
     [TransactionType.MERCURYO_TRANSACTION]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.BANK_DEPOSIT,
@@ -262,6 +267,14 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       category: TransactionCategory.REWARD,
     },
     [TransactionType.FAST_WITHDRAW]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.BORROW_AND_DEPOSIT_TO_CARD]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.CARD_DEPOSIT,
+    },
+    [TransactionType.REPAY_AND_WITHDRAW_COLLATERAL]: {
       sign: TransactionDirection.OUT,
       category: TransactionCategory.SAVINGS_ACCOUNT,
     },
