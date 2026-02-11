@@ -85,7 +85,9 @@ export default function PromotionsBannerPage() {
       ) : banners.length > 0 ? (
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
           <ul className="divide-y divide-gray-200">
-            {banners.map((banner) => (
+            {[...banners]
+            .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+            .map((banner) => (
               <li key={banner._id} className="hover:bg-gray-50 transition-colors">
                 <div className="px-4 py-4 sm:px-6 flex items-center justify-between">
                   <div className="flex flex-col">
@@ -105,7 +107,7 @@ export default function PromotionsBannerPage() {
                     </div>
                     <div className="mt-1">
                       <p className="text-xs text-gray-500">
-                        Created at{" "}
+                        Sort: {banner.sort ?? 0} • Created at{" "}
                         {banner.createdAt
                           ? new Date(banner.createdAt).toLocaleDateString()
                           : "—"}

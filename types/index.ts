@@ -462,6 +462,7 @@ export interface PromotionsBanner {
   title: string;
   imageURL: string;
   enabled: boolean;
+  sort?: number;
   createdAt?: string;
   updatedAt?: string;
 }
