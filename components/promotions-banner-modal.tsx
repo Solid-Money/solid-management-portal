@@ -21,6 +21,7 @@ export default function PromotionsBannerModal({
   const [title, setTitle] = useState(banner?.title ?? "");
   const [imageURL, setImageURL] = useState(banner?.imageURL ?? "");
   const [enabled, setEnabled] = useState(banner?.enabled ?? false);
+  const [sort, setSort] = useState<number>(banner?.sort ?? 0);
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -65,7 +66,7 @@ export default function PromotionsBannerModal({
 
     try {
       setSaving(true);
-      const data = { title: title.trim(), imageURL, enabled };
+      const data = { title: title.trim(), imageURL, enabled, sort };
 
       if (banner) {
         await api.patch(`/admin/v1/promotions-banner/${banner._id}`, data);
@@ -101,7 +102,7 @@ export default function PromotionsBannerModal({
           onSubmit={handleSubmit}
           className="flex-1 overflow-y-auto p-6 space-y-6"
         >
-          <div className="flex space-x-4 bg-indigo-50 p-4 rounded-lg">
+          <div className="flex flex-wrap items-center gap-4 bg-indigo-50 p-4 rounded-lg">
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -111,6 +112,15 @@ export default function PromotionsBannerModal({
               />
               <span className="text-sm font-medium text-gray-700">Enabled</span>
             </label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Sort</label>
+              <input
+                type="number"
+                value={sort}
+                onChange={(e) => setSort(Number(e.target.value) || 0)}
+                className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
