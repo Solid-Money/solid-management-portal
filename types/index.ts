@@ -457,6 +457,15 @@ export interface WhatsNew {
   updatedAt: string;
 }
 
+export interface PromotionsBanner {
+  _id: string;
+  title: string;
+  imageURL: string;
+  enabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Rewards Configuration Types
 export interface TierThresholds {
   tier1: { min: number; max: number };

@@ -12,6 +12,7 @@ import {
   Gift,
   Megaphone,
   Terminal,
+  Image,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
@@ -60,6 +61,7 @@ export default function DashboardLayout({
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/scripts", label: "Scripts", icon: Terminal },
     { href: "/whats-new", label: "What's New", icon: Sparkles },
+    { href: "/promotions-banner", label: "Promotions Banner", icon: Image },
   ];
 
   return (
