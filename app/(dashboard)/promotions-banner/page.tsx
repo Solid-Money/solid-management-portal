@@ -107,7 +107,8 @@ export default function PromotionsBannerPage() {
                     </div>
                     <div className="mt-1">
                       <p className="text-xs text-gray-500">
-                        Sort: {banner.sort ?? 0} • Created at{" "}
+                        Sort: {banner.sort ?? 0}
+                        {banner.link ? " • Has link" : ""} • Created at{" "}
                         {banner.createdAt
                           ? new Date(banner.createdAt).toLocaleDateString()
                           : "—"}
