@@ -22,6 +22,7 @@ export default function PromotionsBannerModal({
   const [imageURL, setImageURL] = useState(banner?.imageURL ?? "");
   const [enabled, setEnabled] = useState(banner?.enabled ?? false);
   const [sort, setSort] = useState<number>(banner?.sort ?? 0);
+  const [link, setLink] = useState(banner?.link ?? "");
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -66,7 +67,13 @@ export default function PromotionsBannerModal({
 
     try {
       setSaving(true);
-      const data = { title: title.trim(), imageURL, enabled, sort };
+      const data = {
+        title: title.trim(),
+        imageURL,
+        enabled,
+        sort,
+        ...(link.trim() ? { link: link.trim() } : {}),
+      };
 
       if (banner) {
         await api.patch(`/admin/v1/promotions-banner/${banner._id}`, data);
@@ -136,6 +143,19 @@ export default function PromotionsBannerModal({
               }`}
               placeholder="Banner title"
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Link (optional)
+            </label>
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="https://..."
             />
           </div>
 
