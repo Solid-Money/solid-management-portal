@@ -5,7 +5,7 @@
  */
 
 // Revenue breakdown by type
-export type RevenueType = 'yield_share' | 'borrowing_fee';
+export type RevenueType = 'yield_share' | 'borrowing_fee' | 'treasury_interest';
 
 export type ReconciliationStatusType = 'pending' | 'verified' | 'discrepancy' | 'resolved';
 
@@ -41,6 +41,7 @@ export interface RevenuePeriodData {
   period: string;
   yieldShare: number;
   borrowingFees: number;
+  treasuryInterest: number;
   total: number;
 }
 
@@ -49,6 +50,7 @@ export interface RevenueSummaryResponse {
   totals: {
     yieldShare: number;
     borrowingFees: number;
+    treasuryInterest: number;
     total: number;
   };
   comparison: {
@@ -153,6 +155,7 @@ export const REVENUE_QUERY_KEYS = {
   byUser: (page: number, limit: number) => ['revenue', 'users', page, limit],
   byProduct: (start: string, end: string) => ['revenue', 'products', start, end],
   investorReport: (month: string) => ['revenue', 'investor', month],
+  treasuryInterest: (start: string, end: string) => ['revenue', 'treasury-interest', start, end],
 } as const;
 
 // Refresh Intervals (in milliseconds)
@@ -166,9 +169,10 @@ export const REFRESH_INTERVALS = {
 
 // Chart Colors
 export const REVENUE_COLORS = {
-  yieldShare: '#6366f1',   // indigo-500
-  borrowingFees: '#8b5cf6', // violet-500
-  total: '#3b82f6',        // blue-500
+  yieldShare: '#6366f1',         // indigo-500
+  borrowingFees: '#8b5cf6',     // violet-500
+  treasuryInterest: '#10b981',  // emerald-500
+  total: '#3b82f6',             // blue-500
 } as const;
 
 // Daily Flow Types (Deposits vs Withdrawals)
@@ -198,3 +202,22 @@ export const DAILY_FLOW_COLORS = {
   withdrawals: '#EF4444', // red-500
   netFlow: '#6366F1',     // indigo-500 (purple line)
 } as const;
+
+// Treasury Interest Types
+export interface TreasuryInterestPeriodData {
+  period: string;
+  treasuryInterest: number;
+  eventCount: number;
+}
+
+export interface TreasuryInterestResponse {
+  periods: TreasuryInterestPeriodData[];
+  totals: {
+    treasuryInterest: number;
+    eventCount: number;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+}

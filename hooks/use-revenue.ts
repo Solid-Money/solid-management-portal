@@ -11,6 +11,7 @@ import {
   ProductRevenueResponse,
   InvestorReportResponse,
   DailyFlowResponse,
+  TreasuryInterestResponse,
   REVENUE_QUERY_KEYS,
   REFRESH_INTERVALS,
 } from "@/types/revenue";
@@ -184,6 +185,31 @@ export function useInvestorReport(month: string) {
     },
     refetchInterval: REFRESH_INTERVALS.investorReport,
     staleTime: REFRESH_INTERVALS.investorReport / 2,
+  });
+}
+
+/**
+ * Hook for fetching treasury interest revenue data
+ * Shows yield earned on company-owned treasury wallet holdings
+ */
+export function useTreasuryInterest(startDate: Date, endDate: Date) {
+  const start = format(startDate, "yyyy-MM-dd");
+  const end = format(endDate, "yyyy-MM-dd");
+
+  return useQuery<TreasuryInterestResponse>({
+    queryKey: REVENUE_QUERY_KEYS.treasuryInterest(start, end),
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: start,
+        endDate: end,
+      });
+      const response = await api.get(
+        `/admin/v1/revenue/treasury-interest?${params}`
+      );
+      return response.data;
+    },
+    refetchInterval: REFRESH_INTERVALS.financeDetail,
+    staleTime: REFRESH_INTERVALS.financeDetail / 2,
   });
 }
 

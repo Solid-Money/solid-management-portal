@@ -11,6 +11,7 @@ import { RevenueSplitChart } from "@/components/charts/revenue-split-chart";
 import { FeeBreakdownChart } from "@/components/charts/fee-breakdown-chart";
 import { TvlYieldCorrelationChart } from "@/components/charts/tvl-yield-correlation-chart";
 import { ExchangeRateChart } from "@/components/charts/exchange-rate-chart";
+import { TreasuryInterestChart } from "@/components/charts/treasury-interest-chart";
 
 import {
   useYieldMetrics,
@@ -19,6 +20,7 @@ import {
   useTvlYieldCorrelation,
   useFeeConfiguration,
 } from "@/hooks/use-yield-metrics";
+import { useTreasuryInterest } from "@/hooks/use-revenue";
 
 function formatCurrency(value: number): string {
   if (value >= 1000000) {
@@ -81,6 +83,8 @@ export function FeesYieldsView() {
   const { data: correlation, isLoading: isLoadingCorrelation } =
     useTvlYieldCorrelation(dateRange.start, dateRange.end);
   const { data: feeConfig, isLoading: isLoadingConfig } = useFeeConfiguration();
+  const { data: treasuryInterest, isLoading: isLoadingTreasury } =
+    useTreasuryInterest(dateRange.start, dateRange.end);
 
   const handleDateRangeChange = (start: Date, end: Date) => {
     setDateRange({ start, end });
@@ -91,6 +95,7 @@ export function FeesYieldsView() {
   const totalProtocolRevenue = yieldMetrics?.totals.totalProtocolRevenue || 0;
   const totalSupplySideRevenue = yieldMetrics?.totals.totalSupplySideRevenue || 0;
   const avgTvl = yieldMetrics?.totals.avgTvl || 0;
+  const totalTreasuryInterest = treasuryInterest?.totals.treasuryInterest || 0;
 
   return (
     <div className="space-y-6">
@@ -109,8 +114,8 @@ export function FeesYieldsView() {
         />
       </div>
 
-      {/* Row 1: 4 KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Row 1: 5 KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <KPICard
           title="Total Daily Fees"
           value={formatCurrency(totalFees)}
@@ -122,6 +127,12 @@ export function FeesYieldsView() {
           value={formatCurrency(totalProtocolRevenue)}
           trend={totalProtocolRevenue > 0 ? "up" : "flat"}
           sparkline={yieldMetrics?.metrics.map((m) => m.dailyProtocolRevenue)}
+        />
+        <KPICard
+          title="Treasury Interest"
+          value={formatCurrency(totalTreasuryInterest)}
+          trend={totalTreasuryInterest > 0 ? "up" : "flat"}
+          sparkline={treasuryInterest?.periods.map((p) => p.treasuryInterest)}
         />
         <KPICard
           title="Stakers Revenue"
@@ -175,7 +186,15 @@ export function FeesYieldsView() {
         </ChartCard>
       </div>
 
-      {/* Row 5: Exchange Rate History */}
+      {/* Row 5: Treasury Interest */}
+      <ChartCard title="Treasury Interest (Company Wallet Yield)" isLoading={isLoadingTreasury}>
+        <TreasuryInterestChart
+          data={treasuryInterest?.periods || []}
+          height={300}
+        />
+      </ChartCard>
+
+      {/* Row 6: Exchange Rate History */}
       <ChartCard title="Exchange Rate History" isLoading={isLoadingRates}>
         <ExchangeRateChart
           data={rateHistory?.history || []}

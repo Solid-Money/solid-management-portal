@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFinanceDetail, useDailyFlow, useRevenueExport } from "@/hooks/use-revenue";
+import { useState, useMemo } from "react";
+import { useFinanceDetail, useDailyFlow, useRevenueExport, useTreasuryInterest } from "@/hooks/use-revenue";
 import { DateRangePicker } from "./date-range-picker";
 import { DailyFlowChart } from "./daily-flow-chart";
 import { Loader2, AlertCircle, Download, CheckCircle, Clock, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
@@ -23,7 +23,20 @@ export function FinanceDetail() {
     dateRange.start,
     dateRange.end
   );
+  const { data: treasuryData } = useTreasuryInterest(
+    dateRange.start,
+    dateRange.end
+  );
   const { exportData } = useRevenueExport();
+
+  // Build a lookup of treasury interest by date
+  const treasuryByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    treasuryData?.periods.forEach((p) => {
+      map[p.period] = p.treasuryInterest;
+    });
+    return map;
+  }, [treasuryData]);
 
   const handleExport = async () => {
     await exportData(dateRange.start, dateRange.end, "csv");
@@ -171,6 +184,9 @@ export function FinanceDetail() {
                   Yield Share
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Treasury Interest
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Total
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -192,8 +208,11 @@ export function FinanceDetail() {
                       </span>
                     )}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-600 text-right">
+                    ${(treasuryByDate[day.date] || 0).toFixed(2)}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 text-right">
-                    ${day.total}
+                    ${(parseFloat(day.total) + (treasuryByDate[day.date] || 0)).toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {getStatusBadge(day.reconciliationStatus)}
@@ -213,11 +232,17 @@ export function FinanceDetail() {
                       .reduce((sum, d) => sum + parseFloat(d.yieldShare.net), 0)
                       .toFixed(2)}
                   </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-emerald-600 text-right">
+                    ${(treasuryData?.totals.treasuryInterest || 0).toFixed(2)}
+                  </td>
                   <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
                     $
-                    {data.dailyBreakdown
-                      .reduce((sum, d) => sum + parseFloat(d.total), 0)
-                      .toFixed(2)}
+                    {(
+                      data.dailyBreakdown.reduce(
+                        (sum, d) => sum + parseFloat(d.total),
+                        0
+                      ) + (treasuryData?.totals.treasuryInterest || 0)
+                    ).toFixed(2)}
                   </td>
                   <td className="px-6 py-4"></td>
                 </tr>
