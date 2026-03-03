@@ -140,6 +140,7 @@ export function InvestorReport() {
                 period: format(new Date(d.date), "MMM d"),
                 yieldShare: 0,
                 borrowingFees: 0,
+                treasuryInterest: 0,
                 total: d.revenue,
               }))}
               height={280}
