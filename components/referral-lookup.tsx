@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ReferralSearchResponse, User } from "@/types";
@@ -8,7 +8,6 @@ import {
   Search,
   Loader2,
   Copy,
-  Check,
   Users,
   UserCircle,
   AlertCircle,
@@ -20,18 +19,17 @@ import { toast } from "sonner";
 export default function ReferralLookup() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [referralCode, setReferralCode] = useState("");
 
-  // Prefill from URL query param
-  useEffect(() => {
+  // Initialize from URL query params
+  const initialCode = (() => {
     const codeFromUrl = searchParams.get("code");
     const usernameFromUrl = searchParams.get("username");
-    if (codeFromUrl) {
-      setReferralCode(codeFromUrl.toUpperCase());
-    } else if (usernameFromUrl) {
-      setReferralCode(usernameFromUrl);
-    }
-  }, [searchParams]);
+    if (codeFromUrl) return codeFromUrl.toUpperCase();
+    if (usernameFromUrl) return usernameFromUrl;
+    return "";
+  })();
+
+  const [referralCode, setReferralCode] = useState(initialCode);
 
   const debouncedCode = useDebounce(referralCode, 500);
 
