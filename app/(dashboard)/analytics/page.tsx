@@ -19,6 +19,11 @@ const DASHBOARDS = [
     label: "Referrals",
     token: "5764cc51-e8e4-4309-b077-65f9588328ac",
   },
+  {
+    id: "points",
+    label: "Points",
+    token: "0e8d792b-23c0-44c3-983b-1ef9d9d80bf8",
+  },
 ] as const;
 
 export default function AnalyticsPage() {

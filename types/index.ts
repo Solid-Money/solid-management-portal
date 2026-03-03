@@ -127,13 +127,15 @@ export enum TransactionType {
   UNSTAKE = "unstake",
   WITHDRAW = "withdraw",
   SEND = "send",
-  RECEIVE = "receive",
+  RECEIVE = "receive", // Incoming token/native transfers from external sources
   BRIDGE = "bridge",
   CANCEL_WITHDRAW = "cancel_withdraw",
   BRIDGE_DEPOSIT = "bridge_deposit",
+  BORROW_AND_DEPOSIT_TO_CARD = "borrow_and_deposit_to_card",
   BRIDGE_TRANSFER = "bridge_transfer",
   BANK_TRANSFER = "bank_transfer",
   CARD_TRANSACTION = "card_transaction",
+  CARD_WITHDRAWAL = "card_withdrawal",
   MERCURYO_TRANSACTION = "mercuryo_transaction",
   SWAP = "swap",
   WRAP = "wrap",
@@ -142,6 +144,7 @@ export enum TransactionType {
   CARD_WELCOME_BONUS = "card_welcome_bonus",
   DEPOSIT_BONUS = "deposit_bonus",
   FAST_WITHDRAW = "fast_withdraw",
+  REPAY_AND_WITHDRAW_COLLATERAL = "repay_and_withdraw_collateral",
 }
 
 export enum TransactionStatus {
@@ -168,6 +171,7 @@ export enum TransactionCategory {
   EXTERNAL_WALLET_TRANSFER = "External wallet transfer",
   BANK_DEPOSIT = "Bank deposit",
   CARD_DEPOSIT = "Card deposit",
+  CARD_WITHDRAWAL = "Card withdraw",
   REWARD = "Reward",
   SEND = "Send",
   SWAP = "Swap",
@@ -230,6 +234,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.OUT,
       category: TransactionCategory.CARD_DEPOSIT,
     },
+    [TransactionType.CARD_WITHDRAWAL]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.CARD_WITHDRAWAL,
+    },
     [TransactionType.MERCURYO_TRANSACTION]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.BANK_DEPOSIT,
@@ -259,6 +267,14 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       category: TransactionCategory.REWARD,
     },
     [TransactionType.FAST_WITHDRAW]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.BORROW_AND_DEPOSIT_TO_CARD]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.CARD_DEPOSIT,
+    },
+    [TransactionType.REPAY_AND_WITHDRAW_COLLATERAL]: {
       sign: TransactionDirection.OUT,
       category: TransactionCategory.SAVINGS_ACCOUNT,
     },
@@ -294,6 +310,13 @@ export const ACTIVITY_TYPES = [
   { value: "card_welcome_bonus", label: "Card Welcome Bonus" },
   { value: "deposit_bonus", label: "Deposit Bonus" },
   { value: "bridge_transfer", label: "Bridge Transfer" },
+  { value: "borrow_and_deposit_to_card", label: "Borrow & Deposit to Card" },
+  { value: "card_withdrawal", label: "Card Withdrawal" },
+  { value: "fast_withdraw", label: "Fast Withdraw" },
+  {
+    value: "repay_and_withdraw_collateral",
+    label: "Repay & Withdraw Collateral",
+  },
 ] as const;
 
 export const DEPOSIT_TYPES = [
@@ -324,6 +347,10 @@ export interface ChainBalance {
   usdcThreshold: string;
   usdcStatus: "OK" | "LOW" | "CRITICAL" | "N/A";
   usdcAddress: string;
+  usdtBalance?: string;
+  usdtThreshold?: string;
+  usdtStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  usdtAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
@@ -430,6 +457,17 @@ export interface WhatsNew {
   updatedAt: string;
 }
 
+export interface PromotionsBanner {
+  _id: string;
+  title: string;
+  imageURL: string;
+  enabled: boolean;
+  sort?: number;
+  link?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Rewards Configuration Types
 export interface TierThresholds {
   tier1: { min: number; max: number };
@@ -512,4 +550,27 @@ export interface FullRewardsConfig {
   fuseStaking: FuseStakingConfig;
   referral: ReferralConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
+}
+
+// Campaign Types
+export type CampaignStatus = "Draft" | "Active" | "Paused" | "Ended";
+
+export interface Campaign {
+  _id: string;
+  name: string;
+  description?: string;
+  country?: string;
+  venueName?: string;
+  venueLocation?: string;
+  merchantName: string;
+  cashbackPercentage: number;
+  maxDailyCashback: number;
+  isInstant: boolean;
+  startDate: string;
+  endDate: string;
+  emailTemplateId?: number;
+  status: CampaignStatus;
+  totalCashbackPaid: number;
+  createdAt: string;
+  updatedAt: string;
 }

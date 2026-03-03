@@ -1,7 +1,7 @@
 "use client";
 
 import { Balance } from "@/types";
-import { Wallet, CreditCard, PiggyBank } from "lucide-react";
+import { Wallet, CreditCard, PiggyBank, Coins } from "lucide-react";
 
 export default function BalancesCard({ balances }: { balances: Balance[] }) {
   // Ensure we always have savings and wallet accounts shown even if they have 0 balance
@@ -9,6 +9,13 @@ export default function BalancesCard({ balances }: { balances: Balance[] }) {
     {
       accountType: "savings",
       currency: "USDC",
+      available: 0,
+      pending: 0,
+      total: 0,
+    },
+    {
+      accountType: "fuse-savings",
+      currency: "FUSE",
       available: 0,
       pending: 0,
       total: 0,
@@ -56,6 +63,8 @@ export default function BalancesCard({ balances }: { balances: Balance[] }) {
                 <div className="p-2 rounded-full bg-white shadow-sm mr-3">
                   {balance.accountType === "savings" ? (
                     <PiggyBank className="h-5 w-5 text-emerald-500" />
+                  ) : balance.accountType === "fuse-savings" ? (
+                    <Coins className="h-5 w-5 text-amber-500" />
                   ) : balance.accountType === "card" ? (
                     <CreditCard className="h-5 w-5 text-blue-500" />
                   ) : (
@@ -67,7 +76,9 @@ export default function BalancesCard({ balances }: { balances: Balance[] }) {
                     {balance.currency}
                   </p>
                   <p className="text-xs text-gray-500 capitalize">
-                    {balance.accountType || "Wallet"}
+                    {balance.accountType === "fuse-savings"
+                      ? "FUSE Savings"
+                      : balance.accountType || "Wallet"}
                   </p>
                 </div>
               </div>
