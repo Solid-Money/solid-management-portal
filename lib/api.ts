@@ -47,4 +47,10 @@ api.interceptors.response.use(
   }
 );
 
+export const getTierRecipients = (tier: number) =>
+  api.get(`/admin/v1/points/tier-recipients`, { params: { tier } });
+
+export const sendTierEmail = (tier: number, templateId: number) =>
+  api.post(`/admin/v1/points/send-tier-email`, { tier, templateId });
+
 export default api;

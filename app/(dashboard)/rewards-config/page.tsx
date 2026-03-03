@@ -16,10 +16,14 @@ import {
   Wallet,
   HelpCircle,
   CreditCard,
+  Mail,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import { FullRewardsConfig } from "@/types";
+import TierUsersModal from "@/components/tier-users-modal";
+import TierEmailModal from "@/components/tier-email-modal";
 import {
   Tooltip,
   TooltipContent,
@@ -205,6 +209,8 @@ export default function RewardsConfigPage() {
     useState<FullRewardsConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [tierUsersModal, setTierUsersModal] = useState<number | null>(null);
+  const [tierEmailModal, setTierEmailModal] = useState<number | null>(null);
 
   const fetchConfig = async () => {
     try {
@@ -548,6 +554,22 @@ export default function RewardsConfigPage() {
                 type="number"
                 tooltip="Maximum points before user advances to next tier"
               />
+              <div className="flex gap-2 pt-2 border-t border-gray-200">
+                <button
+                  onClick={() => setTierUsersModal(1)}
+                  className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  View Users
+                </button>
+                <button
+                  onClick={() => setTierEmailModal(1)}
+                  className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 transition-colors cursor-pointer"
+                >
+                  <Mail className="h-3 w-3 mr-1" />
+                  Send Email
+                </button>
+              </div>
             </TierCard>
             <TierCard tier="Tier 2">
               <InputField
@@ -564,6 +586,22 @@ export default function RewardsConfigPage() {
                 type="number"
                 tooltip="Maximum points before user advances to Tier 3"
               />
+              <div className="flex gap-2 pt-2 border-t border-gray-200">
+                <button
+                  onClick={() => setTierUsersModal(2)}
+                  className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  View Users
+                </button>
+                <button
+                  onClick={() => setTierEmailModal(2)}
+                  className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 transition-colors cursor-pointer"
+                >
+                  <Mail className="h-3 w-3 mr-1" />
+                  Send Email
+                </button>
+              </div>
             </TierCard>
             <TierCard tier="Tier 3">
               <InputField
@@ -573,6 +611,22 @@ export default function RewardsConfigPage() {
                 type="number"
                 tooltip="Points required to unlock the highest tier benefits"
               />
+              <div className="flex gap-2 pt-2 border-t border-gray-200">
+                <button
+                  onClick={() => setTierUsersModal(3)}
+                  className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  View Users
+                </button>
+                <button
+                  onClick={() => setTierEmailModal(3)}
+                  className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 transition-colors cursor-pointer"
+                >
+                  <Mail className="h-3 w-3 mr-1" />
+                  Send Email
+                </button>
+              </div>
             </TierCard>
           </TierGrid>
           <button
@@ -1110,6 +1164,17 @@ export default function RewardsConfigPage() {
           </button>
         </ConfigSection>
       </div>
+
+      <TierUsersModal
+        isOpen={tierUsersModal !== null}
+        onClose={() => setTierUsersModal(null)}
+        tier={tierUsersModal ?? 1}
+      />
+      <TierEmailModal
+        isOpen={tierEmailModal !== null}
+        onClose={() => setTierEmailModal(null)}
+        tier={tierEmailModal ?? 1}
+      />
     </div>
   );
 }
