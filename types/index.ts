@@ -26,6 +26,23 @@ export interface User {
   }[];
 }
 
+export interface DepositTitleGroup {
+  title: string;
+  total: number;
+  count: number;
+}
+
+export interface DepositCategory {
+  total: number;
+  count: number;
+  byTitle: DepositTitleGroup[];
+}
+
+export interface DepositSummary {
+  solidDeposits: DepositCategory;
+  bridgeCardDeposits: DepositCategory;
+}
+
 export interface ReferralSearchResponse {
   referrer: User | null;
   referredUsers: User[];

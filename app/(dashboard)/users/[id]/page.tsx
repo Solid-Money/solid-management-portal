@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { User, Balance, Activity } from "@/types";
 import BalancesCard from "@/components/balances-card";
+import DepositSummaryCard from "@/components/deposit-summary-card";
 import ActivityList from "@/components/activity-list";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -207,6 +208,7 @@ export default function UserDetailPage({
           </div>
 
           <BalancesCard balances={balances?.data || []} />
+          <DepositSummaryCard userId={id} />
         </div>
 
         <div className="lg:col-span-7 h-full min-h-0">
