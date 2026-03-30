@@ -478,6 +478,7 @@ export interface PromotionsBanner {
   _id: string;
   title: string;
   imageURL: string;
+  mobileImageURL?: string;
   enabled: boolean;
   sort?: number;
   link?: string;
