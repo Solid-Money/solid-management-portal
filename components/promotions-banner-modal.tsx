@@ -20,13 +20,16 @@ export default function PromotionsBannerModal({
 }: PromotionsBannerModalProps) {
   const [title, setTitle] = useState(banner?.title ?? "");
   const [imageURL, setImageURL] = useState(banner?.imageURL ?? "");
+  const [mobileImageURL, setMobileImageURL] = useState(banner?.mobileImageURL ?? "");
   const [enabled, setEnabled] = useState(banner?.enabled ?? false);
   const [sort, setSort] = useState<number>(banner?.sort ?? 0);
   const [link, setLink] = useState(banner?.link ?? "");
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingMobile, setUploadingMobile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mobileFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = async (file: File) => {
     try {
@@ -51,6 +54,29 @@ export default function PromotionsBannerModal({
     }
   };
 
+  const handleMobileImageUpload = async (file: File) => {
+    try {
+      setUploadingMobile(true);
+      const response = await fetch(`/api/upload?filename=${file.name}`, {
+        method: "POST",
+        body: file,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload mobile image");
+      }
+
+      const blob = await response.json();
+      setMobileImageURL(blob.url);
+      toast.success("Mobile image uploaded successfully!");
+    } catch (error) {
+      console.error("Upload failed:", error);
+      toast.error("Failed to upload mobile image.");
+    } finally {
+      setUploadingMobile(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setShowErrors(false);
@@ -70,6 +96,7 @@ export default function PromotionsBannerModal({
       const data = {
         title: title.trim(),
         imageURL,
+        ...(mobileImageURL ? { mobileImageURL } : {}),
         enabled,
         sort,
         ...(link.trim() ? { link: link.trim() } : {}),
@@ -205,6 +232,61 @@ export default function PromotionsBannerModal({
               )}
             </div>
           </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Mobile Image (optional)
+            </label>
+            <p className="text-xs text-gray-500">
+              Used on mobile screens. Falls back to the main image if not provided.
+            </p>
+            <div
+              className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 h-40 bg-gray-50 overflow-hidden relative group transition-colors border-gray-300"
+            >
+              {mobileImageURL ? (
+                <>
+                  <Image
+                    src={mobileImageURL}
+                    alt="Mobile Preview"
+                    fill
+                    className="object-cover rounded"
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => mobileFileInputRef.current?.click()}
+                      className="p-2 bg-white rounded-full text-gray-900 cursor-pointer"
+                    >
+                      <Upload className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileImageURL("")}
+                      className="p-2 bg-white rounded-full text-gray-900 cursor-pointer ml-2"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => mobileFileInputRef.current?.click()}
+                  disabled={uploadingMobile}
+                  className="flex flex-col items-center space-y-2 text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {uploadingMobile ? (
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8" />
+                      <span className="text-xs">Upload Mobile Banner</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
         </form>
 
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3">
@@ -218,7 +300,7 @@ export default function PromotionsBannerModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={saving || uploading}
+            disabled={saving || uploading || uploadingMobile}
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {saving ? (
@@ -240,6 +322,19 @@ export default function PromotionsBannerModal({
           const file = e.target.files?.[0];
           if (file) {
             handleImageUpload(file);
+          }
+          e.target.value = "";
+        }}
+        className="hidden"
+        accept="image/*"
+      />
+      <input
+        type="file"
+        ref={mobileFileInputRef}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleMobileImageUpload(file);
           }
           e.target.value = "";
         }}
