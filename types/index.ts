@@ -35,9 +35,16 @@ export interface DepositTitleGroup {
     amount: string;
     symbol: string;
     hash: string | null;
+    userOpHash: string | null;
     chainId: number | null;
+    status: string;
     createdAt: string;
     clientTxId: string;
+    sourceChainConfirmed: boolean;
+    confirmedAt: string | null;
+    cardBalanceConfirmedAt: string | null;
+    processingStatus: string | null;
+    url: string | null;
   }[];
 }
 

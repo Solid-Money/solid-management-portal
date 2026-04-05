@@ -10,6 +10,10 @@ import {
   Loader2,
   ChevronDown,
   ExternalLink,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Radio,
 } from "lucide-react";
 
 function formatAmount(amount: number): string {
@@ -68,6 +72,74 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+interface TxRecord {
+  amount: string;
+  symbol: string;
+  hash: string | null;
+  userOpHash: string | null;
+  chainId: number | null;
+  status: string;
+  createdAt: string;
+  clientTxId: string;
+  sourceChainConfirmed: boolean;
+  confirmedAt: string | null;
+  cardBalanceConfirmedAt: string | null;
+  processingStatus: string | null;
+  url: string | null;
+}
+
+function getStuckAt(tx: TxRecord): {
+  label: string;
+  color: string;
+  icon: React.ReactNode;
+} {
+  if (tx.status === "success" && tx.cardBalanceConfirmedAt) {
+    return {
+      label: "Card confirmed",
+      color: "text-green-600",
+      icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
+    };
+  }
+
+  if (tx.status === "success") {
+    return {
+      label: "Completed",
+      color: "text-green-600",
+      icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
+    };
+  }
+
+  if (tx.status === "failed") {
+    return {
+      label: "Failed",
+      color: "text-red-600",
+      icon: <AlertCircle className="h-3 w-3 text-red-500" />,
+    };
+  }
+
+  if (tx.sourceChainConfirmed) {
+    return {
+      label: "Stuck: confirmed on Fuse, awaiting bridge/card webhook",
+      color: "text-amber-600",
+      icon: <Clock className="h-3 w-3 text-amber-500" />,
+    };
+  }
+
+  if (tx.hash || tx.userOpHash) {
+    return {
+      label: "Stuck: submitted on Fuse, awaiting confirmation",
+      color: "text-orange-600",
+      icon: <Radio className="h-3 w-3 text-orange-500" />,
+    };
+  }
+
+  return {
+    label: "Stuck: created but never submitted",
+    color: "text-red-600",
+    icon: <AlertCircle className="h-3 w-3 text-red-400" />,
+  };
+}
+
 function TitleRow({ item }: { item: DepositTitleGroup }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -99,38 +171,61 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
               <tr className="bg-gray-50 text-gray-500 font-medium">
                 <td className="px-2 py-1.5">Date</td>
                 <td className="px-2 py-1.5 text-right">Amount</td>
+                <td className="px-2 py-1.5">Stuck At</td>
                 <td className="px-2 py-1.5 text-right">Tx Hash</td>
               </tr>
             </thead>
             <tbody>
-              {item.transactions.map((tx, i) => (
-                <tr
-                  key={tx.clientTxId || i}
-                  className="border-t border-gray-50 hover:bg-gray-50/50"
-                >
-                  <td className="px-2 py-1.5 text-gray-500">
-                    {formatDate(tx.createdAt)}
-                  </td>
-                  <td className="px-2 py-1.5 text-right text-gray-900 font-medium">
-                    {parseFloat(tx.amount || "0").toFixed(2)} {tx.symbol}
-                  </td>
-                  <td className="px-2 py-1.5 text-right">
-                    {tx.hash ? (
-                      <a
-                        href={getExplorerTxUrl(tx.hash, tx.chainId)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-mono"
-                      >
-                        {truncateHash(tx.hash)}
-                        <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {item.transactions.map((tx, i) => {
+                const stuckAt = getStuckAt(tx);
+                return (
+                  <tr
+                    key={tx.clientTxId || i}
+                    className="border-t border-gray-50 hover:bg-gray-50/50"
+                  >
+                    <td className="px-2 py-1.5 text-gray-500">
+                      {formatDate(tx.createdAt)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right text-gray-900 font-medium whitespace-nowrap">
+                      {parseFloat(tx.amount || "0").toFixed(2)} {tx.symbol}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-1">
+                        {stuckAt.icon}
+                        <span className={`${stuckAt.color} font-medium`}>
+                          {stuckAt.label}
+                        </span>
+                      </div>
+                      {tx.url && tx.status !== "success" && (
+                        <a
+                          href={tx.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 mt-0.5"
+                        >
+                          LayerZero Scan
+                          <ExternalLink className="h-2 w-2" />
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      {tx.hash ? (
+                        <a
+                          href={getExplorerTxUrl(tx.hash, tx.chainId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-mono"
+                        >
+                          {truncateHash(tx.hash)}
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
