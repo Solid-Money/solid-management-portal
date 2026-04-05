@@ -31,6 +31,14 @@ export interface DepositTitleGroup {
   status: string;
   total: number;
   count: number;
+  transactions: {
+    amount: string;
+    symbol: string;
+    hash: string | null;
+    chainId: number | null;
+    createdAt: string;
+    clientTxId: string;
+  }[];
 }
 
 export interface DepositCategory {

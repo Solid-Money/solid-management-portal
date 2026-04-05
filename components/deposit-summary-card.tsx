@@ -1,15 +1,50 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { DepositSummary } from "@/types";
-import { ArrowDownToLine, CreditCard, Loader2 } from "lucide-react";
+import { DepositSummary, DepositTitleGroup } from "@/types";
+import {
+  ArrowDownToLine,
+  CreditCard,
+  Loader2,
+  ChevronDown,
+  ExternalLink,
+} from "lucide-react";
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function formatDate(dateStr: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(dateStr));
+}
+
+function truncateHash(hash: string): string {
+  return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+}
+
+const EXPLORER_URLS: Record<number, string> = {
+  1: "https://etherscan.io",
+  122: "https://explorer.fuse.io",
+  8453: "https://basescan.org",
+  42161: "https://arbiscan.io",
+  137: "https://polygonscan.com",
+};
+
+function getExplorerTxUrl(hash: string, chainId: number | null): string {
+  const base = EXPLORER_URLS[chainId ?? 122] ?? EXPLORER_URLS[122];
+  return `${base}/tx/${hash}`;
 }
 
 const statusColors: Record<string, string> = {
@@ -33,6 +68,77 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function TitleRow({ item }: { item: DepositTitleGroup }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-xs py-1.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer rounded px-1"
+      >
+        <div className="flex items-center gap-2 truncate mr-2">
+          <ChevronDown
+            className={`h-3 w-3 text-gray-400 transition-transform shrink-0 ${
+              expanded ? "rotate-0" : "-rotate-90"
+            }`}
+          />
+          <span className="text-gray-600 truncate">{item.title}</span>
+          <StatusBadge status={item.status} />
+        </div>
+        <span className="text-gray-900 font-medium whitespace-nowrap">
+          ${formatAmount(item.total)}{" "}
+          <span className="text-gray-400">({item.count})</span>
+        </span>
+      </button>
+
+      {expanded && item.transactions.length > 0 && (
+        <div className="ml-6 mr-1 mb-2 mt-1 border border-gray-100 rounded-lg overflow-hidden">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500 font-medium">
+                <td className="px-2 py-1.5">Date</td>
+                <td className="px-2 py-1.5 text-right">Amount</td>
+                <td className="px-2 py-1.5 text-right">Tx Hash</td>
+              </tr>
+            </thead>
+            <tbody>
+              {item.transactions.map((tx, i) => (
+                <tr
+                  key={tx.clientTxId || i}
+                  className="border-t border-gray-50 hover:bg-gray-50/50"
+                >
+                  <td className="px-2 py-1.5 text-gray-500">
+                    {formatDate(tx.createdAt)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-gray-900 font-medium">
+                    {parseFloat(tx.amount || "0").toFixed(2)} {tx.symbol}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {tx.hash ? (
+                      <a
+                        href={getExplorerTxUrl(tx.hash, tx.chainId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-mono"
+                      >
+                        {truncateHash(tx.hash)}
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CategorySection({
   icon,
   label,
@@ -44,7 +150,7 @@ function CategorySection({
   label: string;
   total: number;
   count: number;
-  byTitle: { title: string; status: string; total: number; count: number }[];
+  byTitle: DepositTitleGroup[];
 }) {
   return (
     <div className="space-y-2">
@@ -63,21 +169,9 @@ function CategorySection({
         </div>
       </div>
       {byTitle.length > 0 && (
-        <div className="ml-8 space-y-1">
+        <div className="ml-8 space-y-0.5">
           {byTitle.map((item) => (
-            <div
-              key={`${item.title}-${item.status}`}
-              className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-0"
-            >
-              <div className="flex items-center gap-2 truncate mr-2">
-                <span className="text-gray-600 truncate">{item.title}</span>
-                <StatusBadge status={item.status} />
-              </div>
-              <span className="text-gray-900 font-medium whitespace-nowrap">
-                ${formatAmount(item.total)}{" "}
-                <span className="text-gray-400">({item.count})</span>
-              </span>
-            </div>
+            <TitleRow key={`${item.title}-${item.status}`} item={item} />
           ))}
         </div>
       )}
