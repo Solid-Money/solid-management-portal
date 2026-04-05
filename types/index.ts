@@ -28,6 +28,7 @@ export interface User {
 
 export interface DepositTitleGroup {
   title: string;
+  status: string;
   total: number;
   count: number;
 }

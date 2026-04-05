@@ -12,6 +12,27 @@ function formatAmount(amount: number): string {
   });
 }
 
+const statusColors: Record<string, string> = {
+  success: "bg-green-100 text-green-700",
+  processing: "bg-yellow-100 text-yellow-700",
+  pending: "bg-gray-100 text-gray-600",
+  failed: "bg-red-100 text-red-700",
+  expired: "bg-orange-100 text-orange-700",
+  cancelled: "bg-gray-100 text-gray-500",
+  refunded: "bg-purple-100 text-purple-700",
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const color = statusColors[status] ?? "bg-gray-100 text-gray-600";
+  return (
+    <span
+      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${color}`}
+    >
+      {status}
+    </span>
+  );
+}
+
 function CategorySection({
   icon,
   label,
@@ -23,7 +44,7 @@ function CategorySection({
   label: string;
   total: number;
   count: number;
-  byTitle: { title: string; total: number; count: number }[];
+  byTitle: { title: string; status: string; total: number; count: number }[];
 }) {
   return (
     <div className="space-y-2">
@@ -45,10 +66,13 @@ function CategorySection({
         <div className="ml-8 space-y-1">
           {byTitle.map((item) => (
             <div
-              key={item.title}
+              key={`${item.title}-${item.status}`}
               className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-0"
             >
-              <span className="text-gray-600 truncate mr-2">{item.title}</span>
+              <div className="flex items-center gap-2 truncate mr-2">
+                <span className="text-gray-600 truncate">{item.title}</span>
+                <StatusBadge status={item.status} />
+              </div>
               <span className="text-gray-900 font-medium whitespace-nowrap">
                 ${formatAmount(item.total)}{" "}
                 <span className="text-gray-400">({item.count})</span>
