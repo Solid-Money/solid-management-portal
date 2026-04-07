@@ -140,8 +140,17 @@ function getStuckAt(tx: TxRecord): {
   };
 }
 
+function isFuseTitle(title: string): boolean {
+  return title.toLowerCase().includes("sofuse") || title.toLowerCase().includes("fuse");
+}
+
+function formatWithCurrency(amount: number, fuse: boolean): string {
+  return fuse ? `${formatAmount(amount)} FUSE` : `$${formatAmount(amount)}`;
+}
+
 function TitleRow({ item }: { item: DepositTitleGroup }) {
   const [expanded, setExpanded] = useState(false);
+  const fuse = isFuseTitle(item.title);
 
   return (
     <div>
@@ -159,7 +168,7 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
           <StatusBadge status={item.status} />
         </div>
         <span className="text-gray-900 font-medium whitespace-nowrap">
-          ${formatAmount(item.total)}{" "}
+          {formatWithCurrency(item.total, fuse)}{" "}
           <span className="text-gray-400">({item.count})</span>
         </span>
       </button>
@@ -247,6 +256,13 @@ function CategorySection({
   count: number;
   byTitle: DepositTitleGroup[];
 }) {
+  const usdTotal = byTitle
+    .filter((t) => !isFuseTitle(t.title))
+    .reduce((sum, t) => sum + t.total, 0);
+  const fuseTotal = byTitle
+    .filter((t) => isFuseTitle(t.title))
+    .reduce((sum, t) => sum + t.total, 0);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -255,9 +271,19 @@ function CategorySection({
           <span className="text-sm font-semibold text-gray-900">{label}</span>
         </div>
         <div className="text-right">
-          <p className="text-sm font-bold text-gray-900">
-            ${formatAmount(total)}
-          </p>
+          {usdTotal > 0 && (
+            <p className="text-sm font-bold text-gray-900">
+              ${formatAmount(usdTotal)}
+            </p>
+          )}
+          {fuseTotal > 0 && (
+            <p className="text-sm font-bold text-gray-900">
+              {formatAmount(fuseTotal)} FUSE
+            </p>
+          )}
+          {usdTotal === 0 && fuseTotal === 0 && (
+            <p className="text-sm font-bold text-gray-900">$0.00</p>
+          )}
           <p className="text-[10px] text-gray-500">
             {count} {count === 1 ? "deposit" : "deposits"}
           </p>
