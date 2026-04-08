@@ -67,4 +67,7 @@ export const getLatestCohortSnapshots = () =>
 export const getCohortEmails = (cohortId: string) =>
   api.get(`/admin/v1/cohort-snapshots/${cohortId}/emails`);
 
+export const triggerCohortSnapshots = () =>
+  api.post("/admin/v1/cohort-snapshots/trigger");
+
 export default api;
