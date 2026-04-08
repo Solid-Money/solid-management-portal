@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, Loader2, UsersRound, RefreshCw } from "lucide-react";
-import { getLatestCohortSnapshots, getCohortEmails } from "@/lib/api";
+import { Download, Loader2, UsersRound, RefreshCw, Play } from "lucide-react";
+import {
+  getLatestCohortSnapshots,
+  getCohortEmails,
+  triggerCohortSnapshots,
+} from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { toast } from "sonner";
 
@@ -35,6 +39,7 @@ export default function CohortsPage() {
   const [exportingCohortId, setExportingCohortId] = useState<string | null>(
     null,
   );
+  const [triggering, setTriggering] = useState(false);
 
   const fetchCohorts = async () => {
     try {
@@ -76,6 +81,20 @@ export default function CohortsPage() {
     }
   };
 
+  const handleTrigger = async () => {
+    try {
+      setTriggering(true);
+      await triggerCohortSnapshots();
+      toast.success("Cohort snapshots recalculated");
+      await fetchCohorts();
+    } catch (error) {
+      console.error("Failed to trigger recalculation:", error);
+      toast.error("Failed to trigger recalculation");
+    } finally {
+      setTriggering(false);
+    }
+  };
+
   const snapshotDate = cohorts.length > 0 ? cohorts[0].date : null;
 
   const formattedDate = snapshotDate
@@ -101,16 +120,30 @@ export default function CohortsPage() {
           </p>
         </div>
 
-        <button
-          onClick={fetchCohorts}
-          disabled={loading}
-          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleTrigger}
+            disabled={triggering || loading}
+            className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {triggering ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            Recalculate
+          </button>
+          <button
+            onClick={fetchCohorts}
+            disabled={loading}
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {loading ? (
