@@ -41,26 +41,26 @@ export const ActivityItem = ({
   const isRefunded = status === TransactionStatus.REFUNDED;
 
   const statusBadge = isFailed
-    ? { text: "Failed", bgColor: "bg-red-500/20", textColor: "text-red-400" }
+    ? { text: "Failed", bgColor: "bg-red-50", textColor: "text-red-600" }
     : isExpired
-    ? { text: "Expired", bgColor: "bg-orange-500/20", textColor: "text-orange-400" }
+    ? { text: "Expired", bgColor: "bg-orange-50", textColor: "text-orange-600" }
     : isRefunded
-    ? { text: "Refunded", bgColor: "bg-purple-500/20", textColor: "text-purple-400" }
+    ? { text: "Refunded", bgColor: "bg-purple-50", textColor: "text-purple-600" }
     : null;
 
   const isIncoming = details?.sign === TransactionDirection.IN;
-  
+
   const statusTextColor = isFailed
-    ? "text-red-400"
+    ? "text-red-600"
     : isExpired
-    ? "text-orange-400"
+    ? "text-orange-600"
     : isRefunded
-    ? "text-purple-400"
+    ? "text-purple-600"
     : isCancelled
-    ? "text-gray-500"
+    ? "text-gray-400"
     : isIncoming
-    ? "text-emerald-400"
-    : "text-white";
+    ? "text-emerald-600"
+    : "text-gray-900";
 
   const statusSign = isFailed
     ? TransactionDirection.FAILED
@@ -90,17 +90,17 @@ export const ActivityItem = ({
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-4 py-4 bg-[#1C1C1E] transition-colors hover:bg-[#2C2C2E]",
-        !isLast && "border-b border-[#2C2C2E]",
-        isFirst && "rounded-t-2xl",
-        isLast && "rounded-b-2xl"
+        "flex items-center justify-between px-4 py-4 bg-white transition-colors hover:bg-gray-50",
+        !isLast && "border-b border-gray-100",
+        isFirst && "rounded-t-2xl shadow-sm",
+        isLast && "rounded-b-2xl shadow-sm"
       )}
     >
       <div className="flex items-center gap-4 flex-1 min-w-0">
         <TokenIcon symbol={symbol} size={44} />
         <div className="shrink min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-base font-medium text-white truncate">
+            <span className="text-base font-medium text-gray-900 truncate">
               {displayTitle}
             </span>
             {url && (
@@ -108,7 +108,7 @@ export const ActivityItem = ({
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-500 hover:text-white"
+                className="text-gray-400 hover:text-gray-900"
               >
                 <ExternalLink className="h-3 w-3" />
               </a>
@@ -116,12 +116,12 @@ export const ActivityItem = ({
           </div>
           <div className="flex items-center gap-2">
             {isPending || isProcessing ? (
-              <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+              <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
             ) : null}
-            <span className="text-sm text-gray-400 font-medium">
+            <span className="text-sm text-gray-600 font-medium">
               {description}
             </span>
-            <span className="text-xs text-gray-600">•</span>
+            <span className="text-xs text-gray-400">•</span>
             <span className="text-xs text-gray-500">{formattedTimestamp}</span>
           </div>
         </div>
@@ -151,7 +151,7 @@ export const ActivityItem = ({
           )}
         </span>
         {hash && (
-          <span className="text-[10px] font-mono text-gray-600 truncate max-w-[100px]">
+          <span className="text-[10px] font-mono text-gray-500 truncate max-w-[100px]">
             {hash.slice(0, 6)}...{hash.slice(-4)}
           </span>
         )}

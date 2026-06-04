@@ -315,7 +315,7 @@ export default function DepositSummaryCard({ userId }: { userId: string }) {
     <div className="bg-white shadow-sm border border-gray-100 overflow-hidden sm:rounded-xl">
       <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
         <h3 className="text-base leading-6 font-semibold text-gray-900">
-          Deposit Summary
+          Total Deposits
         </h3>
       </div>
       <div className="px-4 py-4">
@@ -345,7 +345,7 @@ export default function DepositSummaryCard({ userId }: { userId: string }) {
                   <CreditCard className="h-4 w-4 text-blue-600" />
                 </div>
               }
-              label="Bridge Card Deposits"
+              label="Card Deposits"
               total={summary.bridgeCardDeposits.total}
               count={summary.bridgeCardDeposits.count}
               byTitle={summary.bridgeCardDeposits.byTitle}
