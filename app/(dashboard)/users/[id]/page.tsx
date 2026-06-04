@@ -116,9 +116,19 @@ export default function UserDetailPage({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase">Country</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {user.country || "-"}
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    Rain Card
+                  </dt>
+                  <dd className="mt-1 text-sm">
+                    <span
+                      className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        user.hasRainCard
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {user.hasRainCard ? "Yes" : "No"}
+                    </span>
                   </dd>
                 </div>
                 <div className="sm:col-span-2">

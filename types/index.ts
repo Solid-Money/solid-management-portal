@@ -24,6 +24,7 @@ export interface User {
     kycStatus: string;
     createdAt: string;
   }[];
+  hasRainCard?: boolean;
 }
 
 export interface DepositTitleGroup {
@@ -332,14 +333,11 @@ export const ACTIVITY_TYPES = [
   { value: "swap", label: "Swap" },
   { value: "bridge", label: "Bridge" },
   { value: "bridge_deposit", label: "Bridge Deposit" },
-  { value: "card_transaction", label: "Card Transaction" },
-  { value: "mercuryo_transaction", label: "Mercuryo Transaction" },
   { value: "bank_transfer", label: "Bank Transfer" },
   { value: "unstake", label: "Withdraw" },
   { value: "cancel_withdraw", label: "Cancel Withdraw" },
   { value: "wrap", label: "Wrap" },
   { value: "unwrap", label: "Unwrap" },
-  { value: "merkl_claim", label: "Merkl Claim" },
   { value: "card_welcome_bonus", label: "Card Welcome Bonus" },
   { value: "deposit_bonus", label: "Deposit Bonus" },
   { value: "bridge_transfer", label: "Bridge Transfer" },
