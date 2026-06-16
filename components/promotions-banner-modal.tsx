@@ -24,6 +24,11 @@ export default function PromotionsBannerModal({
   const [enabled, setEnabled] = useState(banner?.enabled ?? false);
   const [sort, setSort] = useState<number>(banner?.sort ?? 0);
   const [link, setLink] = useState(banner?.link ?? "");
+  const [platforms, setPlatforms] = useState({
+    web: banner?.platforms?.web ?? true,
+    ios: banner?.platforms?.ios ?? true,
+    android: banner?.platforms?.android ?? true,
+  });
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -100,6 +105,7 @@ export default function PromotionsBannerModal({
         enabled,
         sort,
         ...(link.trim() ? { link: link.trim() } : {}),
+        platforms,
       };
 
       if (banner) {
@@ -184,6 +190,44 @@ export default function PromotionsBannerModal({
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="https://..."
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Platforms
+            </label>
+            <p className="text-xs text-gray-500">
+              Choose which platforms display this banner in the app.
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              {(
+                [
+                  { key: "web", label: "Web" },
+                  { key: "ios", label: "iOS" },
+                  { key: "android", label: "Android" },
+                ] as const
+              ).map(({ key, label }) => (
+                <label
+                  key={key}
+                  className="flex items-center space-x-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={platforms[key]}
+                    onChange={(e) =>
+                      setPlatforms((prev) => ({
+                        ...prev,
+                        [key]: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 text-indigo-600 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    {label}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-2">
