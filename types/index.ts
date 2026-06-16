@@ -488,6 +488,12 @@ export interface WhatsNew {
   updatedAt: string;
 }
 
+export interface PromotionsBannerPlatforms {
+  web: boolean;
+  android: boolean;
+  ios: boolean;
+}
+
 export interface PromotionsBanner {
   _id: string;
   title: string;
@@ -496,6 +502,7 @@ export interface PromotionsBanner {
   enabled: boolean;
   sort?: number;
   link?: string;
+  platforms?: PromotionsBannerPlatforms;
   createdAt?: string;
   updatedAt?: string;
 }
