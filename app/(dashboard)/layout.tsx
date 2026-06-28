@@ -15,6 +15,7 @@ import {
   Megaphone,
   Terminal,
   Image,
+  TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
@@ -59,6 +60,7 @@ export default function DashboardLayout({
     },
     { href: "/wallets", label: "Wallets", icon: Wallet },
     { href: "/rewards-config", label: "Rewards", icon: Gift },
+    { href: "/landing-apy", label: "Landing APY", icon: TrendingUp },
     { href: "/revenue", label: "Revenue", icon: DollarSign },
     { href: "/campaigns", label: "Campaigns", icon: Megaphone },
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
