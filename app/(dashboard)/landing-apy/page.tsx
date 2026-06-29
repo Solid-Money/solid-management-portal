@@ -22,7 +22,7 @@ interface LandingApyConfig {
 const ASSETS: { key: ApyAsset; label: string }[] = [
   { key: "usdc", label: "USDC (soUSD)" },
   { key: "fuse", label: "FUSE (soFUSE)" },
-  { key: "eth", label: "ETH" },
+  { key: "eth", label: "ETH (soETH)" },
 ];
 
 const WINDOWS: { key: ApyWindow; label: string }[] = [
@@ -223,8 +223,6 @@ export default function LandingApyPage() {
     );
   }
 
-  const fieldsDisabled = !config.overrideEnabled;
-
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center space-x-3">
@@ -256,82 +254,85 @@ export default function LandingApyPage() {
           />
         </div>
 
-        {/* Mode selector */}
-        <div className="flex items-center gap-2">
-          {(["simple", "advanced"] as ApyMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              disabled={fieldsDisabled}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                config.mode === m
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {m === "simple" ? "Simple" : "Advanced"}
-            </button>
-          ))}
-        </div>
-
-        {config.mode === "simple" ? (
-          <div className="flex flex-col max-w-xs">
-            <label className="text-sm font-medium text-gray-700 mb-1">
-              APY value
-            </label>
-            <ApyInput
-              value={config.apy}
-              onChange={(v) => setConfig({ ...config, apy: v })}
-              disabled={fieldsDisabled}
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Shown as the headline APY (maps to USDC · all-time).
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-gray-400">
-              Only USDC · all-time is currently displayed on the landing page.
-              Other windows and assets are stored for future use.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="text-left font-medium text-gray-500 py-2 pr-4">
-                      Asset
-                    </th>
-                    {WINDOWS.map((w) => (
-                      <th
-                        key={w.key}
-                        className="text-left font-medium text-gray-500 py-2 px-2"
-                      >
-                        {w.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ASSETS.map((a) => (
-                    <tr key={a.key} className="border-t border-gray-100">
-                      <td className="py-2 pr-4 font-medium text-gray-700 whitespace-nowrap">
-                        {a.label}
-                      </td>
-                      {WINDOWS.map((w) => (
-                        <td key={w.key} className="py-2 px-2 w-32">
-                          <ApyInput
-                            value={config.apys[a.key][w.key]}
-                            onChange={(v) => setMatrixValue(a.key, w.key, v)}
-                            disabled={fieldsDisabled}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Mode selector and values are only shown once the override is on. */}
+        {config.overrideEnabled && (
+          <>
+            <div className="flex items-center gap-2">
+              {(["simple", "advanced"] as ApyMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                    config.mode === m
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  {m === "simple" ? "Simple" : "Advanced"}
+                </button>
+              ))}
             </div>
-          </div>
+
+            {config.mode === "simple" ? (
+              <div className="flex flex-col max-w-xs">
+                <label className="text-sm font-medium text-gray-700 mb-1">
+                  APY value
+                </label>
+                <ApyInput
+                  value={config.apy}
+                  onChange={(v) => setConfig({ ...config, apy: v })}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Shown as the headline APY (maps to USDC · all-time).
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">
+                  Only USDC · all-time is currently displayed on the landing
+                  page. Other windows and assets are stored for future use.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="text-left font-medium text-gray-500 py-2 pr-4">
+                          Asset
+                        </th>
+                        {WINDOWS.map((w) => (
+                          <th
+                            key={w.key}
+                            className="text-left font-medium text-gray-500 py-2 px-2"
+                          >
+                            {w.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ASSETS.map((a) => (
+                        <tr key={a.key} className="border-t border-gray-100">
+                          <td className="py-2 pr-4 font-medium text-gray-700 whitespace-nowrap">
+                            {a.label}
+                          </td>
+                          {WINDOWS.map((w) => (
+                            <td key={w.key} className="py-2 px-2 w-32">
+                              <ApyInput
+                                value={config.apys[a.key][w.key]}
+                                onChange={(v) =>
+                                  setMatrixValue(a.key, w.key, v)
+                                }
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="flex justify-end pt-2">
