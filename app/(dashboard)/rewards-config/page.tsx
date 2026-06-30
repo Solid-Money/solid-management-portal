@@ -300,6 +300,27 @@ export default function RewardsConfigPage() {
     updateConfig(section, field, num);
   };
 
+  const updateCategoryMerchants = (index: number, rawMerchants: string) => {
+    setConfig((prev) => {
+      if (!prev) return prev;
+      const categories = prev.subscriptionDiscount.categories.map((cat, i) =>
+        i === index
+          ? {
+              ...cat,
+              merchants: rawMerchants
+                .split(",")
+                .map((m) => m.trim())
+                .filter((m) => m.length > 0),
+            }
+          : cat,
+      );
+      return {
+        ...prev,
+        subscriptionDiscount: { ...prev.subscriptionDiscount, categories },
+      };
+    });
+  };
+
   const saveSection = async (
     section: string,
     endpoint: string,
@@ -377,18 +398,21 @@ export default function RewardsConfigPage() {
       "subscription-discount",
       {
         enabled: config.subscriptionDiscount.enabled,
-        eligibleServices: config.subscriptionDiscount.eligibleServices,
+        categories: config.subscriptionDiscount.categories,
+        eligibleAmountCap: Number(
+          config.subscriptionDiscount.eligibleAmountCap,
+        ),
         tier1Percentage: Number(config.subscriptionDiscount.tier1.percentage),
-        tier1ServiceLimit: Number(
-          config.subscriptionDiscount.tier1.serviceLimit,
+        tier1CategoryLimit: Number(
+          config.subscriptionDiscount.tier1.categoryLimit,
         ),
         tier2Percentage: Number(config.subscriptionDiscount.tier2.percentage),
-        tier2ServiceLimit: Number(
-          config.subscriptionDiscount.tier2.serviceLimit,
+        tier2CategoryLimit: Number(
+          config.subscriptionDiscount.tier2.categoryLimit,
         ),
         tier3Percentage: Number(config.subscriptionDiscount.tier3.percentage),
-        tier3ServiceLimit: Number(
-          config.subscriptionDiscount.tier3.serviceLimit,
+        tier3CategoryLimit: Number(
+          config.subscriptionDiscount.tier3.categoryLimit,
         ),
       },
       "subscriptionDiscount",
@@ -985,8 +1009,8 @@ export default function RewardsConfigPage() {
 
         {/* Subscription Discount */}
         <ConfigSection
-          title="Subscription Discount (Not finalized)"
-          description="Discounts on eligible subscription services based on tier (future feature)"
+          title="Category-based Subscription Discounts"
+          description="Up to 50% back on monthly subscriptions (Netflix, Spotify, ChatGPT…). Prime unlocks 2 categories/month, Ultra unlocks 4. One subscription per category per month (first-paid-wins); paid as FUSE and drawn from the same monthly cashback cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
         >
           <ToggleField
@@ -995,23 +1019,45 @@ export default function RewardsConfigPage() {
             onChange={(v) => updateConfig("subscriptionDiscount", "enabled", v)}
             tooltip="Enable or disable subscription discounts for all users"
           />
-          <div className="mt-4">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">
-              Eligible Services (comma-separated)
-              <InfoTooltip text="List of subscription services that qualify for discounts (e.g., Netflix, Spotify)" />
-            </label>
-            <textarea
-              value={config.subscriptionDiscount.eligibleServices.join(", ")}
-              onChange={(e) =>
-                updateConfig(
+          <div className="mt-4 max-w-xs">
+            <InputField
+              label="Eligible Amount Cap"
+              value={config.subscriptionDiscount.eligibleAmountCap}
+              onChange={(v) =>
+                handleNumericUpdate(
                   "subscriptionDiscount",
-                  "eligibleServices",
-                  e.target.value.split(",").map((s) => s.trim()),
+                  "eligibleAmountCap",
+                  v,
                 )
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              rows={2}
+              type="number"
+              suffix="$"
+              tooltip="Only the first N dollars of each eligible subscription charge earn the discount (e.g. $50)."
             />
+          </div>
+          <div className="mt-4 space-y-3">
+            <label className="text-sm font-medium text-gray-700 block">
+              Categories &amp; Eligible Merchants
+              <InfoTooltip text="Each category's merchants (comma-separated). A card transaction is matched to a category when its merchant name contains one of these aliases (case/punctuation-insensitive)." />
+            </label>
+            {config.subscriptionDiscount.categories?.map((cat, index) => (
+              <div
+                key={cat.key}
+                className="border border-gray-200 rounded-md p-3 bg-gray-50"
+              >
+                <div className="text-sm font-semibold text-gray-800 mb-1">
+                  {cat.label}
+                </div>
+                <textarea
+                  value={cat.merchants.join(", ")}
+                  onChange={(e) =>
+                    updateCategoryMerchants(index, e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  rows={2}
+                />
+              </div>
+            ))}
           </div>
           <TierGrid>
             <TierCard tier="Tier 1">
@@ -1036,17 +1082,17 @@ export default function RewardsConfigPage() {
                 tooltip="Percentage discount on eligible subscriptions"
               />
               <InputField
-                label="Service Limit"
-                value={config.subscriptionDiscount.tier1.serviceLimit}
+                label="Categories / month"
+                value={config.subscriptionDiscount.tier1.categoryLimit}
                 onChange={(v) =>
                   handleNumericUpdate(
                     "subscriptionDiscount",
-                    "tier1.serviceLimit",
+                    "tier1.categoryLimit",
                     v,
                   )
                 }
                 type="number"
-                tooltip="Maximum number of services that can receive discount"
+                tooltip="Number of subscription categories this tier can earn a discount on per month (Core 0, Prime 2, Ultra 4)"
               />
             </TierCard>
             <TierCard tier="Tier 2">
@@ -1070,16 +1116,17 @@ export default function RewardsConfigPage() {
                 step="1"
               />
               <InputField
-                label="Service Limit"
-                value={config.subscriptionDiscount.tier2.serviceLimit}
+                label="Categories / month"
+                value={config.subscriptionDiscount.tier2.categoryLimit}
                 onChange={(v) =>
                   handleNumericUpdate(
                     "subscriptionDiscount",
-                    "tier2.serviceLimit",
+                    "tier2.categoryLimit",
                     v,
                   )
                 }
                 type="number"
+                tooltip="Number of subscription categories this tier can earn a discount on per month (Prime: 2)"
               />
             </TierCard>
             <TierCard tier="Tier 3">
@@ -1103,16 +1150,17 @@ export default function RewardsConfigPage() {
                 step="1"
               />
               <InputField
-                label="Service Limit"
-                value={config.subscriptionDiscount.tier3.serviceLimit}
+                label="Categories / month"
+                value={config.subscriptionDiscount.tier3.categoryLimit}
                 onChange={(v) =>
                   handleNumericUpdate(
                     "subscriptionDiscount",
-                    "tier3.serviceLimit",
+                    "tier3.categoryLimit",
                     v,
                   )
                 }
                 type="number"
+                tooltip="Number of subscription categories this tier can earn a discount on per month (Ultra: 4)"
               />
             </TierCard>
           </TierGrid>

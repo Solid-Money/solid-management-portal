@@ -543,12 +543,25 @@ export interface DepositBoostConfig {
 
 export interface TierSubscriptionDiscountConfig {
   percentage: number;
+  /** @deprecated Superseded by categoryLimit. */
   serviceLimit: number;
+  /** Number of subscription categories this tier can earn a discount on per month. */
+  categoryLimit: number;
+}
+
+export interface SubscriptionDiscountCategory {
+  key: string;
+  label: string;
+  merchants: string[];
 }
 
 export interface SubscriptionDiscountConfig {
   enabled: boolean;
+  /** @deprecated Legacy flat service list; detection uses categories. */
   eligibleServices: string[];
+  categories: SubscriptionDiscountCategory[];
+  /** First N dollars of an eligible charge that earn the discount. */
+  eligibleAmountCap: number;
   tier1: TierSubscriptionDiscountConfig;
   tier2: TierSubscriptionDiscountConfig;
   tier3: TierSubscriptionDiscountConfig;
