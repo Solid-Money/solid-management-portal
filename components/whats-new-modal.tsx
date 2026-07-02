@@ -21,7 +21,7 @@ export default function WhatsNewModal({
   const [isActive, setIsActive] = useState(popup?.isActive ?? false);
   const [showOnLoad, setShowOnLoad] = useState(popup?.showOnLoad ?? true);
   const [steps, setSteps] = useState<WhatsNewStep[]>(
-    popup?.steps || [{ imageUrl: "", title: "", text: "" }]
+    popup?.steps || [{ imageUrl: "", title: "", text: "", buttonLabel: "", buttonLink: "" }]
   );
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -279,6 +279,55 @@ export default function WhatsNewModal({
                         required
                       />
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-700">
+                          Button Label{" "}
+                          <span className="font-normal text-gray-400">
+                            (optional)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={step.buttonLabel ?? ""}
+                          onChange={(e) =>
+                            handleStepChange(
+                              index,
+                              "buttonLabel",
+                              e.target.value
+                            )
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="e.g. Check your tier"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-700">
+                          Button Link{" "}
+                          <span className="font-normal text-gray-400">
+                            (optional)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={step.buttonLink ?? ""}
+                          onChange={(e) =>
+                            handleStepChange(
+                              index,
+                              "buttonLink",
+                              e.target.value
+                            )
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="https://... or /rewards"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Add both a label and a link to show a call-to-action
+                      button below the description. Links can be an external
+                      URL (https://...) or an in-app route (e.g. /rewards).
+                    </p>
                   </div>
                 </div>
               </div>
