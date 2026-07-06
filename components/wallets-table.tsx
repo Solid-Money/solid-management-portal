@@ -13,6 +13,22 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
+type BalanceStatus = "OK" | "LOW" | "CRITICAL" | "N/A";
+
+// Which token columns to show for a wallet. A token column (balance + address)
+// is hidden when it is blank (N/A) on every chain of that wallet, so wallets
+// only surface the assets they actually hold (e.g. a soUSD-only payout wallet
+// no longer shows empty USDC/USDT columns).
+interface VisibleColumns {
+  gas: boolean;
+  usdc: boolean;
+  usdt: boolean;
+  soUsd: boolean;
+}
+
+const isActive = (status?: BalanceStatus): boolean =>
+  status != null && status !== "N/A";
+
 export default function WalletsTable() {
   const [expandedWallets, setExpandedWallets] = useState<Set<string>>(
     new Set()
@@ -68,52 +84,118 @@ export default function WalletsTable() {
     }
   };
 
-  const renderChainRow = (chain: ChainBalance) => {
-    const hasGas = chain.gasStatus !== "N/A";
-    const hasUsdc = chain.usdcStatus !== "N/A";
-    const hasUsdt = chain.usdtStatus !== undefined && chain.usdtStatus !== "N/A";
+  // Compute which token columns are non-blank for at least one chain.
+  const getVisibleColumns = (chains: ChainBalance[]): VisibleColumns => ({
+    gas: chains.some((c) => isActive(c.gasStatus)),
+    usdc: chains.some((c) => isActive(c.usdcStatus)),
+    usdt: chains.some((c) => isActive(c.usdtStatus)),
+    soUsd: chains.some((c) => isActive(c.soUsdStatus)),
+  });
+
+  const getStatusWithText = (status: string) => {
+    switch (status) {
+      case "OK":
+        return (
+          <span className="inline-flex items-center gap-1 text-green-700">
+            <CheckCircle className="h-4 w-4" />
+            <span className="text-xs font-medium">OK</span>
+          </span>
+        );
+      case "LOW":
+        return (
+          <span className="inline-flex items-center gap-1 text-yellow-700">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="text-xs font-medium">Low</span>
+          </span>
+        );
+      case "CRITICAL":
+        return (
+          <span className="inline-flex items-center gap-1 text-red-700 animate-pulse">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-xs font-bold uppercase">Critical</span>
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const amountClasses = (status?: BalanceStatus): string =>
+    status === "CRITICAL"
+      ? "text-red-900 font-bold"
+      : status === "LOW"
+      ? "text-yellow-700 font-medium"
+      : "text-green-700";
+
+  // A token balance cell (status + balance / threshold), or a dash when this
+  // chain doesn't hold the token.
+  const renderTokenCell = (
+    status: BalanceStatus | undefined,
+    balance: string | undefined,
+    threshold: string | undefined,
+    label: string
+  ) => (
+    <td className="px-4 py-2 text-sm">
+      {isActive(status) ? (
+        <div className="flex items-center gap-1.5">
+          {getStatusWithText(status as string)}
+          <span className={amountClasses(status)}>
+            {parseFloat(balance ?? "0").toFixed(2)} {label}
+          </span>
+          <span className="text-gray-400 text-xs">/ {threshold}</span>
+        </div>
+      ) : (
+        <span className="text-gray-400">-</span>
+      )}
+    </td>
+  );
+
+  // A token address cell with a copy button.
+  const renderAddressCell = (address: string | undefined, isCritical: boolean) => (
+    <td className="px-4 py-2 text-sm">
+      {address && (
+        <div className="flex items-center gap-1.5">
+          <code
+            className={`text-xs px-1.5 py-0.5 rounded ${
+              isCritical
+                ? "bg-red-100 text-red-900"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            {truncateAddress(address)}
+          </code>
+          <button
+            onClick={(e) => copyToClipboard(address, e)}
+            className="text-gray-400 hover:text-gray-600 cursor-pointer"
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+    </td>
+  );
+
+  const renderChainRow = (chain: ChainBalance, columns: VisibleColumns) => {
+    const hasGas = isActive(chain.gasStatus);
+    const hasUsdc = isActive(chain.usdcStatus);
+    const hasUsdt = isActive(chain.usdtStatus);
+    const hasSoUsd = isActive(chain.soUsdStatus);
     const isCritical =
       chain.gasStatus === "CRITICAL" ||
       chain.usdcStatus === "CRITICAL" ||
-      chain.usdtStatus === "CRITICAL";
+      chain.usdtStatus === "CRITICAL" ||
+      chain.soUsdStatus === "CRITICAL";
     const isLow =
       chain.gasStatus === "LOW" ||
       chain.usdcStatus === "LOW" ||
-      chain.usdtStatus === "LOW";
+      chain.usdtStatus === "LOW" ||
+      chain.soUsdStatus === "LOW";
 
     const rowClasses = isCritical
       ? "border-t border-red-300 bg-red-50"
       : isLow
       ? "border-t border-yellow-200 bg-yellow-50"
       : "border-t border-green-100 bg-green-50";
-
-    const getStatusWithText = (status: string) => {
-      switch (status) {
-        case "OK":
-          return (
-            <span className="inline-flex items-center gap-1 text-green-700">
-              <CheckCircle className="h-4 w-4" />
-              <span className="text-xs font-medium">OK</span>
-            </span>
-          );
-        case "LOW":
-          return (
-            <span className="inline-flex items-center gap-1 text-yellow-700">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-xs font-medium">Low</span>
-            </span>
-          );
-        case "CRITICAL":
-          return (
-            <span className="inline-flex items-center gap-1 text-red-700 animate-pulse">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-xs font-bold uppercase">Critical</span>
-            </span>
-          );
-        default:
-          return null;
-      }
-    };
 
     // Build helper text for LOW/CRITICAL statuses
     const getTopUpHelperText = () => {
@@ -125,6 +207,12 @@ export default function WalletsTable() {
         (chain.gasStatus === "LOW" || chain.gasStatus === "CRITICAL")
       ) {
         needs.push(`${chain.gasThreshold} ${chain.gasTokenSymbol}`);
+      }
+      if (
+        hasSoUsd &&
+        (chain.soUsdStatus === "LOW" || chain.soUsdStatus === "CRITICAL")
+      ) {
+        needs.push(`${chain.soUsdThreshold} soUSD`);
       }
       if (
         hasUsdc &&
@@ -172,117 +260,48 @@ export default function WalletsTable() {
             {getTopUpHelperText()}
           </div>
         </td>
-        <td className="px-4 py-2 text-sm">
-          {hasGas ? (
-            <div className="flex items-center gap-1.5">
-              {getStatusWithText(chain.gasStatus)}
-              <span
-                className={
-                  chain.gasStatus === "CRITICAL"
-                    ? "text-red-900 font-bold"
-                    : chain.gasStatus === "LOW"
-                    ? "text-yellow-700 font-medium"
-                    : "text-green-700"
-                }
-              >
-                {parseFloat(chain.gasBalance).toFixed(4)} {chain.gasTokenSymbol}
-              </span>
-              <span className="text-gray-400 text-xs">
-                / {chain.gasThreshold}
-              </span>
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
+        {columns.gas && (
+          <td className="px-4 py-2 text-sm">
+            {hasGas ? (
+              <div className="flex items-center gap-1.5">
+                {getStatusWithText(chain.gasStatus)}
+                <span className={amountClasses(chain.gasStatus)}>
+                  {parseFloat(chain.gasBalance).toFixed(4)}{" "}
+                  {chain.gasTokenSymbol}
+                </span>
+                <span className="text-gray-400 text-xs">
+                  / {chain.gasThreshold}
+                </span>
+              </div>
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </td>
+        )}
+        {columns.soUsd &&
+          renderTokenCell(
+            chain.soUsdStatus,
+            chain.soUsdBalance,
+            chain.soUsdThreshold,
+            "soUSD"
           )}
-        </td>
-        <td className="px-4 py-2 text-sm">
-          {hasUsdc ? (
-            <div className="flex items-center gap-1.5">
-              {getStatusWithText(chain.usdcStatus)}
-              <span
-                className={
-                  chain.usdcStatus === "CRITICAL"
-                    ? "text-red-900 font-bold"
-                    : chain.usdcStatus === "LOW"
-                    ? "text-yellow-700 font-medium"
-                    : "text-green-700"
-                }
-              >
-                {parseFloat(chain.usdcBalance).toFixed(2)} USDC
-              </span>
-              <span className="text-gray-400 text-xs">
-                / {chain.usdcThreshold}
-              </span>
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
+        {columns.soUsd && renderAddressCell(chain.soUsdAddress, isCritical)}
+        {columns.usdc &&
+          renderTokenCell(
+            chain.usdcStatus,
+            chain.usdcBalance,
+            chain.usdcThreshold,
+            "USDC"
           )}
-        </td>
-        <td className="px-4 py-2 text-sm">
-          {chain.usdcAddress && (
-            <div className="flex items-center gap-1.5">
-              <code
-                className={`text-xs px-1.5 py-0.5 rounded ${
-                  isCritical
-                    ? "bg-red-100 text-red-900"
-                    : "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {truncateAddress(chain.usdcAddress)}
-              </code>
-              <button
-                onClick={(e) => copyToClipboard(chain.usdcAddress, e)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                  <Copy className="h-3 w-3" />
-              </button>
-            </div>
+        {columns.usdc && renderAddressCell(chain.usdcAddress, isCritical)}
+        {columns.usdt &&
+          renderTokenCell(
+            chain.usdtStatus,
+            chain.usdtBalance,
+            chain.usdtThreshold,
+            "USDT"
           )}
-        </td>
-        <td className="px-4 py-2 text-sm">
-          {hasUsdt ? (
-            <div className="flex items-center gap-1.5">
-              {getStatusWithText(chain.usdtStatus!)}
-              <span
-                className={
-                  chain.usdtStatus === "CRITICAL"
-                    ? "text-red-900 font-bold"
-                    : chain.usdtStatus === "LOW"
-                    ? "text-yellow-700 font-medium"
-                    : "text-green-700"
-                }
-              >
-                {parseFloat(chain.usdtBalance ?? "0").toFixed(2)} USDT
-              </span>
-              <span className="text-gray-400 text-xs">
-                / {chain.usdtThreshold}
-              </span>
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </td>
-        <td className="px-4 py-2 text-sm">
-          {chain.usdtAddress && (
-            <div className="flex items-center gap-1.5">
-              <code
-                className={`text-xs px-1.5 py-0.5 rounded ${
-                  isCritical
-                    ? "bg-red-100 text-red-900"
-                    : "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {truncateAddress(chain.usdtAddress)}
-              </code>
-              <button
-                onClick={(e) => copyToClipboard(chain.usdtAddress!, e)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                  <Copy className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-        </td>
+        {columns.usdt && renderAddressCell(chain.usdtAddress, isCritical)}
       </tr>
     );
   };
@@ -338,17 +357,20 @@ export default function WalletsTable() {
       <div className="space-y-4">
         {data.wallets.map((wallet: WalletInfo) => {
           const isExpanded = expandedWallets.has(wallet.name);
+          const columns = getVisibleColumns(wallet.chains);
           const hasCritical = wallet.chains.some(
             (chain) =>
               chain.gasStatus === "CRITICAL" ||
               chain.usdcStatus === "CRITICAL" ||
-              chain.usdtStatus === "CRITICAL"
+              chain.usdtStatus === "CRITICAL" ||
+              chain.soUsdStatus === "CRITICAL"
           );
           const hasLow = wallet.chains.some(
             (chain) =>
               chain.gasStatus === "LOW" ||
               chain.usdcStatus === "LOW" ||
-              chain.usdtStatus === "LOW"
+              chain.usdtStatus === "LOW" ||
+              chain.soUsdStatus === "LOW"
           );
           const needsTopUp = wallet.chains.some((chain) => chain.needsTopUp);
           const isAllOk = !hasCritical && !hasLow;
@@ -432,7 +454,7 @@ export default function WalletsTable() {
                           onClick={(e) => copyToClipboard(wallet.address, e)}
                           className="text-gray-400 hover:text-gray-600 cursor-pointer"
                         >
-                            <Copy className="h-4 w-4" />
+                          <Copy className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -462,25 +484,47 @@ export default function WalletsTable() {
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-24">
                           Chain
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Gas
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          USDC
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          USDC Address
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          USDT
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          USDT Address
-                        </th>
+                        {columns.gas && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            Gas
+                          </th>
+                        )}
+                        {columns.soUsd && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            soUSD
+                          </th>
+                        )}
+                        {columns.soUsd && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            soUSD Address
+                          </th>
+                        )}
+                        {columns.usdc && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            USDC
+                          </th>
+                        )}
+                        {columns.usdc && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            USDC Address
+                          </th>
+                        )}
+                        {columns.usdt && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            USDT
+                          </th>
+                        )}
+                        {columns.usdt && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            USDT Address
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {wallet.chains.map(renderChainRow)}
+                      {wallet.chains.map((chain) =>
+                        renderChainRow(chain, columns)
+                      )}
                     </tbody>
                   </table>
                 </div>

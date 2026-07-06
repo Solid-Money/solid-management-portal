@@ -382,6 +382,11 @@ export interface ChainBalance {
   usdtThreshold?: string;
   usdtStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   usdtAddress?: string;
+  // soUSD is the reward payout asset (cashback, bonuses, referrals) on Fuse.
+  soUsdBalance?: string;
+  soUsdThreshold?: string;
+  soUsdStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  soUsdAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
