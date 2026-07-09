@@ -395,6 +395,8 @@ export interface WalletInfo {
   name: string;
   description: string;
   address: string;
+  // Whether the wallet is active. Defaults to active when omitted.
+  active?: boolean;
   chains: ChainBalance[];
 }
 
@@ -402,6 +404,14 @@ export interface WalletStatusResponse {
   wallets: WalletInfo[];
   lastUpdated: string;
 }
+
+export type WalletFilter = "active" | "inactive" | "all";
+
+export const WALLET_FILTERS = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "all", label: "All" },
+] as const;
 
 // Card Transactions
 export interface CardTransactionCashback {

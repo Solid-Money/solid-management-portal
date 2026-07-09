@@ -2,13 +2,19 @@
 
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { WalletStatusResponse, WalletInfo, ChainBalance } from "@/types";
+import {
+  WalletStatusResponse,
+  WalletInfo,
+  ChainBalance,
+  WalletFilter,
+} from "@/types";
 import {
   Loader2,
   Copy,
   AlertCircle,
   CheckCircle,
   AlertTriangle,
+  ArrowDownToLine,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -29,7 +35,7 @@ interface VisibleColumns {
 const isActive = (status?: BalanceStatus): boolean =>
   status != null && status !== "N/A";
 
-export default function WalletsTable() {
+export default function WalletsTable({ filter }: { filter: WalletFilter }) {
   const [expandedWallets, setExpandedWallets] = useState<Set<string>>(
     new Set()
   );
@@ -332,6 +338,14 @@ export default function WalletsTable() {
     );
   }
 
+  // A wallet is active unless explicitly marked inactive in the backend wallet
+  // config. The page defaults to showing active wallets only.
+  const filteredWallets = data.wallets.filter((wallet: WalletInfo) => {
+    if (filter === "all") return true;
+    const active = wallet.active !== false;
+    return filter === "active" ? active : !active;
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -354,8 +368,14 @@ export default function WalletsTable() {
         </div>
       </div>
 
+      {filteredWallets.length === 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-md p-8 text-center">
+          <p className="text-gray-600">No {filter} wallets to display</p>
+        </div>
+      )}
+
       <div className="space-y-4">
-        {data.wallets.map((wallet: WalletInfo) => {
+        {filteredWallets.map((wallet: WalletInfo) => {
           const isExpanded = expandedWallets.has(wallet.name);
           const columns = getVisibleColumns(wallet.chains);
           const hasCritical = wallet.chains.some(
@@ -438,7 +458,7 @@ export default function WalletsTable() {
                       >
                         {wallet.description}
                       </p>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <code
                           className={`text-sm px-2 py-1 rounded ${
                             hasCritical
@@ -456,6 +476,13 @@ export default function WalletsTable() {
                         >
                           <Copy className="h-4 w-4" />
                         </button>
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200"
+                          title="Send funds to this wallet address, not the token contract addresses listed below"
+                        >
+                          <ArrowDownToLine className="h-3 w-3" />
+                          Transfer funds to this address
+                        </span>
                       </div>
                     </div>
                   </div>
