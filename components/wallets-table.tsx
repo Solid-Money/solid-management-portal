@@ -14,7 +14,7 @@ import {
   AlertCircle,
   CheckCircle,
   AlertTriangle,
-  ArrowDownToLine,
+  ArrowLeft,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -480,7 +480,7 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200"
                           title="Send funds to this wallet address, not the token contract addresses listed below"
                         >
-                          <ArrowDownToLine className="h-3 w-3" />
+                          <ArrowLeft className="h-3 w-3" />
                           Transfer funds to this address
                         </span>
                       </div>
