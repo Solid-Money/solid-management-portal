@@ -202,6 +202,24 @@ function TierCard({
   );
 }
 
+/**
+ * Fill in points fields an older backend may not send yet, so the inputs stay
+ * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
+ * the working copy and the pristine copy so the defaults don't read as unsaved
+ * changes.
+ */
+function withPointsDefaults(config: FullRewardsConfig): FullRewardsConfig {
+  return {
+    ...config,
+    points: {
+      ...config.points,
+      cardBalanceEnabled: config.points.cardBalanceEnabled ?? false,
+      cardBalancePointsPerDollarPerDay:
+        config.points.cardBalancePointsPerDollarPerDay ?? 1,
+    },
+  };
+}
+
 export default function RewardsConfigPage() {
   const { user } = useAuth();
   const [config, setConfig] = useState<FullRewardsConfig | null>(null);
@@ -216,8 +234,9 @@ export default function RewardsConfigPage() {
     try {
       setLoading(true);
       const response = await api.get("/admin/v1/rewards-config");
-      setConfig(response.data);
-      setOriginalConfig(JSON.parse(JSON.stringify(response.data)));
+      const normalized = withPointsDefaults(response.data);
+      setConfig(normalized);
+      setOriginalConfig(JSON.parse(JSON.stringify(normalized)));
     } catch (error) {
       console.error("Failed to fetch rewards config:", error);
       toast.error("Failed to fetch rewards configuration");
@@ -459,11 +478,15 @@ export default function RewardsConfigPage() {
         cardSpendEnabled: config.points.cardSpendEnabled,
         swapEnabled: config.points.swapEnabled,
         holdingFundsEnabled: config.points.holdingFundsEnabled,
+        cardBalanceEnabled: config.points.cardBalanceEnabled,
         cardSpendPointsPerDollar: Number(
           config.points.cardSpendPointsPerDollar,
         ),
         swapPointsPerDollar: Number(config.points.swapPointsPerDollar),
         holdingFundsMultiplier: Number(config.points.holdingFundsMultiplier),
+        cardBalancePointsPerDollarPerDay: Number(
+          config.points.cardBalancePointsPerDollarPerDay,
+        ),
       },
       "points",
     );
@@ -741,6 +764,36 @@ export default function RewardsConfigPage() {
                   step="0.1"
                   disabled={!config.points.holdingFundsEnabled}
                   tooltip="Multiplier applied to points earned per dollar for each hour funds are held"
+                />
+              </div>
+            </div>
+
+            <div
+              className={`p-4 rounded-lg border-2 transition-all ${config.points.cardBalanceEnabled ? "border-indigo-100 bg-white shadow-sm" : "border-gray-200 bg-gray-50 opacity-75"}`}
+            >
+              <ToggleField
+                label="Card Balance Rewards Enabled"
+                value={config.points.cardBalanceEnabled}
+                onChange={(v) =>
+                  updateConfig("points", "cardBalanceEnabled", v)
+                }
+                tooltip="Enable or disable earning points for the balance held on the card"
+              />
+              <div className="mt-3">
+                <InputField
+                  label="Card Balance Points (per $1 per 1 day)"
+                  value={config.points.cardBalancePointsPerDollarPerDay}
+                  onChange={(v) =>
+                    handleNumericUpdate(
+                      "points",
+                      "cardBalancePointsPerDollarPerDay",
+                      v,
+                    )
+                  }
+                  type="number"
+                  step="0.1"
+                  disabled={!config.points.cardBalanceEnabled}
+                  tooltip="Points earned per dollar of card balance for each DAY it is held. Note the unit: holding funds above is per hour, card balance is per day."
                 />
               </div>
             </div>
