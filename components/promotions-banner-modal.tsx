@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { PromotionsBanner } from "@/types";
+import {
+  fetchLatestAppVersion,
+  isValidPagePath,
+  isValidVersionGate,
+  normalizePagePath,
+  normalizeVersionGate,
+} from "@/lib/promotions-banner";
+import { LatestAppVersion, PromotionsBanner } from "@/types";
 
 interface PromotionsBannerModalProps {
   banner?: PromotionsBanner | null;
@@ -24,6 +31,8 @@ export default function PromotionsBannerModal({
   const [enabled, setEnabled] = useState(banner?.enabled ?? false);
   const [sort, setSort] = useState<number>(banner?.sort ?? 0);
   const [link, setLink] = useState(banner?.link ?? "");
+  const [version, setVersion] = useState(banner?.version ?? "");
+  const [page, setPage] = useState(banner?.page ?? "");
   const [platforms, setPlatforms] = useState({
     web: banner?.platforms?.web ?? true,
     ios: banner?.platforms?.ios ?? true,
@@ -33,8 +42,45 @@ export default function PromotionsBannerModal({
   const [showErrors, setShowErrors] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingMobile, setUploadingMobile] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<LatestAppVersion | null>(
+    null
+  );
+  const [loadingLatestVersion, setLoadingLatestVersion] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mobileFileInputRef = useRef<HTMLInputElement>(null);
+
+  const isVersionValid = isValidVersionGate(version);
+  const isPageValid = isValidPagePath(page);
+
+  const loadLatestVersion = useCallback(async (): Promise<LatestAppVersion> => {
+    setLoadingLatestVersion(true);
+    try {
+      const latest = await fetchLatestAppVersion();
+      setLatestVersion(latest);
+      return latest;
+    } finally {
+      setLoadingLatestVersion(false);
+    }
+  }, []);
+
+  // Prefetched so the current app version is on screen while the admin decides,
+  // rather than only after they press Latest. The route caches server-side, so
+  // opening the form repeatedly costs one shared lookup.
+  useEffect(() => {
+    loadLatestVersion().catch((error) => {
+      console.error("Latest app version lookup failed:", error);
+    });
+  }, [loadLatestVersion]);
+
+  const handleUseLatestVersion = async () => {
+    try {
+      const latest = latestVersion ?? (await loadLatestVersion());
+      setVersion(`>=${latest.version}`);
+    } catch (error) {
+      console.error("Latest app version lookup failed:", error);
+      toast.error("Could not look up the latest app version.");
+    }
+  };
 
   const handleImageUpload = async (file: File) => {
     try {
@@ -86,12 +132,16 @@ export default function PromotionsBannerModal({
     e.preventDefault();
     setShowErrors(false);
 
-    if (!title.trim() || !imageURL) {
+    if (!title.trim() || !imageURL || !isVersionValid || !isPageValid) {
       setShowErrors(true);
       if (!title.trim()) {
         toast.error("Please enter a title.");
-      } else {
+      } else if (!imageURL) {
         toast.error("Please upload an image.");
+      } else if (!isVersionValid) {
+        toast.error('Version must look like ">=2.0.0" or "1.0.12".');
+      } else {
+        toast.error('Page must be a pathname such as "/" or "/savings".');
       }
       return;
     }
@@ -106,6 +156,10 @@ export default function PromotionsBannerModal({
         sort,
         ...(link.trim() ? { link: link.trim() } : {}),
         platforms,
+        // Always sent, blank included: an empty value is how the backend is told
+        // to drop an existing gate rather than leave the old one in place.
+        version: normalizeVersionGate(version),
+        page: normalizePagePath(page),
       };
 
       if (banner) {
@@ -190,6 +244,93 @@ export default function PromotionsBannerModal({
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="https://..."
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              App Version (optional)
+            </label>
+            <p className="text-xs text-gray-500">
+              Which native app builds show this banner.{" "}
+              <code>&gt;=2.0.0</code> targets that version and every newer one,{" "}
+              <code>1.0.12</code> only that exact version. Leave empty to show on
+              every version. Ignored on web, which always runs the latest build.
+            </p>
+            <div
+              className={`flex flex-row justify-between items-center gap-2 w-full px-3 py-2 border rounded-md focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 ${
+                showErrors && !isVersionValid
+                  ? "border-red-300 bg-red-50"
+                  : "border-gray-300"
+              }`}
+            >
+              <input
+                type="text"
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                className="flex-1 min-w-0 bg-transparent outline-none"
+                placeholder=">=2.0.0"
+              />
+              <button
+                type="button"
+                onClick={handleUseLatestVersion}
+                disabled={loadingLatestVersion}
+                title={
+                  latestVersion
+                    ? `Set to >=${latestVersion.version}`
+                    : "Look up the current app version"
+                }
+                className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {loadingLatestVersion && (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                )}
+                Latest
+              </button>
+            </div>
+            {showErrors && !isVersionValid ? (
+              <p className="text-xs text-red-600">
+                Use a version like <code>2.0.0</code>, optionally prefixed with{" "}
+                <code>&gt;=</code>, <code>&gt;</code>, <code>&lt;=</code>,{" "}
+                <code>&lt;</code> or <code>=</code>.
+              </p>
+            ) : (
+              latestVersion && (
+                <p className="text-xs text-gray-500">
+                  Current app version: {latestVersion.version}
+                  {latestVersion.branch
+                    ? ` (solid-ui ${latestVersion.branch})`
+                    : " (App Store)"}
+                </p>
+              )
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Page (optional)
+            </label>
+            <p className="text-xs text-gray-500">
+              Which page shows this banner. <code>/</code> is the home/wallet
+              page; <code>savings</code> and <code>/savings</code> both mean{" "}
+              <code>/savings</code>. Leave empty to show on every page.
+            </p>
+            <input
+              type="text"
+              value={page}
+              onChange={(e) => setPage(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${
+                showErrors && !isPageValid
+                  ? "border-red-300 bg-red-50"
+                  : "border-gray-300"
+              }`}
+              placeholder="/savings"
+            />
+            {showErrors && !isPageValid && (
+              <p className="text-xs text-red-600">
+                Use a pathname such as <code>/</code>, <code>/savings</code> or{" "}
+                <code>/card/details</code>.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
