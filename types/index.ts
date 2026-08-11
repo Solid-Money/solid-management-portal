@@ -612,8 +612,8 @@ export interface PointsEarningConfig {
   swapPointsPerDollar: number;
   /** Points per $1 of deposited funds, per HOUR. */
   holdingFundsMultiplier: number;
-  /** Points per $1 of card balance held, per DAY. */
-  cardBalancePointsPerDollarPerDay: number;
+  /** Points per $1 of card balance held, per HOUR. */
+  cardBalancePointsPerDollarPerHour: number;
 }
 
 export interface FullRewardsConfig {

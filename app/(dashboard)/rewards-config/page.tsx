@@ -214,8 +214,8 @@ function withPointsDefaults(config: FullRewardsConfig): FullRewardsConfig {
     points: {
       ...config.points,
       cardBalanceEnabled: config.points.cardBalanceEnabled ?? false,
-      cardBalancePointsPerDollarPerDay:
-        config.points.cardBalancePointsPerDollarPerDay ?? 1,
+      cardBalancePointsPerDollarPerHour:
+        config.points.cardBalancePointsPerDollarPerHour ?? 1,
     },
   };
 }
@@ -484,8 +484,8 @@ export default function RewardsConfigPage() {
         ),
         swapPointsPerDollar: Number(config.points.swapPointsPerDollar),
         holdingFundsMultiplier: Number(config.points.holdingFundsMultiplier),
-        cardBalancePointsPerDollarPerDay: Number(
-          config.points.cardBalancePointsPerDollarPerDay,
+        cardBalancePointsPerDollarPerHour: Number(
+          config.points.cardBalancePointsPerDollarPerHour,
         ),
       },
       "points",
@@ -781,19 +781,19 @@ export default function RewardsConfigPage() {
               />
               <div className="mt-3">
                 <InputField
-                  label="Card Balance Points (per $1 per 1 day)"
-                  value={config.points.cardBalancePointsPerDollarPerDay}
+                  label="Card Balance Points (per $1 per 1h)"
+                  value={config.points.cardBalancePointsPerDollarPerHour}
                   onChange={(v) =>
                     handleNumericUpdate(
                       "points",
-                      "cardBalancePointsPerDollarPerDay",
+                      "cardBalancePointsPerDollarPerHour",
                       v,
                     )
                   }
                   type="number"
                   step="0.1"
                   disabled={!config.points.cardBalanceEnabled}
-                  tooltip="Points earned per dollar of card balance for each DAY it is held. Note the unit: holding funds above is per hour, card balance is per day."
+                  tooltip="Points earned per dollar of card balance for each hour it is held — the same unit as the Holding Funds multiplier"
                 />
               </div>
             </div>
