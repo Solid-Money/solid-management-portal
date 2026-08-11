@@ -520,8 +520,23 @@ export interface PromotionsBanner {
   sort?: number;
   link?: string;
   platforms?: PromotionsBannerPlatforms;
+  /**
+   * Native app version gate, e.g. ">=2.0.0" (that build and every newer one) or
+   * "1.0.12" (only that build). Empty means every version. Web ignores it.
+   */
+  version?: string;
+  /** Pathname the banner is scoped to, e.g. "/" or "/savings". Empty means every page. */
+  page?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/** Response of `GET /api/app-version`. */
+export interface LatestAppVersion {
+  version: string;
+  /** solid-ui branch the version came from, or null when read off the App Store. */
+  branch: string | null;
+  source: "github" | "app-store";
 }
 
 // Rewards Configuration Types

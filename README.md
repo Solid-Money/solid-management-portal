@@ -116,4 +116,4 @@ The frontend expects the following backend endpoints:
 
 ## License
 
-Private
+Private.
