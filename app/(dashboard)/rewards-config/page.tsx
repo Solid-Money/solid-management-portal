@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
-import { FullRewardsConfig } from "@/types";
+import { FullRewardsConfig, ReferralCashbackConfig } from "@/types";
 import TierUsersModal from "@/components/tier-users-modal";
 import TierEmailModal from "@/components/tier-email-modal";
 import {
@@ -202,13 +202,26 @@ function TierCard({
   );
 }
 
+/** Shipped defaults for the referral cashback program (mirrors the backend). */
+const REFERRAL_CASHBACK_DEFAULTS: ReferralCashbackConfig = {
+  enabled: true,
+  referrerRewardUsd: 15,
+  newUserRewardUsd: 15,
+  spendTargetUsd: 75,
+  merchantTarget: 3,
+  qualifyWindowDays: 30,
+  payoutDelayDays: 30,
+  reversalWindowDays: 60,
+  autoReviewMonthlyThreshold: 20,
+};
+
 /**
- * Fill in points fields an older backend may not send yet, so the inputs stay
+ * Fill in fields an older backend may not send yet, so the inputs stay
  * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
  * the working copy and the pristine copy so the defaults don't read as unsaved
  * changes.
  */
-function withPointsDefaults(config: FullRewardsConfig): FullRewardsConfig {
+function withConfigDefaults(config: FullRewardsConfig): FullRewardsConfig {
   return {
     ...config,
     points: {
@@ -216,6 +229,10 @@ function withPointsDefaults(config: FullRewardsConfig): FullRewardsConfig {
       cardBalanceEnabled: config.points.cardBalanceEnabled ?? false,
       cardBalancePointsPerDollarPerHour:
         config.points.cardBalancePointsPerDollarPerHour ?? 1,
+    },
+    referralCashback: {
+      ...REFERRAL_CASHBACK_DEFAULTS,
+      ...config.referralCashback,
     },
   };
 }
@@ -234,7 +251,7 @@ export default function RewardsConfigPage() {
     try {
       setLoading(true);
       const response = await api.get("/admin/v1/rewards-config");
-      const normalized = withPointsDefaults(response.data);
+      const normalized = withConfigDefaults(response.data);
       setConfig(normalized);
       setOriginalConfig(JSON.parse(JSON.stringify(normalized)));
     } catch (error) {
@@ -465,6 +482,29 @@ export default function RewardsConfigPage() {
         boostPercentage: Number(config.referral.boostPercentage),
       },
       "referral",
+    );
+  };
+
+  const saveReferralCashbackConfig = async () => {
+    if (!config) return;
+
+    await saveSection(
+      "Referral Cashback",
+      "referral-cashback",
+      {
+        enabled: config.referralCashback.enabled,
+        referrerRewardUsd: Number(config.referralCashback.referrerRewardUsd),
+        newUserRewardUsd: Number(config.referralCashback.newUserRewardUsd),
+        spendTargetUsd: Number(config.referralCashback.spendTargetUsd),
+        merchantTarget: Number(config.referralCashback.merchantTarget),
+        qualifyWindowDays: Number(config.referralCashback.qualifyWindowDays),
+        payoutDelayDays: Number(config.referralCashback.payoutDelayDays),
+        reversalWindowDays: Number(config.referralCashback.reversalWindowDays),
+        autoReviewMonthlyThreshold: Number(
+          config.referralCashback.autoReviewMonthlyThreshold,
+        ),
+      },
+      "referralCashback",
     );
   };
 
@@ -887,6 +927,177 @@ export default function RewardsConfigPage() {
           >
             <Save className="h-4 w-4 mr-2" />
             Save Referral Config
+          </button>
+        </ConfigSection>
+
+        {/* Referral Cashback Program */}
+        <ConfigSection
+          title="Referral Cashback Program"
+          description="Two-sided USD cashback, paid in soUSD once a referred friend gets a card and proves everyday use. Separate from the points-based referral rewards above."
+          icon={<Gift className="h-5 w-5 text-pink-600" />}
+        >
+          <div className="flex items-center justify-between">
+            <ToggleField
+              label="Referral Cashback Enabled"
+              value={config.referralCashback.enabled}
+              onChange={(v) => updateConfig("referralCashback", "enabled", v)}
+              tooltip="Master switch for referral payouts. When off, referrals still qualify and queue up — they are paid once it is switched back on, nothing is lost."
+            />
+            <div className="text-right">
+              <div className="text-sm font-medium text-gray-700">
+                All-in cost per activated user
+                <InfoTooltip text="Both legs of the reward added together — the number to compare against your cost of customer acquisition (COCA)." />
+              </div>
+              <div className="text-2xl font-semibold text-gray-900">
+                $
+                {(Number(config.referralCashback.referrerRewardUsd) || 0) +
+                  (Number(config.referralCashback.newUserRewardUsd) || 0)}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border-2 border-indigo-100 bg-white p-4 shadow-sm">
+            <h4 className="mb-3 font-semibold text-gray-800">Rewards</h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <InputField
+                label="Referrer Reward"
+                value={config.referralCashback.referrerRewardUsd}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "referralCashback",
+                    "referrerRewardUsd",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="$"
+                min={0}
+                step="1"
+                disabled={!config.referralCashback.enabled}
+                tooltip="Paid to the referrer for each friend who qualifies (you get)."
+              />
+              <InputField
+                label="Friend Reward"
+                value={config.referralCashback.newUserRewardUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("referralCashback", "newUserRewardUsd", v)
+                }
+                type="number"
+                suffix="$"
+                min={0}
+                step="1"
+                disabled={!config.referralCashback.enabled}
+                tooltip="Welcome cashback paid to the referred friend when they qualify (your friend gets)."
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg border-2 border-gray-200 bg-white p-4 shadow-sm">
+            <h4 className="mb-3 font-semibold text-gray-800">
+              Qualification bar
+              <InfoTooltip text="What a referred friend must do before either side is paid. The multi-merchant gate proves everyday use and blocks single-payment fraud." />
+            </h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <InputField
+                label="Spend Target"
+                value={config.referralCashback.spendTargetUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("referralCashback", "spendTargetUsd", v)
+                }
+                type="number"
+                suffix="$"
+                min={0}
+                step="5"
+                tooltip="Card spend the friend must reach inside the qualify window."
+              />
+              <InputField
+                label="Distinct Merchants"
+                value={config.referralCashback.merchantTarget}
+                onChange={(v) =>
+                  handleNumericUpdate("referralCashback", "merchantTarget", v)
+                }
+                type="number"
+                min={1}
+                step="1"
+                tooltip="How many different merchants that spend has to be spread across."
+              />
+              <InputField
+                label="Qualify Window"
+                value={config.referralCashback.qualifyWindowDays}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "referralCashback",
+                    "qualifyWindowDays",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="days"
+                min={1}
+                step="1"
+                tooltip="Days from signup the friend has to clear the bar before the referral expires."
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg border-2 border-gray-200 bg-white p-4 shadow-sm">
+            <h4 className="mb-3 font-semibold text-gray-800">
+              Payout &amp; risk
+            </h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <InputField
+                label="Payout Delay"
+                value={config.referralCashback.payoutDelayDays}
+                onChange={(v) =>
+                  handleNumericUpdate("referralCashback", "payoutDelayDays", v)
+                }
+                type="number"
+                suffix="days"
+                min={0}
+                step="1"
+                tooltip="Days between qualifying and the money going out — covers disputes and chargebacks. The app counts down to this."
+              />
+              <InputField
+                label="Reversal Window"
+                value={config.referralCashback.reversalWindowDays}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "referralCashback",
+                    "reversalWindowDays",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="days"
+                min={0}
+                step="1"
+                tooltip="Window after qualifying in which a churn or chargeback claws the referrer bonus back."
+              />
+              <InputField
+                label="Auto-review Threshold"
+                value={config.referralCashback.autoReviewMonthlyThreshold}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "referralCashback",
+                    "autoReviewMonthlyThreshold",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="/ 30 days"
+                min={1}
+                step="1"
+                tooltip="Referrers above this many qualified referrals in a rolling 30 days are held for manual anti-abuse review instead of being auto-paid."
+              />
+            </div>
+          </div>
+          <button
+            onClick={saveReferralCashbackConfig}
+            disabled={saving || !hasChanges("referralCashback")}
+            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Referral Cashback Config
           </button>
         </ConfigSection>
 
