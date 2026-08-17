@@ -611,6 +611,31 @@ export interface ReferralConfig {
   boostPercentage: number;
 }
 
+/**
+ * Two-sided USD referral cashback: what each side earns once a referred friend
+ * becomes an active cardholder, and the bar they have to clear to get it.
+ */
+export interface ReferralCashbackConfig {
+  /** Kill-switch: when false, qualified referrals are not paid out. */
+  enabled: boolean;
+  /** Cashback credited to the referrer per qualified referral. */
+  referrerRewardUsd: number;
+  /** Welcome cashback credited to the referred friend per qualified referral. */
+  newUserRewardUsd: number;
+  /** Friend must spend at least this much (USD) to qualify. */
+  spendTargetUsd: number;
+  /** ...across at least this many distinct merchants. */
+  merchantTarget: number;
+  /** Friend has this many days from signup to clear the bar. */
+  qualifyWindowDays: number;
+  /** Days between qualifying and the payout (covers disputes/chargebacks). */
+  payoutDelayDays: number;
+  /** Window after qualifying in which churn/chargeback claws the reward back. */
+  reversalWindowDays: number;
+  /** Qualified referrals per rolling 30 days above which a referrer is held for review. */
+  autoReviewMonthlyThreshold: number;
+}
+
 export interface CardWelcomeBonusConfig {
   enabled: boolean;
   percentage: number;
@@ -638,6 +663,7 @@ export interface FullRewardsConfig {
   subscriptionDiscount: SubscriptionDiscountConfig;
   fuseStaking: FuseStakingConfig;
   referral: ReferralConfig;
+  referralCashback: ReferralCashbackConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
 }
 
