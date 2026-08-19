@@ -268,14 +268,47 @@ export default function CardTransactionsTable() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    <div className="font-medium">
-                      {tx.merchantName || "Unknown Merchant"}
-                    </div>
-                    {tx.merchantLocation && (
-                      <div className="text-xs text-gray-500">
-                        {tx.merchantLocation}
+                    <div className="flex items-center gap-2">
+                      {tx.enrichedMerchantIcon && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={tx.enrichedMerchantIcon}
+                          alt=""
+                          className="h-6 w-6 rounded-full bg-gray-100 object-contain shrink-0"
+                        />
+                      )}
+                      <div>
+                        <div className="font-medium">
+                          {tx.enrichedMerchantName ||
+                            tx.merchantName ||
+                            "Unknown Merchant"}
+                        </div>
+                        {/* The raw descriptor stays visible whenever the enriched
+                            name differs from it — disputes and support tickets
+                            quote what the network actually sent. */}
+                        {tx.enrichedMerchantName &&
+                          tx.merchantName &&
+                          tx.enrichedMerchantName.trim() !==
+                            tx.merchantName.trim() && (
+                            <div className="text-xs text-gray-400 font-mono">
+                              {tx.merchantName.trim()}
+                            </div>
+                          )}
+                        {(tx.merchantLocation ||
+                          tx.enrichedMerchantCategory ||
+                          tx.merchantCategory) && (
+                          <div className="text-xs text-gray-500">
+                            {[
+                              tx.merchantLocation,
+                              tx.enrichedMerchantCategory ||
+                                tx.merchantCategory,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                     {formatAmount(tx.amount, tx.currency)}
