@@ -426,6 +426,7 @@ export default function RewardsConfigPage() {
       "FUSE Staking",
       "fuse-staking",
       {
+        enabled: config.fuseStaking.enabled,
         tier2Amount: Number(config.fuseStaking.tier2Amount),
         tier3Amount: Number(config.fuseStaking.tier3Amount),
       },
@@ -1177,29 +1178,37 @@ export default function RewardsConfigPage() {
         {/* FUSE Staking */}
         <ConfigSection
           title="FUSE Staking for Tier Unlock"
-          description="Alternative path to unlock higher tiers by staking FUSE tokens"
+          description={`"Skip the line": holding FUSE in the soFUSE savings vault unlocks a tier outright, bypassing the points ladder. The tier is held only while the balance stays above the threshold.`}
           icon={<Wallet className="h-5 w-5 text-orange-600" />}
         >
+          <div className="mb-4">
+            <ToggleField
+              label="Skip the Line Enabled"
+              value={config.fuseStaking.enabled}
+              onChange={(v) => updateConfig("fuseStaking", "enabled", v)}
+              tooltip="When off, a FUSE balance grants no tier and the app hides the Skip the line section entirely"
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InputField
-              label="Tier 2 FUSE Amount"
+              label="Prime FUSE Amount"
               value={config.fuseStaking.tier2Amount}
               onChange={(v) =>
                 handleNumericUpdate("fuseStaking", "tier2Amount", v)
               }
               type="number"
               suffix="FUSE"
-              tooltip="Amount of FUSE tokens user must stake to unlock Tier 2"
+              tooltip="FUSE that must sit in the soFUSE vault to hold Prime. 0 disables this rung — it never unlocks."
             />
             <InputField
-              label="Tier 3 FUSE Amount"
+              label="Ultra FUSE Amount"
               value={config.fuseStaking.tier3Amount}
               onChange={(v) =>
                 handleNumericUpdate("fuseStaking", "tier3Amount", v)
               }
               type="number"
               suffix="FUSE"
-              tooltip="Amount of FUSE tokens user must stake to unlock Tier 3"
+              tooltip="FUSE that must sit in the soFUSE vault to hold Ultra. 0 disables this rung — it never unlocks."
             />
           </div>
           <button
