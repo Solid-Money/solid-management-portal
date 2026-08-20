@@ -656,6 +656,35 @@ export interface PointsEarningConfig {
   cardBalancePointsPerDollarPerHour: number;
 }
 
+/** One fee category's per-tier rates, as fractions (0.0099 = 0.99%). */
+export interface CardFeeRates {
+  enabled: boolean;
+  tier1: number;
+  tier2: number;
+  tier3: number;
+}
+
+/**
+ * Per-tier card fees — the revenue side of the tier system.
+ *
+ * Fees apply only at the edges of the product: converting currency, and moving
+ * money off the card. Holding and spending in USD is free on every tier, and
+ * there is deliberately no monthly-fee field — no competitor in the benchmark
+ * charges its free tier one, and the tier story is "stake FUSE and you'll pay no
+ * fees". Swap fees are absent because swaps happen in our own app, not on the
+ * card, so Rain has no charge surface for them.
+ */
+export interface CardFeesConfig {
+  /** Master kill-switch: when false, no card fee is ever charged. */
+  enabled: boolean;
+  /** Charged when a purchase settles in a currency other than the card's. */
+  fx: CardFeeRates;
+  /** Charged when funds are moved off the card. */
+  offRamp: CardFeeRates;
+  /** Computed fees below this (USD) are waived rather than charged. */
+  minChargeUsd: number;
+}
+
 export interface FullRewardsConfig {
   tiers: TierThresholds;
   points: PointsEarningConfig;
@@ -665,6 +694,7 @@ export interface FullRewardsConfig {
   referral: ReferralConfig;
   referralCashback: ReferralCashbackConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
+  cardFees: CardFeesConfig;
 }
 
 // Campaign Types

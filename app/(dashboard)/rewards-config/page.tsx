@@ -21,7 +21,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
-import { FullRewardsConfig, ReferralCashbackConfig } from "@/types";
+import {
+  CardFeesConfig,
+  FullRewardsConfig,
+  ReferralCashbackConfig,
+} from "@/types";
 import TierUsersModal from "@/components/tier-users-modal";
 import TierEmailModal from "@/components/tier-email-modal";
 import {
@@ -216,6 +220,19 @@ const REFERRAL_CASHBACK_DEFAULTS: ReferralCashbackConfig = {
 };
 
 /**
+ * Shipped defaults for the card fee program (mirrors the backend).
+ *
+ * `enabled: false` is the real default: charging users money is a launch
+ * decision made with the toggle below, not by a deploy.
+ */
+const CARD_FEES_DEFAULTS: CardFeesConfig = {
+  enabled: false,
+  fx: { enabled: true, tier1: 0.0099, tier2: 0.0049, tier3: 0 },
+  offRamp: { enabled: true, tier1: 0.005, tier2: 0.0025, tier3: 0 },
+  minChargeUsd: 0.01,
+};
+
+/**
  * Fill in fields an older backend may not send yet, so the inputs stay
  * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
  * the working copy and the pristine copy so the defaults don't read as unsaved
@@ -233,6 +250,12 @@ function withConfigDefaults(config: FullRewardsConfig): FullRewardsConfig {
     referralCashback: {
       ...REFERRAL_CASHBACK_DEFAULTS,
       ...config.referralCashback,
+    },
+    cardFees: {
+      ...CARD_FEES_DEFAULTS,
+      ...config.cardFees,
+      fx: { ...CARD_FEES_DEFAULTS.fx, ...config.cardFees?.fx },
+      offRamp: { ...CARD_FEES_DEFAULTS.offRamp, ...config.cardFees?.offRamp },
     },
   };
 }
@@ -544,6 +567,28 @@ export default function RewardsConfigPage() {
         cap: Number(config.cardWelcomeBonus.cap),
       },
       "cardWelcomeBonus",
+    );
+  };
+
+  const saveCardFeesConfig = async () => {
+    if (!config) return;
+
+    await saveSection(
+      "Card Fees",
+      "card-fees",
+      {
+        enabled: config.cardFees.enabled,
+        fxEnabled: config.cardFees.fx.enabled,
+        fxTier1Percentage: Number(config.cardFees.fx.tier1),
+        fxTier2Percentage: Number(config.cardFees.fx.tier2),
+        fxTier3Percentage: Number(config.cardFees.fx.tier3),
+        offRampEnabled: config.cardFees.offRamp.enabled,
+        offRampTier1Percentage: Number(config.cardFees.offRamp.tier1),
+        offRampTier2Percentage: Number(config.cardFees.offRamp.tier2),
+        offRampTier3Percentage: Number(config.cardFees.offRamp.tier3),
+        minChargeUsd: Number(config.cardFees.minChargeUsd),
+      },
+      "cardFees",
     );
   };
 
@@ -1268,6 +1313,216 @@ export default function RewardsConfigPage() {
           >
             <Save className="h-4 w-4 mr-2" />
             Save Card Welcome Bonus Config
+          </button>
+        </ConfigSection>
+
+        {/* Card Fees */}
+        <ConfigSection
+          title="Card Fees"
+          description="What the card earns us. Fees apply only at the edges — converting currency and moving money off the card — so holding and spending in USD is free on every tier, Core included. There is no monthly fee by design. Rates taper to zero at Ultra, so staking FUSE buys a genuinely fee-free card. Charged through Rain after the transaction settles, which can push a user negative if their balance doesn't cover it."
+          icon={<Percent className="h-5 w-5 text-amber-600" />}
+        >
+          <div className="space-y-6">
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-medium">These values charge real money.</p>
+              <p className="mt-1">
+                Percentages are entered as percentages (0.99 means 0.99% of the
+                transaction). Rain applies the charge after authorization, so a
+                user whose balance doesn&apos;t cover the fee goes negative and
+                the shortfall comes out of their next deposit. Swap fees are not
+                listed: swaps happen in the app, not on the card, so Rain
+                can&apos;t charge for them.
+              </p>
+            </div>
+
+            <ToggleField
+              label="Card Fees Enabled"
+              value={config.cardFees.enabled}
+              onChange={(v) => updateConfig("cardFees", "enabled", v)}
+              tooltip="Master switch. When off, no card fee is charged in any category, on any tier."
+            />
+
+            {/* FX fees */}
+            <div className="space-y-3">
+              <ToggleField
+                label="FX Fees Enabled"
+                value={config.cardFees.fx.enabled}
+                onChange={(v) => updateConfig("cardFees", "fx.enabled", v)}
+                disabled={!config.cardFees.enabled}
+                tooltip="Charged when a card purchase settles in a currency other than USD. A purchase in USD is never charged an FX fee."
+              />
+              <TierGrid>
+                <TierCard tier="Tier 1">
+                  <InputField
+                    label="Core FX Fee"
+                    value={
+                      (config.cardFees.fx.tier1 as unknown as string) === ""
+                        ? ""
+                        : config.cardFees.fx.tier1 * 100
+                    }
+                    onChange={(v) =>
+                      handleNumericUpdate("cardFees", "fx.tier1", v, true)
+                    }
+                    type="number"
+                    suffix="%"
+                    min={0}
+                    step="0.01"
+                    disabled={
+                      !config.cardFees.enabled || !config.cardFees.fx.enabled
+                    }
+                    tooltip="Headline FX rate. 0.99% sits at the low end of neobank card FX (typically 1–2%)."
+                  />
+                </TierCard>
+                <TierCard tier="Tier 2">
+                  <InputField
+                    label="Prime FX Fee"
+                    value={
+                      (config.cardFees.fx.tier2 as unknown as string) === ""
+                        ? ""
+                        : config.cardFees.fx.tier2 * 100
+                    }
+                    onChange={(v) =>
+                      handleNumericUpdate("cardFees", "fx.tier2", v, true)
+                    }
+                    type="number"
+                    suffix="%"
+                    min={0}
+                    step="0.01"
+                    disabled={
+                      !config.cardFees.enabled || !config.cardFees.fx.enabled
+                    }
+                    tooltip="Reduced rate for Prime."
+                  />
+                </TierCard>
+                <TierCard tier="Tier 3">
+                  <InputField
+                    label="Ultra FX Fee"
+                    value={
+                      (config.cardFees.fx.tier3 as unknown as string) === ""
+                        ? ""
+                        : config.cardFees.fx.tier3 * 100
+                    }
+                    onChange={(v) =>
+                      handleNumericUpdate("cardFees", "fx.tier3", v, true)
+                    }
+                    type="number"
+                    suffix="%"
+                    min={0}
+                    step="0.01"
+                    disabled={
+                      !config.cardFees.enabled || !config.cardFees.fx.enabled
+                    }
+                    tooltip="Keep at 0 to preserve the story: stake FUSE and you'll pay no fees."
+                  />
+                </TierCard>
+              </TierGrid>
+            </div>
+
+            {/* Off-ramp fees */}
+            <div className="space-y-3">
+              <ToggleField
+                label="Off-ramp Fees Enabled"
+                value={config.cardFees.offRamp.enabled}
+                onChange={(v) => updateConfig("cardFees", "offRamp.enabled", v)}
+                disabled={!config.cardFees.enabled}
+                tooltip="Charged when funds leave the card (a completed card withdrawal). Charged only against money that actually moved."
+              />
+              <TierGrid>
+                <TierCard tier="Tier 1">
+                  <InputField
+                    label="Core Off-ramp Fee"
+                    value={
+                      (config.cardFees.offRamp
+                        .tier1 as unknown as string) === ""
+                        ? ""
+                        : config.cardFees.offRamp.tier1 * 100
+                    }
+                    onChange={(v) =>
+                      handleNumericUpdate("cardFees", "offRamp.tier1", v, true)
+                    }
+                    type="number"
+                    suffix="%"
+                    min={0}
+                    step="0.01"
+                    disabled={
+                      !config.cardFees.enabled ||
+                      !config.cardFees.offRamp.enabled
+                    }
+                    tooltip="Headline off-ramp rate. 0.5% matches the cheapest comparable withdrawal rail."
+                  />
+                </TierCard>
+                <TierCard tier="Tier 2">
+                  <InputField
+                    label="Prime Off-ramp Fee"
+                    value={
+                      (config.cardFees.offRamp
+                        .tier2 as unknown as string) === ""
+                        ? ""
+                        : config.cardFees.offRamp.tier2 * 100
+                    }
+                    onChange={(v) =>
+                      handleNumericUpdate("cardFees", "offRamp.tier2", v, true)
+                    }
+                    type="number"
+                    suffix="%"
+                    min={0}
+                    step="0.01"
+                    disabled={
+                      !config.cardFees.enabled ||
+                      !config.cardFees.offRamp.enabled
+                    }
+                    tooltip="Reduced rate for Prime."
+                  />
+                </TierCard>
+                <TierCard tier="Tier 3">
+                  <InputField
+                    label="Ultra Off-ramp Fee"
+                    value={
+                      (config.cardFees.offRamp
+                        .tier3 as unknown as string) === ""
+                        ? ""
+                        : config.cardFees.offRamp.tier3 * 100
+                    }
+                    onChange={(v) =>
+                      handleNumericUpdate("cardFees", "offRamp.tier3", v, true)
+                    }
+                    type="number"
+                    suffix="%"
+                    min={0}
+                    step="0.01"
+                    disabled={
+                      !config.cardFees.enabled ||
+                      !config.cardFees.offRamp.enabled
+                    }
+                    tooltip="Keep at 0 so Ultra moves money in and out for free."
+                  />
+                </TierCard>
+              </TierGrid>
+            </div>
+
+            <div className="max-w-xs">
+              <InputField
+                label="Minimum Charge"
+                value={config.cardFees.minChargeUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("cardFees", "minChargeUsd", v)
+                }
+                type="number"
+                suffix="$"
+                min={0}
+                step="0.01"
+                disabled={!config.cardFees.enabled}
+                tooltip="Fees computing below this are waived instead of charged. Rain's own minimum is $0.01, and a sub-cent charge costs more in support than it earns."
+              />
+            </div>
+          </div>
+          <button
+            onClick={saveCardFeesConfig}
+            disabled={saving || !hasChanges("cardFees")}
+            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Card Fees Config
           </button>
         </ConfigSection>
 
