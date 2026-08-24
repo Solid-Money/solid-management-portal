@@ -442,6 +442,17 @@ export interface CardTransaction {
   merchantName?: string;
   merchantLocation?: string;
   merchantCategoryCode: string;
+  /** The issuer's own human-readable category for the raw descriptor. */
+  merchantCategory?: string;
+  /**
+   * Merchant enrichment from the issuer: the clean brand name ("Google Play"
+   * rather than "GOOGLE *Play Books"), its category, and a logo URL. All
+   * optional — the issuer enriches opportunistically and never before a
+   * transaction settles, so support views must still show the raw descriptor.
+   */
+  enrichedMerchantName?: string;
+  enrichedMerchantCategory?: string;
+  enrichedMerchantIcon?: string;
   transactionDescription: string;
   cashback?: CardTransactionCashback;
   user?: {
