@@ -600,7 +600,11 @@ export interface SubscriptionDiscountConfig {
 }
 
 export interface FuseStakingConfig {
+  /** Master switch for the "skip the line" FUSE tier unlock. */
+  enabled: boolean;
+  /** FUSE that must sit in the soFUSE vault to hold Prime. */
   tier2Amount: number;
+  /** FUSE that must sit in the soFUSE vault to hold Ultra. */
   tier3Amount: number;
 }
 
