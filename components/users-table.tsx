@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { UsersResponse, UserFilters } from "@/types";
 import {
@@ -36,6 +36,10 @@ export default function UsersTable() {
   const debouncedSearch = useDebounce(filters.search, 500);
 
   const { data, isLoading, isError } = useQuery<UsersResponse>({
+    // Keep the previous page on screen while the next one loads: the table
+    // used to blank out on every keystroke and page change, which made
+    // scanning a result set feel broken.
+    placeholderData: keepPreviousData,
     queryKey: ["users", { ...filters, search: debouncedSearch }],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -79,6 +83,7 @@ export default function UsersTable() {
       referredby: "referredBy",
       referralcodeused: "referralCodeUsed",
       country: "country",
+      points: "totalPoints",
       createdat: "createdAt",
       lastactivity: "lastActivityTimestamp",
     };
@@ -116,7 +121,7 @@ export default function UsersTable() {
           <input
             type="text"
             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            placeholder="Search users..."
+            placeholder="Username, email, address, Safe or referral code…"
             value={filters.search}
             onChange={handleSearch}
           />
@@ -139,6 +144,7 @@ export default function UsersTable() {
                   "Referred By",
                   "Referral Code Used",
                   "Country",
+                  "Points",
                   "Last Activity",
                   "Created At",
                 ].map((header) => {
@@ -175,14 +181,14 @@ export default function UsersTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-4 text-center">
+                  <td colSpan={13} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={13}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     No users found
@@ -307,6 +313,11 @@ export default function UsersTable() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.country || "-"}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {user.totalPoints !== undefined && user.totalPoints !== null
+                        ? user.totalPoints.toLocaleString()
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.lastActivityTimestamp

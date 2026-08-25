@@ -1,101 +1,148 @@
 "use client";
 
 import { Balance } from "@/types";
-import { Wallet, CreditCard, PiggyBank, Coins } from "lucide-react";
+import { Coins, CreditCard, PiggyBank, Wallet } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+/**
+ * Every account a user holds money in, in the order the app presents them.
+ * Rows are shown even at zero so "they have no soETH" and "we failed to read
+ * soETH" are not the same blank space.
+ */
+const ACCOUNT_ORDER = [
+  "card",
+  "savings",
+  "fuse-savings",
+  "eth-savings",
+  "wallet",
+] as const;
+
+const ACCOUNT_LABELS: Record<string, string> = {
+  card: "Card",
+  savings: "soUSD Savings",
+  "fuse-savings": "soFUSE Savings",
+  "eth-savings": "soETH Savings",
+  wallet: "Wallet",
+};
+
+function iconFor(accountType?: string) {
+  switch (accountType) {
+    case "card":
+      return <CreditCard className="h-5 w-5 text-blue-500" />;
+    case "savings":
+      return <PiggyBank className="h-5 w-5 text-emerald-500" />;
+    case "fuse-savings":
+      return <Coins className="h-5 w-5 text-amber-500" />;
+    case "eth-savings":
+      return <Coins className="h-5 w-5 text-slate-500" />;
+    default:
+      return <Wallet className="h-5 w-5 text-gray-500" />;
+  }
+}
+
+function formatAmount(value: number, currency: string): string {
+  // Non-USD assets keep more precision: 0.0042 ETH must not round to 0.00.
+  const decimals = currency === "soETH" || currency === "ETH" ? 6 : 2;
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimals,
+  });
+}
 
 export default function BalancesCard({ balances }: { balances: Balance[] }) {
-  // Ensure we always have savings and wallet accounts shown even if they have 0 balance
-  const defaultBalances: Balance[] = [
-    {
-      accountType: "savings",
-      currency: "USDC",
-      available: 0,
-      pending: 0,
-      total: 0,
-    },
-    {
-      accountType: "fuse-savings",
-      currency: "FUSE",
-      available: 0,
-      pending: 0,
-      total: 0,
-    },
-    {
-      accountType: "wallet",
-      currency: "USDC",
-      available: 0,
-      pending: 0,
-      total: 0,
-    },
+  const byType = new Map(
+    balances.map((balance) => [balance.accountType ?? "wallet", balance])
+  );
+
+  // Anything the backend returns that isn't one of the known accounts still
+  // gets a row rather than being silently dropped.
+  const extras = balances.filter(
+    (balance) =>
+      !ACCOUNT_ORDER.includes(
+        (balance.accountType ?? "wallet") as (typeof ACCOUNT_ORDER)[number]
+      )
+  );
+
+  const rows = [
+    ...ACCOUNT_ORDER.map((accountType) => byType.get(accountType)).filter(
+      (balance): balance is Balance => Boolean(balance)
+    ),
+    ...extras,
   ];
 
-  // Merge provided balances with defaults
-  const displayBalances = [...defaultBalances];
-
-  balances.forEach((balance) => {
-    const type = balance.accountType?.toLowerCase() || "wallet";
-    const existingIndex = displayBalances.findIndex(
-      (b) => (b.accountType?.toLowerCase() || "wallet") === type
-    );
-
-    if (existingIndex !== -1) {
-      displayBalances[existingIndex] = balance;
-    } else {
-      displayBalances.push(balance);
-    }
-  });
+  const totalUsd = rows.reduce(
+    (sum, balance) => sum + (balance.usdValue ?? 0),
+    0
+  );
 
   return (
-    <div className="bg-white shadow-sm border border-gray-100 overflow-hidden sm:rounded-xl">
-      <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
-        <h3 className="text-base leading-6 font-semibold text-gray-900">
-          Balances
-        </h3>
-      </div>
-      <div className="px-4 py-4">
-        <div className="space-y-4">
-          {displayBalances.map((balance, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
-            >
-              <div className="flex items-center">
-                <div className="p-2 rounded-full bg-white shadow-sm mr-3">
-                  {balance.accountType === "savings" ? (
-                    <PiggyBank className="h-5 w-5 text-emerald-500" />
-                  ) : balance.accountType === "fuse-savings" ? (
-                    <Coins className="h-5 w-5 text-amber-500" />
-                  ) : balance.accountType === "card" ? (
-                    <CreditCard className="h-5 w-5 text-blue-500" />
-                  ) : (
-                    <Wallet className="h-5 w-5 text-gray-500" />
-                  )}
+    <Card>
+      <CardHeader>
+        <CardTitle>Balances</CardTitle>
+        <span className="text-sm font-semibold text-gray-900">
+          ${totalUsd.toFixed(2)}
+        </span>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-sm text-gray-500">No balances available.</p>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((balance, index) => {
+              const accountType = balance.accountType ?? "wallet";
+              const label =
+                balance.label ?? ACCOUNT_LABELS[accountType] ?? accountType;
+
+              return (
+                <div
+                  key={`${accountType}-${index}`}
+                  className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-full bg-white p-2 shadow-sm">
+                      {iconFor(accountType)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {label}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs text-gray-500">
+                          {balance.currency}
+                        </p>
+                        {balance.provider && (
+                          <Badge variant="muted">{balance.provider}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-900">
+                      {formatAmount(balance.total, balance.currency)}{" "}
+                      {balance.currency}
+                    </p>
+                    {/* The USD line only earns its place when the row is not
+                        already denominated in dollars. */}
+                    {balance.usdValue !== undefined &&
+                      balance.currency !== "USD" &&
+                      balance.currency !== "USDC" &&
+                      balance.currency !== "soUSD" && (
+                        <p className="text-[11px] text-gray-500">
+                          $
+                          {balance.usdValue.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
+                      )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {balance.currency}
-                  </p>
-                  <p className="text-xs text-gray-500 capitalize">
-                    {balance.accountType === "fuse-savings"
-                      ? "FUSE Savings"
-                      : balance.accountType || "Wallet"}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-gray-900">
-                  {balance.total.toFixed(2)} {balance.currency}
-                </p>
-                {balance.accountType === "card" && (
-                  <p className="text-[10px] text-gray-500">
-                    Avail: {balance.available.toFixed(2)} | Pend: {balance.pending.toFixed(2)}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

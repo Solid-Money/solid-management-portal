@@ -35,6 +35,40 @@ interface VisibleColumns {
 const isActive = (status?: BalanceStatus): boolean =>
   status != null && status !== "N/A";
 
+/** Every token status on a wallet, across all of its chains. */
+const walletStatuses = (wallet: WalletInfo): (BalanceStatus | undefined)[] =>
+  wallet.chains.flatMap((chain) => [
+    chain.gasStatus,
+    chain.usdcStatus,
+    chain.usdtStatus,
+    chain.soUsdStatus,
+  ]);
+
+const hasStatus = (wallet: WalletInfo, status: BalanceStatus): boolean =>
+  walletStatuses(wallet).some((value) => value === status);
+
+/**
+ * Sort key: anything CRITICAL first, then anything LOW, then the rest.
+ *
+ * The list was in config order, so a wallet about to run dry could sit below a
+ * dozen healthy ones and be missed entirely — the one thing this page exists
+ * to prevent. Ties keep their configured order, which groups related wallets.
+ */
+const severityRank = (wallet: WalletInfo): number => {
+  if (hasStatus(wallet, "CRITICAL")) return 0;
+  if (hasStatus(wallet, "LOW")) return 1;
+  return 2;
+};
+
+const bySeverity = (wallets: WalletInfo[]): WalletInfo[] =>
+  wallets
+    .map((wallet, index) => ({ wallet, index }))
+    .sort(
+      (a, b) =>
+        severityRank(a.wallet) - severityRank(b.wallet) || a.index - b.index
+    )
+    .map(({ wallet }) => wallet);
+
 export default function WalletsTable({ filter }: { filter: WalletFilter }) {
   const [expandedWallets, setExpandedWallets] = useState<Set<string>>(
     new Set()
@@ -340,18 +374,39 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
 
   // A wallet is active unless explicitly marked inactive in the backend wallet
   // config. The page defaults to showing active wallets only.
-  const filteredWallets = data.wallets.filter((wallet: WalletInfo) => {
-    if (filter === "all") return true;
-    const active = wallet.active !== false;
-    return filter === "active" ? active : !active;
-  });
+  const filteredWallets = bySeverity(
+    data.wallets.filter((wallet: WalletInfo) => {
+      if (filter === "all") return true;
+      const active = wallet.active !== false;
+      return filter === "active" ? active : !active;
+    })
+  );
+
+  const criticalCount = filteredWallets.filter(
+    (wallet) => severityRank(wallet) === 0
+  ).length;
+  const lowCount = filteredWallets.filter(
+    (wallet) => severityRank(wallet) === 1
+  ).length;
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-500">
-          Last updated: {new Date(data.lastUpdated).toLocaleString()}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-gray-500">
+            Last updated: {new Date(data.lastUpdated).toLocaleString()}
+          </p>
+          {criticalCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+              {criticalCount} critical
+            </span>
+          )}
+          {lowCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+              {lowCount} low
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1">
             <CheckCircle className="h-4 w-4 text-green-600" />
@@ -446,6 +501,11 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
                             ✓ OK
                           </span>
                         )}
+                        {wallet.active === false && (
+                          <span className="ml-3 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">
+                            Inactive
+                          </span>
+                        )}
                       </h3>
                       <p
                         className={`text-sm mt-1 ${
@@ -458,6 +518,13 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
                       >
                         {wallet.description}
                       </p>
+                      {/* Why it is inactive, so nobody has to go back to the
+                          code to tell a retired feature from an idle wallet. */}
+                      {wallet.active === false && wallet.inactiveReason && (
+                        <p className="mt-1 max-w-2xl text-xs text-gray-500">
+                          {wallet.inactiveReason}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <code
                           className={`text-sm px-2 py-1 rounded ${

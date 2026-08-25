@@ -2,13 +2,48 @@
 
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
-import { User, Balance, Activity } from "@/types";
-import BalancesCard from "@/components/balances-card";
-import DepositSummaryCard from "@/components/deposit-summary-card";
-import ActivityList from "@/components/activity-list";
-import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { ArrowLeft, Eye, Loader2, Snowflake } from "lucide-react";
+
+import api, { getUserCard } from "@/lib/api";
+import { Activity, Balance, User, UserCardOverview } from "@/types";
+import ActivityList from "@/components/activity-list";
+import BalancesCard from "@/components/balances-card";
+import CardTransactionsTable from "@/components/card-transactions-table";
+import DepositSummaryCard from "@/components/deposit-summary-card";
+import UserCardPanel from "@/components/user/user-card-panel";
+import UserCashbackCard from "@/components/user/user-cashback-card";
+import UserIntercomCard from "@/components/user/user-intercom-card";
+import UserProfileCard from "@/components/user/user-profile-card";
+import UserRewardsCard from "@/components/user/user-rewards-card";
+import UserSavingsCard from "@/components/user/user-savings-card";
+import { Badge } from "@/components/ui/badge";
+import { CopyButton } from "@/components/ui/copy-button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+/** One headline figure in the strip under the user's name. */
+function SummaryStat({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-100 bg-white px-4 py-3 shadow-sm">
+      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
+      <p
+        className={`mt-1 font-bold text-gray-900 ${
+          emphasis ? "text-xl" : "text-lg"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
 
 export default function UserDetailPage({
   params,
@@ -19,212 +54,185 @@ export default function UserDetailPage({
 
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["user", id],
-    queryFn: async () => {
-      const res = await api.get(`/admin/v1/users/${id}`);
-      return res.data;
-    },
+    queryFn: async () => (await api.get(`/admin/v1/users/${id}`)).data,
   });
 
   const { data: balances, isLoading: balancesLoading } = useQuery<{
     data: Balance[];
   }>({
     queryKey: ["user-balances", id],
-    queryFn: async () => {
-      const res = await api.get(`/admin/v1/users/${id}/balances`);
-      return res.data;
-    },
+    queryFn: async () => (await api.get(`/admin/v1/users/${id}/balances`)).data,
+  });
+
+  const { data: card, isLoading: cardLoading } = useQuery<{
+    data: UserCardOverview;
+  }>({
+    queryKey: ["user-card", id],
+    queryFn: async () => (await getUserCard(id)).data,
   });
 
   const { data: activity, isLoading: activityLoading } = useQuery<{
     docs: Activity[];
   }>({
     queryKey: ["user-activity", id],
-    queryFn: async () => {
-      const res = await api.get(`/admin/v1/users/${id}/activity`, {
-        params: { limit: 100 },
-      });
-      return res.data;
-    },
+    queryFn: async () =>
+      (
+        await api.get(`/admin/v1/users/${id}/activity`, {
+          params: { limit: 100 },
+        })
+      ).data,
   });
 
-  if (userLoading || balancesLoading || activityLoading) {
+  // The page frame renders as soon as the user record lands; the panels each
+  // carry their own loading state, so one slow on-chain read no longer holds
+  // the whole page — and support's most common lookup — behind a spinner.
+  if (userLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="animate-spin h-8 w-8 text-indigo-600" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
       </div>
     );
   }
 
   if (!user) {
-    return <div>User not found</div>;
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-600">
+        User not found.
+      </div>
+    );
   }
 
+  const balanceRows = balances?.data ?? [];
+  const displayName = user.username || user.email || id;
+  const cardOverview = card?.data;
+
+  const totalOf = (accountType: string) =>
+    balanceRows.find((balance) => balance.accountType === accountType)
+      ?.usdValue ?? 0;
+
+  const savingsUsd =
+    totalOf("savings") + totalOf("fuse-savings") + totalOf("eth-savings");
+  const walletUsd = totalOf("wallet");
+  const cardUsd = cardOverview?.balanceUsd ?? totalOf("card");
+
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex items-center space-x-4 mb-6">
-        <Link href="/users" className="text-gray-500 hover:text-gray-700">
-          <ArrowLeft className="h-6 w-6" />
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">
-          {user.username || user.email}
-        </h1>
-        <span
-          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-            user.status === "active"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
-          }`}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href="/users"
+          className="text-gray-500 hover:text-gray-700"
+          aria-label="Back to users"
         >
-          {user.status || "Unknown"}
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
+        <CopyButton value={id} label="User ID" />
+        <Badge variant={user.status === "active" ? "success" : "muted"}>
+          {user.status || "unknown"}
+        </Badge>
+        {cardOverview?.hasCard && (
+          <Badge variant="info">{cardOverview.provider} card</Badge>
+        )}
+        {cardOverview?.frozen && (
+          <Badge variant="warning">
+            <Snowflake className="h-3 w-3" />
+            Card frozen
+          </Badge>
+        )}
+        <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600">
+          <Eye className="h-3.5 w-3.5" />
+          Read-only view of what this user sees
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
-        <div className="lg:col-span-5 space-y-6 overflow-y-auto pr-2">
-          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden sm:rounded-xl">
-            <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
-              <h3 className="text-base leading-6 font-semibold text-gray-900">
-                User Details
-              </h3>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SummaryStat
+          label="Total"
+          value={`$${(savingsUsd + walletUsd).toFixed(2)}`}
+          emphasis
+        />
+        <SummaryStat label="Savings" value={`$${savingsUsd.toFixed(2)}`} />
+        <SummaryStat label="Card" value={`$${cardUsd.toFixed(2)}`} />
+        <SummaryStat label="Wallet" value={`$${walletUsd.toFixed(2)}`} />
+      </div>
+
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="deposits">Deposits</TabsTrigger>
+          <TabsTrigger value="card">Card &amp; spending</TabsTrigger>
+          <TabsTrigger value="rewards">Rewards</TabsTrigger>
+          <TabsTrigger value="support">Support</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
+              <UserProfileCard user={user} />
+              {balancesLoading ? (
+                <div className="flex justify-center rounded-xl border bg-white py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+                </div>
+              ) : (
+                <BalancesCard balances={balanceRows} />
+              )}
             </div>
-            <div className="px-4 py-4">
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium text-gray-500 uppercase">User ID</dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono truncate">
-                    {user._id}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium text-gray-500 uppercase">Email</dt>
-                  <dd className="mt-1 text-sm text-gray-900 truncate">
-                    {user.email}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium text-gray-500 uppercase">
-                    Wallet Address
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono truncate">
-                    {user.walletAddress || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase">Joined</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase">
-                    Rain Card
-                  </dt>
-                  <dd className="mt-1 text-sm">
-                    <span
-                      className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.hasRainCard
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {user.hasRainCard ? "Yes" : "No"}
-                    </span>
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium text-gray-500 uppercase">
-                    Safe Address
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono truncate">
-                    {user.safeAddress || "-"}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium text-gray-500 uppercase">
-                    Bridge Customers
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {user.bridgeCustomers && user.bridgeCustomers.length > 0 ? (
-                      <div className="space-y-2">
-                        {user.bridgeCustomers.map((customer) => (
-                          <div
-                            key={customer.bridgeCustomerId}
-                            className="flex items-center gap-2 font-mono"
-                          >
-                            <a
-                              href={`https://dashboard.bridge.xyz/app/customers/${customer.bridgeCustomerId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-indigo-600 hover:text-indigo-800 hover:underline truncate"
-                            >
-                              {customer.bridgeCustomerId}
-                            </a>
-                            <span
-                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${
-                                customer.kycStatus === "approved"
-                                  ? "bg-green-100 text-green-800"
-                                  : customer.kycStatus === "under_review"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : customer.kycStatus === "rejected"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {customer.kycStatus}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      "-"
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase">
-                    Referral Code
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono">
-                    {user.referralCode || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase">
-                    Code Used
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono">
-                    {user.referralCodeUsed || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase">
-                    Referred By
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 truncate">
-                    {user.referredBy ? (
-                      <Link
-                        href={`/users/${user.referredBy.id}`}
-                        className="text-indigo-600 hover:text-indigo-800 hover:underline"
-                      >
-                        {user.referredBy.username}
-                      </Link>
-                    ) : (
-                      "-"
-                    )}
-                  </dd>
-                </div>
-              </dl>
+            <div className="space-y-4">
+              <UserSavingsCard userId={id} />
+              <UserCardPanel
+                userId={id}
+                username={displayName}
+                card={cardOverview}
+                isLoading={cardLoading}
+              />
             </div>
           </div>
+        </TabsContent>
 
-          <BalancesCard balances={balances?.data || []} />
+        <TabsContent value="activity">
+          {activityLoading ? (
+            <div className="flex justify-center rounded-xl border bg-white py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+            </div>
+          ) : (
+            <div className="h-[calc(100vh-22rem)] min-h-96">
+              <ActivityList activities={activity?.docs ?? []} />
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="deposits">
           <DepositSummaryCard userId={id} />
-        </div>
+        </TabsContent>
 
-        <div className="lg:col-span-7 h-full min-h-0">
-          <ActivityList activities={activity?.docs || []} />
-        </div>
-      </div>
+        <TabsContent value="card" className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <UserCardPanel
+              userId={id}
+              username={displayName}
+              card={cardOverview}
+              isLoading={cardLoading}
+            />
+            <UserCashbackCard userId={id} />
+          </div>
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-gray-900">
+              Card spending
+            </h2>
+            <CardTransactionsTable userId={id} compact />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="rewards" className="space-y-4">
+          <UserRewardsCard userId={id} />
+          <UserCashbackCard userId={id} />
+        </TabsContent>
+
+        <TabsContent value="support">
+          <UserIntercomCard userId={id} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

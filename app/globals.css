@@ -37,16 +37,54 @@
   --tw-enter-translate-y: initial;
 }
 
+@utility animate-out {
+  animation-name: exit;
+  animation-duration: 150ms;
+  --tw-exit-opacity: initial;
+  --tw-exit-scale: initial;
+  --tw-exit-rotate: initial;
+  --tw-exit-translate-x: initial;
+  --tw-exit-translate-y: initial;
+}
+
+@utility fade-in {
+  --tw-enter-opacity: 0;
+}
+
 @utility fade-in-0 {
   --tw-enter-opacity: 0;
+}
+
+@utility fade-out {
+  --tw-exit-opacity: 0;
+}
+
+@utility fade-out-0 {
+  --tw-exit-opacity: 0;
 }
 
 @utility zoom-in-95 {
   --tw-enter-scale: 0.95;
 }
 
+@utility zoom-out-95 {
+  --tw-exit-scale: 0.95;
+}
+
 @utility slide-in-from-top-2 {
   --tw-enter-translate-y: -0.5rem;
+}
+
+@utility slide-in-from-bottom-2 {
+  --tw-enter-translate-y: 0.5rem;
+}
+
+@utility slide-in-from-left-2 {
+  --tw-enter-translate-x: -0.5rem;
+}
+
+@utility slide-in-from-right-2 {
+  --tw-enter-translate-x: 0.5rem;
 }
 
 @theme inline {
