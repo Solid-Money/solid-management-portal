@@ -17,6 +17,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function UsersTable() {
   const router = useRouter();
@@ -144,6 +145,7 @@ export default function UsersTable() {
                   "Referred By",
                   "Referral Code Used",
                   "Country",
+                  "Card",
                   "Points",
                   "Last Activity",
                   "Created At",
@@ -181,14 +183,14 @@ export default function UsersTable() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-4 text-center">
+                  <td colSpan={14} className="px-4 py-4 text-center">
                     <Loader2 className="animate-spin h-6 w-6 mx-auto text-indigo-600" />
                   </td>
                 </tr>
               ) : data?.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={13}
+                    colSpan={14}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     No users found
@@ -313,6 +315,19 @@ export default function UsersTable() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.country || "-"}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      {user.card ? (
+                        <Badge
+                          variant={user.card.frozen ? "warning" : "success"}
+                          title={`${user.card.provider} · ${user.card.status}`}
+                        >
+                          {user.card.provider}
+                          {user.card.frozen && " · frozen"}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.totalPoints !== undefined && user.totalPoints !== null

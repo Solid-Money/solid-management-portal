@@ -27,6 +27,12 @@ export interface User {
     createdAt: string;
   }[];
   hasRainCard?: boolean;
+  /** The user's primary card, or null when they have none. */
+  card?: {
+    provider: string;
+    status: string;
+    frozen: boolean;
+  } | null;
 }
 
 export interface DepositTransactionRecord {
@@ -589,8 +595,15 @@ export interface CardTransaction {
   updatedAt: string;
   merchantName?: string;
   merchantLocation?: string;
+  merchantCity?: string;
+  merchantCountry?: string;
   merchantCategoryCode: string;
   transactionDescription: string;
+  /** Why the issuer declined it — only set on declined transactions. */
+  declinedReason?: string;
+  /** Merchant-currency amount, when the purchase converted currency. */
+  localAmount?: string;
+  localCurrency?: string;
   cashback?: CardTransactionCashback;
   /** Card fees charged for this spend; empty when none applied. */
   fees?: CardTransactionFee[];
@@ -638,16 +651,26 @@ export interface CardTransactionFilters {
   limit: number;
 }
 
+/**
+ * Mirrors `CardTransactionStatus` in accounts-service, which the schema
+ * enforces — so these four are the only values the collection can hold.
+ *
+ * The list used to carry four more (pending, authorized, posted, denied) from
+ * the Bridge.xyz era. Nothing writes them any more, so selecting one returned
+ * an empty table with no hint that the filter itself was the problem.
+ */
 export const CARD_TRANSACTION_STATUSES = [
   { value: "", label: "All Statuses" },
-  { value: "pending", label: "Pending" },
-  { value: "authorized", label: "Authorized" },
-  { value: "approved", label: "Approved" },
+  { value: "approved", label: "Approved (authorized)" },
   { value: "settled", label: "Settled" },
-  { value: "posted", label: "Posted" },
   { value: "declined", label: "Declined" },
-  { value: "denied", label: "Denied" },
   { value: "reversed", label: "Reversed" },
+] as const;
+
+export const CARD_TRANSACTION_CATEGORIES = [
+  { value: "", label: "All Categories" },
+  { value: "purchase", label: "Purchase" },
+  { value: "refund", label: "Refund" },
 ] as const;
 
 /**

@@ -374,11 +374,24 @@ export default function CardTransactionsTable({
                         auth {formatAmount(tx.amount, tx.currency)}
                       </div>
                     )}
+                    {/* The merchant-currency side of a converted purchase —
+                        the same condition that produces an FX fee. */}
+                    {tx.localAmount && tx.localCurrency && (
+                      <div className="text-[10px] text-gray-500">
+                        merchant {Number(tx.localAmount).toFixed(2)}{" "}
+                        {tx.localCurrency}
+                      </div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-4 py-3">
                     <Badge variant={cardStatusVariant(tx.status)}>
                       {tx.status}
                     </Badge>
+                    {tx.declinedReason && (
+                      <p className="mt-1 max-w-40 text-[10px] text-red-600">
+                        {tx.declinedReason}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm">{renderFees(tx)}</td>
                   <td className="px-4 py-3 text-sm text-gray-900">
