@@ -124,6 +124,12 @@ export default function ActivitiesTable() {
         return "bg-yellow-100 text-yellow-800";
       case "processing":
         return "bg-blue-100 text-blue-800";
+      // Mid-flight deposit states. Without these they fell through to the same
+      // grey as "cancelled", so a deposit still being processed looked dead.
+      case "detected":
+        return "bg-sky-100 text-sky-800";
+      case "transferred_to_safe":
+        return "bg-indigo-100 text-indigo-800";
       case "cancelled":
         return "bg-gray-100 text-gray-800";
       case "expired":
@@ -148,10 +154,11 @@ export default function ActivitiesTable() {
     const chains: Record<number, string> = {
       1: "Ethereum",
       10: "Optimism",
+      56: "BSC",
+      122: "Fuse",
       137: "Polygon",
-      42161: "Arbitrum",
       8453: "Base",
-      122: 'Fuse'
+      42161: "Arbitrum",
     };
     return chains[chainId] || `Chain ${chainId}`;
   };

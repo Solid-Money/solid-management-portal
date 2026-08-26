@@ -55,6 +55,43 @@ api.interceptors.response.use(
   },
 );
 
+// --- User detail page ------------------------------------------------------
+
+export const getUserCard = (userId: string) =>
+  api.get(`/admin/v1/users/${userId}/card`);
+
+export const getUserSavings = (userId: string) =>
+  api.get(`/admin/v1/users/${userId}/savings`);
+
+export const getUserRewards = (userId: string) =>
+  api.get(`/admin/v1/users/${userId}/rewards`);
+
+export const getUserCashback = (userId: string) =>
+  api.get(`/admin/v1/users/${userId}/cashback`);
+
+export const getUserIntercomHistory = (userId: string) =>
+  api.get(`/admin/v1/users/${userId}/intercom`);
+
+export const getCardFreezeHistory = (userId: string) =>
+  api.get(`/admin/v1/users/${userId}/card/freeze-history`);
+
+/**
+ * Freeze or unfreeze a user's card. The admin identity is taken from the
+ * Firebase token server-side — never sent from here — so the audit row and the
+ * Slack message name whoever is actually signed in.
+ */
+export const setUserCardFreeze = (
+  userId: string,
+  freeze: boolean,
+  reason?: string
+) =>
+  api.post(`/admin/v1/users/${userId}/card/freeze`, {
+    freeze,
+    ...(reason ? { reason } : {}),
+  });
+
+// --- Rewards / cohorts -----------------------------------------------------
+
 export const getTierRecipients = (tier: number) =>
   api.get(`/admin/v1/points/tier-recipients`, { params: { tier } });
 

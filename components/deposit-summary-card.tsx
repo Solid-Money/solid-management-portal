@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { DepositSummary, DepositTitleGroup } from "@/types";
+import {
+  DepositSummary,
+  DepositTitleGroup,
+  DepositTransactionRecord,
+} from "@/types";
 import {
   ArrowDownToLine,
   CreditCard,
@@ -14,6 +18,7 @@ import {
   CheckCircle2,
   Clock,
   Radio,
+  Workflow,
 } from "lucide-react";
 
 function formatAmount(amount: number): string {
@@ -40,10 +45,14 @@ function truncateHash(hash: string): string {
 
 const EXPLORER_URLS: Record<number, string> = {
   1: "https://etherscan.io",
+  // BSC is a supported bridge chain, so its deposits need an explorer too —
+  // without it they silently fell back to the Fuse explorer, which cannot
+  // resolve a BSC hash.
+  56: "https://bscscan.com",
   122: "https://explorer.fuse.io",
+  137: "https://polygonscan.com",
   8453: "https://basescan.org",
   42161: "https://arbiscan.io",
-  137: "https://polygonscan.com",
 };
 
 function getExplorerTxUrl(hash: string, chainId: number | null): string {
@@ -72,20 +81,20 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-interface TxRecord {
-  amount: string;
-  symbol: string;
-  hash: string | null;
-  userOpHash: string | null;
-  chainId: number | null;
-  status: string;
-  createdAt: string;
-  clientTxId: string;
-  sourceChainConfirmed: boolean;
-  confirmedAt: string | null;
-  cardBalanceConfirmedAt: string | null;
-  processingStatus: string | null;
-  url: string | null;
+type TxRecord = DepositTransactionRecord;
+
+/**
+ * Base URL of the Temporal UI, e.g. https://temporal.solid.xyz. Unset means no
+ * workflow links are rendered — a link into a UI that isn't there would be
+ * worse than none.
+ */
+const TEMPORAL_UI_BASE_URL = process.env.NEXT_PUBLIC_TEMPORAL_UI_BASE_URL;
+const TEMPORAL_NAMESPACE =
+  process.env.NEXT_PUBLIC_TEMPORAL_NAMESPACE || "default";
+
+function temporalWorkflowUrl(workflowId?: string | null): string | null {
+  if (!workflowId || !TEMPORAL_UI_BASE_URL) return null;
+  return `${TEMPORAL_UI_BASE_URL.replace(/\/$/, "")}/namespaces/${TEMPORAL_NAMESPACE}/workflows/${encodeURIComponent(workflowId)}`;
 }
 
 function getStuckAt(tx: TxRecord): {
@@ -181,6 +190,7 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
                 <td className="px-2 py-1.5">Date</td>
                 <td className="px-2 py-1.5 text-right">Amount</td>
                 <td className="px-2 py-1.5">Stuck At</td>
+                <td className="px-2 py-1.5">Workflow</td>
                 <td className="px-2 py-1.5 text-right">Tx Hash</td>
               </tr>
             </thead>
@@ -217,6 +227,35 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
                         </a>
                       )}
                     </td>
+                    <td className="px-2 py-1.5">
+                      {/* The workflow's event history is where a stuck deposit
+                          actually explains itself, so link straight to it. */}
+                      {tx.workflowId ? (
+                        temporalWorkflowUrl(tx.workflowId) ? (
+                          <a
+                            href={temporalWorkflowUrl(tx.workflowId)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                            title={tx.workflowId}
+                          >
+                            <Workflow className="h-3 w-3" />
+                            Temporal
+                          </a>
+                        ) : (
+                          <span
+                            className="font-mono text-[10px] text-gray-500"
+                            title={tx.workflowId}
+                          >
+                            {tx.workflowId.length > 24
+                              ? `${tx.workflowId.slice(0, 24)}…`
+                              : tx.workflowId}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="px-2 py-1.5 text-right">
                       {tx.hash ? (
                         <a
@@ -246,13 +285,11 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
 function CategorySection({
   icon,
   label,
-  total,
   count,
   byTitle,
 }: {
   icon: React.ReactNode;
   label: string;
-  total: number;
   count: number;
   byTitle: DepositTitleGroup[];
 }) {
@@ -334,7 +371,6 @@ export default function DepositSummaryCard({ userId }: { userId: string }) {
                 </div>
               }
               label="Solid Deposits"
-              total={summary.solidDeposits.total}
               count={summary.solidDeposits.count}
               byTitle={summary.solidDeposits.byTitle}
             />
@@ -346,7 +382,6 @@ export default function DepositSummaryCard({ userId }: { userId: string }) {
                 </div>
               }
               label="Card Deposits"
-              total={summary.bridgeCardDeposits.total}
               count={summary.bridgeCardDeposits.count}
               byTitle={summary.bridgeCardDeposits.byTitle}
             />
