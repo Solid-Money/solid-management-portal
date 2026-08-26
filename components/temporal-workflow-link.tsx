@@ -22,13 +22,25 @@ interface TemporalWorkflowLinkProps {
  *
  * With no namespace configured there is nothing to link to, so it degrades to
  * a copyable id rather than an anchor that goes nowhere.
+ *
+ * A dash is a real answer, not a gap: most card deposits never touch Temporal
+ * (the in-app borrow-and-deposit flow is one client-signed transaction, and
+ * Rain's collateral webhook records its deposit inline), so the tooltip says so
+ * rather than leaving support wondering whether the link is broken.
  */
 export default function TemporalWorkflowLink({
   workflowId,
   className,
 }: TemporalWorkflowLinkProps) {
   if (!workflowId) {
-    return <span className="text-gray-400">—</span>;
+    return (
+      <span
+        className="text-gray-400"
+        title="No Temporal workflow — this deposit was not processed by one"
+      >
+        —
+      </span>
+    );
   }
 
   const url = temporalWorkflowUrl(workflowId);
