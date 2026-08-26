@@ -406,8 +406,13 @@ export function getTransactionCategory(
   type: TransactionType,
   title?: string
 ): TransactionCategory | undefined {
+  // A deposit headed for the card is written under the plain deposit types —
+  // the destination lives in the title, not the type. Without this a crypto
+  // deposit to a Rain card reads as "Savings account", which is the one thing
+  // it is not.
   if (
-    type === TransactionType.BRIDGE_DEPOSIT &&
+    (type === TransactionType.BRIDGE_DEPOSIT ||
+      type === TransactionType.DEPOSIT) &&
     title?.toLowerCase().includes("card")
   ) {
     return TransactionCategory.CARD_DEPOSIT;
