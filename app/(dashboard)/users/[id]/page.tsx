@@ -127,9 +127,11 @@ export default function UserDetailPage({
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
         <CopyButton value={id} label="User ID" />
-        <Badge variant={user.status === "active" ? "success" : "muted"}>
-          {user.status || "unknown"}
-        </Badge>
+        {/*
+          No account-status badge here: users have no status field, so it only
+          ever read "unknown". KYC — the status support actually asks about —
+          is on the profile card, per Bridge customer.
+        */}
         {cardOverview?.hasCard && (
           <Badge variant="info">{cardOverview.provider} card</Badge>
         )}
