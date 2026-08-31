@@ -953,8 +953,34 @@ export interface UserCardOverview {
    */
   freezeInitiator?: "customer" | "developer" | "bridge";
   balanceUsd: number;
+  /** Why a Wirex card's balance is what it is. Wirex cards only. */
+  wirexSpend?: WirexSpendContext;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * The state behind a Wirex card's spending power.
+ *
+ * A Wirex card is never funded — it spends the cardholder's soUSD where it sits,
+ * against an allowance they granted in the app — so its "Card balance" is
+ * `min(allowance, savings) - held`. A $0 there has three different causes and
+ * three different answers for support: no savings (deposit), no approval
+ * (re-authorize in the app), or everything committed to charges Wirex has not
+ * settled yet (wait). These are the figures that tell them apart.
+ *
+ * Absent when the chain state could not be read, so an empty panel means "we
+ * could not check" rather than "this user has nothing".
+ */
+export interface WirexSpendContext {
+  /** The Safe's soUSD balance — the money that could back a purchase. */
+  balanceUsd: number;
+  /** What the card-spend wallet is still permitted to pull. */
+  allowanceRemainingUsd: number;
+  /** Committed to authorizations Wirex has not settled yet. */
+  heldUsd: number;
+  /** Whether the card can spend anything at all right now. */
+  authorized: boolean;
 }
 
 /** One entry in the admin audit trail for a card freeze or unfreeze. */
