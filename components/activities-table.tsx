@@ -9,7 +9,7 @@ import {
   ACTIVITY_TYPES,
   DEPOSIT_TYPES,
   ACTIVITY_STATUSES,
-  TRANSACTION_DETAILS,
+  getTransactionCategory,
   TransactionType,
 } from "@/types";
 import {
@@ -146,8 +146,11 @@ export default function ActivitiesTable() {
     return typeObj?.label || type;
   };
 
-  const getTransactionDetails = (type: string) =>
-    TRANSACTION_DETAILS[type as TransactionType];
+  // Via the resolver, not the raw map: `deposit` and `bridge_deposit` each back
+  // both a savings deposit and a card deposit, and only the title tells them
+  // apart — without it a card deposit reads "Savings account".
+  const getCategory = (type: string, title?: string) =>
+    getTransactionCategory(type as TransactionType, title);
 
   const getChainName = (chainId?: number) => {
     if (!chainId) return "-";
@@ -311,12 +314,13 @@ export default function ActivitiesTable() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                       {(() => {
-                        const txDetails = getTransactionDetails(activity.type);
-                        if (!txDetails) return "-";
+                        const category = getCategory(
+                          activity.type,
+                          activity.title
+                        );
+                        if (!category) return "-";
                         return (
-                          <span className="text-gray-600">
-                            {txDetails.category}
-                          </span>
+                          <span className="text-gray-600">{category}</span>
                         );
                       })()}
                     </td>
