@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Activity, TRANSACTION_DETAILS, TransactionStatus, TransactionDirection, TransactionType } from "@/types";
+import { Activity, getTransactionCategory, TRANSACTION_DETAILS, TransactionStatus, TransactionDirection, TransactionType } from "@/types";
 import { cn, formatNumber } from "@/lib/utils";
 import { TokenIcon } from "./token-icon";
 import { ExternalLink, Loader2 } from "lucide-react";
@@ -69,20 +69,27 @@ export const ActivityItem = ({
     : (details?.sign ?? "");
 
   const displayTitle = shortTitle || title || type;
-  const description = details?.category || "Unknown";
+  // Resolved from the title too: `deposit` and `bridge_deposit` each back both a
+  // savings deposit and a card deposit, so the static map alone labelled every
+  // card deposit "Savings account".
+  const description = getTransactionCategory(transactionType, title) || "Unknown";
 
   const formatActivityTimestamp = (ts?: string, createdAtDate?: string) => {
     const date = ts ? new Date(parseInt(ts) * 1000) : new Date(createdAtDate || "");
-    return new Intl.DateTimeFormat("en-US", {
+    // Format the parts rather than patching the string: the formatted date
+    // carries two commas ("Aug 31, 2026, 3:07 PM"), and replacing the first one
+    // — which sits between day and year — produced "Aug 31 at 2026, 3:07 PM".
+    const day = new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
+    }).format(date);
+    const time = new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
-    })
-      .format(date)
-      .replace(",", " at");
+    }).format(date);
+    return `${day} at ${time}`;
   };
 
   const formattedTimestamp = formatActivityTimestamp(timestamp, createdAt);

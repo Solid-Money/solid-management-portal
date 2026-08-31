@@ -248,11 +248,14 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
 function CategorySection({
   icon,
   label,
+  hint,
   count,
   byTitle,
 }: {
   icon: React.ReactNode;
   label: string;
+  /** What this section counts — without it a $0.00 reads as missing data. */
+  hint: string;
   count: number;
   byTitle: DepositTitleGroup[];
 }) {
@@ -268,7 +271,10 @@ function CategorySection({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {icon}
-          <span className="text-sm font-semibold text-gray-900">{label}</span>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{label}</p>
+            <p className="text-[10px] text-gray-500">{hint}</p>
+          </div>
         </div>
         <div className="text-right">
           {usdTotal > 0 && (
@@ -333,7 +339,11 @@ export default function DepositSummaryCard({ userId }: { userId: string }) {
                   <ArrowDownToLine className="h-4 w-4 text-emerald-600" />
                 </div>
               }
-              label="Solid Deposits"
+              // Named for what it counts. "Solid Deposits" read as "everything
+              // this user put into Solid", so a card-only user's $0.00 looked
+              // like a broken panel rather than "never deposited to savings".
+              label="Savings deposits"
+              hint="Vault mints — soUSD, soETH, soFUSE"
               count={summary.solidDeposits.count}
               byTitle={summary.solidDeposits.byTitle}
             />
@@ -344,7 +354,8 @@ export default function DepositSummaryCard({ userId }: { userId: string }) {
                   <CreditCard className="h-4 w-4 text-blue-600" />
                 </div>
               }
-              label="Card Deposits"
+              label="Card deposits"
+              hint="Money added to the card, from any source"
               count={summary.bridgeCardDeposits.count}
               byTitle={summary.bridgeCardDeposits.byTitle}
             />
