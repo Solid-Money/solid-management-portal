@@ -33,6 +33,85 @@ function formatDateTime(value?: string) {
   });
 }
 
+const usd = (value: number) =>
+  `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+/**
+ * Why a Wirex card can spend what it can — and, more often, why it cannot.
+ *
+ * A Wirex card holds no balance: it spends the cardholder's savings in place,
+ * against an allowance they approved in the app. So "Card balance: $0.00" on a
+ * Wirex row is ambiguous in a way it never is for Rain, and the three causes
+ * need opposite answers from support. Spelling out the inputs turns a support
+ * conversation that starts with "the balance looks wrong" into one that starts
+ * with "your approval has run out".
+ */
+function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
+  const spend = card.wirexSpend;
+  if (card.provider !== "wirex") return null;
+
+  if (!spend) {
+    return (
+      <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+        Could not read this cardholder&apos;s on-chain spend state. The balance
+        above may be stale — retry before drawing conclusions from it.
+      </div>
+    );
+  }
+
+  // The binding constraint, which is the thing worth naming outright.
+  const blocker =
+    spend.balanceUsd <= 0
+      ? "No savings to spend. They need to deposit."
+      : spend.allowanceRemainingUsd <= 0
+        ? "Approval used up. They need to re-authorize spending in the app."
+        : spend.heldUsd > 0 && card.balanceUsd <= 0
+          ? "Everything is committed to charges Wirex has not settled yet."
+          : null;
+
+  return (
+    <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold uppercase text-gray-500">
+          Wirex spending power
+        </h4>
+        <Badge variant={spend.authorized ? "success" : "warning"}>
+          {spend.authorized ? "Authorized" : "Not authorized"}
+        </Badge>
+      </div>
+
+      <dl className="grid grid-cols-3 gap-2 text-xs">
+        <div>
+          <dt className="text-gray-500">Savings</dt>
+          <dd className="mt-0.5 font-medium text-gray-900">
+            {usd(spend.balanceUsd)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-500">Approved</dt>
+          <dd className="mt-0.5 font-medium text-gray-900">
+            {usd(spend.allowanceRemainingUsd)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-500">On hold</dt>
+          <dd className="mt-0.5 font-medium text-gray-900">
+            {usd(spend.heldUsd)}
+          </dd>
+        </div>
+      </dl>
+
+      <p className="text-xs text-gray-600">
+        {blocker ??
+          "This card spends the user's savings directly — there is no balance to top up."}
+      </p>
+    </div>
+  );
+}
+
 /** Who froze the card, and whether the cardholder can undo it themselves. */
 function FreezeExplanation({ card }: { card: UserCardOverview }) {
   if (!card.frozen) return null;
@@ -199,7 +278,9 @@ export default function UserCardPanel({
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase text-gray-500">
-                  Card balance
+                  {/* A Wirex card has no balance of its own — the number is
+                      what it can reach right now, which is a different claim. */}
+                  {card.provider === "wirex" ? "Spendable now" : "Card balance"}
                 </dt>
                 <dd className="mt-1 text-sm font-semibold text-gray-900">
                   ${card.balanceUsd.toFixed(2)}
@@ -233,6 +314,8 @@ export default function UserCardPanel({
                 </dd>
               </div>
             </dl>
+
+            <WirexSpendBreakdown card={card} />
 
             <FreezeExplanation card={card} />
 
