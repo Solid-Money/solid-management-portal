@@ -962,25 +962,51 @@ export interface UserCardOverview {
 /**
  * The state behind a Wirex card's spending power.
  *
- * A Wirex card is never funded — it spends the cardholder's soUSD where it sits,
- * against an allowance they granted in the app — so its "Card balance" is
- * `min(allowance, savings) - held`. A $0 there has three different causes and
- * three different answers for support: no savings (deposit), no approval
- * (re-authorize in the app), or everything committed to charges Wirex has not
- * settled yet (wait). These are the figures that tell them apart.
+ * A Wirex card is never funded — it spends the cardholder's own assets where
+ * they sit, through `SolidCashModule` on their Safe — so its "Card balance" is
+ * whatever the module will release for the next tap. A $0 there has several
+ * different causes with opposite answers for support: nothing to spend
+ * (deposit), a spent cap (wait for the window to roll), revoked module consent
+ * (re-enable in the app), a guardian pause (arrears or a fraud hold), or
+ * everything committed to charges Wirex has not settled yet (wait). These are
+ * the figures that tell them apart.
  *
- * Absent when the chain state could not be read, so an empty panel means "we
- * could not check" rather than "this user has nothing".
+ * Mirrors `AdminWirexSpendContext` in accounts-service. Absent when the chain
+ * state could not be read, so an empty panel means "we could not check" rather
+ * than "this user has nothing".
  */
 export interface WirexSpendContext {
-  /** The Safe's soUSD balance — the money that could back a purchase. */
-  balanceUsd: number;
-  /** What the card-spend wallet is still permitted to pull. */
-  allowanceRemainingUsd: number;
+  /**
+   * What the card can spend right now: the live value of every allowlisted
+   * asset the Safe holds (USDC, USDT, soUSD), already clamped by the rolling
+   * caps and net of unsettled authorizations. The next tap is decided
+   * against this number.
+   */
+  spendableUsd: number;
   /** Committed to authorizations Wirex has not settled yet. */
   heldUsd: number;
-  /** Whether the card can spend anything at all right now. */
-  authorized: boolean;
+  /**
+   * Headroom left under the tighter of the daily and monthly caps. Distinct
+   * from `spendableUsd`: plenty of assets behind an exhausted cap is a
+   * different problem, with a different answer, than an empty Safe.
+   */
+  limitRemainingUsd: number;
+  /** The Safe's own caps. `null` means no cap of its own — not zero. */
+  dailyLimitUsd: number | null;
+  monthlyLimitUsd: number | null;
+  /** Both halves done: the module is enabled on the Safe *and* it registered. */
+  registered: boolean;
+  /**
+   * The two halves separately, because they fail differently. Consent can be
+   * revoked from any Safe client with no call to us, so `registeredOnChain`
+   * with `moduleEnabled: false` means re-enable the module — registering
+   * again reverts it.
+   */
+  registeredOnChain: boolean;
+  moduleEnabled: boolean;
+  /** Guardian pauses. `safePaused` is usually arrears or a fraud hold. */
+  modulePaused: boolean;
+  safePaused: boolean;
 }
 
 /** One entry in the admin audit trail for a card freeze or unfreeze. */

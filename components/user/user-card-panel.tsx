@@ -4,7 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { CreditCard, Loader2, Snowflake } from "lucide-react";
 
 import { getCardFreezeHistory } from "@/lib/api";
-import { CardFreezeAuditEntry, UserCardOverview } from "@/types";
+import {
+  CardFreezeAuditEntry,
+  UserCardOverview,
+  WirexSpendContext,
+} from "@/types";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -33,21 +37,67 @@ function formatDateTime(value?: string) {
   });
 }
 
-const usd = (value: number) =>
-  `$${value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+/**
+ * Money, or an em dash when the figure is missing.
+ *
+ * Deliberately tolerant of a number that is not there. This panel renders
+ * whatever accounts-service sends, and a field that goes away in a backend
+ * change must show as "not reported" — not throw inside render and take the
+ * whole user page down with it, which is exactly what a bare `.toLocaleString`
+ * on a renamed field did here.
+ */
+const usd = (value: number | null | undefined) =>
+  typeof value === "number" && Number.isFinite(value)
+    ? `$${value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    : "—";
+
+/** A spend cap. `null` means the Safe set no cap of its own, which is not $0. */
+const cap = (value: number | null | undefined) =>
+  value === null ? "No cap" : usd(value);
+
+/**
+ * The binding constraint on this card, named outright.
+ *
+ * Ordered by which one actually decides the next tap: a module-wide pause makes
+ * the user's own balance irrelevant, a revoked module is not a funding problem,
+ * and an exhausted cap is not an empty Safe. Support needs the first one that
+ * applies, because each sends them somewhere different.
+ */
+function describeBlocker(spend: WirexSpendContext): string | null {
+  if (spend.modulePaused) {
+    return "Card spending is paused for everyone. This is a module-wide pause, not something about this user.";
+  }
+  if (spend.safePaused) {
+    return "This user's Safe is paused — usually arrears or a fraud hold. Nothing will authorize until it is lifted.";
+  }
+  if (!spend.registeredOnChain) {
+    return "Never registered for card spending. They need to finish card setup in the app.";
+  }
+  if (!spend.moduleEnabled) {
+    return "Module consent was revoked. They need to re-enable card spending in the app — registering again will not fix it.";
+  }
+  if (spend.limitRemainingUsd <= 0) {
+    return "Spending cap reached. Nothing more authorizes until the daily or monthly window rolls over.";
+  }
+  if (spend.spendableUsd > 0) return null;
+  if (spend.heldUsd > 0) {
+    return "Everything is committed to charges Wirex has not settled yet.";
+  }
+  return "Nothing spendable in the Safe. They need to deposit.";
+}
 
 /**
  * Why a Wirex card can spend what it can — and, more often, why it cannot.
  *
- * A Wirex card holds no balance: it spends the cardholder's savings in place,
- * against an allowance they approved in the app. So "Card balance: $0.00" on a
- * Wirex row is ambiguous in a way it never is for Rain, and the three causes
- * need opposite answers from support. Spelling out the inputs turns a support
- * conversation that starts with "the balance looks wrong" into one that starts
- * with "your approval has run out".
+ * A Wirex card holds no balance: it spends the cardholder's own assets where
+ * they sit, through the cash module on their Safe. So "Card balance: $0.00" on
+ * a Wirex row is ambiguous in a way it never is for Rain, and the causes need
+ * opposite answers from support. Spelling out the inputs turns a conversation
+ * that starts with "the balance looks wrong" into one that starts with "their
+ * daily cap is spent".
  */
 function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
   const spend = card.wirexSpend;
@@ -62,15 +112,8 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
     );
   }
 
-  // The binding constraint, which is the thing worth naming outright.
-  const blocker =
-    spend.balanceUsd <= 0
-      ? "No savings to spend. They need to deposit."
-      : spend.allowanceRemainingUsd <= 0
-        ? "Approval used up. They need to re-authorize spending in the app."
-        : spend.heldUsd > 0 && card.balanceUsd <= 0
-          ? "Everything is committed to charges Wirex has not settled yet."
-          : null;
+  const blocker = describeBlocker(spend);
+  const paused = spend.modulePaused || spend.safePaused;
 
   return (
     <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
@@ -78,22 +121,24 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
         <h4 className="text-xs font-semibold uppercase text-gray-500">
           Wirex spending power
         </h4>
-        <Badge variant={spend.authorized ? "success" : "warning"}>
-          {spend.authorized ? "Authorized" : "Not authorized"}
+        <Badge
+          variant={paused ? "danger" : spend.registered ? "success" : "warning"}
+        >
+          {paused ? "Paused" : spend.registered ? "Registered" : "Not registered"}
         </Badge>
       </div>
 
       <dl className="grid grid-cols-3 gap-2 text-xs">
         <div>
-          <dt className="text-gray-500">Savings</dt>
+          <dt className="text-gray-500">Spendable now</dt>
           <dd className="mt-0.5 font-medium text-gray-900">
-            {usd(spend.balanceUsd)}
+            {usd(spend.spendableUsd)}
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500">Approved</dt>
+          <dt className="text-gray-500">Cap left</dt>
           <dd className="mt-0.5 font-medium text-gray-900">
-            {usd(spend.allowanceRemainingUsd)}
+            {usd(spend.limitRemainingUsd)}
           </dd>
         </div>
         <div>
@@ -104,9 +149,14 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
         </div>
       </dl>
 
+      <p className="text-[11px] text-gray-500">
+        Caps: {cap(spend.dailyLimitUsd)} daily · {cap(spend.monthlyLimitUsd)}{" "}
+        monthly
+      </p>
+
       <p className="text-xs text-gray-600">
         {blocker ??
-          "This card spends the user's savings directly — there is no balance to top up."}
+          "This card spends the user's own assets directly — there is no balance to top up."}
       </p>
     </div>
   );
@@ -283,7 +333,7 @@ export default function UserCardPanel({
                   {card.provider === "wirex" ? "Spendable now" : "Card balance"}
                 </dt>
                 <dd className="mt-1 text-sm font-semibold text-gray-900">
-                  ${card.balanceUsd.toFixed(2)}
+                  {usd(card.balanceUsd)}
                 </dd>
               </div>
               <div>
