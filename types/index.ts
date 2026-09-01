@@ -196,6 +196,17 @@ export enum TransactionType {
   BORROW_AND_DEPOSIT_TO_CARD = "borrow_and_deposit_to_card",
   BRIDGE_TRANSFER = "bridge_transfer",
   BANK_TRANSFER = "bank_transfer",
+  /**
+   * Wirex bank rails (EUR SEPA / USD ACH) on the user's own virtual account.
+   * Separate from BANK_TRANSFER, which is the Bridge rail and is hard-coded
+   * inbound — a payout under it would read "+" to the support agent.
+   *
+   * These settle into the user's Wirex unified balance and are deliberately not
+   * swept on-chain, so the rows carry no hash. `metadata.settlement` records
+   * where the money actually sits.
+   */
+  WIREX_BANK_DEPOSIT = "wirex_bank_deposit",
+  WIREX_BANK_PAYOUT = "wirex_bank_payout",
   CARD_TRANSACTION = "card_transaction",
   CARD_DEPOSIT = "card_deposit",
   CARD_WITHDRAWAL = "card_withdrawal",
@@ -247,6 +258,7 @@ export enum TransactionCategory {
   WALLET_TRANSFER = "Wallet transfer",
   EXTERNAL_WALLET_TRANSFER = "External wallet transfer",
   BANK_DEPOSIT = "Bank deposit",
+  BANK_WITHDRAWAL = "Bank withdraw",
   CARD_DEPOSIT = "Card deposit",
   CARD_WITHDRAWAL = "Card withdraw",
   REWARD = "Reward",
@@ -317,6 +329,14 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
     [TransactionType.BANK_TRANSFER]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.BANK_DEPOSIT,
+    },
+    [TransactionType.WIREX_BANK_DEPOSIT]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.BANK_DEPOSIT,
+    },
+    [TransactionType.WIREX_BANK_PAYOUT]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.BANK_WITHDRAWAL,
     },
     [TransactionType.CARD_TRANSACTION]: {
       sign: TransactionDirection.OUT,
@@ -454,6 +474,8 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.BRIDGE_DEPOSIT, label: "Bridge Deposit" },
   { value: TransactionType.BRIDGE_TRANSFER, label: "Bridge Transfer" },
   { value: TransactionType.BANK_TRANSFER, label: "Bank Transfer" },
+  { value: TransactionType.WIREX_BANK_DEPOSIT, label: "Wirex Bank Deposit" },
+  { value: TransactionType.WIREX_BANK_PAYOUT, label: "Wirex Bank Payout" },
   { value: TransactionType.MERCURYO_TRANSACTION, label: "Mercuryo Purchase" },
   { value: TransactionType.CARD_DEPOSIT, label: "Card Deposit" },
   { value: TransactionType.CARD_TRANSACTION, label: "Card Transaction" },
