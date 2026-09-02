@@ -1026,7 +1026,13 @@ export interface CardFreezeAuditEntry {
 
 export type VaultKey = "USDC" | "FUSE" | "ETH";
 
-/** One vault's savings summary, exactly as the app's savings screen reads it. */
+/**
+ * One vault's savings summary, exactly as the app's savings screen reads it.
+ *
+ * The `*USD` names are a soUSD-era misnomer: each figure is denominated in its
+ * own vault's underlying asset, so soFUSE reports FUSE and soETH reports ETH.
+ * Use `SavingsVaultResult.underlyingPriceUsd` to put them in dollars.
+ */
 export interface SavingsSummary {
   vault: string;
   vaultToken: string;
@@ -1044,6 +1050,10 @@ export interface SavingsSummary {
 export interface SavingsVaultResult {
   vault: VaultKey;
   summary: SavingsSummary | null;
+  /** The unit `summary`'s `*USD` figures are really in: USD, FUSE or ETH. */
+  underlyingSymbol?: string;
+  /** USD price of one `underlyingSymbol`; null when it could not be read. */
+  underlyingPriceUsd?: number | null;
   /** Why the vault could not be read, when `summary` is null. */
   error?: string;
 }
