@@ -890,6 +890,8 @@ export interface ProductFeesConfig {
   enabled: boolean;
   /** Charged on in-app swaps, taken from the source token on-chain. */
   swap: FeeRates;
+  /** Charged on stock trades, taken from the sell side in the CoW batch. */
+  stocks: FeeRates;
   /** Charged when a purchase settles in a currency other than the card's. */
   fx: FeeRates;
   /**
@@ -901,6 +903,8 @@ export interface ProductFeesConfig {
   offRamp: FeeRates;
   /** Charged on fiat arriving from a bank, withheld from the amount credited. */
   bankDeposit: FeeRates;
+  /** Charged on a settled TransFi buy-crypto order. */
+  transfi: FeeRates;
   /** Computed fees below this (USD) are waived rather than charged. */
   minChargeUsd: number;
 }

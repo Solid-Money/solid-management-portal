@@ -1,519 +1,53 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import api from "@/lib/api";
+import { useState } from "react";
 import {
-  Save,
-  RefreshCw,
-  ChevronDown,
-  ChevronUp,
-  Settings,
-  Gift,
-  Percent,
-  Coins,
-  Users,
   Calendar,
-  Wallet,
-  HelpCircle,
+  Coins,
   CreditCard,
-  Mail,
   Eye,
+  Gift,
+  Mail,
+  Percent,
+  RefreshCw,
+  Save,
+  Settings,
+  Users,
+  Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
-import { useAuth } from "@/components/auth-provider";
+
 import {
-  FeeRates,
-  ProductFeesConfig,
-  FullRewardsConfig,
-  ReferralCashbackConfig,
-} from "@/types";
-import TierUsersModal from "@/components/tier-users-modal";
+  ConfigSection,
+  InfoTooltip,
+  InputField,
+  TierCard,
+  TierGrid,
+  ToggleField,
+} from "@/components/config/config-fields";
 import TierEmailModal from "@/components/tier-email-modal";
+import TierUsersModal from "@/components/tier-users-modal";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help inline-block ml-1" />
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs">
-        <p>{text}</p>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-interface ConfigSectionProps {
-  title: string;
-  description?: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}
-
-function ConfigSection({
-  title,
-  description,
-  icon,
-  children,
-  defaultOpen = false,
-}: ConfigSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
-      >
-        <div className="flex items-center space-x-3">
-          {icon}
-          <div className="text-left">
-            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-            {description && (
-              <p className="text-sm text-gray-500 font-normal">{description}</p>
-            )}
-          </div>
-        </div>
-        {isOpen ? (
-          <ChevronUp className="h-5 w-5 text-gray-500" />
-        ) : (
-          <ChevronDown className="h-5 w-5 text-gray-500" />
-        )}
-      </button>
-      {isOpen && <div className="px-6 py-4 space-y-4">{children}</div>}
-    </div>
-  );
-}
-
-interface InputFieldProps {
-  label: string;
-  value: string | number;
-  onChange: (value: string) => void;
-  type?: "text" | "number";
-  suffix?: string;
-  disabled?: boolean;
-  min?: number;
-  step?: string;
-  tooltip?: string;
-}
-
-function InputField({
-  label,
-  value,
-  onChange,
-  type = "text",
-  suffix,
-  disabled = false,
-  min,
-  step,
-  tooltip,
-}: InputFieldProps) {
-  return (
-    <div className="flex flex-col">
-      <label className="text-sm font-medium text-gray-700 mb-1">
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </label>
-      <div className="flex items-center">
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          min={min}
-          step={step}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        />
-        {suffix && (
-          <span className="ml-2 text-sm text-gray-500 whitespace-nowrap">
-            {suffix}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface ToggleFieldProps {
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-  disabled?: boolean;
-  tooltip?: string;
-}
-
-function ToggleField({
-  label,
-  value,
-  onChange,
-  disabled = false,
-  tooltip,
-}: ToggleFieldProps) {
-  return (
-    <div className="flex items-center gap-3">
-      <label className="text-sm font-medium text-gray-700">
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </label>
-      <button
-        onClick={() => !disabled && onChange(!value)}
-        disabled={disabled}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
-          value ? "bg-indigo-600" : "bg-gray-300"
-        } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-            value ? "translate-x-6" : "translate-x-1"
-          }`}
-        />
-      </button>
-    </div>
-  );
-}
-
-function TierGrid({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{children}</div>
-  );
-}
-
-function TierCard({
-  tier,
-  children,
-}: {
-  tier: string;
-  children: React.ReactNode;
-}) {
-  const tierColors: Record<string, string> = {
-    "Tier 1": "border-gray-300 bg-gray-50",
-    "Tier 2": "border-blue-300 bg-blue-50",
-    "Tier 3": "border-purple-300 bg-purple-50",
-  };
-
-  return (
-    <div
-      className={`border-2 rounded-lg p-4 space-y-3 ${tierColors[tier] || "border-gray-300"}`}
-    >
-      <h4 className="font-semibold text-gray-800">{tier}</h4>
-      {children}
-    </div>
-  );
-}
-
-/** Shipped defaults for the referral cashback program (mirrors the backend). */
-const REFERRAL_CASHBACK_DEFAULTS: ReferralCashbackConfig = {
-  enabled: true,
-  referrerRewardUsd: 15,
-  newUserRewardUsd: 15,
-  spendTargetUsd: 75,
-  merchantTarget: 3,
-  qualifyWindowDays: 30,
-  payoutDelayDays: 30,
-  reversalWindowDays: 60,
-  autoReviewMonthlyThreshold: 20,
-};
-
-/**
- * Shipped defaults for the product fee program (mirrors the backend).
- *
- * `enabled: false` is the real default: charging users money is a launch
- * decision made with the toggle below, not by a deploy.
- */
-const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
-  enabled: false,
-  swap: { enabled: true, tier1: 0.005, tier2: 0.0025, tier3: 0 },
-  fx: { enabled: true, tier1: 0.005, tier2: 0.0025, tier3: 0 },
-  offRamp: { enabled: true, tier1: 0.005, tier2: 0.0025, tier3: 0 },
-  bankDeposit: { enabled: true, tier1: 0.005, tier2: 0.0025, tier3: 0 },
-  minChargeUsd: 0.01,
-};
-
-/**
- * Fill in fields an older backend may not send yet, so the inputs stay
- * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
- * the working copy and the pristine copy so the defaults don't read as unsaved
- * changes.
- */
-function withConfigDefaults(config: FullRewardsConfig): FullRewardsConfig {
-  return {
-    ...config,
-    points: {
-      ...config.points,
-      cardBalanceEnabled: config.points.cardBalanceEnabled ?? false,
-      cardBalancePointsPerDollarPerHour:
-        config.points.cardBalancePointsPerDollarPerHour ?? 1,
-    },
-    referralCashback: {
-      ...REFERRAL_CASHBACK_DEFAULTS,
-      ...config.referralCashback,
-    },
-    productFees: {
-      ...PRODUCT_FEES_DEFAULTS,
-      ...config.productFees,
-      swap: { ...PRODUCT_FEES_DEFAULTS.swap, ...config.productFees?.swap },
-      fx: { ...PRODUCT_FEES_DEFAULTS.fx, ...config.productFees?.fx },
-      offRamp: {
-        ...PRODUCT_FEES_DEFAULTS.offRamp,
-        ...config.productFees?.offRamp,
-      },
-      bankDeposit: {
-        ...PRODUCT_FEES_DEFAULTS.bankDeposit,
-        ...config.productFees?.bankDeposit,
-      },
-    },
-  };
-}
-
-/** A tier key on a fee rate block. */
-type FeeTierKey = "tier1" | "tier2" | "tier3";
-
-interface FeeProductDefinition {
-  /** Field on ProductFeesConfig holding this product's rates. */
-  key: "swap" | "fx" | "offRamp" | "bankDeposit";
-  label: string;
-  /** How this fee actually reaches us — the operational difference that matters. */
-  collection: string;
-  toggleTooltip: string;
-  tierTooltips: Record<FeeTierKey, string>;
-}
-
-/**
- * The fee products, in the order the app's fee table shows them.
- *
- * Each carries the copy explaining how its fee is collected, because that is
- * what differs between them and what an admin needs to know before switching
- * one on: a swap fee moves on-chain and cannot fail, a bank deposit fee is
- * withheld before the user sees the money, and a card fee is billed afterwards
- * and can push a balance negative.
- */
-const FEE_PRODUCTS: FeeProductDefinition[] = [
-  {
-    key: "bankDeposit",
-    label: "Bank Deposit",
-    collection:
-      "Withheld from the arriving amount before the user is credited, so it can never push a balance negative.",
-    toggleTooltip:
-      "Charged on fiat arriving from a bank. Taken out of the deposit rather than billed back afterwards.",
-    tierTooltips: {
-      tier1: "Headline bank deposit rate.",
-      tier2: "Reduced rate for Prime.",
-      tier3: "Keep at 0 so Ultra deposits for free.",
-    },
-  },
-  {
-    key: "swap",
-    label: "Swaps",
-    collection:
-      "Deducted from the source token and transferred on-chain inside the user's own swap transaction — no extra signature, and nothing to retry.",
-    toggleTooltip:
-      "Charged on in-app token swaps. Collected on-chain at the moment of the swap.",
-    tierTooltips: {
-      tier1: "Headline swap rate.",
-      tier2: "Reduced rate for Prime.",
-      tier3: "Keep at 0 so Ultra swaps for free.",
-    },
-  },
-  {
-    key: "fx",
-    label: "FX Conversion",
-    collection:
-      "Rain bills it against the card balance after the purchase settles. Wirex has no charge API, so its fees are accrued and await collection.",
-    toggleTooltip:
-      "Charged when a card purchase settles in a currency other than USD. A purchase in USD is never charged an FX fee.",
-    tierTooltips: {
-      tier1: "Headline FX rate, applied on both the Rain and Wirex rails.",
-      tier2: "Reduced rate for Prime.",
-      tier3: "Keep at 0 so Ultra converts currency for free.",
-    },
-  },
-  {
-    key: "offRamp",
-    label: "Bank Withdrawal",
-    collection:
-      "Charged when funds leave Solid for a bank account, which includes a completed card off-ramp.",
-    toggleTooltip:
-      "Charged on money leaving Solid. Only ever applied after the withdrawal completes, so it bills against money that actually moved.",
-    tierTooltips: {
-      tier1: "Headline withdrawal rate.",
-      tier2: "Reduced rate for Prime.",
-      tier3: "Keep at 0 so Ultra withdraws for free.",
-    },
-  },
-];
-
-const FEE_TIERS: { key: FeeTierKey; card: string; tierName: string }[] = [
-  { key: "tier1", card: "Tier 1", tierName: "Core" },
-  { key: "tier2", card: "Tier 2", tierName: "Prime" },
-  { key: "tier3", card: "Tier 3", tierName: "Ultra" },
-];
-
-/**
- * One product's enable toggle and its three per-tier rates.
- *
- * Rendered per product rather than written out four times: the four blocks were
- * identical apart from their labels, and four copies is how a rate ends up
- * validated on one product and not another.
- *
- * Rates are stored as fractions and edited as percentages, so the input
- * multiplies by 100 on the way in. The empty-string check keeps the field
- * controlled while an admin is mid-edit — without it, clearing the box would
- * snap the value back to 0 and read as "this tier is free".
- */
-function FeeProductRates({
-  product,
-  rates,
-  programEnabled,
-  onToggle,
-  onRateChange,
-}: {
-  product: FeeProductDefinition;
-  rates: FeeRates;
-  programEnabled: boolean;
-  onToggle: (value: boolean) => void;
-  onRateChange: (tier: FeeTierKey, value: string) => void;
-}) {
-  const disabled = !programEnabled || !rates.enabled;
-
-  return (
-    <div className="space-y-3 rounded-md border border-gray-200 p-4">
-      <ToggleField
-        label={`${product.label} Fees Enabled`}
-        value={rates.enabled}
-        onChange={onToggle}
-        disabled={!programEnabled}
-        tooltip={product.toggleTooltip}
-      />
-      <p className="text-sm text-gray-500">{product.collection}</p>
-      <TierGrid>
-        {FEE_TIERS.map((tier) => (
-          <TierCard key={tier.key} tier={tier.card}>
-            <InputField
-              label={`${tier.tierName} ${product.label} Fee`}
-              value={
-                (rates[tier.key] as unknown as string) === ""
-                  ? ""
-                  : rates[tier.key] * 100
-              }
-              onChange={(v) => onRateChange(tier.key, v)}
-              type="number"
-              suffix="%"
-              min={0}
-              step="0.01"
-              disabled={disabled}
-              tooltip={product.tierTooltips[tier.key]}
-            />
-          </TierCard>
-        ))}
-      </TierGrid>
-    </div>
-  );
-}
+import { useConfigEditor } from "@/hooks/use-config-editor";
 
 export default function RewardsConfigPage() {
-  const { user } = useAuth();
-  const [config, setConfig] = useState<FullRewardsConfig | null>(null);
-  const [originalConfig, setOriginalConfig] =
-    useState<FullRewardsConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const {
+    config,
+    loading,
+    saving,
+    hasChanges,
+    updateConfig,
+    handleNumericUpdate,
+    setConfig,
+    saveSection,
+    clearCache,
+    refetch,
+  } = useConfigEditor();
   const [tierUsersModal, setTierUsersModal] = useState<number | null>(null);
   const [tierEmailModal, setTierEmailModal] = useState<number | null>(null);
-
-  const fetchConfig = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/admin/v1/rewards-config");
-      const normalized = withConfigDefaults(response.data);
-      setConfig(normalized);
-      setOriginalConfig(JSON.parse(JSON.stringify(normalized)));
-    } catch (error) {
-      console.error("Failed to fetch rewards config:", error);
-      toast.error("Failed to fetch rewards configuration");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const hasChanges = (section: keyof FullRewardsConfig): boolean => {
-    if (!config || !originalConfig) return false;
-    return (
-      JSON.stringify(config[section]) !==
-      JSON.stringify(originalConfig[section])
-    );
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchConfig();
-    }
-  }, [user]);
-
-  const updateConfig = (
-    section: keyof FullRewardsConfig,
-    field: string,
-    value: string | number | boolean | string[],
-  ) => {
-    if (!config) return;
-
-    setConfig((prev) => {
-      if (!prev) return prev;
-
-      const sectionData = prev[section];
-
-      if (typeof sectionData === "object" && sectionData !== null) {
-        const keys = field.split(".");
-
-        if (keys.length === 1) {
-          return {
-            ...prev,
-            [section]: {
-              ...(sectionData as any),
-              [field]: value,
-            },
-          };
-        } else if (keys.length === 2) {
-          const [tier, prop] = keys;
-          return {
-            ...prev,
-            [section]: {
-              ...(sectionData as any),
-              [tier]: {
-                ...((sectionData as any)[tier] || {}),
-                [prop]: value,
-              },
-            },
-          };
-        }
-      }
-
-      return prev;
-    });
-  };
-
-  const handleNumericUpdate = (
-    section: keyof FullRewardsConfig,
-    field: string,
-    value: string,
-    isPercentage: boolean = false,
-  ) => {
-    if (value === "") {
-      updateConfig(section, field, "");
-      return;
-    }
-
-    const num = isPercentage ? parseFloat(value) / 100 : parseFloat(value);
-
-    if (isNaN(num)) return;
-
-    updateConfig(section, field, num);
-  };
 
   const updateCategoryMerchants = (index: number, rawMerchants: string) => {
     setConfig((prev) => {
@@ -534,38 +68,6 @@ export default function RewardsConfigPage() {
         subscriptionDiscount: { ...prev.subscriptionDiscount, categories },
       };
     });
-  };
-
-  const saveSection = async (
-    section: string,
-    endpoint: string,
-    data: Record<string, unknown>,
-    configKey: keyof FullRewardsConfig,
-  ) => {
-    try {
-      setSaving(true);
-      await api.patch(`/admin/v1/rewards-config/${endpoint}`, data);
-      toast.success(`${section} configuration saved`, {
-        description:
-          "The changes have been applied successfully and will propagate shortly.",
-        duration: 5000,
-        className: "p-5 text-lg",
-        descriptionClassName: "text-base",
-      });
-      // Update originalConfig to match current config for this section
-      setOriginalConfig((prev) => {
-        if (!prev || !config) return prev;
-        return {
-          ...prev,
-          [configKey]: JSON.parse(JSON.stringify(config[configKey])),
-        };
-      });
-    } catch (error) {
-      console.error(`Failed to save ${section} config:`, error);
-      toast.error(`Failed to save ${section} configuration`);
-    } finally {
-      setSaving(false);
-    }
   };
 
   const saveTierThresholds = async () => {
@@ -727,54 +229,6 @@ export default function RewardsConfigPage() {
     );
   };
 
-  const saveProductFeesConfig = async () => {
-    if (!config) return;
-
-    const { swap, fx, offRamp, bankDeposit } = config.productFees;
-
-    await saveSection(
-      "Product Fees",
-      // Endpoint keeps its original path, which is also what the stored config
-      // keys are named after.
-      "card-fees",
-      {
-        enabled: config.productFees.enabled,
-        swapEnabled: swap.enabled,
-        swapTier1Percentage: Number(swap.tier1),
-        swapTier2Percentage: Number(swap.tier2),
-        swapTier3Percentage: Number(swap.tier3),
-        fxEnabled: fx.enabled,
-        fxTier1Percentage: Number(fx.tier1),
-        fxTier2Percentage: Number(fx.tier2),
-        fxTier3Percentage: Number(fx.tier3),
-        offRampEnabled: offRamp.enabled,
-        offRampTier1Percentage: Number(offRamp.tier1),
-        offRampTier2Percentage: Number(offRamp.tier2),
-        offRampTier3Percentage: Number(offRamp.tier3),
-        bankDepositEnabled: bankDeposit.enabled,
-        bankDepositTier1Percentage: Number(bankDeposit.tier1),
-        bankDepositTier2Percentage: Number(bankDeposit.tier2),
-        bankDepositTier3Percentage: Number(bankDeposit.tier3),
-        minChargeUsd: Number(config.productFees.minChargeUsd),
-      },
-      "productFees",
-    );
-  };
-
-  const clearCache = async () => {
-    try {
-      await api.post("/admin/v1/rewards-config/clear-cache");
-      toast.success("Configuration cache cleared", {
-        description:
-          "The system cache has been refreshed with the latest values.",
-        duration: 4000,
-        className: "p-4 text-base",
-      });
-    } catch (error) {
-      console.error("Failed to clear cache:", error);
-      toast.error("Failed to clear cache");
-    }
-  };
 
   if (loading) {
     return (
@@ -789,7 +243,7 @@ export default function RewardsConfigPage() {
       <div className="text-center py-12">
         <p className="text-gray-500">Failed to load configuration</p>
         <button
-          onClick={fetchConfig}
+          onClick={refetch}
           className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
         >
           Retry
@@ -1485,78 +939,6 @@ export default function RewardsConfigPage() {
           </button>
         </ConfigSection>
 
-        {/* Product Fees */}
-        <ConfigSection
-          title="Product Fees"
-          description="What Solid earns on every active product. Fees apply only at the edges — swapping, converting currency, and moving money in or out — so holding a card and spending in USD is free on every tier, Core included. There is no monthly fee by design. Rates taper to zero at Ultra, so staking FUSE genuinely drops every fee to zero."
-          icon={<Percent className="h-5 w-5 text-amber-600" />}
-        >
-          <div className="space-y-6">
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-medium">These values charge real money.</p>
-              <p className="mt-1">
-                Percentages are entered as percentages (0.5 means 0.5% of the
-                transaction). How each fee is collected differs by product:
-                swap fees move on-chain inside the user&apos;s own swap
-                transaction, bank deposit fees are withheld from the amount
-                credited, and card fees are charged after the transaction
-                settles — which on Rain can push a user negative if their
-                balance doesn&apos;t cover it.
-              </p>
-            </div>
-
-            <ToggleField
-              label="Product Fees Enabled"
-              value={config.productFees.enabled}
-              onChange={(v) => updateConfig("productFees", "enabled", v)}
-              tooltip="Master switch. When off, no fee is charged on any product, on any tier."
-            />
-
-            {FEE_PRODUCTS.map((product) => (
-              <FeeProductRates
-                key={product.key}
-                product={product}
-                rates={config.productFees[product.key]}
-                programEnabled={config.productFees.enabled}
-                onToggle={(v) =>
-                  updateConfig("productFees", `${product.key}.enabled`, v)
-                }
-                onRateChange={(tier, v) =>
-                  handleNumericUpdate(
-                    "productFees",
-                    `${product.key}.${tier}`,
-                    v,
-                    true,
-                  )
-                }
-              />
-            ))}
-
-            <div className="max-w-xs">
-              <InputField
-                label="Minimum Charge"
-                value={config.productFees.minChargeUsd}
-                onChange={(v) =>
-                  handleNumericUpdate("productFees", "minChargeUsd", v)
-                }
-                type="number"
-                suffix="$"
-                min={0}
-                step="0.01"
-                disabled={!config.productFees.enabled}
-                tooltip="Fees computing below this are waived instead of charged. Rain's own minimum is $0.01, and a sub-cent charge costs more in support than it earns."
-              />
-            </div>
-          </div>
-          <button
-            onClick={saveProductFeesConfig}
-            disabled={saving || !hasChanges("productFees")}
-            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save Product Fees Config
-          </button>
-        </ConfigSection>
 
         {/* Subscription Discount */}
         <ConfigSection
