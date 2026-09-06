@@ -27,12 +27,51 @@ export interface User {
     createdAt: string;
   }[];
   hasRainCard?: boolean;
+  /**
+   * Card cashback rate pinned to this cardholder, as a fraction — 0.03 is 3%.
+   * Overrides their tier's rate for every purchase from now on. Absent means no
+   * override; 0 means an operator decided they earn nothing.
+   */
+  cashbackPercentage?: number;
   /** The user's primary card, or null when they have none. */
   card?: {
     provider: string;
     status: string;
     frozen: boolean;
   } | null;
+}
+
+/**
+ * Which of the three configurable levels decided a cashback rate. Mirrors
+ * `CashbackPercentageSource` in accounts-service.
+ */
+export type CashbackPercentageSource = "Transaction" | "User" | "Tier";
+
+export const CASHBACK_PERCENTAGE_SOURCE_LABELS: Record<string, string> = {
+  Transaction: "this transaction",
+  User: "this user",
+  Tier: "tier default",
+};
+
+/** What the backend reports after pinning or clearing a cardholder's rate. */
+export interface SetUserCashbackPercentageResult {
+  userId: string;
+  percentage: number | null;
+  previousPercentage: number | null;
+  tierPercentage: number;
+  effectivePercentage: number;
+}
+
+/** What the backend reports after pinning or clearing one purchase's rate. */
+export interface SetTransactionCashbackPercentageResult {
+  transactionId: string;
+  percentage: number | null;
+  previousPercentage: number | null;
+  /** Whether the purchase's own cashback row was re-priced too. */
+  repriced: boolean;
+  /** Why it was not, when it was not — an already-paid row, or none yet. */
+  repricedReason?: string;
+  cashbackPercentage?: number;
 }
 
 export interface DepositTransactionRecord {
@@ -561,6 +600,13 @@ export interface CardTransactionCashback {
   /** "Cashback" or "SubscriptionDiscount". */
   type?: string;
   merchantName?: string;
+  /**
+   * The rate this row was created at, as a fraction, and which of the three
+   * levels set it. This is what the payout will use — not whatever the config
+   * says by the time the escrow matures.
+   */
+  cashbackPercentage?: number;
+  cashbackPercentageSource?: CashbackPercentageSource;
 }
 
 /**
@@ -610,6 +656,15 @@ export interface CardTransaction {
   localAmount?: string;
   localCurrency?: string;
   cashback?: CardTransactionCashback;
+  /**
+   * Cashback rate pinned to this one purchase, as a fraction. Outranks the
+   * cardholder's own rate and their tier's. Lives on the transaction rather
+   * than the cashback row so a purchase can be priced before it settles.
+   */
+  cashbackPercentage?: number;
+  /** Admin email that last set it, and when. */
+  cashbackPercentageSetBy?: string;
+  cashbackPercentageSetAt?: string;
   /** Card fees charged for this spend; empty when none applied. */
   fees?: CardTransactionFee[];
   /** Sum of the fees Rain actually accepted, in USD. */
@@ -1068,7 +1123,15 @@ export interface UserRewardsData {
   nextTierPoints: number;
   pointsToNextTier: number;
   progressToNextTierPct: number;
+  /**
+   * The rate this cardholder actually earns — their tier's, unless an operator
+   * has pinned one to them.
+   */
   cashbackRate: number;
+  /** What their tier pays by default, before any override. */
+  tierCashbackRate?: number;
+  /** Whether `cashbackRate` is pinned to them rather than coming from the tier. */
+  hasCustomCashbackRate?: boolean;
   nextTierCashbackRate: number;
   cashbackThisMonth: number;
   maxCashbackMonthly: number;
@@ -1108,6 +1171,9 @@ export interface CashbackEntry {
   payoutAt?: string;
   createdAt: string;
   lastError?: string;
+  /** The rate the row was created at, and which of the three levels set it. */
+  cashbackPercentage?: number;
+  cashbackPercentageSource?: CashbackPercentageSource;
 }
 
 /** Cashback rows plus the totals support is usually actually after. */

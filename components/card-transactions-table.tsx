@@ -1,15 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import api from "@/lib/api";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
+import { toast } from "sonner";
+import api, { setTransactionCashbackPercentage } from "@/lib/api";
 import {
   CardTransactionsResponse,
   CardTransactionFilters,
   CardTransaction,
   CARD_TRANSACTION_STATUSES,
   CARD_FEE_STATUS_LABELS,
+  CASHBACK_PERCENTAGE_SOURCE_LABELS,
 } from "@/types";
+import { formatCashbackRate } from "@/lib/cashback-percentage";
+import CashbackRateDialog from "@/components/cashback/cashback-rate-dialog";
+import { Button } from "@/components/ui/button";
 import {
   cardFeeStatusVariant,
   cardStatusVariant,
@@ -28,6 +38,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  Percent,
   Search,
 } from "lucide-react";
 import Link from "next/link";
@@ -51,6 +62,9 @@ export default function CardTransactionsTable({
   compact = false,
 }: CardTransactionsTableProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  /** The transaction whose cashback rate is being edited, if any. */
+  const [editingRate, setEditingRate] = useState<CardTransaction | null>(null);
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<CardTransactionFilters>({
     status: "",
     search: "",
@@ -83,6 +97,46 @@ export default function CardTransactionsTable({
       return response.data;
     },
     placeholderData: keepPreviousData,
+  });
+
+  const rateMutation = useMutation({
+    mutationFn: ({
+      transactionId,
+      percentage,
+      reason,
+    }: {
+      transactionId: string;
+      percentage: number | null;
+      reason?: string;
+    }) => setTransactionCashbackPercentage(transactionId, percentage, reason),
+    onSuccess: (response, variables) => {
+      const result = response.data;
+
+      toast.success(
+        variables.percentage === null
+          ? "Cleared the rate on this transaction"
+          : `This transaction now earns ${formatCashbackRate(variables.percentage)}`,
+        {
+          // The rate lands on the transaction either way; whether the cashback
+          // that already accrued moved with it is the part an operator cannot
+          // see from the row, and is exactly what they came to change.
+          description: result?.repriced
+            ? "Its escrowed cashback was re-priced to match."
+            : result?.repricedReason,
+        }
+      );
+      setEditingRate(null);
+      void queryClient.invalidateQueries({ queryKey: ["card-transactions"] });
+      if (userId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["user-cashback", userId],
+        });
+      }
+    },
+    onError: () => {
+      // The API layer already toasts the server's message; leaving the dialog
+      // open lets the rate be corrected and retried.
+    },
   });
 
   const handleSort = (field: string) => {
@@ -213,6 +267,56 @@ export default function CardTransactionsTable({
     );
   };
 
+  /**
+   * The cashback rate for one purchase, and the control that changes it.
+   *
+   * Two rates can be in play and they answer different questions, so both are
+   * shown when they differ: the rate the cashback row was actually created at
+   * (what it will pay, whatever the config says now), and the rate pinned to
+   * the transaction itself (what it will accrue at, which is all there is
+   * before it settles).
+   */
+  const renderCashbackRate = (tx: CardTransaction) => {
+    const accrued = tx.cashback?.cashbackPercentage;
+    const pinned = tx.cashbackPercentage;
+    const source = tx.cashback?.cashbackPercentageSource;
+
+    return (
+      <div className="space-y-1">
+        {accrued !== undefined ? (
+          <div>
+            <span className="font-medium text-gray-900">
+              {formatCashbackRate(accrued)}
+            </span>
+            {source && (
+              <div className="text-[10px] text-gray-500">
+                {CASHBACK_PERCENTAGE_SOURCE_LABELS[source] ?? source}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="text-gray-400">—</span>
+        )}
+
+        {pinned !== undefined && pinned !== accrued && (
+          <div className="text-[10px] text-indigo-600">
+            set to {formatCashbackRate(pinned)} for new accruals
+          </div>
+        )}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setEditingRate(tx)}
+          className="h-6 cursor-pointer px-1.5 text-[11px] text-indigo-600 hover:text-indigo-800"
+        >
+          <Percent className="h-3 w-3" />
+          {pinned === undefined ? "Set rate" : "Change"}
+        </Button>
+      </div>
+    );
+  };
+
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
@@ -221,7 +325,7 @@ export default function CardTransactionsTable({
     );
   }
 
-  const columnCount = compact ? 7 : 8;
+  const columnCount = compact ? 8 : 9;
 
   return (
     <div className="bg-white shadow rounded-lg">
@@ -307,6 +411,9 @@ export default function CardTransactionsTable({
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Cashback
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rate
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Tx ID
@@ -408,6 +515,9 @@ export default function CardTransactionsTable({
                       <span className="text-gray-400">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-sm">
+                    {renderCashbackRate(tx)}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center space-x-1">
                       <span className="font-mono text-xs">
@@ -455,6 +565,37 @@ export default function CardTransactionsTable({
             </button>
           </div>
         </div>
+      )}
+
+      {editingRate && (
+        <CashbackRateDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setEditingRate(null);
+          }}
+          title={`Cashback rate for ${
+            editingRate.merchantName || "this purchase"
+          }`}
+          description={
+            <>
+              Beats both the cardholder&apos;s own rate and their tier&apos;s,
+              for this purchase only. If its cashback has already accrued and is
+              still owed, that is re-priced too; cashback already paid out is
+              left as it is.
+            </>
+          }
+          current={editingRate.cashbackPercentage ?? null}
+          fallback={editingRate.cashback?.cashbackPercentage}
+          fallbackLabel="This purchase accrued at"
+          isSaving={rateMutation.isPending}
+          onSubmit={(percentage, reason) =>
+            rateMutation.mutate({
+              transactionId: editingRate.transactionId,
+              percentage,
+              reason,
+            })
+          }
+        />
       )}
     </div>
   );
