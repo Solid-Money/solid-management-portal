@@ -6,7 +6,9 @@ import {
   Gift,
   Image,
   Megaphone,
+  Percent,
   Share2,
+  SlidersHorizontal,
   Sparkles,
   Terminal,
   TrendingUp,
@@ -36,10 +38,14 @@ export interface NavGroup {
  * The dashboard's navigation, grouped.
  *
  * Thirteen top-level links stretched the bar past the width of the window and
- * left it with a horizontal scrollbar; grouping them into five entries keeps
- * every page one hover away without the bar ever overflowing. Grouping is by
- * the job being done — who is this user / what happened / where is the money /
- * what are we promoting — rather than by which service owns the data.
+ * left it with a horizontal scrollbar; grouping them keeps every page one hover
+ * away without the bar ever overflowing. Grouping is by the job being done —
+ * who is this user / what happened / where is the money / what do we pay and
+ * charge / what are we promoting — rather than by which service owns the data.
+ *
+ * Config is its own group rather than a corner of Growth: what we pay users and
+ * what we charge them are set by different people at different times, and one
+ * of the two moves real money out of their accounts.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -96,15 +102,27 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Growth",
-    icon: Gift,
+    label: "Config",
+    icon: SlidersHorizontal,
     items: [
       {
         href: "/rewards-config",
-        label: "Rewards Config",
-        description: "Tiers, cashback rates, card fees and bonuses",
+        label: "Rewards",
+        description: "Tiers, cashback rates, bonuses and referral rewards",
         icon: Gift,
       },
+      {
+        href: "/fees-config",
+        label: "Fees",
+        description: "Per-tier fee rates on every product we charge on",
+        icon: Percent,
+      },
+    ],
+  },
+  {
+    label: "Growth",
+    icon: Megaphone,
+    items: [
       {
         href: "/campaigns",
         label: "Campaigns",

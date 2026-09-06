@@ -170,6 +170,66 @@ function MobileNav({ pathname }: { pathname: string }) {
   );
 }
 
+/**
+ * Who is signed in, and how to stop being signed in.
+ *
+ * Behind an icon rather than spelled out along the bar: the email was only
+ * visible above 1280px and the Sign Out button sat permanently next to it,
+ * which is a lot of bar for two things that are read once a session. Tucking
+ * both into the avatar also means the address is legible at every width instead
+ * of disappearing on smaller screens.
+ */
+function ProfileMenu({
+  email,
+  onSignOut,
+}: {
+  email?: string | null;
+  onSignOut: () => void;
+}) {
+  // Initial from the email so the button is identifiable at a glance; the
+  // generic icon covers the moment before the session resolves.
+  const initial = email?.trim()?.[0]?.toUpperCase();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="cursor-pointer rounded-full"
+          aria-label={email ? `Account menu for ${email}` : 'Account menu'}
+        >
+          {initial ? (
+            <span className="text-sm font-semibold text-gray-700">
+              {initial}
+            </span>
+          ) : (
+            <UserIcon className="h-4 w-4" />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel className="font-normal">
+          <span className="text-muted-foreground text-xs">Signed in as</span>
+          {/* Broken rather than truncated: an admin needs to read the whole
+              address to know which account they are on. */}
+          <span className="mt-0.5 block text-sm font-medium break-all text-gray-900">
+            {email ?? 'Unknown account'}
+          </span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={onSignOut}
+          className="cursor-pointer text-red-600 focus:text-red-700"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function DashboardNav() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
@@ -223,19 +283,10 @@ export default function DashboardNav() {
 
           <div className="ml-auto flex items-center gap-3">
             <UserQuickSearch />
-            <span className="hidden items-center text-sm text-gray-600 xl:flex">
-              <UserIcon className="mr-2 h-4 w-4" />
-              {user?.email}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsSignOutModalOpen(true)}
-              className="cursor-pointer"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </Button>
+            <ProfileMenu
+              email={user?.email}
+              onSignOut={() => setIsSignOutModalOpen(true)}
+            />
           </div>
         </div>
       </nav>

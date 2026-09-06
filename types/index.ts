@@ -923,8 +923,8 @@ export interface PointsEarningConfig {
   cardBalancePointsPerDollarPerHour: number;
 }
 
-/** One fee category's per-tier rates, as fractions (0.0099 = 0.99%). */
-export interface CardFeeRates {
+/** One product's per-tier rates, as fractions (0.005 = 0.5%). */
+export interface FeeRates {
   enabled: boolean;
   tier1: number;
   tier2: number;
@@ -932,22 +932,34 @@ export interface CardFeeRates {
 }
 
 /**
- * Per-tier card fees — the revenue side of the tier system.
+ * Per-tier product fees — the revenue side of the tier system.
  *
- * Fees apply only at the edges of the product: converting currency, and moving
- * money off the card. Holding and spending in USD is free on every tier, and
- * there is deliberately no monthly-fee field — no competitor in the benchmark
- * charges its free tier one, and the tier story is "stake FUSE and you'll pay no
- * fees". Swap fees are absent because swaps happen in our own app, not on the
- * card, so Rain has no charge surface for them.
+ * Fees apply only at the edges of the product: swapping tokens, converting
+ * currency, and moving money in or out. Holding and spending in USD is free on
+ * every tier, and there is deliberately no monthly-fee field — no competitor in
+ * the benchmark charges its free tier one, and the tier story is "stake FUSE
+ * and every fee drops to zero".
  */
-export interface CardFeesConfig {
-  /** Master kill-switch: when false, no card fee is ever charged. */
+export interface ProductFeesConfig {
+  /** Master kill-switch: when false, no product fee is ever charged. */
   enabled: boolean;
+  /** Charged on in-app swaps, taken from the source token on-chain. */
+  swap: FeeRates;
+  /** Charged on stock trades, taken from the sell side in the CoW batch. */
+  stocks: FeeRates;
   /** Charged when a purchase settles in a currency other than the card's. */
-  fx: CardFeeRates;
-  /** Charged when funds are moved off the card. */
-  offRamp: CardFeeRates;
+  fx: FeeRates;
+  /**
+   * Charged when funds leave Solid for a bank account, card off-ramp included.
+   *
+   * Named `offRamp` because that is the key it is stored under: the product
+   * started as the card off-ramp before it grew to cover every withdrawal rail.
+   */
+  offRamp: FeeRates;
+  /** Charged on fiat arriving from a bank, withheld from the amount credited. */
+  bankDeposit: FeeRates;
+  /** Charged on a settled TransFi buy-crypto order. */
+  transfi: FeeRates;
   /** Computed fees below this (USD) are waived rather than charged. */
   minChargeUsd: number;
 }
@@ -961,7 +973,7 @@ export interface FullRewardsConfig {
   referral: ReferralConfig;
   referralCashback: ReferralCashbackConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
-  cardFees: CardFeesConfig;
+  productFees: ProductFeesConfig;
 }
 
 // Campaign Types

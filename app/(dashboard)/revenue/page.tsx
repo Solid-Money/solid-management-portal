@@ -8,6 +8,7 @@ import { FinanceDetail } from "@/components/revenue/finance-detail";
 import { OperationsView } from "@/components/revenue/operations-view";
 import { InvestorReport } from "@/components/revenue/investor-report";
 import { FeesYieldsView } from "@/components/revenue/fees-yields-view";
+import { ProductFeesView } from "@/components/revenue/product-fees-view";
 import { AnalyticsChartsView } from "@/components/revenue/analytics-charts-view";
 import type { DashboardView } from "@/types/revenue";
 
@@ -25,7 +26,7 @@ export default function RevenueDashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Revenue Dashboard</h1>
             <p className="text-sm text-gray-500">
-              Track yield share and borrowing revenue
+              Track yield share, borrowing and per-tier product fee revenue
             </p>
           </div>
         </div>
@@ -40,6 +41,7 @@ export default function RevenueDashboardPage() {
         <TabsList>
           <TabsTrigger value="executive">Executive</TabsTrigger>
           <TabsTrigger value="finance">Finance</TabsTrigger>
+          <TabsTrigger value="product-fees">Product Fees</TabsTrigger>
           <TabsTrigger value="fees-yields">Fees & Yields</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="operations">Operations</TabsTrigger>
@@ -53,6 +55,10 @@ export default function RevenueDashboardPage() {
 
           <TabsContent value="finance" className="mt-0">
             <FinanceDetail />
+          </TabsContent>
+
+          <TabsContent value="product-fees" className="mt-0">
+            <ProductFeesView />
           </TabsContent>
 
           <TabsContent value="fees-yields" className="mt-0">
