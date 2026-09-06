@@ -1,6 +1,16 @@
 "use client";
 
 import {
+  ArrowLeftRight,
+  ArrowUpFromLine,
+  Globe,
+  Landmark,
+  ShoppingCart,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
+
+import {
   InputField,
   TierCard,
   TierGrid,
@@ -23,6 +33,9 @@ export type FeeProductKey =
 export interface FeeProductDefinition {
   key: FeeProductKey;
   label: string;
+  /** One line for the section header — what this fee is charged on. */
+  summary: string;
+  icon: LucideIcon;
   /** How this fee actually reaches us — the operational difference that matters. */
   collection: string;
   toggleTooltip: string;
@@ -41,6 +54,8 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
   {
     key: "bankDeposit",
     label: "Bank Deposit",
+    summary: "Charged on fiat arriving from a bank",
+    icon: Landmark,
     collection:
       "Withheld from the arriving amount before the user is credited, so it can never push a balance negative.",
     toggleTooltip:
@@ -54,8 +69,10 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
   {
     key: "swap",
     label: "Swaps",
+    summary: "Charged on in-app token swaps",
+    icon: ArrowLeftRight,
     collection:
-      "Deducted from the source token and transferred on-chain inside the user's own swap transaction — no extra signature, and nothing to retry.",
+      "Deducted from the source token and transferred on-chain inside the user's own swap transaction — no extra signature, and nothing to retry. Needs REVENUE_WALLET_ADDRESS set, or no transfer is built and nothing is collected.",
     toggleTooltip:
       "Charged on in-app token swaps. Collected on-chain at the moment of the swap.",
     tierTooltips: {
@@ -67,8 +84,10 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
   {
     key: "stocks",
     label: "Stocks",
+    summary: "Charged on tokenised-equity trades",
+    icon: TrendingUp,
     collection:
-      "Taken from the sell side (USDC when buying, the stock when selling) inside the CoW pre-sign batch, on mainnet.",
+      "Taken from the sell side (USDC when buying, the stock when selling) inside the CoW pre-sign batch, on mainnet. Needs REVENUE_WALLET_ADDRESS set, as the swap fee does.",
     toggleTooltip:
       "Charged on tokenised-equity trades. Collected on-chain in the same batch that pre-signs the CoW order.",
     tierTooltips: {
@@ -80,8 +99,10 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
   {
     key: "fx",
     label: "FX Conversion",
+    summary: "Charged when a card purchase settles in another currency",
+    icon: Globe,
     collection:
-      "Rain bills it against the card balance after the purchase settles. Wirex has no charge API, so its fees accrue and await collection.",
+      "Rain bills it against the card balance after the purchase settles. Wirex has no charge API, so its fees are collected by a separate on-chain spend from the cardholder's Safe — a different transaction from the settlement sweep, so a Safe too short for the fee never fails the purchase recovery.",
     toggleTooltip:
       "Charged when a card purchase settles in a currency other than USD. A purchase in USD is never charged an FX fee.",
     tierTooltips: {
@@ -93,6 +114,8 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
   {
     key: "offRamp",
     label: "Bank Withdrawal",
+    summary: "Charged on money leaving Solid for a bank account",
+    icon: ArrowUpFromLine,
     collection:
       "Charged when funds leave Solid for a bank account, which includes a completed card off-ramp.",
     toggleTooltip:
@@ -106,8 +129,10 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
   {
     key: "transfi",
     label: "Buy Crypto (TransFi)",
+    summary: "Charged on buy-crypto orders through TransFi",
+    icon: ShoppingCart,
     collection:
-      "Charged after the order settles, against the USDC that arrived rather than the fiat paid — TransFi takes its own cut in between. Billed on a Rain card; accrued for Wirex and wallet-only users.",
+      "Charged after the order settles, against the USDC that arrived rather than the fiat paid — TransFi takes its own cut in between. Billed on a Rain card; on Wirex it is collected from the cardholder's Safe, and a wallet-only buyer with no card Safe stays accrued.",
     toggleTooltip:
       "Charged on buy-crypto orders through TransFi's card and local payment rails.",
     tierTooltips: {
@@ -135,6 +160,11 @@ export type ProductFeeRatesMap = Pick<ProductFeesConfig, FeeProductKey>;
  * identical apart from their labels, and six copies is how a rate ends up
  * validated on one product and not another.
  *
+ * The product's own toggle is the only gate. There is no program-wide switch
+ * above it — each fee is turned on and off on its own, so switching on the one
+ * you are ready to charge cannot be blocked by, or accidentally enable, the
+ * five you are not.
+ *
  * Rates are stored as fractions and edited as percentages, so the input
  * multiplies by 100 on the way in. The empty-string check keeps the field
  * controlled while an admin is mid-edit — without it, clearing the box would
@@ -143,25 +173,20 @@ export type ProductFeeRatesMap = Pick<ProductFeesConfig, FeeProductKey>;
 export function FeeProductRates({
   product,
   rates,
-  programEnabled,
   onToggle,
   onRateChange,
 }: {
   product: FeeProductDefinition;
   rates: FeeRates;
-  programEnabled: boolean;
   onToggle: (value: boolean) => void;
   onRateChange: (tier: FeeTierKey, value: string) => void;
 }) {
-  const disabled = !programEnabled || !rates.enabled;
-
   return (
-    <div className="space-y-3 rounded-md border border-gray-200 p-4">
+    <div className="space-y-4">
       <ToggleField
         label={`${product.label} Fees Enabled`}
         value={rates.enabled}
         onChange={onToggle}
-        disabled={!programEnabled}
         tooltip={product.toggleTooltip}
       />
       <p className="text-sm text-gray-500">{product.collection}</p>
@@ -180,7 +205,7 @@ export function FeeProductRates({
               suffix="%"
               min={0}
               step="0.01"
-              disabled={disabled}
+              disabled={!rates.enabled}
               tooltip={product.tierTooltips[tier.key]}
             />
           </TierCard>

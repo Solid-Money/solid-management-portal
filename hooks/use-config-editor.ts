@@ -24,9 +24,15 @@ export const REFERRAL_CASHBACK_DEFAULTS: ReferralCashbackConfig = {
   autoReviewMonthlyThreshold: 20,
 };
 
-/** Day-one rates: 0.5% on Core, halving at Prime, zero at Ultra. */
+/**
+ * Day-one rates: 0.5% on Core, halving at Prime, zero at Ultra — and off.
+ *
+ * `enabled: false` is the real default. The fees page has no master switch, so
+ * saving one product turns the program on, and a product still sitting on a
+ * default would come on with it.
+ */
 const DEFAULT_RATES = {
-  enabled: true,
+  enabled: false,
   tier1: 0.005,
   tier2: 0.0025,
   tier3: 0,
@@ -35,8 +41,8 @@ const DEFAULT_RATES = {
 /**
  * Shipped defaults for the product fee program (mirrors the backend).
  *
- * `enabled: false` is the real default: charging users money is a launch
- * decision made with the master toggle, not by a deploy.
+ * Charging users money is a launch decision made per product on the fees page,
+ * not by a deploy.
  */
 export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
   enabled: false,
@@ -90,10 +96,23 @@ export function withConfigDefaults(
 
 export interface ConfigEditor {
   config: FullRewardsConfig | null;
+  /**
+   * The last copy the server confirmed.
+   *
+   * Exposed because one endpoint can own several independently-saved blocks —
+   * the fee page saves one product at a time through the same `card-fees`
+   * endpoint that carries all six. Building that payload from this copy for
+   * every block except the one being saved is what stops a Save on one product
+   * publishing another product's half-finished edits.
+   */
+  savedConfig: FullRewardsConfig | null;
   loading: boolean;
   saving: boolean;
-  /** Whether a section differs from what the server last confirmed. */
-  hasChanges: (section: keyof FullRewardsConfig) => boolean;
+  /**
+   * Whether a section — or one field within it — differs from what the server
+   * last confirmed.
+   */
+  hasChanges: (section: keyof FullRewardsConfig, field?: string) => boolean;
   /** Set one field. `field` may be dotted for one level of nesting. */
   updateConfig: (
     section: keyof FullRewardsConfig,
@@ -113,6 +132,12 @@ export interface ConfigEditor {
     endpoint: string,
     data: Record<string, unknown>,
     configKey: keyof FullRewardsConfig,
+    /**
+     * The nested field that was actually published. Omit to re-baseline the
+     * whole section; pass one when several fields share an endpoint, so the
+     * others' Save buttons keep reflecting their own unsaved edits.
+     */
+    field?: string,
   ) => Promise<void>;
   clearCache: () => Promise<void>;
   refetch: () => Promise<void>;
@@ -159,12 +184,20 @@ export function useConfigEditor(): ConfigEditor {
   }, [user, fetchConfig]);
 
   const hasChanges = useCallback(
-    (section: keyof FullRewardsConfig): boolean => {
+    (section: keyof FullRewardsConfig, field?: string): boolean => {
       if (!config || !originalConfig) return false;
-      return (
-        JSON.stringify(config[section]) !==
-        JSON.stringify(originalConfig[section])
-      );
+
+      const current = config[section];
+      const saved = originalConfig[section];
+
+      if (!field) return JSON.stringify(current) !== JSON.stringify(saved);
+
+      const read = (value: unknown) =>
+        typeof value === "object" && value !== null
+          ? (value as Record<string, unknown>)[field]
+          : undefined;
+
+      return JSON.stringify(read(current)) !== JSON.stringify(read(saved));
     },
     [config, originalConfig],
   );
@@ -245,6 +278,7 @@ export function useConfigEditor(): ConfigEditor {
       endpoint: string,
       data: Record<string, unknown>,
       configKey: keyof FullRewardsConfig,
+      field?: string,
     ) => {
       try {
         setSaving(true);
@@ -256,13 +290,29 @@ export function useConfigEditor(): ConfigEditor {
           className: "p-5 text-lg",
           descriptionClassName: "text-base",
         });
-        // Re-baseline only this section, so the other sections' Save buttons
-        // keep reflecting their own unsaved edits.
+        // Re-baseline only what was published, so everything else keeps
+        // reflecting its own unsaved edits — the section, or one field within it
+        // when several share an endpoint.
         setOriginalConfig((prev) => {
           if (!prev || !config) return prev;
+
+          const clone = (value: unknown) =>
+            JSON.parse(JSON.stringify(value)) as unknown;
+
+          if (!field) {
+            return { ...prev, [configKey]: clone(config[configKey]) };
+          }
+
+          const current = config[configKey] as unknown as Record<
+            string,
+            unknown
+          >;
           return {
             ...prev,
-            [configKey]: JSON.parse(JSON.stringify(config[configKey])),
+            [configKey]: {
+              ...(prev[configKey] as unknown as Record<string, unknown>),
+              [field]: clone(current?.[field]),
+            },
           };
         });
       } catch (error) {
@@ -292,6 +342,7 @@ export function useConfigEditor(): ConfigEditor {
 
   return {
     config,
+    savedConfig: originalConfig,
     loading,
     saving,
     hasChanges,

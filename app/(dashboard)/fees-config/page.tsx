@@ -5,13 +5,33 @@ import { Percent, RefreshCw, Save } from "lucide-react";
 import {
   ConfigSection,
   InputField,
-  ToggleField,
 } from "@/components/config/config-fields";
 import {
   FEE_PRODUCTS,
   FeeProductRates,
+  type FeeProductDefinition,
 } from "@/components/config/fee-product-rates";
 import { useConfigEditor } from "@/hooks/use-config-editor";
+import { FeeRates, ProductFeesConfig } from "@/types";
+
+/**
+ * Flattens one product's rates into the field names the endpoint expects.
+ *
+ * `PATCH card-fees` takes all six products in one payload, so every save has to
+ * send all six — see {@link FeesConfigPage} for why the other five come from the
+ * saved copy rather than the working one.
+ */
+function productFields(
+  key: FeeProductDefinition["key"],
+  rates: FeeRates,
+): Record<string, number | boolean> {
+  return {
+    [`${key}Enabled`]: rates.enabled,
+    [`${key}Tier1Percentage`]: Number(rates.tier1),
+    [`${key}Tier2Percentage`]: Number(rates.tier2),
+    [`${key}Tier3Percentage`]: Number(rates.tier3),
+  };
+}
 
 /**
  * Product fees — the revenue side of the tier system.
@@ -20,10 +40,21 @@ import { useConfigEditor } from "@/hooks/use-config-editor";
  * pay users and fees decide what we charge them, and the two are set by
  * different people at different times. They still share one config document and
  * one endpoint, which is why both pages drive `useConfigEditor`.
+ *
+ * Each product is its own section with its own toggle and its own Save. There is
+ * no program-wide switch: turning a fee on is a decision per product, and one
+ * master toggle either blocks the fee you are ready to charge or, flipped, arms
+ * the five you are not. The stored config still carries a program flag, which
+ * this page keeps on — the per-product toggles are the real gate.
+ *
+ * Because all six products share one endpoint, a save has to send all six. It
+ * sends the OTHER five from the last copy the server confirmed, so saving Swaps
+ * cannot publish half-finished edits sitting in the Stocks section.
  */
 export default function FeesConfigPage() {
   const {
     config,
+    savedConfig,
     loading,
     saving,
     hasChanges,
@@ -33,48 +64,57 @@ export default function FeesConfigPage() {
     clearCache,
   } = useConfigEditor();
 
-  const saveProductFeesConfig = async () => {
-    if (!config) return;
+  /**
+   * Saves one block, taking every other block from the saved copy.
+   *
+   * @param field the `productFees` field being published, so only that one is
+   * re-baselined and the other sections' Save buttons keep their own state.
+   */
+  const savePartial = async (
+    label: string,
+    field: keyof ProductFeesConfig,
+    overrides: Record<string, number | boolean>,
+  ) => {
+    if (!config || !savedConfig) return;
 
-    const { swap, stocks, fx, offRamp, bankDeposit, transfi } =
-      config.productFees;
+    const saved = savedConfig.productFees;
+    const published = FEE_PRODUCTS.reduce<Record<string, number | boolean>>(
+      (fields, product) => ({
+        ...fields,
+        ...productFields(product.key, saved[product.key]),
+      }),
+      {},
+    );
 
     await saveSection(
-      "Product Fees",
+      label,
       // Endpoint keeps its original path, which is also what the stored config
       // keys are named after.
       "card-fees",
       {
-        enabled: config.productFees.enabled,
-        swapEnabled: swap.enabled,
-        swapTier1Percentage: Number(swap.tier1),
-        swapTier2Percentage: Number(swap.tier2),
-        swapTier3Percentage: Number(swap.tier3),
-        stocksEnabled: stocks.enabled,
-        stocksTier1Percentage: Number(stocks.tier1),
-        stocksTier2Percentage: Number(stocks.tier2),
-        stocksTier3Percentage: Number(stocks.tier3),
-        fxEnabled: fx.enabled,
-        fxTier1Percentage: Number(fx.tier1),
-        fxTier2Percentage: Number(fx.tier2),
-        fxTier3Percentage: Number(fx.tier3),
-        offRampEnabled: offRamp.enabled,
-        offRampTier1Percentage: Number(offRamp.tier1),
-        offRampTier2Percentage: Number(offRamp.tier2),
-        offRampTier3Percentage: Number(offRamp.tier3),
-        bankDepositEnabled: bankDeposit.enabled,
-        bankDepositTier1Percentage: Number(bankDeposit.tier1),
-        bankDepositTier2Percentage: Number(bankDeposit.tier2),
-        bankDepositTier3Percentage: Number(bankDeposit.tier3),
-        transfiEnabled: transfi.enabled,
-        transfiTier1Percentage: Number(transfi.tier1),
-        transfiTier2Percentage: Number(transfi.tier2),
-        transfiTier3Percentage: Number(transfi.tier3),
-        minChargeUsd: Number(config.productFees.minChargeUsd),
+        ...published,
+        minChargeUsd: Number(saved.minChargeUsd),
+        // The per-product toggles are the gate, so the program flag stays on.
+        // Sending it false here would silently zero every rate on the page.
+        enabled: true,
+        ...overrides,
       },
       "productFees",
+      field,
     );
   };
+
+  const saveProduct = (product: FeeProductDefinition) =>
+    savePartial(
+      `${product.label} Fees`,
+      product.key,
+      productFields(product.key, config!.productFees[product.key]),
+    );
+
+  const saveMinimumCharge = () =>
+    savePartial("Minimum Charge", "minChargeUsd", {
+      minChargeUsd: Number(config!.productFees.minChargeUsd),
+    });
 
   if (loading) {
     return (
@@ -115,75 +155,83 @@ export default function FeesConfigPage() {
         </button>
       </div>
 
-      <ConfigSection
-        title="Product Fees"
-        description="What Solid earns on every active product. Fees apply only at the edges — swapping, trading, converting currency, and moving money in or out — so holding a card and spending in USD is free on every tier, Core included. There is no monthly fee by design. Rates taper to zero at Ultra, so staking FUSE genuinely drops every fee to zero."
-        icon={<Percent className="h-5 w-5 text-amber-600" />}
-        defaultOpen
-      >
-        <div className="space-y-6">
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-medium">These values charge real money.</p>
-            <p className="mt-1">
-              Percentages are entered as percentages (0.5 means 0.5% of the
-              transaction). How each fee is collected differs by product — the
-              line under each toggle says which — and that difference decides
-              what happens when a user is short: an on-chain fee cannot fail, a
-              withheld fee never touches a balance, and a billed fee can push
-              one negative.
-            </p>
-          </div>
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-medium">These values charge real money.</p>
+        <p className="mt-1">
+          Percentages are entered as percentages (0.5 means 0.5% of the
+          transaction). Each fee is switched on and saved on its own, so turning
+          one on never arms the rest. How a fee is collected differs by product —
+          the line under each toggle says which — and that difference decides
+          what happens when a user is short: an on-chain fee cannot fail, a
+          withheld fee never touches a balance, and a billed fee can push one
+          negative. Fees apply only at the edges, so holding a card and spending
+          in USD is free on every tier, Core included. Rates taper to zero at
+          Ultra, so staking FUSE genuinely drops every fee to zero.
+        </p>
+      </div>
 
-          <ToggleField
-            label="Product Fees Enabled"
-            value={config.productFees.enabled}
-            onChange={(v) => updateConfig("productFees", "enabled", v)}
-            tooltip="Master switch. When off, no fee is charged on any product, on any tier."
+      {FEE_PRODUCTS.map((product, index) => (
+        <ConfigSection
+          key={product.key}
+          title={product.label}
+          description={product.summary}
+          icon={<product.icon className="h-5 w-5 text-amber-600" />}
+          // First one open, as on the rewards page, so the page opens on a
+          // worked example rather than seven collapsed rows.
+          defaultOpen={index === 0}
+        >
+          <FeeProductRates
+            product={product}
+            rates={config.productFees[product.key]}
+            onToggle={(v) =>
+              updateConfig("productFees", `${product.key}.enabled`, v)
+            }
+            onRateChange={(tier, v) =>
+              handleNumericUpdate(
+                "productFees",
+                `${product.key}.${tier}`,
+                v,
+                true,
+              )
+            }
           />
+          <button
+            onClick={() => saveProduct(product)}
+            disabled={saving || !hasChanges("productFees", product.key)}
+            className="mt-4 inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Save {product.label} Fees
+          </button>
+        </ConfigSection>
+      ))}
 
-          {FEE_PRODUCTS.map((product) => (
-            <FeeProductRates
-              key={product.key}
-              product={product}
-              rates={config.productFees[product.key]}
-              programEnabled={config.productFees.enabled}
-              onToggle={(v) =>
-                updateConfig("productFees", `${product.key}.enabled`, v)
-              }
-              onRateChange={(tier, v) =>
-                handleNumericUpdate(
-                  "productFees",
-                  `${product.key}.${tier}`,
-                  v,
-                  true,
-                )
-              }
-            />
-          ))}
-
-          <div className="max-w-xs">
-            <InputField
-              label="Minimum Charge"
-              value={config.productFees.minChargeUsd}
-              onChange={(v) =>
-                handleNumericUpdate("productFees", "minChargeUsd", v)
-              }
-              type="number"
-              suffix="$"
-              min={0}
-              step="0.01"
-              disabled={!config.productFees.enabled}
-              tooltip="Fees computing below this are waived instead of charged. Rain's own minimum is $0.01, and a sub-cent charge costs more in support than it earns."
-            />
-          </div>
+      <ConfigSection
+        title="Minimum Charge"
+        description="The floor below which a computed fee is waived instead of charged"
+        icon={<Percent className="h-5 w-5 text-amber-600" />}
+      >
+        <div className="max-w-xs">
+          <InputField
+            label="Minimum Charge"
+            value={config.productFees.minChargeUsd}
+            onChange={(v) =>
+              handleNumericUpdate("productFees", "minChargeUsd", v)
+            }
+            type="number"
+            suffix="$"
+            min={0}
+            step="0.01"
+            tooltip="Applies to every product. Rain's own minimum is $0.01, and a sub-cent charge costs more in support than it earns."
+          />
         </div>
         <button
-          onClick={saveProductFeesConfig}
-          disabled={saving || !hasChanges("productFees")}
+          onClick={saveMinimumCharge}
+          disabled={saving || !hasChanges("productFees", "minChargeUsd")}
           className="mt-4 inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Save className="mr-2 h-4 w-4" />
-          Save Product Fees Config
+          Save Minimum Charge
         </button>
       </ConfigSection>
     </div>
