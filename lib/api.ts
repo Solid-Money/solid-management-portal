@@ -1,6 +1,10 @@
 import axios from "axios";
 import { auth } from "./firebase";
 import { toast } from "sonner";
+import {
+  SetTransactionCashbackPercentageResult,
+  SetUserCashbackPercentageResult,
+} from "@/types";
 
 const api = axios.create({
   baseURL:
@@ -89,6 +93,45 @@ export const setUserCardFreeze = (
     freeze,
     ...(reason ? { reason } : {}),
   });
+
+/**
+ * Pin a cashback rate to this cardholder, or clear it by passing `null`.
+ *
+ * The rate is a fraction, not a percent — 0.03 is 3% — matching how tier rates
+ * are stored. It overrides what their tier pays for every purchase from now on;
+ * escrows already outstanding keep the rate they were created at.
+ *
+ * The admin identity comes from the Firebase token server-side, never from
+ * here, so the audit row names whoever is actually signed in.
+ */
+export const setUserCashbackPercentage = (
+  userId: string,
+  percentage: number | null,
+  reason?: string
+) =>
+  api.post<{ data: SetUserCashbackPercentageResult }>(
+    `/admin/v1/users/${userId}/cashback-percentage`,
+    { percentage, ...(reason ? { reason } : {}) }
+  );
+
+/**
+ * Pin a cashback rate to one purchase, or clear it by passing `null`.
+ *
+ * The most specific of the three levels: it outranks the cardholder's own rate
+ * and their tier's. When the purchase's cashback has already accrued and is
+ * still owed, that row is re-priced too — the result says whether it was.
+ */
+export const setTransactionCashbackPercentage = (
+  transactionId: string,
+  percentage: number | null,
+  reason?: string
+) =>
+  api.post<SetTransactionCashbackPercentageResult>(
+    `/admin/v1/card-transactions/${encodeURIComponent(
+      transactionId
+    )}/cashback-percentage`,
+    { percentage, ...(reason ? { reason } : {}) }
+  );
 
 // --- Rewards / cohorts -----------------------------------------------------
 
