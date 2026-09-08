@@ -858,7 +858,11 @@ export interface SubscriptionDiscountConfig {
   /** @deprecated Legacy flat service list; detection uses categories. */
   eligibleServices: string[];
   categories: SubscriptionDiscountCategory[];
-  /** First N dollars of an eligible charge that earn the discount. */
+  /**
+   * Most subscription cashback one eligible service can earn in a month, in USD
+   * (Rewards Terms §5). Caps the cashback, not the charge it is earned on; the
+   * name is left from an earlier reading and is what the API still sends.
+   */
   eligibleAmountCap: number;
   tier1: TierSubscriptionDiscountConfig;
   tier2: TierSubscriptionDiscountConfig;
