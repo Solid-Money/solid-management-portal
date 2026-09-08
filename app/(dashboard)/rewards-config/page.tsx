@@ -943,7 +943,7 @@ export default function RewardsConfigPage() {
         {/* Subscription Discount */}
         <ConfigSection
           title="Category-based Subscription Discounts"
-          description="Up to 50% back on monthly subscriptions (Netflix, Spotify, ChatGPT…). Prime unlocks 2 categories/month, Ultra unlocks 4. One subscription per category per month (first-paid-wins); paid as FUSE and drawn from the same monthly cashback cap."
+          description="Up to 50% back on monthly subscriptions (Netflix, Spotify, ChatGPT…). Prime unlocks 2 categories/month, Ultra unlocks 4. One subscription per category per month (first-paid-wins); paid as soUSD and drawn from the same monthly cashback cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
         >
           <ToggleField
@@ -954,7 +954,7 @@ export default function RewardsConfigPage() {
           />
           <div className="mt-4 max-w-xs">
             <InputField
-              label="Eligible Amount Cap"
+              label="Max Cashback / Service / Month"
               value={config.subscriptionDiscount.eligibleAmountCap}
               onChange={(v) =>
                 handleNumericUpdate(
@@ -965,7 +965,7 @@ export default function RewardsConfigPage() {
               }
               type="number"
               suffix="$"
-              tooltip="Only the first N dollars of each eligible subscription charge earn the discount (e.g. $50)."
+              tooltip="Most cashback one eligible service can earn in a calendar month (e.g. $50). Caps the cashback, NOT the charge: a $200 subscription at Prime's 25% earns $50, not 25% of the first $50. Rewards Terms §5 promises this figure — changing it changes what the published terms owe."
             />
           </div>
           <div className="mt-4 space-y-3">
@@ -1012,7 +1012,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="1"
-                tooltip="Percentage discount on eligible subscriptions"
+                tooltip="Percentage of an eligible subscription charge paid back as cashback, before the per-service monthly cap above (Core 0%, Prime 25%, Ultra 50%). Paid instead of this tier's regular card cashback on that charge, not on top of it."
               />
               <InputField
                 label="Categories / month"
