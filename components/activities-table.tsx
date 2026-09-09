@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SponsoredGasFee from "@/components/sponsored-gas-fee";
 
+import { formatDateTime } from "@/lib/utils";
 export default function ActivitiesTable() {
   const router = useRouter();
   const [filters, setFilters] = useState<ActivityFilters>({
@@ -452,13 +453,7 @@ export default function ActivitiesTable() {
                             ? new Date(timestamp * 1000)
                             : new Date(activity.createdAt);
 
-                        return dateToUse.toLocaleString(undefined, {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        });
+                        return formatDateTime(dateToUse);
                       })()}
                     </td>
                   </tr>

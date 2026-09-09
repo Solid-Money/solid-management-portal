@@ -174,6 +174,14 @@ export function FeesYieldsView() {
           <FeeBreakdownChart
             data={feeBreakdown?.breakdown || []}
             totals={feeBreakdown?.totals}
+            rates={
+              feeConfig
+                ? {
+                    performanceFeeRate: feeConfig.performanceFeeRate,
+                    platformFeeRate: feeConfig.platformFeeRate,
+                  }
+                : undefined
+            }
             height={350}
           />
         </ChartCard>

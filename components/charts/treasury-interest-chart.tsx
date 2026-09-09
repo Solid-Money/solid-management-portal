@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { TreasuryInterestPeriodData, REVENUE_COLORS } from "@/types/revenue";
 
+import { formatUsd } from "@/lib/utils";
 interface TreasuryInterestChartProps {
   data: TreasuryInterestPeriodData[];
   height?: number;
@@ -65,10 +66,7 @@ function CustomTooltip({
           </span>
           <span className="font-semibold text-gray-900">
             $
-            {interest.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatUsd(interest)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">

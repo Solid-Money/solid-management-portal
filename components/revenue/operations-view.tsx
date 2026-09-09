@@ -5,7 +5,7 @@ import { useRevenueByProduct } from "@/hooks/use-revenue";
 import { DateRangePicker } from "./date-range-picker";
 import { Loader2, AlertCircle, Users, TrendingUp, TrendingDown } from "lucide-react";
 import { subDays } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatUsd } from "@/lib/utils";
 import { REVENUE_COLORS } from "@/types/revenue";
 
 export function OperationsView() {
@@ -52,9 +52,20 @@ export function OperationsView() {
 
       {/* Product Comparison */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Revenue by Product
+        <h3 className="text-lg font-medium text-gray-900">
+          Revenue by business line
         </h3>
+        {/* The scope, spelled out. This total is grouped by business line
+            (savings, swap, card) over the range above — 90 days by default —
+            while the executive card is all revenue types over a fixed 30 days.
+            Both are correct; they answer different questions, and the labels
+            now say which. */}
+        <p className="mb-4 text-sm text-gray-500">
+          Savings, swaps and card, over the selected range. Grouped by business
+          line rather than by fee product, so this total will not match the
+          30-day executive figure above or the per-fee totals under Fee
+          breakdown.
+        </p>
         {productsData?.products && productsData.products.length > 0 ? (
           <div className="space-y-4">
             {productsData.products.map((product) => {
@@ -83,10 +94,7 @@ export function OperationsView() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-semibold text-gray-900">
-                        ${product.revenue.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {formatUsd(product.revenue)}
                       </span>
                       <span
                         className={cn(
@@ -127,10 +135,7 @@ export function OperationsView() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700">Total</span>
                 <span className="text-lg font-bold text-gray-900">
-                  ${productsData.totalRevenue.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatUsd(productsData.totalRevenue)}
                 </span>
               </div>
             </div>

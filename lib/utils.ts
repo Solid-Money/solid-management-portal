@@ -17,6 +17,53 @@ export function formatNumber(
   }).format(number);
 }
 
+/**
+ * A USD amount, always `$1,234.56` — the only way money should be rendered.
+ *
+ * Locked to en-US rather than the browser's locale. `toLocaleString(undefined,
+ * …)` follows whatever the viewer's machine is set to, so the same revenue
+ * figure read `$583.53` on one laptop and `$73,31` on a French one, and two
+ * people comparing screenshots could not tell a formatting difference from a
+ * data difference.
+ *
+ * Distinct from {@link formatNumber} because that one drops the minimum
+ * fraction digits below 1 — right for a token balance, wrong for money, where
+ * it turns a 50-cent fee into `$0.5`. Cents are never dropped here.
+ *
+ * `fractionDigits` is fixed rather than a maximum: a column of amounts only
+ * lines up if every row has the same number of decimals. Pass 0 for the
+ * whole-dollar aggregates on the charts.
+ */
+export function formatUsd(value: number, fractionDigits = 2): string {
+  const safe = Number.isFinite(value) ? value : 0;
+
+  return `$${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(safe)}`;
+}
+
+/**
+ * A date and time in en-US, for the same reason as {@link formatUsd}: a
+ * timestamp that reads `9/8/2026` for one operator and `08/09/2026` for another
+ * is a support call waiting to happen.
+ */
+export function formatDateTime(
+  value: string | number | Date,
+  options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-US", options).format(date);
+}
+
 export const isTransactionStuck = (timestamp: string): boolean => {
   if (!timestamp) return false;
   const transactionDate = new Date(parseInt(timestamp) * 1000);

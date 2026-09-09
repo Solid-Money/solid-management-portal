@@ -16,6 +16,7 @@ import {
   Cell,
 } from "recharts";
 import { FeeBreakdownData, YIELD_CHART_COLORS } from "@/types/yield-metrics";
+import { formatNumber } from "@/lib/utils";
 
 interface FeeBreakdownChartProps {
   data: FeeBreakdownData[];
@@ -23,6 +24,19 @@ interface FeeBreakdownChartProps {
     totalPerformanceFee: number;
     totalPlatformFee: number;
     total: number;
+  };
+  /**
+   * The live fee rates, as fractions, from `/revenue/fee-configuration`.
+   *
+   * Passed in rather than written into the labels because the two drifted: the
+   * legend read "Platform (1%/yr)" while the configured platform fee was 0, so
+   * the chart asserted a fee the protocol was not charging. Undefined while the
+   * config is still loading, which reads as an unqualified label rather than a
+   * wrong number.
+   */
+  rates?: {
+    performanceFeeRate: number;
+    platformFeeRate: number;
   };
   height?: number;
 }
@@ -38,11 +52,21 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
+/** A fee rate as a percentage suffix, or nothing when the rate is unknown. */
+const rateLabel = (rate: number | undefined, suffix = "") =>
+  rate === undefined ? "" : ` (${(rate * 100).toFixed(rate * 100 < 1 ? 2 : 0)}%${suffix})`;
+
+/** USD, always en-US — see the locale note in `formatNumber`. */
+const usd = (value: number) => `$${formatNumber(value, 2, 2)}`;
+
 function CustomTooltip({
   active,
   payload,
   label,
-}: TooltipProps<number, string>) {
+  rates,
+}: TooltipProps<number, string> & {
+  rates?: FeeBreakdownChartProps["rates"];
+}) {
   if (!active || !payload || payload.length === 0) {
     return null;
   }
@@ -75,7 +99,9 @@ function CustomTooltip({
           <span>📅</span> {formatDate(label as string)}
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          Protocol fee sources: Performance Fee (10% of profits) and Platform Fee (1% annual on TVL).
+          Protocol fee sources: Performance Fee
+          {rateLabel(rates?.performanceFeeRate)} of profits and Platform Fee
+          {rateLabel(rates?.platformFeeRate, "/yr")} on TVL.
         </p>
       </div>
 
@@ -87,10 +113,12 @@ function CustomTooltip({
               className="w-3 h-3 rounded-sm"
               style={{ backgroundColor: YIELD_CHART_COLORS.performanceFee }}
             />
-            <span className="text-gray-600">Performance Fee (10%)</span>
+            <span className="text-gray-600">
+              Performance Fee{rateLabel(rates?.performanceFeeRate)}
+            </span>
           </span>
           <span className="font-medium text-amber-600">
-            ${performanceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {usd(performanceFee)}
             <span className="text-gray-400 ml-1">({perfPct.toFixed(0)}%)</span>
           </span>
         </div>
@@ -100,10 +128,12 @@ function CustomTooltip({
               className="w-3 h-3 rounded-sm"
               style={{ backgroundColor: YIELD_CHART_COLORS.platformFee }}
             />
-            <span className="text-gray-600">Platform Fee (1%/yr)</span>
+            <span className="text-gray-600">
+              Platform Fee{rateLabel(rates?.platformFeeRate, "/yr")}
+            </span>
           </span>
           <span className="font-medium text-blue-600">
-            ${platformFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {usd(platformFee)}
             <span className="text-gray-400 ml-1">({platPct.toFixed(0)}%)</span>
           </span>
         </div>
@@ -113,9 +143,7 @@ function CustomTooltip({
       <div className="border-t border-gray-100 pt-2 space-y-1.5">
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600 font-medium">Total Protocol Fee</span>
-          <span className="font-semibold text-gray-900">
-            ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
+          <span className="font-semibold text-gray-900">{usd(total)}</span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Dominant</span>
@@ -134,7 +162,12 @@ function CustomTooltip({
   );
 }
 
-export function FeeBreakdownChart({ data, totals, height = 350 }: FeeBreakdownChartProps) {
+export function FeeBreakdownChart({
+  data,
+  totals,
+  rates,
+  height = 350,
+}: FeeBreakdownChartProps) {
   const chartData = useMemo(
     () =>
       data.map((item) => ({
@@ -184,12 +217,14 @@ export function FeeBreakdownChart({ data, totals, height = 350 }: FeeBreakdownCh
               tickLine={false}
               tick={{ fontSize: 12, fill: "#6b7280" }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip rates={rates} />} />
             <Legend
               wrapperStyle={{ paddingTop: "10px" }}
               formatter={(value) => (
                 <span className="text-sm text-gray-600">
-                  {value === "performanceFee" ? "Performance (10%)" : "Platform (1%/yr)"}
+                  {value === "performanceFee"
+                    ? `Performance${rateLabel(rates?.performanceFeeRate)}`
+                    : `Platform${rateLabel(rates?.platformFeeRate, "/yr")}`}
                 </span>
               )}
             />
@@ -232,16 +267,14 @@ export function FeeBreakdownChart({ data, totals, height = 350 }: FeeBreakdownCh
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) =>
-                  `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                }
+                formatter={(value: number) => usd(value)}
               />
             </PieChart>
           </ResponsiveContainer>
           <div className="text-center mt-2">
             <p className="text-xs text-gray-500">Total Protocol Fees</p>
             <p className="text-lg font-semibold text-gray-900">
-              ${totals.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {usd(totals.total)}
             </p>
           </div>
         </div>

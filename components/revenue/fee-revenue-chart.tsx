@@ -19,6 +19,7 @@ import {
   FEE_REVENUE_COLORS,
 } from "@/types/revenue";
 
+import { formatUsd } from "@/lib/utils";
 interface FeeRevenueChartProps {
   growth: FeeRevenueGrowthPoint[];
   /** Products in table order, so the stack order matches the rows beneath it. */
@@ -26,12 +27,6 @@ interface FeeRevenueChartProps {
   groupBy: FeeRevenueGroupBy;
   height?: number;
 }
-
-const formatUsd = (value: number) =>
-  `$${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
 const formatYAxis = (value: number) => {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
