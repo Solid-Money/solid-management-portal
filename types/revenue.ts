@@ -11,12 +11,26 @@ export type RevenueType =
   | 'treasury_interest'
   | FeeRevenueType;
 
-/** The revenue lines produced by the per-tier product fee program. */
+/**
+ * The revenue lines produced by the per-tier product fee program.
+ *
+ * Must stay in step with `RevenueType` / `PRODUCT_FEE_REVENUE_TYPES` in the
+ * backend's `revenue-event.schema.ts`. A product missing here is not a cosmetic
+ * gap: the fee views key their rows off this union, so its fees are dropped from
+ * the breakdown without any error, and the total silently disagrees with the
+ * ledger.
+ *
+ * Note `transfi_fee`, not `buy_crypto_fee`: buy-crypto orders run through
+ * TransFi and the ledger records the rail, so the backend enum — and therefore
+ * the wire format — calls it `transfi_fee`.
+ */
 export type FeeRevenueType =
   | 'swap_fee'
   | 'fx_fee'
   | 'bank_withdrawal_fee'
-  | 'bank_deposit_fee';
+  | 'bank_deposit_fee'
+  | 'stocks_fee'
+  | 'transfi_fee';
 
 export type ReconciliationStatusType = 'pending' | 'verified' | 'discrepancy' | 'resolved';
 
@@ -345,14 +359,26 @@ export const FEE_REVENUE_COLORS: Record<FeeRevenueType, string> = {
   fx_fee: '#f59e0b', // amber-500
   bank_withdrawal_fee: '#e11d48', // rose-600
   bank_deposit_fee: '#0d9488', // teal-600
+  transfi_fee: '#7c3aed', // violet-600
+  stocks_fee: '#0284c7', // sky-600
 };
 
-/** Fee products in the order the app's own fee table lists them. */
+/**
+ * Fee products in the order the app's own fee table lists them.
+ *
+ * Every product in the backend's `PRODUCT_FEE_REVENUE_TYPES` appears here, even
+ * one configured but currently disabled: a product with no charges renders as a
+ * zero row, which is how an operator sees that a fee they switched on is not
+ * being collected. Omitting it would make "no revenue" and "not tracked" look
+ * identical.
+ */
 export const FEE_REVENUE_TYPES: FeeRevenueType[] = [
   'bank_deposit_fee',
   'swap_fee',
   'fx_fee',
   'bank_withdrawal_fee',
+  'transfi_fee',
+  'stocks_fee',
 ];
 
 export const FEE_REVENUE_QUERY_KEYS = {

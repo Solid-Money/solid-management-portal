@@ -263,8 +263,11 @@ export function formatLatency(seconds: number): string {
  */
 export function formatShareAmount(amount: string, decimals = 6): string {
   const value = Number(BigInt(amount)) / 10 ** decimals;
-  return value.toLocaleString(undefined, {
+  // Pinned to en-US, not the viewer's locale: a share count that reads "1.50"
+  // on one machine and "1,50" on another cannot be compared across screenshots.
+  // Not `formatUsd` — these are vault shares, not dollars.
+  return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  });
+  }).format(value);
 }

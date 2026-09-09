@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useInvestorReport } from "@/hooks/use-revenue";
 import { RevenueAreaChart } from "@/components/charts/revenue-area-chart";
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, TrendingUp, DollarSign, Users, Clock } from "lucide-react";
@@ -54,6 +55,17 @@ export function InvestorReport() {
   const isPositiveMoM = data.summary.growth.mom.startsWith("+");
   const isPositiveYoY = data.summary.growth.yoy.startsWith("+");
 
+  /**
+   * Whether the selected month has a real month to compare against.
+   *
+   * Revenue recognition started in June 2026, so any month before June 2027 is
+   * being compared to a period with no meaningful revenue in it. Derived from
+   * the date rather than from the response, because the backend returns a
+   * formatted percentage either way and cannot say whether it is meaningful.
+   */
+  const hasFullYearOfHistory =
+    selectedDate >= new Date(Date.UTC(2027, 5, 1));
+
   return (
     <div className="space-y-6">
       {/* Month selector */}
@@ -104,17 +116,28 @@ export function InvestorReport() {
             </span>
             <span className="text-sm text-gray-500">MoM</span>
           </div>
-          <div className="flex items-baseline gap-3 mt-1">
-            <span
-              className={cn(
-                "text-lg font-medium",
-                isPositiveYoY ? "text-emerald-600" : "text-red-600"
-              )}
-            >
-              {data.summary.growth.yoy}
-            </span>
-            <span className="text-sm text-gray-500">YoY</span>
-          </div>
+          {/* YoY is hidden until there are twelve real months behind it.
+              With a partial first year the comparison is against a month that
+              barely existed, which produced figures like "-95.6% YoY" — noise
+              that reads as a collapse. MoM above is the honest growth number
+              for now. */}
+          {hasFullYearOfHistory ? (
+            <div className="flex items-baseline gap-3 mt-1">
+              <span
+                className={cn(
+                  "text-lg font-medium",
+                  isPositiveYoY ? "text-emerald-600" : "text-red-600"
+                )}
+              >
+                {data.summary.growth.yoy}
+              </span>
+              <span className="text-sm text-gray-500">YoY</span>
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-gray-400">
+              YoY hidden until 12 months of revenue history exist
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -154,9 +177,23 @@ export function InvestorReport() {
 
         {/* Unit Economics */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Unit Economics
-          </h3>
+          <h3 className="text-lg font-medium text-gray-900">Unit Economics</h3>
+          {/* These four come from the backend already formatted, and it does not
+              report which cost inputs went into them. Until they are computed
+              from the per-user P&L, the figures here should not be quoted
+              externally without checking that the costs behind them are set —
+              an unset cost makes CAC look better than it is. */}
+          <p className="mb-4 text-sm text-amber-700">
+            Not yet reconciled to the cost inputs. LTV and CAC are computed
+            server-side and do not state their inputs; confirm the costs under{" "}
+            <Link
+              href="/costs-config"
+              className="underline hover:no-underline"
+            >
+              Config → Costs
+            </Link>{" "}
+            are entered before quoting these.
+          </p>
           <div className="space-y-6">
             <div>
               <div className="flex items-center justify-between mb-1">

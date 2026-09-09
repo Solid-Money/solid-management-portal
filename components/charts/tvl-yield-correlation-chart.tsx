@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { TvlYieldCorrelationData, YIELD_CHART_COLORS } from "@/types/yield-metrics";
 
+import { formatUsd } from "@/lib/utils";
 interface TvlYieldCorrelationChartProps {
   data: TvlYieldCorrelationData[];
   correlation?: number;
@@ -99,7 +100,7 @@ function CustomTooltip({
           <span className="font-medium text-blue-600">
             ${tvlInMillions >= 1
               ? `${tvlInMillions.toFixed(2)}M`
-              : tvl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              :formatUsd(tvl, 0)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
@@ -117,7 +118,7 @@ function CustomTooltip({
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Daily Yield</span>
           <span className="font-medium text-gray-900">
-            ${dailyYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatUsd(dailyYield)}
           </span>
         </div>
       </div>

@@ -1,12 +1,14 @@
 import {
   Activity,
   BarChart3,
+  BookOpen,
   CreditCard,
   DollarSign,
   Gift,
   Image,
   Megaphone,
   Percent,
+  Receipt,
   Share2,
   SlidersHorizontal,
   Sparkles,
@@ -72,6 +74,48 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Analytics",
+    icon: BarChart3,
+    items: [
+      {
+        href: "/analytics/overview",
+        label: "Overview",
+        description: "Is the business moving, and is anything on fire",
+        icon: BarChart3,
+      },
+      {
+        href: "/analytics/revenue",
+        label: "Revenue",
+        description: "What we earn, from what, and from whom",
+        icon: DollarSign,
+      },
+      {
+        href: "/analytics/rewards",
+        label: "Rewards",
+        description: "What we have paid, what we owe, and whether we can pay it",
+        icon: Gift,
+      },
+      {
+        href: "/analytics/funnel",
+        label: "Funnel",
+        description: "Where users drop off, and where deposits fail",
+        icon: TrendingUp,
+      },
+      {
+        href: "/analytics/signals",
+        label: "Signals",
+        description: "User segments, and the Metabase dashboards being retired",
+        icon: UsersRound,
+      },
+      {
+        href: "/analytics/glossary",
+        label: "Glossary",
+        description: "What every metric on this dashboard actually means",
+        icon: BookOpen,
+      },
+    ],
+  },
+  {
     label: "Treasury",
     icon: Wallet,
     items: [
@@ -80,18 +124,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Wallets",
         description: "Admin wallet balances and what needs topping up",
         icon: Wallet,
-      },
-      {
-        href: "/revenue",
-        label: "Revenue",
-        description: "Fees, yields and the investor-facing summary",
-        icon: DollarSign,
-      },
-      {
-        href: "/analytics",
-        label: "Analytics",
-        description: "Protocol charts: TVL, flows, exchange rate",
-        icon: BarChart3,
       },
       {
         href: "/landing-apy",
@@ -116,6 +148,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Fees",
         description: "Per-tier fee rates on every product we charge on",
         icon: Percent,
+      },
+      {
+        href: "/costs-config",
+        label: "Costs",
+        description: "KYC, card and rail costs behind every margin number",
+        icon: Receipt,
       },
     ],
   },

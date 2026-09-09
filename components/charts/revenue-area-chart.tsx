@@ -14,6 +14,7 @@ import {
 import { REVENUE_COLORS, RevenuePeriodData } from "@/types/revenue";
 import { subDays, format } from "date-fns";
 
+import { formatUsd } from "@/lib/utils";
 interface RevenueAreaChartProps {
   data: number[] | RevenuePeriodData[];
   height?: number;
@@ -70,7 +71,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
             <span className="text-gray-600">Total Revenue</span>
           </span>
           <span className="font-semibold text-gray-900">
-            ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatUsd(total)}
           </span>
         </div>
       </div>
@@ -124,10 +125,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
               </span>
             </span>
             <span className="font-medium text-gray-900">
-              ${(entry.value as number).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatUsd((entry.value as number))}
             </span>
           </div>
         ))}
@@ -138,7 +136,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600 font-medium">Daily Total</span>
           <span className="font-semibold text-gray-900">
-            ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatUsd(total)}
           </span>
         </div>
         {dominant && (

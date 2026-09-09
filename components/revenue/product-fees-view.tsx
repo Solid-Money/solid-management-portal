@@ -8,7 +8,7 @@ import { DateRangePicker } from "@/components/revenue/date-range-picker";
 import { FeeRevenueChart } from "@/components/revenue/fee-revenue-chart";
 import { KPICard } from "@/components/revenue/kpi-card";
 import { useFeeRevenueDetail, useFeeRevenueOverview } from "@/hooks/use-fee-revenue";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime, formatUsd } from "@/lib/utils";
 import {
   FeeRevenueGroupBy,
   FeeRevenueProductRow,
@@ -21,12 +21,6 @@ const GROUP_BY_OPTIONS: { label: string; value: FeeRevenueGroupBy }[] = [
   { label: "Weekly", value: "week" },
   { label: "Monthly", value: "month" },
 ];
-
-const formatUsd = (value: number) =>
-  `$${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
 const formatCount = (value: number) => value.toLocaleString();
 
@@ -407,7 +401,7 @@ function ProductFeeDetail({
               <tr key={fee.eventId}>
                 <td className="whitespace-nowrap px-4 py-2 text-gray-600">
                   {fee.chargedAt
-                    ? new Date(fee.chargedAt).toLocaleString(undefined, {
+                    ? formatDateTime(fee.chargedAt, {
                         dateStyle: "medium",
                         timeStyle: "short",
                       })
