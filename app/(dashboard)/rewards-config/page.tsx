@@ -601,7 +601,7 @@ export default function RewardsConfigPage() {
         {/* Referral Cashback Program */}
         <ConfigSection
           title="Referral Cashback Program"
-          description="Two-sided USD cashback, paid in FUSE once a referred friend gets a card and proves everyday use. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Separate from the points-based referral rewards above."
+          description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield and counts towards the FUSE skip-the-line unlock, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Separate from the points-based referral rewards above."
           icon={<Gift className="h-5 w-5 text-pink-600" />}
         >
           <div className="flex items-center justify-between">
