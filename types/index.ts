@@ -552,13 +552,19 @@ export interface ChainBalance {
   usdtStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   usdtAddress?: string;
   // soUSD is the reward payout asset (cashback, bonuses) on Fuse. Referral
-  // cashback pays in native FUSE, so for the referral payout wallet the gas
-  // balance above IS the payout float — its soUSD only covers rewards earned
-  // before that switch.
+  // cashback pays in soFUSE instead, so on the referral payout wallet the
+  // soUSD balance only covers rewards earned before that switch.
   soUsdBalance?: string;
   soUsdThreshold?: string;
   soUsdStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   soUsdAddress?: string;
+  // soFUSE, the FUSE vault share: the referral cashback payout float. Top it up
+  // by depositing FUSE to the soFUSE vault from the payout wallet — the gas
+  // balance above is only the transfers' gas.
+  soFuseBalance?: string;
+  soFuseThreshold?: string;
+  soFuseStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  soFuseAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
