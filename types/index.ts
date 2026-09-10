@@ -1177,6 +1177,92 @@ export interface UserRewardsData {
     balanceUsd: number;
     unlockedTier: RewardsTierName;
   };
+  /** A gifted trial the user has not accepted yet. */
+  pendingTierTrial?: TierTrial | null;
+  /** The trial currently granting them their tier. */
+  activeTierTrial?: TierTrial | null;
+}
+
+/** The tiers a trial can grant. Core is the floor, not a gift. */
+export type GiftableTier = Exclude<RewardsTierName, "core">;
+
+/** Where a trial came from. */
+export type TierTrialSource = "admin_gift" | "promotion";
+
+/**
+ * A trial's lifecycle. It is issued `pending_activation` and stays there until
+ * the user accepts it — the duration is theirs to start.
+ */
+export type TierTrialStatus =
+  | "pending_activation"
+  | "active"
+  | "expired"
+  | "revoked";
+
+/**
+ * A temporary tier upgrade: the user holds `tier` for `durationDays` from the
+ * moment they activate it, then returns to the tier their points and FUSE
+ * balance earn them. Their points and balances are never touched.
+ */
+export interface TierTrial {
+  id: string;
+  tier: GiftableTier;
+  source: TierTrialSource;
+  status: TierTrialStatus;
+  durationDays: number;
+  /** The note the admin wrote with the gift, shown to the user. */
+  giftMessage?: string;
+  /** When an active trial ends; null while it waits to be started. */
+  expiresAt: string | null;
+  /** Whole hours left on an active trial, 0 otherwise. */
+  hoursRemaining: number;
+  /** Internal note from the admin who issued it. Never shown to the user. */
+  reason?: string;
+  issuedBy?: string;
+  issuedAt: string;
+  activatedAt: string | null;
+  revokedBy?: string;
+  revokedAt: string | null;
+  revokeReason?: string;
+  /** The trial this one replaced, when an admin chose to replace. */
+  replacedTrialId?: string;
+  /** Days added to this trial by later gifts. */
+  extensions?: {
+    days: number;
+    extendedBy?: string;
+    extendedAt: string;
+    reason?: string;
+  }[];
+}
+
+/** The open trial, if any, plus everything that came before it. */
+export interface TierTrialView {
+  current: TierTrial | null;
+  history: TierTrial[];
+}
+
+/**
+ * What to do about a trial the user already has. There is no default: trial
+ * durations are never silently combined, so a second gift has to say.
+ */
+export type TierTrialConflictResolution = "replace" | "extend";
+
+/** A trial an operator is gifting. */
+export interface IssueTierTrialRequest {
+  tier: GiftableTier;
+  durationDays: number;
+  giftMessage?: string;
+  reason?: string;
+  onExistingTrial?: TierTrialConflictResolution;
+}
+
+/** The outcome of issuing a gift. */
+export interface IssueTierTrialResult {
+  trial: TierTrial;
+  /** Set when the gift replaced a trial the user already had. */
+  replacedTrialId?: string;
+  /** Set when the days went onto an existing trial instead of a new one. */
+  extendedTrialId?: string;
 }
 
 export interface CashbackEntry {

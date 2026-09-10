@@ -18,6 +18,7 @@ import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
+import UserTierTrialCard from "@/components/user/user-tier-trial-card";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -236,6 +237,9 @@ export default function UserDetailPage({
 
         <TabsContent value="rewards" className="space-y-4">
           <UserRewardsCard userId={id} />
+          {/* Directly under the tier it can override: a running trial is why
+              the tier above may not match the points next to it. */}
+          <UserTierTrialCard userId={id} username={displayName} />
           <UserCashbackRateCard
             userId={id}
             username={displayName}
