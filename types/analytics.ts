@@ -221,6 +221,62 @@ export interface DepositRailsResponse {
   generatedAt: string;
 }
 
+/**
+ * The live card issuers.
+ *
+ * Deprecated bridge.xyz cards are deliberately absent: they no longer issue or
+ * spend, and a dead rail in the legend of every card chart is worse than no
+ * legend entry at all. The backend filters them out; this type is why a caller
+ * cannot put one back.
+ */
+export type CardRail = "rain" | "wirex";
+
+export const CARD_RAILS: Array<{ id: CardRail; label: string; color: string }> =
+  [
+    // Fixed per rail, never by rank, so re-sorting or filtering a chart never
+    // repaints a series. Indigo and teal separate under both common forms of
+    // colour blindness, and each bar segment is labelled in the tooltip so the
+    // chart never depends on hue alone.
+    { id: "rain", label: "Rain", color: "#6366f1" },
+    { id: "wirex", label: "Wirex", color: "#0d9488" },
+  ];
+
+export interface CardDailyPoint {
+  date: string;
+  rainUsd: number;
+  wirexUsd: number;
+  totalUsd: number;
+  rainCount: number;
+  wirexCount: number;
+  totalCount: number;
+}
+
+/** A rail that cannot contribute to a series, as opposed to one with no activity. */
+export interface UnavailableRail {
+  rail: CardRail;
+  reason: string;
+}
+
+export interface CardDailySeries {
+  byDay: CardDailyPoint[];
+  totals: {
+    rainUsd: number;
+    wirexUsd: number;
+    totalUsd: number;
+    rainCount: number;
+    wirexCount: number;
+    totalCount: number;
+  };
+  unavailableRails: UnavailableRail[];
+  meta: SeriesMeta;
+}
+
+export interface CardDailyResponse {
+  deposits: CardDailySeries;
+  spend: CardDailySeries;
+  generatedAt: string;
+}
+
 export interface CostsConfig {
   kycSolidUsd?: number;
   kycRainUsd?: number;
@@ -313,6 +369,7 @@ export const ANALYTICS_QUERY_KEYS = {
   depositRails: (query: string) =>
     ["analytics", "funnel", "rails", query] as const,
   costsConfig: ["analytics", "costs-config"] as const,
+  cardDaily: (query: string) => ["analytics", "card", "daily", query] as const,
 };
 
 /**
@@ -327,4 +384,5 @@ export const ANALYTICS_REFRESH_INTERVALS = {
   referralProgram: 10 * 60 * 1000,
   depositRails: 5 * 60 * 1000,
   costsConfig: 30 * 60 * 1000,
+  cardDaily: 5 * 60 * 1000,
 };

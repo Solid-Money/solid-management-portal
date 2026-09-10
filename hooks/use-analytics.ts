@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import {
   ANALYTICS_QUERY_KEYS,
   ANALYTICS_REFRESH_INTERVALS,
+  type CardDailyResponse,
   type CostsConfig,
   type CostsConfigResponse,
   type DepositRailsResponse,
@@ -73,6 +74,26 @@ export function useDepositRails(queryString: string) {
     },
     refetchInterval: ANALYTICS_REFRESH_INTERVALS.depositRails,
     staleTime: ANALYTICS_REFRESH_INTERVALS.depositRails / 2,
+  });
+}
+
+/**
+ * Card deposits and settled spend per day, split Rain / Wirex.
+ *
+ * One call for both series so the two charts on the page can never show
+ * different windows or refresh out of step with each other.
+ */
+export function useCardDaily(queryString: string) {
+  return useQuery<CardDailyResponse>({
+    queryKey: ANALYTICS_QUERY_KEYS.cardDaily(queryString),
+    queryFn: async () => {
+      const response = await api.get(
+        `/admin/v1/analytics/card/daily?${queryString}`
+      );
+      return response.data;
+    },
+    refetchInterval: ANALYTICS_REFRESH_INTERVALS.cardDaily,
+    staleTime: ANALYTICS_REFRESH_INTERVALS.cardDaily / 2,
   });
 }
 

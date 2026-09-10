@@ -146,8 +146,7 @@ export const ANALYTICS_TABS: AnalyticsTab[] = [
       {
         id: "spending",
         label: "Spending",
-        question: "How much is being spent, and on which rail?",
-        pending: { phase: 2 },
+        question: "How much moves onto cards and off them, and on which rail?",
       },
       {
         id: "issuance",
