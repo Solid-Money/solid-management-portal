@@ -2,8 +2,12 @@ import axios from "axios";
 import { auth } from "./firebase";
 import { toast } from "sonner";
 import {
+  IssueTierTrialRequest,
+  IssueTierTrialResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
+  TierTrial,
+  TierTrialView,
 } from "@/types";
 
 const api = axios.create({
@@ -93,6 +97,54 @@ export const setUserCardFreeze = (
     freeze,
     ...(reason ? { reason } : {}),
   });
+
+/**
+ * This user's tier trials: the one that is open — waiting to be started or
+ * running — plus the history behind it.
+ *
+ * Read before offering the gift form: an open trial is what makes the operator
+ * choose between replacing it and extending it, and the backend refuses a gift
+ * that does not say which.
+ */
+export const getUserTierTrials = (userId: string) =>
+  api.get<{ data: TierTrialView }>(`/admin/v1/users/${userId}/tier-trial`);
+
+/**
+ * Gift this user a temporary tier upgrade.
+ *
+ * The trial is issued waiting for the user to accept it — the duration runs
+ * from their activation, not from now — and grants its tier on top of whatever
+ * their points and FUSE balance already earn, without touching either. When it
+ * ends they simply return to their earned tier.
+ *
+ * `onExistingTrial` is required when the user already has one open: pass
+ * `replace` to swap their trial for this one, or `extend` to add these days to
+ * it at the tier it already grants.
+ *
+ * The admin identity comes from the Firebase token server-side, never from
+ * here, so the audit row names whoever is actually signed in.
+ */
+export const issueUserTierTrial = (
+  userId: string,
+  request: IssueTierTrialRequest
+) =>
+  api.post<{ data: IssueTierTrialResult }>(
+    `/admin/v1/users/${userId}/tier-trial`,
+    request
+  );
+
+/**
+ * Take a tier trial back — one the user has not opened, or one already running.
+ * Either way they return to the tier their points and FUSE balance earn them.
+ */
+export const revokeUserTierTrial = (
+  userId: string,
+  options: { trialId?: string; reason?: string } = {}
+) =>
+  api.post<{ data: TierTrial }>(
+    `/admin/v1/users/${userId}/tier-trial/revoke`,
+    options
+  );
 
 /**
  * Pin a cashback rate to this cardholder, or clear it by passing `null`.
