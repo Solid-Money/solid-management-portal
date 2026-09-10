@@ -30,6 +30,7 @@ function productFields(
     [`${key}Tier1Percentage`]: Number(rates.tier1),
     [`${key}Tier2Percentage`]: Number(rates.tier2),
     [`${key}Tier3Percentage`]: Number(rates.tier3),
+    [`${key}ShowInApp`]: rates.showInApp,
   };
 }
 
@@ -41,11 +42,17 @@ function productFields(
  * different people at different times. They still share one config document and
  * one endpoint, which is why both pages drive `useConfigEditor`.
  *
- * Each product is its own section with its own toggle and its own Save. There is
- * no program-wide switch: turning a fee on is a decision per product, and one
+ * Each product is its own section with its own toggles and its own Save. There
+ * is no program-wide switch: turning a fee on is a decision per product, and one
  * master toggle either blocks the fee you are ready to charge or, flipped, arms
  * the five you are not. The stored config still carries a program flag, which
  * this page keeps on — the per-product toggles are the real gate.
+ *
+ * Each section carries two toggles. One charges the fee; the other lists the
+ * product in the app's tier fee table. They are independent because a fee can go
+ * live before it is announced, and a row can be published at "Free" on a product
+ * that is not charging yet — and because hiding a row must never be mistaken for
+ * switching a fee off.
  *
  * Because all six products share one endpoint, a save has to send all six. It
  * sends the OTHER five from the last copy the server confirmed, so saving Swaps
@@ -168,6 +175,13 @@ export default function FeesConfigPage() {
           in USD is free on every tier, Core included. Rates taper to zero at
           Ultra, so staking FUSE genuinely drops every fee to zero.
         </p>
+        <p className="mt-1">
+          <span className="font-medium">Show in App</span> is a separate switch:
+          it only decides whether the app&apos;s tier Fees &amp; Caps table lists
+          the product. Hiding a row does not stop the fee being charged, and
+          showing one does not start it — to stop charging, switch the fee itself
+          off.
+        </p>
       </div>
 
       {FEE_PRODUCTS.map((product, index) => (
@@ -185,6 +199,9 @@ export default function FeesConfigPage() {
             rates={config.productFees[product.key]}
             onToggle={(v) =>
               updateConfig("productFees", `${product.key}.enabled`, v)
+            }
+            onShowInAppToggle={(v) =>
+              updateConfig("productFees", `${product.key}.showInApp`, v)
             }
             onRateChange={(tier, v) =>
               handleNumericUpdate(

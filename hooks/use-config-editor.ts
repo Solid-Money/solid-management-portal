@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import {
+  FeeRates,
   FullRewardsConfig,
   ProductFeesConfig,
   ReferralCashbackConfig,
@@ -30,12 +31,17 @@ export const REFERRAL_CASHBACK_DEFAULTS: ReferralCashbackConfig = {
  * `enabled: false` is the real default. The fees page has no master switch, so
  * saving one product turns the program on, and a product still sitting on a
  * default would come on with it.
+ *
+ * `showInApp` defaults the other way, because it is the fee table the app
+ * already publishes rather than a charge: the five products that have always
+ * had a row keep it, and TransFi (below) starts hidden because it never had one.
  */
 const DEFAULT_RATES = {
   enabled: false,
   tier1: 0.005,
   tier2: 0.0025,
   tier3: 0,
+  showInApp: true,
 };
 
 /**
@@ -51,7 +57,7 @@ export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
   fx: { ...DEFAULT_RATES },
   offRamp: { ...DEFAULT_RATES },
   bankDeposit: { ...DEFAULT_RATES },
-  transfi: { ...DEFAULT_RATES },
+  transfi: { ...DEFAULT_RATES, showInApp: false },
   minChargeUsd: 0.01,
 };
 
@@ -65,6 +71,16 @@ export function withConfigDefaults(
   config: FullRewardsConfig,
 ): FullRewardsConfig {
   const fees = config.productFees;
+
+  // The API names the withdrawal block `bankWithdrawal`; this page has always
+  // called it `offRamp`, which is also the name its PATCH payload uses. Without
+  // this line the section reads the shipped defaults instead of the stored
+  // values, so a saved rate — or a switched-off app row — reappears as its
+  // default on the next load.
+  const offRamp =
+    fees?.offRamp ??
+    (fees as unknown as { bankWithdrawal?: Partial<FeeRates> } | undefined)
+      ?.bankWithdrawal;
 
   return {
     ...config,
@@ -84,7 +100,7 @@ export function withConfigDefaults(
       swap: { ...PRODUCT_FEES_DEFAULTS.swap, ...fees?.swap },
       stocks: { ...PRODUCT_FEES_DEFAULTS.stocks, ...fees?.stocks },
       fx: { ...PRODUCT_FEES_DEFAULTS.fx, ...fees?.fx },
-      offRamp: { ...PRODUCT_FEES_DEFAULTS.offRamp, ...fees?.offRamp },
+      offRamp: { ...PRODUCT_FEES_DEFAULTS.offRamp, ...offRamp },
       bankDeposit: {
         ...PRODUCT_FEES_DEFAULTS.bankDeposit,
         ...fees?.bankDeposit,

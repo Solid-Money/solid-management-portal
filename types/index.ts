@@ -942,6 +942,16 @@ export interface FeeRates {
   tier1: number;
   tier2: number;
   tier3: number;
+  /**
+   * Whether the app's tier "Fees & Caps" table lists this product.
+   *
+   * Presentational only, and deliberately not the same switch as `enabled`:
+   * that one decides whether the user is charged, this one whether the row is
+   * on the screen. Both mixed states are real — a fee that is live but not yet
+   * announced, and a row shown at "Free" on a product that is switched off —
+   * so one flag could not express either. Hiding a row never stops a charge.
+   */
+  showInApp: boolean;
 }
 
 /**
