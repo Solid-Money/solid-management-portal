@@ -2,6 +2,8 @@ import axios from "axios";
 import { auth } from "./firebase";
 import { toast } from "sonner";
 import {
+  BatchIssueTierTrialRequest,
+  BatchIssueTierTrialResult,
   IssueTierTrialRequest,
   IssueTierTrialResult,
   SetTransactionCashbackPercentageResult,
@@ -130,6 +132,25 @@ export const issueUserTierTrial = (
 ) =>
   api.post<{ data: IssueTierTrialResult }>(
     `/admin/v1/users/${userId}/tier-trial`,
+    request
+  );
+
+/**
+ * Gift the same tier trial to a list of users, named by username.
+ *
+ * Succeeds as a whole and reports per user: the response carries a row for
+ * every line submitted saying whether it was gifted, extended, replaced,
+ * skipped because they already had a trial, not found, or failed — so one
+ * mistyped username costs that line and nothing else. Only a gift that is
+ * wrong for everybody — a duration outside the bounds, an empty list — is
+ * refused outright, before anything has been issued.
+ *
+ * `onExistingTrial` decides once, for the whole batch, what happens to the
+ * users who already hold a trial. Omitted, they are left alone.
+ */
+export const batchIssueTierTrials = (request: BatchIssueTierTrialRequest) =>
+  api.post<{ data: BatchIssueTierTrialResult }>(
+    "/admin/v1/users/tier-trial/batch",
     request
   );
 

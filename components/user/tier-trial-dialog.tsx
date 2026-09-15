@@ -4,9 +4,11 @@ import { useState } from "react";
 import { Gift, Loader2 } from "lucide-react";
 
 import {
+  BatchIssueTierTrialRequest,
   GiftableTier,
   IssueTierTrialRequest,
   TierTrial,
+  TierTrialBatchConflictPolicy,
   TierTrialConflictResolution,
 } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -23,8 +25,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  countDuplicateUsernames,
+  MAX_TIER_TRIAL_BATCH_SIZE,
   MAX_TIER_TRIAL_DAYS,
   MIN_TIER_TRIAL_DAYS,
+  parseUsernameList,
   tierTrialStatusLabel,
 } from "@/lib/tier-trial";
 
@@ -36,13 +41,30 @@ const TIERS: { tier: GiftableTier; label: string; blurb: string }[] = [
   { tier: "ultra", label: "Ultra", blurb: "5% cashback · +3% yield" },
 ];
 
-interface TierTrialDialogProps {
+/** The three answers a batch can give about users who already hold a trial. */
+const BATCH_POLICIES: {
+  policy: TierTrialBatchConflictPolicy;
+  label: string;
+  blurb: string;
+}[] = [
+  { policy: "skip", label: "Skip them", blurb: "Leave their trial alone" },
+  { policy: "extend", label: "Extend it", blurb: "Add these days, same tier" },
+  { policy: "replace", label: "Replace it", blurb: "Revoke theirs, start this" },
+];
+
+interface BaseProps {
   /**
    * Always `true` in practice: the form seeds itself on mount, so mount this
    * only while it is open rather than leaving it mounted and toggling.
    */
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isSaving: boolean;
+}
+
+/** Gifting one user, from their profile page. */
+interface SingleProps extends BaseProps {
+  mode?: "single";
   username: string;
   /**
    * The trial the user already has, when they have one. Its presence is what
@@ -50,9 +72,16 @@ interface TierTrialDialogProps {
    * not make it.
    */
   existing?: TierTrial | null;
-  isSaving: boolean;
   onSubmit: (request: IssueTierTrialRequest) => void;
 }
+
+/** Gifting a pasted list of users at once. */
+interface BatchProps extends BaseProps {
+  mode: "batch";
+  onSubmit: (request: BatchIssueTierTrialRequest) => void;
+}
+
+type TierTrialDialogProps = SingleProps | BatchProps;
 
 /** One choice in a segmented row. */
 function Choice({
@@ -85,7 +114,15 @@ function Choice({
 }
 
 /**
- * Gift a user a temporary tier upgrade.
+ * Gift a temporary tier upgrade — to one user, or to a pasted list of them.
+ *
+ * ## Why one component for both
+ *
+ * Everything about what the gift *is* — the tier, the duration, the message
+ * the user reads, the internal reason — means exactly the same thing for four
+ * hundred users as for one. Only the "who" and the conflict decision differ,
+ * so the two modes are the same form with the list and the policy swapped in,
+ * rather than two forms that would drift the moment a preset changed.
  *
  * ## Why the tier and duration are buttons, not fields
  *
@@ -105,27 +142,39 @@ function Choice({
  * Extending only ever adds days at the tier the trial already grants; picking a
  * different tier is a replacement, which is why choosing one switches the
  * decision back to Replace.
+ *
+ * A batch cannot ask that question per user — nobody is going to answer it
+ * four hundred times — so it is asked once for everyone, and defaults to
+ * leaving those users alone.
  */
-export default function TierTrialDialog({
-  open,
-  onOpenChange,
-  username,
-  existing,
-  isSaving,
-  onSubmit,
-}: TierTrialDialogProps) {
+export default function TierTrialDialog(props: TierTrialDialogProps) {
+  const { open, onOpenChange, isSaving } = props;
+  const isBatch = props.mode === "batch";
+  // A batch has no one user to name and no one trial to look at, so both are
+  // read out here once rather than guarded at every place they are shown.
+  const username = props.mode === "batch" ? "" : props.username;
+  const existing = (props.mode === "batch" ? null : props.existing) ?? null;
+
   const [tier, setTier] = useState<GiftableTier>(existing?.tier ?? "prime");
   const [days, setDays] = useState(String(DURATION_PRESETS[0]));
   const [giftMessage, setGiftMessage] = useState("");
   const [reason, setReason] = useState("");
   const [onExistingTrial, setOnExistingTrial] =
     useState<TierTrialConflictResolution>(existing ? "extend" : "replace");
+  const [usernamesText, setUsernamesText] = useState("");
+  const [batchPolicy, setBatchPolicy] =
+    useState<TierTrialBatchConflictPolicy>("skip");
 
   const parsedDays = Number(days);
   const isValidDuration =
     Number.isInteger(parsedDays) &&
     parsedDays >= MIN_TIER_TRIAL_DAYS &&
     parsedDays <= MAX_TIER_TRIAL_DAYS;
+
+  const usernames = isBatch ? parseUsernameList(usernamesText) : [];
+  const duplicateCount = countDuplicateUsernames(usernames);
+  const isOverBatchLimit = usernames.length > MAX_TIER_TRIAL_BATCH_SIZE;
+  const isValidBatch = usernames.length > 0 && !isOverBatchLimit;
 
   // Extending keeps the open trial's tier, so the two controls cannot disagree.
   const isExtending = !!existing && onExistingTrial === "extend";
@@ -136,6 +185,28 @@ export default function TierTrialDialog({
     // A different tier is a replacement, not a top-up — say so rather than
     // letting the save be refused for a contradiction the form allowed.
     if (existing && next !== existing.tier) setOnExistingTrial("replace");
+  };
+
+  const submit = () => {
+    if (props.mode === "batch") {
+      props.onSubmit({
+        usernames,
+        tier,
+        durationDays: parsedDays,
+        giftMessage: giftMessage.trim() || undefined,
+        reason: reason.trim() || undefined,
+        onExistingTrial: batchPolicy,
+      });
+      return;
+    }
+
+    props.onSubmit({
+      tier: effectiveTier,
+      durationDays: parsedDays,
+      giftMessage: giftMessage.trim() || undefined,
+      reason: reason.trim() || undefined,
+      ...(existing ? { onExistingTrial } : {}),
+    });
   };
 
   return (
@@ -150,14 +221,74 @@ export default function TierTrialDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gift className="h-4 w-4 text-gray-400" />
-            Gift a tier trial to {username}
+            {isBatch
+              ? "Gift a tier trial to a list of users"
+              : `Gift a tier trial to ${username}`}
           </DialogTitle>
           <DialogDescription>
-            They keep their points and FUSE balance exactly as they are. The
-            trial grants its tier on top for its duration, and the countdown
-            starts when they activate it — not now.
+            {isBatch ? "They all keep" : "They keep"} their points and FUSE
+            balance exactly as they are. The trial grants its tier on top for
+            its duration, and the countdown starts when they activate it — not
+            now.
           </DialogDescription>
         </DialogHeader>
+
+        {isBatch && (
+          <div className="space-y-2">
+            <Label htmlFor="tier-trial-usernames">Usernames</Label>
+            <Textarea
+              id="tier-trial-usernames"
+              value={usernamesText}
+              onChange={(event) => setUsernamesText(event.target.value)}
+              rows={8}
+              spellCheck={false}
+              placeholder={"jane\njohn.doe\nsatoshi"}
+              disabled={isSaving}
+              className="font-mono text-xs"
+            />
+            {isOverBatchLimit ? (
+              <p className="text-xs text-red-600">
+                {usernames.length} usernames — one batch carries at most{" "}
+                {MAX_TIER_TRIAL_BATCH_SIZE}. Split the list and run it twice.
+              </p>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                One per line, up to {MAX_TIER_TRIAL_BATCH_SIZE}. Blank lines and
+                a leading &ldquo;@&rdquo; are ignored.
+                {usernames.length > 0 &&
+                  ` ${usernames.length} name${usernames.length === 1 ? "" : "s"} so far`}
+                {duplicateCount > 0 &&
+                  `, ${duplicateCount} of them repeated — each is gifted once`}
+                {usernames.length > 0 && "."}
+              </p>
+            )}
+          </div>
+        )}
+
+        {isBatch && (
+          <div className="space-y-2">
+            <Label>If they already have a trial</Label>
+            <div className="flex gap-2">
+              {BATCH_POLICIES.map(({ policy, label, blurb }) => (
+                <Choice
+                  key={policy}
+                  selected={batchPolicy === policy}
+                  disabled={isSaving}
+                  onClick={() => setBatchPolicy(policy)}
+                >
+                  <span className="font-medium">{label}</span>
+                  <span className="block text-xs text-gray-500">{blurb}</span>
+                </Choice>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Asked once for the whole list — nobody is going to answer it per
+              user.
+              {batchPolicy === "extend" &&
+                " Extending only adds days at the tier a user's trial already grants, so anyone on the other tier is reported as failed rather than upgraded."}
+            </p>
+          </div>
+        )}
 
         {existing && (
           <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">
@@ -270,7 +401,7 @@ export default function TierTrialDialog({
           <Label htmlFor="tier-trial-message">
             Gift message{" "}
             <span className="text-muted-foreground">
-              (optional, shown to the user)
+              (optional, shown to the user{isBatch ? "s" : ""})
             </span>
           </Label>
           <Textarea
@@ -282,8 +413,9 @@ export default function TierTrialDialog({
             disabled={isSaving}
           />
           <p className="text-muted-foreground text-xs">
-            They see this on the gift card in the app. Leave it empty for the
-            app&apos;s own copy.
+            {isBatch
+              ? "Every user in the list sees this same note on the gift card in the app. Leave it empty for the app's own copy."
+              : "They see this on the gift card in the app. Leave it empty for the app's own copy."}
           </p>
         </div>
 
@@ -315,22 +447,16 @@ export default function TierTrialDialog({
             Cancel
           </Button>
           <Button
-            onClick={() =>
-              onSubmit({
-                tier: effectiveTier,
-                durationDays: parsedDays,
-                giftMessage: giftMessage.trim() || undefined,
-                reason: reason.trim() || undefined,
-                ...(existing ? { onExistingTrial } : {}),
-              })
-            }
-            disabled={isSaving || !isValidDuration}
+            onClick={submit}
+            disabled={isSaving || !isValidDuration || (isBatch && !isValidBatch)}
             className="cursor-pointer"
           >
             {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isExtending
-              ? `Add ${isValidDuration ? parsedDays : ""} days`
-              : "Send gift"}
+            {isBatch
+              ? `Send ${isValidBatch ? usernames.length : ""} gift${usernames.length === 1 ? "" : "s"}`
+              : isExtending
+                ? `Add ${isValidDuration ? parsedDays : ""} days`
+                : "Send gift"}
           </Button>
         </DialogFooter>
       </DialogContent>

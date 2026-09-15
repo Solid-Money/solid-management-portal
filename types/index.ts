@@ -1265,6 +1265,57 @@ export interface IssueTierTrialResult {
   extendedTrialId?: string;
 }
 
+/**
+ * What a batch does about the users in it who already hold a trial.
+ *
+ * A single gift asks about the one trial on the screen; a batch is issued
+ * blind, so the answer is decided once for everyone. Skipping is the default
+ * because it is the only one of the three that cannot take something away from
+ * a user the operator never looked at.
+ */
+export type TierTrialBatchConflictPolicy = "skip" | "replace" | "extend";
+
+/** The same trial, gifted to a list of users named by username. */
+export interface BatchIssueTierTrialRequest {
+  usernames: string[];
+  tier: GiftableTier;
+  durationDays: number;
+  giftMessage?: string;
+  reason?: string;
+  onExistingTrial?: TierTrialBatchConflictPolicy;
+}
+
+/** What became of one line of a batch. */
+export type TierTrialBatchOutcome =
+  | "gifted"
+  | "extended"
+  | "replaced"
+  | "skipped"
+  | "not_found"
+  | "duplicate"
+  | "failed";
+
+/** One line of the batch and what happened to it. */
+export interface TierTrialBatchRow {
+  /** The username as it was typed, so the operator can find their own line. */
+  username: string;
+  outcome: TierTrialBatchOutcome;
+  userId?: string;
+  trialId?: string;
+  /** Why it was skipped or failed. */
+  message?: string;
+}
+
+/** The outcome of a batch: every line, and the totals over them. */
+export interface BatchIssueTierTrialResult {
+  /** Ties every audit row this batch wrote back together. */
+  batchId: string;
+  /** One row per line submitted, in the order they were given. */
+  rows: TierTrialBatchRow[];
+  /** How many lines ended in each outcome. Every outcome is present. */
+  summary: Record<TierTrialBatchOutcome, number>;
+}
+
 export interface CashbackEntry {
   _id: string;
   transactionId: string;
