@@ -144,6 +144,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Gift,
       },
       {
+        href: "/tier-trials",
+        label: "Tier Trials",
+        description: "Gift Prime or Ultra to a list of users at once",
+        icon: Sparkles,
+      },
+      {
         href: "/fees-config",
         label: "Fees",
         description: "Per-tier fee rates on every product we charge on",
