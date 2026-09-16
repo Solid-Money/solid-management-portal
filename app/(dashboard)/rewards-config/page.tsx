@@ -7,6 +7,7 @@ import {
   CreditCard,
   Eye,
   Gift,
+  KeyRound,
   Mail,
   Percent,
   RefreshCw,
@@ -148,6 +149,26 @@ export default function RewardsConfigPage() {
         tier3Amount: Number(config.fuseStaking.tier3Amount),
       },
       "fuseStaking",
+    );
+  };
+
+  const saveTierMembershipConfig = async () => {
+    if (!config) return;
+
+    await saveSection(
+      "Tier Membership",
+      "tier-membership",
+      {
+        pointsUnlockEnabled: config.tierMembership.pointsUnlockEnabled,
+        lockEnabled: config.tierMembership.lockEnabled,
+        lockDurationDays: Number(config.tierMembership.lockDurationDays),
+        subscriptionEnabled: config.tierMembership.subscriptionEnabled,
+        primeAnnualUsd: Number(config.tierMembership.primeAnnualUsd),
+        ultraAnnualUsd: Number(config.tierMembership.ultraAnnualUsd),
+        graceDays: Number(config.tierMembership.graceDays),
+        renewalNoticeDays: Number(config.tierMembership.renewalNoticeDays),
+      },
+      "tierMembership",
     );
   };
 
@@ -1150,6 +1171,107 @@ export default function RewardsConfigPage() {
           >
             <Save className="h-4 w-4 mr-2" />
             Save FUSE Staking Config
+          </button>
+        </ConfigSection>
+
+        {/* Tier Membership (rewards v3) */}
+        <ConfigSection
+          title="Tier Membership (v3)"
+          description="How a tier is bought: lock FUSE for a term, or pay an annual fee in USDC. The FUSE amounts are the ones above — a tier costs the same FUSE whether it is held or locked."
+          icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
+        >
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <strong>Both routes need their contract deployed first.</strong> A
+            route with no address configured stays hidden in the app whatever
+            this switch says, so turning one on before its deployment is safe
+            but does nothing.
+          </div>
+
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <ToggleField
+              label="Points Still Unlock Tiers"
+              value={config.tierMembership.pointsUnlockEnabled}
+              onChange={(v) =>
+                updateConfig("tierMembership", "pointsUnlockEnabled", v)
+              }
+              tooltip="The v3 rollback switch. Off retires the points ladder — a tier can then only be bought. Leave ON until both purchase routes are live, or nobody can reach a tier at all."
+            />
+            <ToggleField
+              label="FUSE Lock Enabled"
+              value={config.tierMembership.lockEnabled}
+              onChange={(v) => updateConfig("tierMembership", "lockEnabled", v)}
+              tooltip="Whether locking FUSE for a term buys a tier. Locks already taken keep their own term and are unaffected by turning this off."
+            />
+            <ToggleField
+              label="Annual Fee Enabled"
+              value={config.tierMembership.subscriptionEnabled}
+              onChange={(v) =>
+                updateConfig("tierMembership", "subscriptionEnabled", v)
+              }
+              tooltip="Whether a tier can be bought with an annual USDC fee. Off stops new sign-ups; memberships already running keep billing until they are cancelled."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InputField
+              label="Lock Duration"
+              value={config.tierMembership.lockDurationDays}
+              onChange={(v) =>
+                handleNumericUpdate("tierMembership", "lockDurationDays", v)
+              }
+              type="number"
+              suffix="days"
+              tooltip="The term a NEW lock carries. Each lock stores its own expiry, so raising this cannot extend a commitment a user has already made."
+            />
+            <InputField
+              label="Prime Annual Fee"
+              value={config.tierMembership.primeAnnualUsd}
+              onChange={(v) =>
+                handleNumericUpdate("tierMembership", "primeAnnualUsd", v)
+              }
+              type="number"
+              suffix="USD"
+              tooltip="0 means Prime cannot be bought for cash — only by locking FUSE. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
+            />
+            <InputField
+              label="Ultra Annual Fee"
+              value={config.tierMembership.ultraAnnualUsd}
+              onChange={(v) =>
+                handleNumericUpdate("tierMembership", "ultraAnnualUsd", v)
+              }
+              type="number"
+              suffix="USD"
+              tooltip="0 by default: Ultra is held by locking FUSE, not by paying. Set a price only if Ultra is to be sold for cash too."
+            />
+            <InputField
+              label="Grace Period"
+              value={config.tierMembership.graceDays}
+              onChange={(v) =>
+                handleNumericUpdate("tierMembership", "graceDays", v)
+              }
+              type="number"
+              suffix="days"
+              tooltip="How long a membership keeps its tier after a renewal charge first fails. The usual cause is a Safe briefly short of USDC; the charge is retried on a backoff throughout."
+            />
+            <InputField
+              label="Renewal Notice"
+              value={config.tierMembership.renewalNoticeDays}
+              onChange={(v) =>
+                handleNumericUpdate("tierMembership", "renewalNoticeDays", v)
+              }
+              type="number"
+              suffix="days"
+              tooltip="How far ahead of a renewal the user is told it is coming."
+            />
+          </div>
+
+          <button
+            onClick={saveTierMembershipConfig}
+            disabled={saving || !hasChanges("tierMembership")}
+            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Tier Membership Config
           </button>
         </ConfigSection>
       </div>
