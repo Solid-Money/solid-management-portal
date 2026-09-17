@@ -30,19 +30,40 @@ interface VisibleColumns {
   usdc: boolean;
   usdt: boolean;
   soUsd: boolean;
+  soFuse: boolean;
 }
 
 const isActive = (status?: BalanceStatus): boolean =>
   status != null && status !== "N/A";
 
+/**
+ * Every non-gas token status on a chain.
+ *
+ * The severity checks below used to spell out each asset by name, in five
+ * places, which meant adding one (soFUSE, the referral payout float) silently
+ * left a chain that was critical on it looking healthy in four of them.
+ */
+const chainTokenStatuses = (
+  chain: ChainBalance,
+): (BalanceStatus | undefined)[] => [
+  chain.usdcStatus,
+  chain.usdtStatus,
+  chain.soUsdStatus,
+  chain.soFuseStatus,
+];
+
+/** Every status on a chain, gas included. */
+const chainStatuses = (chain: ChainBalance): (BalanceStatus | undefined)[] => [
+  chain.gasStatus,
+  ...chainTokenStatuses(chain),
+];
+
+const chainHasStatus = (chain: ChainBalance, status: BalanceStatus): boolean =>
+  chainStatuses(chain).some((value) => value === status);
+
 /** Every token status on a wallet, across all of its chains. */
 const walletStatuses = (wallet: WalletInfo): (BalanceStatus | undefined)[] =>
-  wallet.chains.flatMap((chain) => [
-    chain.gasStatus,
-    chain.usdcStatus,
-    chain.usdtStatus,
-    chain.soUsdStatus,
-  ]);
+  wallet.chains.flatMap(chainStatuses);
 
 const hasStatus = (wallet: WalletInfo, status: BalanceStatus): boolean =>
   walletStatuses(wallet).some((value) => value === status);
@@ -130,6 +151,7 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
     usdc: chains.some((c) => isActive(c.usdcStatus)),
     usdt: chains.some((c) => isActive(c.usdtStatus)),
     soUsd: chains.some((c) => isActive(c.soUsdStatus)),
+    soFuse: chains.some((c) => isActive(c.soFuseStatus)),
   });
 
   const getStatusWithText = (status: string) => {
@@ -220,16 +242,9 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
     const hasUsdc = isActive(chain.usdcStatus);
     const hasUsdt = isActive(chain.usdtStatus);
     const hasSoUsd = isActive(chain.soUsdStatus);
-    const isCritical =
-      chain.gasStatus === "CRITICAL" ||
-      chain.usdcStatus === "CRITICAL" ||
-      chain.usdtStatus === "CRITICAL" ||
-      chain.soUsdStatus === "CRITICAL";
-    const isLow =
-      chain.gasStatus === "LOW" ||
-      chain.usdcStatus === "LOW" ||
-      chain.usdtStatus === "LOW" ||
-      chain.soUsdStatus === "LOW";
+    const hasSoFuse = isActive(chain.soFuseStatus);
+    const isCritical = chainHasStatus(chain, "CRITICAL");
+    const isLow = chainHasStatus(chain, "LOW");
 
     const rowClasses = isCritical
       ? "border-t border-red-300 bg-red-50"
@@ -247,6 +262,12 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
         (chain.gasStatus === "LOW" || chain.gasStatus === "CRITICAL")
       ) {
         needs.push(`${chain.gasThreshold} ${chain.gasTokenSymbol}`);
+      }
+      if (
+        hasSoFuse &&
+        (chain.soFuseStatus === "LOW" || chain.soFuseStatus === "CRITICAL")
+      ) {
+        needs.push(`${chain.soFuseThreshold} soFUSE`);
       }
       if (
         hasSoUsd &&
@@ -318,6 +339,14 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
             )}
           </td>
         )}
+        {columns.soFuse &&
+          renderTokenCell(
+            chain.soFuseStatus,
+            chain.soFuseBalance,
+            chain.soFuseThreshold,
+            "soFUSE"
+          )}
+        {columns.soFuse && renderAddressCell(chain.soFuseAddress, isCritical)}
         {columns.soUsd &&
           renderTokenCell(
             chain.soUsdStatus,
@@ -433,20 +462,8 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
         {filteredWallets.map((wallet: WalletInfo) => {
           const isExpanded = expandedWallets.has(wallet.name);
           const columns = getVisibleColumns(wallet.chains);
-          const hasCritical = wallet.chains.some(
-            (chain) =>
-              chain.gasStatus === "CRITICAL" ||
-              chain.usdcStatus === "CRITICAL" ||
-              chain.usdtStatus === "CRITICAL" ||
-              chain.soUsdStatus === "CRITICAL"
-          );
-          const hasLow = wallet.chains.some(
-            (chain) =>
-              chain.gasStatus === "LOW" ||
-              chain.usdcStatus === "LOW" ||
-              chain.usdtStatus === "LOW" ||
-              chain.soUsdStatus === "LOW"
-          );
+          const hasCritical = hasStatus(wallet, "CRITICAL");
+          const hasLow = hasStatus(wallet, "LOW");
           const needsTopUp = wallet.chains.some((chain) => chain.needsTopUp);
           const isAllOk = !hasCritical && !hasLow;
 
@@ -581,6 +598,16 @@ export default function WalletsTable({ filter }: { filter: WalletFilter }) {
                         {columns.gas && (
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                             Gas
+                          </th>
+                        )}
+                        {columns.soFuse && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            soFUSE
+                          </th>
+                        )}
+                        {columns.soFuse && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            soFUSE Address
                           </th>
                         )}
                         {columns.soUsd && (

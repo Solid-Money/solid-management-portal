@@ -19,6 +19,7 @@ import {
   formatLatency,
 } from "@/types/analytics-charts";
 
+import { formatUsd } from "@/lib/utils";
 interface WithdrawalLatencyChartProps {
   data: WithdrawalLatencyResponse;
   height?: number;
@@ -85,13 +86,13 @@ function CustomTooltip({
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Total Value</span>
           <span className="font-medium text-emerald-600">
-            ${bucket.totalAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(bucket.totalAmount, 0)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Avg Transaction</span>
           <span className="font-medium text-blue-600">
-            ${avgTransaction.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(avgTransaction, 0)}
           </span>
         </div>
       </div>

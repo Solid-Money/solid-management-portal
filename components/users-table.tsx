@@ -19,6 +19,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
+import { formatDateTime } from "@/lib/utils";
 export default function UsersTable() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -268,8 +269,8 @@ export default function UsersTable() {
                             {user.referredBy.username}
                           </span>
                           <span className="text-xs text-gray-400">
-                            {new Date(user.createdAt).toLocaleString(
-                              undefined,
+                            {formatDateTime(
+                              user.createdAt,
                               {
                                 month: "short",
                                 day: "numeric",
@@ -336,26 +337,11 @@ export default function UsersTable() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.lastActivityTimestamp
-                        ? new Date(user.lastActivityTimestamp).toLocaleString(
-                            undefined,
-                            {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
+                        ? formatDateTime(user.lastActivityTimestamp)
                         : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(user.createdAt).toLocaleString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTime(user.createdAt)}
                     </td>
                   </tr>
                 ))

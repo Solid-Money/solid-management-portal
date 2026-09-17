@@ -19,6 +19,7 @@ import {
   ANALYTICS_CHART_COLORS,
 } from "@/types/analytics-charts";
 
+import { formatUsd } from "@/lib/utils";
 interface BridgeActivityChartProps {
   data: BridgeActivityResponse;
   height?: number;
@@ -69,7 +70,7 @@ function CustomTooltip({
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Volume</span>
           <span className="font-medium text-blue-600">
-            ${item.totalValueUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(item.totalValueUsd, 0)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
@@ -85,13 +86,13 @@ function CustomTooltip({
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Avg per User</span>
           <span className="font-medium text-gray-700">
-            ${avgPerUser.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({bridgesPerUser.toFixed(1)} bridges)
+            {formatUsd(avgPerUser, 0)} ({bridgesPerUser.toFixed(1)} bridges)
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Avg Transaction</span>
           <span className="font-medium text-gray-700">
-            ${avgTransaction.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(avgTransaction, 0)}
           </span>
         </div>
       </div>
@@ -115,7 +116,7 @@ function BridgeSummary({
       <div className="text-center p-3 bg-blue-50 rounded-lg">
         <p className="text-xs text-blue-600">Total Volume</p>
         <p className="text-sm font-semibold text-blue-700">
-          ${summary.totalValueUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          {formatUsd(summary.totalValueUsd, 0)}
         </p>
       </div>
       <div className="text-center p-3 bg-emerald-50 rounded-lg">
@@ -133,7 +134,10 @@ function BridgeSummary({
       <div className="text-center p-3 bg-amber-50 rounded-lg">
         <p className="text-xs text-amber-600">Avg per User</p>
         <p className="text-sm font-semibold text-amber-700">
-          ${(summary.totalValueUsd / Math.max(1, summary.uniqueUsers)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          {formatUsd(
+            summary.totalValueUsd / Math.max(1, summary.uniqueUsers),
+            0
+          )}
         </p>
       </div>
     </div>

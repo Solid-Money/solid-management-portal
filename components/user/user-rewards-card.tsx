@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Gift, Loader2, Sparkles } from "lucide-react";
 
 import { getUserRewards } from "@/lib/api";
+import { tierTrialRemaining } from "@/lib/tier-trial";
 import { UserRewardsData } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,6 +151,23 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
                     staked → {rewards.fuseSkipLine.unlockedTier}
                   </Badge>
                 )}
+              {/* The tier above can be a trial rather than something they
+                  earned, which is the first thing to know when the tier and the
+                  points next to it don't line up. */}
+              {rewards.activeTierTrial && (
+                <Badge variant="success">
+                  <Sparkles className="h-3 w-3" />
+                  {rewards.activeTierTrial.tier} trial ·{" "}
+                  {tierTrialRemaining(rewards.activeTierTrial)}
+                </Badge>
+              )}
+              {rewards.pendingTierTrial && (
+                <Badge variant="warning">
+                  <Gift className="h-3 w-3" />
+                  {rewards.pendingTierTrial.durationDays} days of{" "}
+                  {rewards.pendingTierTrial.tier} waiting to be activated
+                </Badge>
+              )}
             </div>
           </div>
         )}

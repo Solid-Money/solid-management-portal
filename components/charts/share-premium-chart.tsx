@@ -18,6 +18,7 @@ import {
   ANALYTICS_CHART_COLORS,
 } from "@/types/analytics-charts";
 
+import { formatUsd } from "@/lib/utils";
 interface SharePremiumChartProps {
   data: SharePremiumResponse;
   height?: number;
@@ -107,13 +108,13 @@ function CustomTooltip({
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Total Deposited</span>
           <span className="font-medium text-blue-600">
-            ${item.totalDepositAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(item.totalDepositAmount, 0)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Avg Deposit</span>
           <span className="font-medium text-gray-700">
-            ${avgDeposit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(avgDeposit, 0)}
           </span>
         </div>
       </div>

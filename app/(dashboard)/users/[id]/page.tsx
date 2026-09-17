@@ -13,10 +13,12 @@ import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
 import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
+import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
+import UserTierTrialCard from "@/components/user/user-tier-trial-card";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -218,6 +220,13 @@ export default function UserDetailPage({
             />
             <UserCashbackCard userId={id} />
           </div>
+          {/* Next to the spending table, because a rate set on one transaction
+              beats this one and is edited from a row down there. */}
+          <UserCashbackRateCard
+            userId={id}
+            username={displayName}
+            cashbackPercentage={user.cashbackPercentage}
+          />
           <div>
             <h2 className="mb-2 text-sm font-semibold text-gray-900">
               Card spending
@@ -228,6 +237,14 @@ export default function UserDetailPage({
 
         <TabsContent value="rewards" className="space-y-4">
           <UserRewardsCard userId={id} />
+          {/* Directly under the tier it can override: a running trial is why
+              the tier above may not match the points next to it. */}
+          <UserTierTrialCard userId={id} username={displayName} />
+          <UserCashbackRateCard
+            userId={id}
+            username={displayName}
+            cashbackPercentage={user.cashbackPercentage}
+          />
           <UserCashbackCard userId={id} />
         </TabsContent>
 

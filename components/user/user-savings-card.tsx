@@ -10,19 +10,47 @@ import { Badge } from "@/components/ui/badge";
 
 const VAULT_META: Record<
   VaultKey,
-  { token: string; unit: string; decimals: number }
+  { token: string; decimals: number; valueDecimals: number }
 > = {
-  USDC: { token: "soUSD", unit: "USDC", decimals: 2 },
-  FUSE: { token: "soFUSE", unit: "FUSE", decimals: 2 },
-  ETH: { token: "soETH", unit: "ETH", decimals: 4 },
+  USDC: { token: "soUSD", decimals: 2, valueDecimals: 2 },
+  FUSE: { token: "soFUSE", decimals: 2, valueDecimals: 2 },
+  ETH: { token: "soETH", decimals: 4, valueDecimals: 6 },
 };
 
-function usd(value?: string | number): string {
+function toNumber(value?: string | number): number {
   const num = Number(value ?? 0);
-  return `$${(Number.isFinite(num) ? num : 0).toLocaleString("en-US", {
+  return Number.isFinite(num) ? num : 0;
+}
+
+function usd(value?: string | number): string {
+  return `$${toNumber(value).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+/**
+ * A vault figure in the unit it is actually denominated in.
+ *
+ * Only soUSD reports dollars. soFUSE reports FUSE and soETH reports ETH, so
+ * rendering either with a `$` overstated the position by the whole token price
+ * — a 5,120 FUSE position (~$18) read as $5,120.
+ */
+function denominated(
+  value: string | number | undefined,
+  symbol: string,
+  decimals: number
+): string {
+  if (symbol === "USD") return usd(value);
+  return `${toNumber(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimals,
+  })} ${symbol}`;
+}
+
+/** What the backend says this vault's figures are in, with a safe default. */
+function unitOf(vault: SavingsVaultResult): string {
+  return vault.underlyingSymbol ?? (vault.vault === "USDC" ? "USD" : vault.vault);
 }
 
 /**
@@ -40,9 +68,22 @@ export default function UserSavingsCard({ userId }: { userId: string }) {
   });
 
   const vaults = data?.data ?? [];
+
+  // Every vault priced into dollars before totalling. Summing the raw figures
+  // would add FUSE and ETH to dollars as if all three were the same unit.
   const totalUsd = vaults.reduce(
-    (sum, vault) => sum + Number(vault.summary?.totalValueUSD ?? 0),
+    (sum, vault) =>
+      sum +
+      toNumber(vault.summary?.totalValueUSD) * (vault.underlyingPriceUsd ?? 0),
     0
+  );
+
+  // A vault holding something we could not price is missing from that total,
+  // so the total is shown as a floor rather than as the whole picture.
+  const totalIsPartial = vaults.some(
+    (vault) =>
+      vault.underlyingPriceUsd == null &&
+      toNumber(vault.summary?.totalValueUSD) > 0
   );
 
   return (
@@ -53,7 +94,15 @@ export default function UserSavingsCard({ userId }: { userId: string }) {
           Savings
         </CardTitle>
         {!isLoading && vaults.length > 0 && (
-          <span className="text-sm font-semibold text-gray-900">
+          <span
+            className="text-sm font-semibold text-gray-900"
+            title={
+              totalIsPartial
+                ? "At least one vault could not be priced and is missing from this total."
+                : undefined
+            }
+          >
+            {totalIsPartial ? "≥ " : ""}
             {usd(totalUsd)}
           </span>
         )}
@@ -68,7 +117,8 @@ export default function UserSavingsCard({ userId }: { userId: string }) {
         ) : vaults.length === 0 ? (
           <p className="text-sm text-gray-500">No savings data available.</p>
         ) : (
-          vaults.map(({ vault, summary, error: vaultError }) => {
+          vaults.map((result) => {
+            const { vault, summary, error: vaultError } = result;
             const meta = VAULT_META[vault];
             if (!summary) {
               return (
@@ -82,8 +132,18 @@ export default function UserSavingsCard({ userId }: { userId: string }) {
               );
             }
 
-            const shares = Number(summary.balanceShares || 0);
-            const interest = Number(summary.interestEarnedUSD || 0);
+            const shares = toNumber(summary.balanceShares);
+            const interest = toNumber(summary.interestEarnedUSD);
+            const unit = unitOf(result);
+            const price = result.underlyingPriceUsd;
+            const amount = (value: string | number | undefined) =>
+              denominated(value, unit, meta.valueDecimals);
+            // The dollar line only earns its place where the figures above it
+            // are not already dollars.
+            const valueUsd =
+              unit === "USD" || price == null
+                ? null
+                : toNumber(summary.totalValueUSD) * price;
 
             return (
               <div
@@ -110,8 +170,18 @@ export default function UserSavingsCard({ userId }: { userId: string }) {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-gray-900">
-                      {usd(summary.totalValueUSD)}
+                      {amount(summary.totalValueUSD)}
                     </p>
+                    {valueUsd !== null && (
+                      <p className="text-[11px] text-gray-500">
+                        ≈ {usd(valueUsd)}
+                      </p>
+                    )}
+                    {unit !== "USD" && price == null && (
+                      <p className="text-[11px] text-amber-600">
+                        No {unit} price
+                      </p>
+                    )}
                     <p className="flex items-center justify-end gap-1 text-[11px] text-gray-500">
                       <TrendingUp className="h-3 w-3" />
                       {summary.apyPercent.toFixed(2)}% APY
@@ -119,13 +189,13 @@ export default function UserSavingsCard({ userId }: { userId: string }) {
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
-                  <span>Deposited {usd(summary.actualDepositedUSD)}</span>
+                  <span>Deposited {amount(summary.actualDepositedUSD)}</span>
                   <span
                     className={
                       interest >= 0 ? "text-emerald-600" : "text-red-600"
                     }
                   >
-                    Interest {usd(interest)}
+                    Interest {amount(interest)}
                   </span>
                   <span>{summary.activityCount} activities</span>
                   {summary.lastDepositAt && (

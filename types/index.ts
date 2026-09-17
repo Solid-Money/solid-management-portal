@@ -27,12 +27,51 @@ export interface User {
     createdAt: string;
   }[];
   hasRainCard?: boolean;
+  /**
+   * Card cashback rate pinned to this cardholder, as a fraction — 0.03 is 3%.
+   * Overrides their tier's rate for every purchase from now on. Absent means no
+   * override; 0 means an operator decided they earn nothing.
+   */
+  cashbackPercentage?: number;
   /** The user's primary card, or null when they have none. */
   card?: {
     provider: string;
     status: string;
     frozen: boolean;
   } | null;
+}
+
+/**
+ * Which of the three configurable levels decided a cashback rate. Mirrors
+ * `CashbackPercentageSource` in accounts-service.
+ */
+export type CashbackPercentageSource = "Transaction" | "User" | "Tier";
+
+export const CASHBACK_PERCENTAGE_SOURCE_LABELS: Record<string, string> = {
+  Transaction: "this transaction",
+  User: "this user",
+  Tier: "tier default",
+};
+
+/** What the backend reports after pinning or clearing a cardholder's rate. */
+export interface SetUserCashbackPercentageResult {
+  userId: string;
+  percentage: number | null;
+  previousPercentage: number | null;
+  tierPercentage: number;
+  effectivePercentage: number;
+}
+
+/** What the backend reports after pinning or clearing one purchase's rate. */
+export interface SetTransactionCashbackPercentageResult {
+  transactionId: string;
+  percentage: number | null;
+  previousPercentage: number | null;
+  /** Whether the purchase's own cashback row was re-priced too. */
+  repriced: boolean;
+  /** Why it was not, when it was not — an already-paid row, or none yet. */
+  repricedReason?: string;
+  cashbackPercentage?: number;
 }
 
 export interface DepositTransactionRecord {
@@ -534,11 +573,20 @@ export interface ChainBalance {
   usdtThreshold?: string;
   usdtStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   usdtAddress?: string;
-  // soUSD is the reward payout asset (cashback, bonuses, referrals) on Fuse.
+  // soUSD is the reward payout asset (cashback, bonuses) on Fuse. Referral
+  // cashback pays in soFUSE instead, so on the referral payout wallet the
+  // soUSD balance only covers rewards earned before that switch.
   soUsdBalance?: string;
   soUsdThreshold?: string;
   soUsdStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   soUsdAddress?: string;
+  // soFUSE, the FUSE vault share: the referral cashback payout float. Top it up
+  // by depositing FUSE to the soFUSE vault from the payout wallet — the gas
+  // balance above is only the transfers' gas.
+  soFuseBalance?: string;
+  soFuseThreshold?: string;
+  soFuseStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  soFuseAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
@@ -583,6 +631,13 @@ export interface CardTransactionCashback {
   /** "Cashback" or "SubscriptionDiscount". */
   type?: string;
   merchantName?: string;
+  /**
+   * The rate this row was created at, as a fraction, and which of the three
+   * levels set it. This is what the payout will use — not whatever the config
+   * says by the time the escrow matures.
+   */
+  cashbackPercentage?: number;
+  cashbackPercentageSource?: CashbackPercentageSource;
 }
 
 /**
@@ -632,6 +687,15 @@ export interface CardTransaction {
   localAmount?: string;
   localCurrency?: string;
   cashback?: CardTransactionCashback;
+  /**
+   * Cashback rate pinned to this one purchase, as a fraction. Outranks the
+   * cardholder's own rate and their tier's. Lives on the transaction rather
+   * than the cashback row so a purchase can be priced before it settles.
+   */
+  cashbackPercentage?: number;
+  /** Admin email that last set it, and when. */
+  cashbackPercentageSetBy?: string;
+  cashbackPercentageSetAt?: string;
   /** Card fees charged for this spend; empty when none applied. */
   fees?: CardTransactionFee[];
   /** Sum of the fees Rain actually accepted, in USD. */
@@ -822,7 +886,11 @@ export interface SubscriptionDiscountConfig {
   /** @deprecated Legacy flat service list; detection uses categories. */
   eligibleServices: string[];
   categories: SubscriptionDiscountCategory[];
-  /** First N dollars of an eligible charge that earn the discount. */
+  /**
+   * Most subscription cashback one eligible service can earn in a month, in USD
+   * (Rewards Terms §5). Caps the cashback, not the charge it is earned on; the
+   * name is left from an earlier reading and is what the API still sends.
+   */
   eligibleAmountCap: number;
   tier1: TierSubscriptionDiscountConfig;
   tier2: TierSubscriptionDiscountConfig;
@@ -890,8 +958,8 @@ export interface PointsEarningConfig {
   cardBalancePointsPerDollarPerHour: number;
 }
 
-/** One fee category's per-tier rates, as fractions (0.0099 = 0.99%). */
-export interface CardFeeRates {
+/** One product's per-tier rates, as fractions (0.005 = 0.5%). */
+export interface FeeRates {
   enabled: boolean;
   tier1: number;
   tier2: number;
@@ -899,22 +967,34 @@ export interface CardFeeRates {
 }
 
 /**
- * Per-tier card fees — the revenue side of the tier system.
+ * Per-tier product fees — the revenue side of the tier system.
  *
- * Fees apply only at the edges of the product: converting currency, and moving
- * money off the card. Holding and spending in USD is free on every tier, and
- * there is deliberately no monthly-fee field — no competitor in the benchmark
- * charges its free tier one, and the tier story is "stake FUSE and you'll pay no
- * fees". Swap fees are absent because swaps happen in our own app, not on the
- * card, so Rain has no charge surface for them.
+ * Fees apply only at the edges of the product: swapping tokens, converting
+ * currency, and moving money in or out. Holding and spending in USD is free on
+ * every tier, and there is deliberately no monthly-fee field — no competitor in
+ * the benchmark charges its free tier one, and the tier story is "stake FUSE
+ * and every fee drops to zero".
  */
-export interface CardFeesConfig {
-  /** Master kill-switch: when false, no card fee is ever charged. */
+export interface ProductFeesConfig {
+  /** Master kill-switch: when false, no product fee is ever charged. */
   enabled: boolean;
+  /** Charged on in-app swaps, taken from the source token on-chain. */
+  swap: FeeRates;
+  /** Charged on stock trades, taken from the sell side in the CoW batch. */
+  stocks: FeeRates;
   /** Charged when a purchase settles in a currency other than the card's. */
-  fx: CardFeeRates;
-  /** Charged when funds are moved off the card. */
-  offRamp: CardFeeRates;
+  fx: FeeRates;
+  /**
+   * Charged when funds leave Solid for a bank account, card off-ramp included.
+   *
+   * Named `offRamp` because that is the key it is stored under: the product
+   * started as the card off-ramp before it grew to cover every withdrawal rail.
+   */
+  offRamp: FeeRates;
+  /** Charged on fiat arriving from a bank, withheld from the amount credited. */
+  bankDeposit: FeeRates;
+  /** Charged on a settled TransFi buy-crypto order. */
+  transfi: FeeRates;
   /** Computed fees below this (USD) are waived rather than charged. */
   minChargeUsd: number;
 }
@@ -928,7 +1008,7 @@ export interface FullRewardsConfig {
   referral: ReferralConfig;
   referralCashback: ReferralCashbackConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
-  cardFees: CardFeesConfig;
+  productFees: ProductFeesConfig;
 }
 
 // Campaign Types
@@ -975,8 +1055,60 @@ export interface UserCardOverview {
    */
   freezeInitiator?: "customer" | "developer" | "bridge";
   balanceUsd: number;
+  /** Why a Wirex card's balance is what it is. Wirex cards only. */
+  wirexSpend?: WirexSpendContext;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * The state behind a Wirex card's spending power.
+ *
+ * A Wirex card is never funded — it spends the cardholder's own assets where
+ * they sit, through `SolidCashModule` on their Safe — so its "Card balance" is
+ * whatever the module will release for the next tap. A $0 there has several
+ * different causes with opposite answers for support: nothing to spend
+ * (deposit), a spent cap (wait for the window to roll), revoked module consent
+ * (re-enable in the app), a guardian pause (arrears or a fraud hold), or
+ * everything committed to charges Wirex has not settled yet (wait). These are
+ * the figures that tell them apart.
+ *
+ * Mirrors `AdminWirexSpendContext` in accounts-service. Absent when the chain
+ * state could not be read, so an empty panel means "we could not check" rather
+ * than "this user has nothing".
+ */
+export interface WirexSpendContext {
+  /**
+   * What the card can spend right now: the live value of every allowlisted
+   * asset the Safe holds (USDC, USDT, soUSD), already clamped by the rolling
+   * caps and net of unsettled authorizations. The next tap is decided
+   * against this number.
+   */
+  spendableUsd: number;
+  /** Committed to authorizations Wirex has not settled yet. */
+  heldUsd: number;
+  /**
+   * Headroom left under the tighter of the daily and monthly caps. Distinct
+   * from `spendableUsd`: plenty of assets behind an exhausted cap is a
+   * different problem, with a different answer, than an empty Safe.
+   */
+  limitRemainingUsd: number;
+  /** The Safe's own caps. `null` means no cap of its own — not zero. */
+  dailyLimitUsd: number | null;
+  monthlyLimitUsd: number | null;
+  /** Both halves done: the module is enabled on the Safe *and* it registered. */
+  registered: boolean;
+  /**
+   * The two halves separately, because they fail differently. Consent can be
+   * revoked from any Safe client with no call to us, so `registeredOnChain`
+   * with `moduleEnabled: false` means re-enable the module — registering
+   * again reverts it.
+   */
+  registeredOnChain: boolean;
+  moduleEnabled: boolean;
+  /** Guardian pauses. `safePaused` is usually arrears or a fraud hold. */
+  modulePaused: boolean;
+  safePaused: boolean;
 }
 
 /** One entry in the admin audit trail for a card freeze or unfreeze. */
@@ -996,7 +1128,13 @@ export interface CardFreezeAuditEntry {
 
 export type VaultKey = "USDC" | "FUSE" | "ETH";
 
-/** One vault's savings summary, exactly as the app's savings screen reads it. */
+/**
+ * One vault's savings summary, exactly as the app's savings screen reads it.
+ *
+ * The `*USD` names are a soUSD-era misnomer: each figure is denominated in its
+ * own vault's underlying asset, so soFUSE reports FUSE and soETH reports ETH.
+ * Use `SavingsVaultResult.underlyingPriceUsd` to put them in dollars.
+ */
 export interface SavingsSummary {
   vault: string;
   vaultToken: string;
@@ -1014,6 +1152,10 @@ export interface SavingsSummary {
 export interface SavingsVaultResult {
   vault: VaultKey;
   summary: SavingsSummary | null;
+  /** The unit `summary`'s `*USD` figures are really in: USD, FUSE or ETH. */
+  underlyingSymbol?: string;
+  /** USD price of one `underlyingSymbol`; null when it could not be read. */
+  underlyingPriceUsd?: number | null;
   /** Why the vault could not be read, when `summary` is null. */
   error?: string;
 }
@@ -1028,7 +1170,15 @@ export interface UserRewardsData {
   nextTierPoints: number;
   pointsToNextTier: number;
   progressToNextTierPct: number;
+  /**
+   * The rate this cardholder actually earns — their tier's, unless an operator
+   * has pinned one to them.
+   */
   cashbackRate: number;
+  /** What their tier pays by default, before any override. */
+  tierCashbackRate?: number;
+  /** Whether `cashbackRate` is pinned to them rather than coming from the tier. */
+  hasCustomCashbackRate?: boolean;
   nextTierCashbackRate: number;
   cashbackThisMonth: number;
   maxCashbackMonthly: number;
@@ -1049,6 +1199,143 @@ export interface UserRewardsData {
     balanceUsd: number;
     unlockedTier: RewardsTierName;
   };
+  /** A gifted trial the user has not accepted yet. */
+  pendingTierTrial?: TierTrial | null;
+  /** The trial currently granting them their tier. */
+  activeTierTrial?: TierTrial | null;
+}
+
+/** The tiers a trial can grant. Core is the floor, not a gift. */
+export type GiftableTier = Exclude<RewardsTierName, "core">;
+
+/** Where a trial came from. */
+export type TierTrialSource = "admin_gift" | "promotion";
+
+/**
+ * A trial's lifecycle. It is issued `pending_activation` and stays there until
+ * the user accepts it — the duration is theirs to start.
+ */
+export type TierTrialStatus =
+  | "pending_activation"
+  | "active"
+  | "expired"
+  | "revoked";
+
+/**
+ * A temporary tier upgrade: the user holds `tier` for `durationDays` from the
+ * moment they activate it, then returns to the tier their points and FUSE
+ * balance earn them. Their points and balances are never touched.
+ */
+export interface TierTrial {
+  id: string;
+  tier: GiftableTier;
+  source: TierTrialSource;
+  status: TierTrialStatus;
+  durationDays: number;
+  /** The note the admin wrote with the gift, shown to the user. */
+  giftMessage?: string;
+  /** When an active trial ends; null while it waits to be started. */
+  expiresAt: string | null;
+  /** Whole hours left on an active trial, 0 otherwise. */
+  hoursRemaining: number;
+  /** Internal note from the admin who issued it. Never shown to the user. */
+  reason?: string;
+  issuedBy?: string;
+  issuedAt: string;
+  activatedAt: string | null;
+  revokedBy?: string;
+  revokedAt: string | null;
+  revokeReason?: string;
+  /** The trial this one replaced, when an admin chose to replace. */
+  replacedTrialId?: string;
+  /** Days added to this trial by later gifts. */
+  extensions?: {
+    days: number;
+    extendedBy?: string;
+    extendedAt: string;
+    reason?: string;
+  }[];
+}
+
+/** The open trial, if any, plus everything that came before it. */
+export interface TierTrialView {
+  current: TierTrial | null;
+  history: TierTrial[];
+}
+
+/**
+ * What to do about a trial the user already has. There is no default: trial
+ * durations are never silently combined, so a second gift has to say.
+ */
+export type TierTrialConflictResolution = "replace" | "extend";
+
+/** A trial an operator is gifting. */
+export interface IssueTierTrialRequest {
+  tier: GiftableTier;
+  durationDays: number;
+  giftMessage?: string;
+  reason?: string;
+  onExistingTrial?: TierTrialConflictResolution;
+}
+
+/** The outcome of issuing a gift. */
+export interface IssueTierTrialResult {
+  trial: TierTrial;
+  /** Set when the gift replaced a trial the user already had. */
+  replacedTrialId?: string;
+  /** Set when the days went onto an existing trial instead of a new one. */
+  extendedTrialId?: string;
+}
+
+/**
+ * What a batch does about the users in it who already hold a trial.
+ *
+ * A single gift asks about the one trial on the screen; a batch is issued
+ * blind, so the answer is decided once for everyone. Skipping is the default
+ * because it is the only one of the three that cannot take something away from
+ * a user the operator never looked at.
+ */
+export type TierTrialBatchConflictPolicy = "skip" | "replace" | "extend";
+
+/** The same trial, gifted to a list of users named by username. */
+export interface BatchIssueTierTrialRequest {
+  usernames: string[];
+  tier: GiftableTier;
+  durationDays: number;
+  giftMessage?: string;
+  reason?: string;
+  onExistingTrial?: TierTrialBatchConflictPolicy;
+}
+
+/** What became of one line of a batch. */
+export type TierTrialBatchOutcome =
+  | "gifted"
+  | "extended"
+  | "replaced"
+  | "skipped"
+  | "not_found"
+  | "duplicate"
+  | "failed";
+
+/** One line of the batch and what happened to it. */
+export interface TierTrialBatchRow {
+  /** The username as it was typed, so the operator can find their own line. */
+  username: string;
+  outcome: TierTrialBatchOutcome;
+  userId?: string;
+  trialId?: string;
+  /** Why it was skipped or failed. */
+  message?: string;
+}
+
+/** The outcome of a batch: every line, and the totals over them. */
+export interface BatchIssueTierTrialResult {
+  /** Ties every audit row this batch wrote back together. */
+  batchId: string;
+  /** One row per line submitted, in the order they were given. */
+  rows: TierTrialBatchRow[];
+  /** How many lines ended in each outcome. Every outcome is present. */
+  summary: Record<TierTrialBatchOutcome, number>;
 }
 
 export interface CashbackEntry {
@@ -1068,6 +1355,9 @@ export interface CashbackEntry {
   payoutAt?: string;
   createdAt: string;
   lastError?: string;
+  /** The rate the row was created at, and which of the three levels set it. */
+  cashbackPercentage?: number;
+  cashbackPercentageSource?: CashbackPercentageSource;
 }
 
 /** Cashback rows plus the totals support is usually actually after. */

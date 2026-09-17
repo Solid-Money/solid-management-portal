@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { DailyFlowData, DAILY_FLOW_COLORS } from "@/types/revenue";
 
+import { formatUsd } from "@/lib/utils";
 interface DailyFlowChartProps {
   data: DailyFlowData[];
   height?: number;
@@ -65,10 +66,7 @@ function CustomTooltip({
           </span>
           <span className="font-medium text-emerald-600">
             +$
-            {deposits.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatUsd(deposits)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
@@ -81,10 +79,7 @@ function CustomTooltip({
           </span>
           <span className="font-medium text-red-600">
             -$
-            {withdrawals.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatUsd(withdrawals)}
           </span>
         </div>
         <div className="border-t border-gray-200 pt-1 mt-1">
@@ -102,10 +97,7 @@ function CustomTooltip({
               }`}
             >
               {netFlow >= 0 ? "+" : ""}$
-              {netFlow.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatUsd(netFlow)}
             </span>
           </div>
         </div>

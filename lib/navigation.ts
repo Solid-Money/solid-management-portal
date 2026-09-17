@@ -1,13 +1,17 @@
 import {
   Activity,
   BarChart3,
+  BookOpen,
   CreditCard,
   DollarSign,
   Gift,
   Image,
   LayoutTemplate,
   Megaphone,
+  Percent,
+  Receipt,
   Share2,
+  SlidersHorizontal,
   Sparkles,
   Terminal,
   TrendingUp,
@@ -37,10 +41,14 @@ export interface NavGroup {
  * The dashboard's navigation, grouped.
  *
  * Thirteen top-level links stretched the bar past the width of the window and
- * left it with a horizontal scrollbar; grouping them into five entries keeps
- * every page one hover away without the bar ever overflowing. Grouping is by
- * the job being done — who is this user / what happened / where is the money /
- * what are we promoting — rather than by which service owns the data.
+ * left it with a horizontal scrollbar; grouping them keeps every page one hover
+ * away without the bar ever overflowing. Grouping is by the job being done —
+ * who is this user / what happened / where is the money / what do we pay and
+ * charge / what are we promoting — rather than by which service owns the data.
+ *
+ * Config is its own group rather than a corner of Growth: what we pay users and
+ * what we charge them are set by different people at different times, and one
+ * of the two moves real money out of their accounts.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -67,6 +75,48 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Analytics",
+    icon: BarChart3,
+    items: [
+      {
+        href: "/analytics/overview",
+        label: "Overview",
+        description: "Is the business moving, and is anything on fire",
+        icon: BarChart3,
+      },
+      {
+        href: "/analytics/revenue",
+        label: "Revenue",
+        description: "What we earn, from what, and from whom",
+        icon: DollarSign,
+      },
+      {
+        href: "/analytics/rewards",
+        label: "Rewards",
+        description: "What we have paid, what we owe, and whether we can pay it",
+        icon: Gift,
+      },
+      {
+        href: "/analytics/funnel",
+        label: "Funnel",
+        description: "Where users drop off, and where deposits fail",
+        icon: TrendingUp,
+      },
+      {
+        href: "/analytics/signals",
+        label: "Signals",
+        description: "User segments, and the Metabase dashboards being retired",
+        icon: UsersRound,
+      },
+      {
+        href: "/analytics/glossary",
+        label: "Glossary",
+        description: "What every metric on this dashboard actually means",
+        icon: BookOpen,
+      },
+    ],
+  },
+  {
     label: "Treasury",
     icon: Wallet,
     items: [
@@ -77,18 +127,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Wallet,
       },
       {
-        href: "/revenue",
-        label: "Revenue",
-        description: "Fees, yields and the investor-facing summary",
-        icon: DollarSign,
-      },
-      {
-        href: "/analytics",
-        label: "Analytics",
-        description: "Protocol charts: TVL, flows, exchange rate",
-        icon: BarChart3,
-      },
-      {
         href: "/landing-apy",
         label: "Landing APY",
         description: "The APY figures shown on the marketing site",
@@ -97,15 +135,39 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Growth",
-    icon: Gift,
+    label: "Config",
+    icon: SlidersHorizontal,
     items: [
       {
         href: "/rewards-config",
-        label: "Rewards Config",
-        description: "Tiers, cashback rates, card fees and bonuses",
+        label: "Rewards",
+        description: "Tiers, cashback rates, bonuses and referral rewards",
         icon: Gift,
       },
+      {
+        href: "/tier-trials",
+        label: "Tier Trials",
+        description: "Gift Prime or Ultra to a list of users at once",
+        icon: Sparkles,
+      },
+      {
+        href: "/fees-config",
+        label: "Fees",
+        description: "Per-tier fee rates on every product we charge on",
+        icon: Percent,
+      },
+      {
+        href: "/costs-config",
+        label: "Costs",
+        description: "KYC, card and rail costs behind every margin number",
+        icon: Receipt,
+      },
+    ],
+  },
+  {
+    label: "Growth",
+    icon: Megaphone,
+    items: [
       {
         href: "/campaigns",
         label: "Campaigns",

@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { DailyYieldMetrics, YIELD_CHART_COLORS } from "@/types/yield-metrics";
 
+import { formatUsd } from "@/lib/utils";
 interface RevenueSplitChartProps {
   data: DailyYieldMetrics[];
   height?: number;
@@ -94,7 +95,7 @@ function CustomTooltip({
             <span className="text-gray-600">Protocol Revenue</span>
           </span>
           <span className="font-medium text-purple-600">
-            ${protocolRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatUsd(protocolRevenue)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
@@ -106,13 +107,13 @@ function CustomTooltip({
             <span className="text-gray-600">Stakers Revenue</span>
           </span>
           <span className="font-medium text-emerald-600">
-            ${supplySideRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatUsd(supplySideRevenue)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Total Yield</span>
           <span className="font-semibold text-gray-900">
-            ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatUsd(totalRevenue)}
           </span>
         </div>
       </div>

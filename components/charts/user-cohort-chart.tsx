@@ -19,6 +19,7 @@ import {
   ANALYTICS_CHART_COLORS,
 } from "@/types/analytics-charts";
 
+import { formatUsd } from "@/lib/utils";
 interface UserCohortChartProps {
   data: UserCohortResponse;
   height?: number;
@@ -143,13 +144,13 @@ function CustomTooltip({
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Total Value</span>
           <span className="font-medium text-blue-600">
-            ${cohort.totalDepositAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(cohort.totalDepositAmount, 0)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="text-gray-600">Avg per User</span>
           <span className="font-medium text-gray-700">
-            ${avgValuePerUser.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatUsd(avgValuePerUser, 0)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">

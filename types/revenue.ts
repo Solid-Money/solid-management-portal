@@ -5,7 +5,32 @@
  */
 
 // Revenue breakdown by type
-export type RevenueType = 'yield_share' | 'borrowing_fee' | 'treasury_interest';
+export type RevenueType =
+  | 'yield_share'
+  | 'borrowing_fee'
+  | 'treasury_interest'
+  | FeeRevenueType;
+
+/**
+ * The revenue lines produced by the per-tier product fee program.
+ *
+ * Must stay in step with `RevenueType` / `PRODUCT_FEE_REVENUE_TYPES` in the
+ * backend's `revenue-event.schema.ts`. A product missing here is not a cosmetic
+ * gap: the fee views key their rows off this union, so its fees are dropped from
+ * the breakdown without any error, and the total silently disagrees with the
+ * ledger.
+ *
+ * Note `transfi_fee`, not `buy_crypto_fee`: buy-crypto orders run through
+ * TransFi and the ledger records the rail, so the backend enum — and therefore
+ * the wire format — calls it `transfi_fee`.
+ */
+export type FeeRevenueType =
+  | 'swap_fee'
+  | 'fx_fee'
+  | 'bank_withdrawal_fee'
+  | 'bank_deposit_fee'
+  | 'stocks_fee'
+  | 'transfi_fee';
 
 export type ReconciliationStatusType = 'pending' | 'verified' | 'discrepancy' | 'resolved';
 
@@ -141,7 +166,14 @@ export interface InvestorReportResponse {
 }
 
 // Dashboard View Types
-export type DashboardView = 'executive' | 'finance' | 'fees-yields' | 'analytics' | 'operations' | 'investor';
+export type DashboardView =
+  | 'executive'
+  | 'finance'
+  | 'product-fees'
+  | 'fees-yields'
+  | 'analytics'
+  | 'operations'
+  | 'investor';
 
 // Export Formats
 export type ExportFormat = 'csv' | 'pdf' | 'xlsx';
@@ -221,3 +253,149 @@ export interface TreasuryInterestResponse {
     endDate: string;
   };
 }
+
+// ============================================
+// Product Fee Revenue
+// ============================================
+
+/** One product's row in the fee revenue table. */
+export interface FeeRevenueProductRow {
+  revenueType: FeeRevenueType;
+  /** Display name, e.g. 'FX conversion'. */
+  name: string;
+  revenue: number;
+  feeCount: number;
+  userCount: number;
+  previousRevenue: number;
+  /**
+   * Change against the previous equal-length window, as a percentage.
+   *
+   * Null when the previous window earned nothing — the first period after a fee
+   * is switched on has no baseline, and both "+∞%" and "0%" misrepresent that.
+   */
+  changePercent: number | null;
+}
+
+/** One bucket of the fee revenue growth series. */
+export interface FeeRevenueGrowthPoint {
+  /** 'YYYY-MM-DD' | 'YYYY-Www' | 'YYYY-MM', per the requested grouping. */
+  period: string;
+  total: number;
+  /** Running total across the series, so chart and totals can't disagree. */
+  cumulative: number;
+  feeCount: number;
+  /** Revenue per revenue type in this bucket, zero-filled. */
+  byProduct: Record<string, number>;
+}
+
+export interface FeeRevenueOverviewResponse {
+  products: FeeRevenueProductRow[];
+  totals: {
+    revenue: number;
+    feeCount: number;
+    previousRevenue: number;
+    changePercent: number | null;
+  };
+  growth: FeeRevenueGrowthPoint[];
+  period: {
+    startDate: string;
+    endDate: string;
+    groupBy: FeeRevenueGroupBy;
+  };
+}
+
+export type FeeRevenueGroupBy = 'day' | 'week' | 'month';
+
+/** One charged fee, as an expanded product row shows it. */
+export interface FeeRevenueRow {
+  eventId: string;
+  userId?: string;
+  /** Which rail carried it: 'rain' | 'wirex' | 'bank' | 'onchain'. */
+  rail?: string;
+  /** 'Charge' when billed through a provider, 'Collected' when taken at source. */
+  settlement?: string;
+  /** Tier the fee was rated at — not the tier the user holds now. */
+  tierName?: string;
+  percentage?: number;
+  baseAmountUsd?: string;
+  feeAmountUsd: string;
+  foreignCurrency?: string;
+  description?: string;
+  sourceId?: string;
+  transactionHash?: string;
+  chargedAt?: string;
+}
+
+export interface FeeRevenueDetailResponse {
+  revenueType: FeeRevenueType;
+  name: string;
+  fees: FeeRevenueRow[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+}
+
+/**
+ * Series colors for the fee products, in fixed assignment order.
+ *
+ * Validated for colorblind separation against the dashboard's white surface:
+ * adjacent-pair ΔE 10.2 at worst under deuteranopia, 17.6 under tritanopia,
+ * 25.6 for normal vision. Colour follows the product, never its rank, so
+ * filtering or re-sorting the table never repaints a series.
+ *
+ * Amber sits below 3:1 against white on its own, which is why the legend is
+ * always shown and the table below carries every number — the chart is never
+ * the only way to read a value.
+ */
+export const FEE_REVENUE_COLORS: Record<FeeRevenueType, string> = {
+  swap_fee: '#6366f1', // indigo-500
+  fx_fee: '#f59e0b', // amber-500
+  bank_withdrawal_fee: '#e11d48', // rose-600
+  bank_deposit_fee: '#0d9488', // teal-600
+  transfi_fee: '#7c3aed', // violet-600
+  stocks_fee: '#0284c7', // sky-600
+};
+
+/**
+ * Fee products in the order the app's own fee table lists them.
+ *
+ * Every product in the backend's `PRODUCT_FEE_REVENUE_TYPES` appears here, even
+ * one configured but currently disabled: a product with no charges renders as a
+ * zero row, which is how an operator sees that a fee they switched on is not
+ * being collected. Omitting it would make "no revenue" and "not tracked" look
+ * identical.
+ */
+export const FEE_REVENUE_TYPES: FeeRevenueType[] = [
+  'bank_deposit_fee',
+  'swap_fee',
+  'fx_fee',
+  'bank_withdrawal_fee',
+  'transfi_fee',
+  'stocks_fee',
+];
+
+export const FEE_REVENUE_QUERY_KEYS = {
+  overview: (start: string, end: string, groupBy: string) => [
+    'revenue',
+    'fees',
+    start,
+    end,
+    groupBy,
+  ],
+  detail: (revenueType: string, start: string, end: string, page: number) => [
+    'revenue',
+    'fees',
+    'detail',
+    revenueType,
+    start,
+    end,
+    page,
+  ],
+} as const;

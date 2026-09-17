@@ -55,17 +55,26 @@ export function ExecutiveSummary() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Every card states its own scope.
+            These four, the fee totals on Product Fees, and the per-product
+            totals below all used to be labelled only "revenue", over three
+            different windows and three different definitions — so the numbers
+            disagreed and nothing on screen explained why. Naming the window and
+            the scope does not reconcile them, but it makes the difference
+            legible instead of looking like a bug. */}
         <KPICard
           title="Total Revenue (30d)"
           value={data.totalRevenue.value}
           change={data.totalRevenue.change}
           trend={data.monthOverMonth.trend}
           sparkline={data.sparklineData}
+          description="All revenue types, fixed 30-day window"
         />
         <KPICard
           title="Month over Month"
           value={data.monthOverMonth.value}
           trend={data.monthOverMonth.trend}
+          description="This calendar month against the last"
         />
         <KPICard
           title="Revenue per User"
@@ -78,6 +87,7 @@ export function ExecutiveSummary() {
               ? "down"
               : "flat"
           }
+          description="30-day revenue ÷ active users below"
         />
         <KPICard
           title="Active Users"
@@ -90,6 +100,7 @@ export function ExecutiveSummary() {
               ? "down"
               : "flat"
           }
+          description="Users with revenue-generating activity in 30d — narrower than the glossary's active user"
         />
       </div>
 
