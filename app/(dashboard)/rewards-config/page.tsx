@@ -152,8 +152,19 @@ export default function RewardsConfigPage() {
     );
   };
 
+  /**
+   * Saves the whole v3 section, which spans two config groups.
+   *
+   * The FUSE amounts live under `fuseStaking` because a tier costs the same
+   * FUSE whether it is held or locked — one pair of numbers, two features. The
+   * v3 section edits them in place rather than sending the admin up the page,
+   * so its save has to cover them too. Skipped when untouched, so saving the
+   * annual charge does not rewrite the staking config.
+   */
   const saveTierMembershipConfig = async () => {
     if (!config) return;
+
+    if (hasChanges("fuseStaking")) await saveFuseStakingConfig();
 
     await saveSection(
       "Tier Membership",
@@ -1131,7 +1142,7 @@ export default function RewardsConfigPage() {
         {/* FUSE Staking */}
         <ConfigSection
           title="FUSE Staking for Tier Unlock"
-          description={`"Skip the line": holding FUSE in the soFUSE savings vault unlocks a tier outright, bypassing the points ladder. The tier is held only while the balance stays above the threshold.`}
+          description={`"Skip the line": HOLDING FUSE in the soFUSE savings vault unlocks a tier outright, bypassing the points ladder — the tier lasts only while the balance stays above the threshold. The toggle here gates that route alone. The two amounts are shared with the v3 FUSE lock below and apply to it whether this toggle is on or off, which is why they are editable in both places.`}
           icon={<Wallet className="h-5 w-5 text-orange-600" />}
         >
           <div className="mb-4">
@@ -1177,97 +1188,160 @@ export default function RewardsConfigPage() {
         {/* Tier Membership (rewards v3) */}
         <ConfigSection
           title="Tier Membership (v3)"
-          description="How a tier is bought: lock FUSE for a term, or pay an annual fee in USDC. The FUSE amounts are the ones above — a tier costs the same FUSE whether it is held or locked."
+          description="How a tier is bought. Each route has its own switch and its own numbers; a tier costs the same whichever way it is reached."
           icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
         >
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <strong>Both routes need their contract deployed first.</strong> A
-            route with no address configured stays hidden in the app whatever
-            this switch says, so turning one on before its deployment is safe
-            but does nothing.
+            <strong>Both purchase routes need their contract deployed first.</strong>{" "}
+            A route with no address configured stays hidden in the app whatever
+            its switch says, so turning one on before its deployment is safe but
+            does nothing.
           </div>
 
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 1 — the v2 ladder */}
+          <div className="mb-6 rounded-lg border border-gray-200 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Points
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              The v2 route, and the rollback switch for the whole of v3.
+            </p>
             <ToggleField
               label="Points Still Unlock Tiers"
               value={config.tierMembership.pointsUnlockEnabled}
               onChange={(v) =>
                 updateConfig("tierMembership", "pointsUnlockEnabled", v)
               }
-              tooltip="The v3 rollback switch. Off retires the points ladder — a tier can then only be bought. Leave ON until both purchase routes are live, or nobody can reach a tier at all."
-            />
-            <ToggleField
-              label="FUSE Lock Enabled"
-              value={config.tierMembership.lockEnabled}
-              onChange={(v) => updateConfig("tierMembership", "lockEnabled", v)}
-              tooltip="Whether locking FUSE for a term buys a tier. Locks already taken keep their own term and are unaffected by turning this off."
-            />
-            <ToggleField
-              label="Annual Fee Enabled"
-              value={config.tierMembership.subscriptionEnabled}
-              onChange={(v) =>
-                updateConfig("tierMembership", "subscriptionEnabled", v)
-              }
-              tooltip="Whether a tier can be bought with an annual USDC fee. Off stops new sign-ups; memberships already running keep billing until they are cancelled."
+              tooltip="Off retires the points ladder — a tier can then only be bought. Leave ON until at least one purchase route is live, or nobody can reach a tier at all. The app also swaps its rewards card on this: ON shows the points progress card, OFF shows the membership teaser."
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField
-              label="Lock Duration"
-              value={config.tierMembership.lockDurationDays}
-              onChange={(v) =>
-                handleNumericUpdate("tierMembership", "lockDurationDays", v)
-              }
-              type="number"
-              suffix="days"
-              tooltip="The term a NEW lock carries. Each lock stores its own expiry, so raising this cannot extend a commitment a user has already made."
-            />
-            <InputField
-              label="Prime Annual Fee"
-              value={config.tierMembership.primeAnnualUsd}
-              onChange={(v) =>
-                handleNumericUpdate("tierMembership", "primeAnnualUsd", v)
-              }
-              type="number"
-              suffix="USD"
-              tooltip="Set -1 (or any value at or below 0) to stop selling Prime for cash, leaving the FUSE lock as its only route. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
-            />
-            <InputField
-              label="Ultra Annual Fee"
-              value={config.tierMembership.ultraAnnualUsd}
-              onChange={(v) =>
-                handleNumericUpdate("tierMembership", "ultraAnnualUsd", v)
-              }
-              type="number"
-              suffix="USD"
-              tooltip="-1 by default, meaning not for sale: Ultra is held by locking FUSE, not by paying. Enter a positive price only if Ultra is to be sold for cash too. Anything at or below 0 means the same thing — not sold — and the app hides the cash route entirely rather than showing a $0 offer."
-            />
-            <InputField
-              label="Grace Period"
-              value={config.tierMembership.graceDays}
-              onChange={(v) =>
-                handleNumericUpdate("tierMembership", "graceDays", v)
-              }
-              type="number"
-              suffix="days"
-              tooltip="How long a membership keeps its tier after a renewal charge first fails. The usual cause is a Safe briefly short of USDC; the charge is retried on a backoff throughout."
-            />
-            <InputField
-              label="Renewal Notice"
-              value={config.tierMembership.renewalNoticeDays}
-              onChange={(v) =>
-                handleNumericUpdate("tierMembership", "renewalNoticeDays", v)
-              }
-              type="number"
-              suffix="days"
-              tooltip="How far ahead of a renewal the user is told it is coming."
-            />
+          {/* 2 — the lock route, with the numbers it actually uses */}
+          <div className="mb-6 rounded-lg border border-gray-200 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Lock FUSE
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              Lock soFUSE for a term to hold a tier. These are the same two
+              amounts as &ldquo;FUSE Staking for Tier Unlock&rdquo; above —
+              one pair of numbers, because a tier costs the same FUSE whether it
+              is held or locked. Editing them here edits them there, and they
+              apply even when that section&rsquo;s own toggle is off.
+            </p>
+            <div className="mb-4">
+              <ToggleField
+                label="FUSE Lock Enabled"
+                value={config.tierMembership.lockEnabled}
+                onChange={(v) =>
+                  updateConfig("tierMembership", "lockEnabled", v)
+                }
+                tooltip="Whether locking FUSE for a term buys a tier. Locks already taken keep their own term and are unaffected by turning this off."
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InputField
+                label="Prime FUSE Amount"
+                value={config.fuseStaking.tier2Amount}
+                onChange={(v) =>
+                  handleNumericUpdate("fuseStaking", "tier2Amount", v)
+                }
+                type="number"
+                suffix="FUSE"
+                tooltip="FUSE that must be locked to hold Prime. 0 disables this rung — it never unlocks, for either route. Shared with the FUSE Staking section above."
+              />
+              <InputField
+                label="Ultra FUSE Amount"
+                value={config.fuseStaking.tier3Amount}
+                onChange={(v) =>
+                  handleNumericUpdate("fuseStaking", "tier3Amount", v)
+                }
+                type="number"
+                suffix="FUSE"
+                tooltip="FUSE that must be locked to hold Ultra. 0 disables this rung — it never unlocks, for either route. Shared with the FUSE Staking section above."
+              />
+              <InputField
+                label="Lock Duration"
+                value={config.tierMembership.lockDurationDays}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "lockDurationDays", v)
+                }
+                type="number"
+                suffix="days"
+                tooltip="The term a NEW lock carries. Each lock stores its own expiry, so raising this cannot extend a commitment a user has already made. Keep it equal to the contract's own lockDuration — this value is what the app promises, the contract's is what binds."
+              />
+            </div>
+          </div>
+
+          {/* 3 — the cash route */}
+          <div className="mb-4 rounded-lg border border-gray-200 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Annual Charge
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              Pay once a year in USDC to hold a tier. Nothing to do with the
+              Fees config — this is a membership price, not a rate taken on a
+              transaction.
+            </p>
+            <div className="mb-4">
+              <ToggleField
+                label="Annual Charge Enabled"
+                value={config.tierMembership.subscriptionEnabled}
+                onChange={(v) =>
+                  updateConfig("tierMembership", "subscriptionEnabled", v)
+                }
+                tooltip="Whether a tier can be bought with an annual USDC charge. Off stops new sign-ups; memberships already running keep billing until they are cancelled."
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField
+                label="Prime Annual Charge"
+                value={config.tierMembership.primeAnnualUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "primeAnnualUsd", v)
+                }
+                type="number"
+                suffix="USD"
+                tooltip="Set -1 (or any value at or below 0) to stop selling Prime for cash, leaving the FUSE lock as its only route. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
+              />
+              <InputField
+                label="Ultra Annual Charge"
+                value={config.tierMembership.ultraAnnualUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "ultraAnnualUsd", v)
+                }
+                type="number"
+                suffix="USD"
+                tooltip="-1 by default, meaning not for sale: Ultra is held by locking FUSE, not by paying. Enter a positive price to sell it for cash too, and the app shows both routes. Anything at or below 0 means not sold, and the app hides the cash route entirely rather than showing a $0 offer."
+              />
+              <InputField
+                label="Grace Period"
+                value={config.tierMembership.graceDays}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "graceDays", v)
+                }
+                type="number"
+                suffix="days"
+                tooltip="How long a membership keeps its tier after a renewal charge first fails. The usual cause is a Safe briefly short of USDC; the charge is retried on a backoff throughout. Never applies to a first charge — a membership that has paid for nothing gets no grace."
+              />
+              <InputField
+                label="Renewal Notice"
+                value={config.tierMembership.renewalNoticeDays}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "renewalNoticeDays", v)
+                }
+                type="number"
+                suffix="days"
+                tooltip="How far ahead of a renewal the user is told it is coming."
+              />
+            </div>
           </div>
 
           <button
             onClick={saveTierMembershipConfig}
-            disabled={saving || !hasChanges("tierMembership")}
+            disabled={
+              saving ||
+              (!hasChanges("tierMembership") && !hasChanges("fuseStaking"))
+            }
             className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4 mr-2" />
