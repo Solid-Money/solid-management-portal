@@ -999,6 +999,38 @@ export interface ProductFeesConfig {
   minChargeUsd: number;
 }
 
+/**
+ * How a tier is bought in rewards v3.
+ *
+ * The FUSE thresholds are deliberately not repeated here: a locked position is
+ * measured against the same `FuseStakingConfig` amounts a held one is, so a tier
+ * costs the same FUSE either way and there is one set of numbers to change.
+ */
+export interface TierMembershipConfig {
+  /**
+   * Whether the points ladder still grants a tier.
+   *
+   * The v3 rollback switch. v3 sells tiers instead of awarding them, but leaving
+   * this on keeps the old ladder working alongside the purchase routes — so the
+   * two can be shipped apart, and the ladder restored without a deploy.
+   */
+  pointsUnlockEnabled: boolean;
+  /** Whether a FUSE lock can buy a tier. */
+  lockEnabled: boolean;
+  /** The term a new lock carries, in days. Existing locks keep their own. */
+  lockDurationDays: number;
+  /** Whether a tier can be bought with an annual fee. */
+  subscriptionEnabled: boolean;
+  /** Annual price of Prime, in USD. 0 means it is not sold for cash. */
+  primeAnnualUsd: number;
+  /** Annual price of Ultra, in USD. 0 by default — Ultra is FUSE-only. */
+  ultraAnnualUsd: number;
+  /** Days a membership keeps its tier after a renewal charge first fails. */
+  graceDays: number;
+  /** How far ahead of a renewal the user is told about it. */
+  renewalNoticeDays: number;
+}
+
 export interface FullRewardsConfig {
   tiers: TierThresholds;
   points: PointsEarningConfig;
@@ -1009,6 +1041,80 @@ export interface FullRewardsConfig {
   referralCashback: ReferralCashbackConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
   productFees: ProductFeesConfig;
+  tierMembership: TierMembershipConfig;
+}
+
+/** A membership's lifecycle, as the backend reports it. */
+export type TierSubscriptionStatus =
+  | "active"
+  | "past_due"
+  | "cancelled"
+  | "expired";
+
+/** The user's paid membership, if they have one. */
+export interface TierSubscriptionView {
+  id: string;
+  tier: string;
+  status: TierSubscriptionStatus;
+  priceUsd: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  /** When the next renewal is attempted. Null once it will not renew. */
+  nextChargeAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  failedAttempts: number;
+  pastDueSince: string | null;
+  /** When a past-due membership finally loses its tier. */
+  graceEndsAt: string | null;
+  subscribedAt: string;
+}
+
+/** The user's locked FUSE position, read from the chain. */
+export interface TierLockView {
+  enabled: boolean;
+  lockAddress: string | null;
+  durationDays: number;
+  lockedFuse: number;
+  lockedShares: string;
+  unlockedTier: string;
+  lockedSince: string | null;
+  nextUnlockAt: string | null;
+  nextUnlockFuse: number;
+  maturedFuse: number;
+}
+
+/** What one tier costs by each route, and whether the user already holds it. */
+export interface TierOfferView {
+  tier: string;
+  lockFuse: number;
+  lockAvailable: boolean;
+  annualFeeUsd: number;
+  cashAvailable: boolean;
+  held: boolean;
+}
+
+/** The membership payload the app renders, as support reads it. */
+export interface TierMembershipStateView {
+  enabled: boolean;
+  pointsUnlockEnabled: boolean;
+  offers: TierOfferView[];
+  lock: TierLockView;
+  subscription: TierSubscriptionView | null;
+  currentTier: string;
+  memberSince: string | null;
+  contracts: {
+    chainId: number;
+    lockAddress: string | null;
+    subscriptionModuleAddress: string | null;
+    shareTokenAddress: string | null;
+    billingTokenAddress: string | null;
+  };
+}
+
+/** The membership as it stands, plus every one the user has had. */
+export interface TierMembershipView {
+  state: TierMembershipStateView;
+  history: TierSubscriptionView[];
 }
 
 // Campaign Types
