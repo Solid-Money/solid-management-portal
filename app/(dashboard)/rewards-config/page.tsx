@@ -1231,7 +1231,7 @@ export default function RewardsConfigPage() {
               }
               type="number"
               suffix="USD"
-              tooltip="0 means Prime cannot be bought for cash — only by locking FUSE. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
+              tooltip="Set -1 (or any value at or below 0) to stop selling Prime for cash, leaving the FUSE lock as its only route. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
             />
             <InputField
               label="Ultra Annual Fee"
@@ -1241,7 +1241,7 @@ export default function RewardsConfigPage() {
               }
               type="number"
               suffix="USD"
-              tooltip="0 by default: Ultra is held by locking FUSE, not by paying. Set a price only if Ultra is to be sold for cash too."
+              tooltip="-1 by default, meaning not for sale: Ultra is held by locking FUSE, not by paying. Enter a positive price only if Ultra is to be sold for cash too. Anything at or below 0 means the same thing — not sold — and the app hides the cash route entirely rather than showing a $0 offer."
             />
             <InputField
               label="Grace Period"

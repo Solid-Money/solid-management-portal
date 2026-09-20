@@ -63,13 +63,24 @@ export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
  * not change what anybody can reach. Turning a route on is a launch decision
  * made here, once its contract is deployed and its address configured.
  */
+/**
+ * An annual tier price meaning "this tier is not sold for cash".
+ *
+ * Mirrors the backend's constant of the same name. Negative rather than 0 so a
+ * blank or cleared field cannot be mistaken for a free tier — the backend reads
+ * any non-positive price the same way, so an existing 0 still behaves.
+ */
+export const TIER_PRICE_NOT_PURCHASABLE = -1;
+
 export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
   pointsUnlockEnabled: true,
   lockEnabled: false,
   lockDurationDays: 365,
   subscriptionEnabled: false,
   primeAnnualUsd: 199,
-  ultraAnnualUsd: 0,
+  // -1, not 0: Ultra is held by locking FUSE, and a price of zero would read
+  // as "free" both here and to anyone reading the config later.
+  ultraAnnualUsd: TIER_PRICE_NOT_PURCHASABLE,
   graceDays: 7,
   renewalNoticeDays: 7,
 };
