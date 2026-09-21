@@ -266,6 +266,10 @@ export enum TransactionType {
   AGENT_WALLET_DEPOSIT = "agent_wallet_deposit",
   GOODDOLLAR_CLAIM = "gooddollar_claim",
   GOODDOLLAR_SWEEP = "gooddollar_sweep",
+  /** soFUSE committed to `SolidTierLock` to hold a rewards v3 membership tier. */
+  TIER_LOCK = "tier_lock",
+  /** The annual USDC the subscription module draws for a membership tier. */
+  TIER_SUBSCRIPTION = "tier_subscription",
 }
 
 /** Mirrors `ActivityStatus` in accounts-service. */
@@ -309,6 +313,7 @@ export enum TransactionCategory {
   CARD_WELCOME_BONUS = "Card welcome bonus",
   DEPOSIT_BONUS = "Deposit bonus",
   GOODDOLLAR_UBI = "GoodDollar UBI",
+  TIER_MEMBERSHIP = "Tier membership",
   RECEIVE = "Receive",
 }
 
@@ -453,6 +458,17 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.IN,
       category: TransactionCategory.GOODDOLLAR_UBI,
     },
+    // Both leave the Safe. The lock comes back after its term and the annual
+    // fee does not, but the sign describes the movement, not whether it is
+    // recoverable.
+    [TransactionType.TIER_LOCK]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.TIER_MEMBERSHIP,
+    },
+    [TransactionType.TIER_SUBSCRIPTION]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.TIER_MEMBERSHIP,
+    },
   };
 
 /**
@@ -534,6 +550,8 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.GOODDOLLAR_SWEEP, label: "GoodDollar Sweep" },
   { value: TransactionType.AGENT_X402_PAYMENT, label: "Agent x402 Payment" },
   { value: TransactionType.AGENT_WALLET_DEPOSIT, label: "Agent Wallet Deposit" },
+  { value: TransactionType.TIER_LOCK, label: "Tier Lock" },
+  { value: TransactionType.TIER_SUBSCRIPTION, label: "Tier Membership" },
 ] as const;
 
 export const DEPOSIT_TYPES = [
