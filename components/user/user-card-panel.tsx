@@ -3,9 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { CreditCard, Loader2, Snowflake } from "lucide-react";
 
-import { getCardFreezeHistory } from "@/lib/api";
+import { getCardAuditHistory } from "@/lib/api";
 import {
-  CardFreezeAuditEntry,
+  CardAuditAction,
+  CardAuditEntry,
   UserCardOverview,
   WirexSpendContext,
 } from "@/types";
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/card";
 import { CopyableValue } from "@/components/ui/copy-button";
 import FreezeCardDialog from "@/components/user/freeze-card-dialog";
+import IssueCardDialog from "@/components/user/issue-card-dialog";
 
 const PROVIDER_LABELS: Record<string, string> = {
   rain: "Rain",
@@ -188,10 +190,43 @@ function FreezeExplanation({ card }: { card: UserCardOverview }) {
   );
 }
 
-function FreezeHistory({ userId }: { userId: string }) {
-  const { data, isLoading } = useQuery<{ data: CardFreezeAuditEntry[] }>({
-    queryKey: ["user-freeze-history", userId],
-    queryFn: async () => (await getCardFreezeHistory(userId)).data,
+/** How each admin action reads in the history, and how loudly. */
+const ACTION_LABELS: Record<
+  CardAuditAction,
+  { label: string; variant: "warning" | "success" | "info" | "danger" }
+> = {
+  card_frozen: { label: "Frozen", variant: "warning" },
+  card_unfrozen: { label: "Unfrozen", variant: "success" },
+  card_issued: { label: "New card issued", variant: "info" },
+  card_canceled: { label: "Card canceled", variant: "danger" },
+};
+
+/** The card ids an audit row refers to, so a replacement can be traced. */
+function auditCardIds(entry: CardAuditEntry): string | null {
+  const metadata = entry.metadata ?? {};
+  const cardId = typeof metadata.cardId === "string" ? metadata.cardId : null;
+  const previousCardId =
+    typeof metadata.previousCardId === "string"
+      ? metadata.previousCardId
+      : null;
+
+  if (entry.action === "card_issued" && previousCardId) {
+    return `${previousCardId.slice(0, 8)}… → ${cardId ? `${cardId.slice(0, 8)}…` : "new card"}`;
+  }
+  return cardId ? `${cardId.slice(0, 8)}…` : null;
+}
+
+/**
+ * Every admin action taken on this card, newest first.
+ *
+ * Deliberately wider than the freezes it started as: a cancel followed by an
+ * issue is one replacement, and either half on its own tells the wrong story
+ * about why this cardholder is on their third card this year.
+ */
+function CardAuditHistory({ userId }: { userId: string }) {
+  const { data, isLoading } = useQuery<{ data: CardAuditEntry[] }>({
+    queryKey: ["user-card-audit-history", userId],
+    queryFn: async () => (await getCardAuditHistory(userId)).data,
   });
 
   const entries = data?.data ?? [];
@@ -207,44 +242,46 @@ function FreezeHistory({ userId }: { userId: string }) {
   if (entries.length === 0) {
     return (
       <p className="text-xs text-gray-500">
-        No admin has frozen or unfrozen this card.
+        No admin has frozen, canceled or issued a card for this user.
       </p>
     );
   }
 
   return (
     <ul className="space-y-2">
-      {entries.map((entry) => (
-        <li
-          key={entry._id}
-          className="flex flex-col gap-1 border-l-2 border-gray-200 pl-3 text-xs"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant={
-                !entry.success
-                  ? "danger"
-                  : entry.action === "card_frozen"
-                    ? "warning"
-                    : "success"
-              }
-            >
-              {entry.action === "card_frozen" ? "Frozen" : "Unfrozen"}
-              {!entry.success && " (failed)"}
-            </Badge>
-            <span className="font-medium text-gray-900">
-              {entry.adminUsername}
-            </span>
-            <span className="text-gray-500">
-              {formatDateTime(entry.createdAt)}
-            </span>
-          </div>
-          {entry.reason && (
-            <span className="text-gray-600">“{entry.reason}”</span>
-          )}
-          {entry.error && <span className="text-red-600">{entry.error}</span>}
-        </li>
-      ))}
+      {entries.map((entry) => {
+        const action = ACTION_LABELS[entry.action];
+        const cardIds = auditCardIds(entry);
+
+        return (
+          <li
+            key={entry._id}
+            className="flex flex-col gap-1 border-l-2 border-gray-200 pl-3 text-xs"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={!entry.success ? "danger" : action.variant}>
+                {action.label}
+                {!entry.success && " (failed)"}
+              </Badge>
+              <span className="font-medium text-gray-900">
+                {entry.adminUsername}
+              </span>
+              <span className="text-gray-500">
+                {formatDateTime(entry.createdAt)}
+              </span>
+            </div>
+            {cardIds && (
+              <span className="font-mono text-[11px] text-gray-500">
+                {cardIds}
+              </span>
+            )}
+            {entry.reason && (
+              <span className="text-gray-600">“{entry.reason}”</span>
+            )}
+            {entry.error && <span className="text-red-600">{entry.error}</span>}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -272,15 +309,28 @@ export default function UserCardPanel({
           <CreditCard className="h-4 w-4 text-gray-400" />
           Card
         </CardTitle>
-        {card?.hasCard && (
-          <CardAction>
-            <FreezeCardDialog
-              userId={userId}
-              username={username}
-              card={card}
-            />
-          </CardAction>
-        )}
+        {/* Both actions sit here, next to the state they change. Issuing is
+            offered even to a cardholder with no card: the self-serve flow
+            leaves a handful of approved applicants without one, and this is
+            the only way they get served. */}
+        <CardAction>
+          <div className="flex flex-wrap items-center gap-2">
+            {card?.hasCard && (
+              <FreezeCardDialog
+                userId={userId}
+                username={username}
+                card={card}
+              />
+            )}
+            {!isLoading && (
+              <IssueCardDialog
+                userId={userId}
+                username={username}
+                card={card}
+              />
+            )}
+          </div>
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
@@ -289,7 +339,7 @@ export default function UserCardPanel({
           </div>
         ) : !card?.hasCard ? (
           <p className="text-sm text-gray-500">
-            This user has no card. Nothing to freeze.
+            This user has no card. Issue one above if they should have it.
           </p>
         ) : (
           <>
@@ -368,14 +418,19 @@ export default function UserCardPanel({
             <WirexSpendBreakdown card={card} />
 
             <FreezeExplanation card={card} />
-
-            <div className="space-y-2 border-t border-gray-100 pt-3">
-              <h4 className="text-xs font-semibold uppercase text-gray-500">
-                Admin freeze history
-              </h4>
-              <FreezeHistory userId={userId} />
-            </div>
           </>
+        )}
+
+        {/* Outside the has-card branch: a card that was canceled and never
+            replaced leaves the user with none, and that history is exactly
+            what explains the empty panel above it. */}
+        {!isLoading && (
+          <div className="space-y-2 border-t border-gray-100 pt-3">
+            <h4 className="text-xs font-semibold uppercase text-gray-500">
+              Admin card actions
+            </h4>
+            <CardAuditHistory userId={userId} />
+          </div>
         )}
       </CardContent>
     </Card>
