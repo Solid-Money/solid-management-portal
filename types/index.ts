@@ -569,6 +569,46 @@ export interface ChainBalance {
   topUpRecommendation?: string;
 }
 
+/**
+ * What a wallet is for. The Treasury page groups by this rather than by chain:
+ * a paymaster out of gas breaks the same user journey on every chain, and the
+ * person funding at 2am is looking for the journey, not the RPC.
+ */
+export type WalletRole =
+  | "User deposits"
+  | "Bridging"
+  | "Reward payouts"
+  | "Gas sponsorship"
+  | "Card operations"
+  | "Protocol operations"
+  | "Unclassified";
+
+/**
+ * The order roles are listed in: widest blast radius first.
+ *
+ * A paymaster stops every user at once; a strategist wallet degrades yield.
+ * Both matter, and only one of them is worth waking someone up for.
+ */
+export const WALLET_ROLE_ORDER: WalletRole[] = [
+  "Gas sponsorship",
+  "User deposits",
+  "Bridging",
+  "Reward payouts",
+  "Card operations",
+  "Protocol operations",
+  "Unclassified",
+];
+
+export type WalletFailureSource =
+  | "cashback_payout"
+  | "referral_payout"
+  | "user_activity";
+
+export type WalletForecastSource = "cashback" | "referral";
+
+/** The five assets the page tracks, as the backend names them. */
+export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE";
+
 export interface WalletInfo {
   name: string;
   description: string;
@@ -577,7 +617,137 @@ export interface WalletInfo {
   active?: boolean;
   /** Why an inactive wallet is inactive; absent on active wallets. */
   inactiveReason?: string;
+  role?: WalletRole;
+  /** What this wallet pays for, in product terms. */
+  funds?: string;
+  /** What breaks for users when it is empty — the line that decides urgency. */
+  impactWhenEmpty?: string;
+  /** How to top it up, when sending the token to the address is not the whole story. */
+  topUpHint?: string;
+  /** Whether any failure signal is wired to this wallet at all. */
+  hasFailureSources?: boolean;
+  forecastSource?: WalletForecastSource;
   chains: ChainBalance[];
+}
+
+export interface WalletTransfer {
+  hash: string;
+  timestamp: string;
+  chainId: number;
+  chainName: string;
+  /** Who sent it (incoming) or where it went (outgoing). */
+  counterparty: string;
+  direction: "incoming" | "outgoing";
+  amount: string;
+  symbol: string;
+  asset?: WalletAsset;
+  isNative: boolean;
+  tokenAddress?: string;
+  explorerUrl: string;
+  /** Set when the counterparty is another wallet we operate. */
+  counterpartyWalletName?: string;
+}
+
+export interface WalletTransfersResponse {
+  walletName: string;
+  address: string;
+  transfers: WalletTransfer[];
+  /** Which chains could be queried for transfer history, and which could not. */
+  coverage: Array<{
+    chainId: number;
+    chainName: string;
+    supported: boolean;
+    reason?: string;
+  }>;
+  counterpartyFilter?: string;
+  generatedAt: string;
+}
+
+export interface WalletFailureEvent {
+  source: WalletFailureSource;
+  occurredAt: string;
+  userId?: string;
+  /** What the user was trying to do, in product terms. */
+  action: string;
+  /** What the record says went wrong. */
+  internalCause: string;
+  /** What the user actually saw — often nothing, which is the point. */
+  userMessage?: string;
+  amountUsd?: number;
+  chainId?: number;
+  /** Whether the cause reads as this wallet being out of funds. */
+  attributedToBalance: boolean;
+  reference?: string;
+}
+
+export interface WalletFailuresResponse {
+  walletName: string;
+  /** False means no signal is mapped — an empty list is "not looking", not "fine". */
+  wired: boolean;
+  events: WalletFailureEvent[];
+  summary: {
+    total: number;
+    balanceRelated: number;
+    affectedUsers: number;
+    firstFailureAt?: string;
+    lastFailureAt?: string;
+    amountUsd: number;
+  };
+  note?: string;
+  generatedAt: string;
+}
+
+export interface WalletAssetFlow {
+  chainId: number;
+  chainName: string;
+  asset: WalletAsset;
+  symbol: string;
+  balance: string;
+  threshold: string;
+  status: string;
+  outflowCount: number;
+  outflowTotal: number;
+  outflowPerDay: number;
+  inflowCount: number;
+  inflowTotal: number;
+  /** True drain from balance snapshots, gas fees included. */
+  measuredBurnPerDay?: number;
+  snapshotCount: number;
+  daysOfRunway?: number;
+  /** Which figure the runway was computed from. */
+  runwayBasis?: "measured" | "outflow";
+  activityScore: number;
+}
+
+export interface WalletFlowResponse {
+  walletName: string;
+  address: string;
+  windowDays: number;
+  /** Hottest first — what this wallet actually consumes. */
+  assets: WalletAssetFlow[];
+  degraded: boolean;
+  generatedAt: string;
+}
+
+export interface WalletForecastResponse {
+  walletName: string;
+  source?: WalletForecastSource;
+  /** False when this wallet has no dated obligations to forecast. */
+  available: boolean;
+  overdue: { count: number; usd: number };
+  next10Days: { count: number; usd: number };
+  next30Days: { count: number; usd: number };
+  byDueDate: Array<{ date: string; count: number; usd: number }>;
+  coverage?: {
+    asset: WalletAsset;
+    symbol: string;
+    balance: string;
+    balanceUsd?: number;
+    shortfallUsd?: number;
+    coversUntil?: string;
+  };
+  note?: string;
+  generatedAt: string;
 }
 
 export interface WalletStatusResponse {

@@ -122,7 +122,8 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         href: "/wallets",
         label: "Wallets",
-        description: "Admin wallet balances and what needs topping up",
+        description:
+          "Every production wallet: what it funds, what it burns, and who it has blocked",
         icon: Wallet,
       },
       {
