@@ -53,10 +53,10 @@ export default function FreezeCardDialog({
       );
       setOpen(false);
       setReason("");
-      // The card panel, the freeze history and the balances all move together.
+      // The card panel, its admin history and the balances all move together.
       void queryClient.invalidateQueries({ queryKey: ["user-card", userId] });
       void queryClient.invalidateQueries({
-        queryKey: ["user-freeze-history", userId],
+        queryKey: ["user-card-audit-history", userId],
       });
       void queryClient.invalidateQueries({
         queryKey: ["user-balances", userId],

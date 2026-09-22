@@ -4,6 +4,10 @@ import { toast } from "sonner";
 import {
   BatchIssueTierTrialRequest,
   BatchIssueTierTrialResult,
+  CardAuditEntry,
+  CardIssuanceContext,
+  IssueCardRequest,
+  IssueCardResult,
   IssueTierTrialRequest,
   IssueTierTrialResult,
   SetTransactionCashbackPercentageResult,
@@ -82,8 +86,50 @@ export const getUserCashback = (userId: string) =>
 export const getUserIntercomHistory = (userId: string) =>
   api.get(`/admin/v1/users/${userId}/intercom`);
 
-export const getCardFreezeHistory = (userId: string) =>
-  api.get(`/admin/v1/users/${userId}/card/freeze-history`);
+/**
+ * Every admin action on this user's card — frozen, unfrozen, canceled,
+ * issued — newest first.
+ *
+ * Wider than the freeze history on purpose: a cancel and the issue that
+ * followed it are one replacement, and either half read alone tells the wrong
+ * story about why this cardholder's card looks the way it does.
+ */
+export const getCardAuditHistory = (userId: string) =>
+  api.get<{ data: CardAuditEntry[] }>(
+    `/admin/v1/users/${userId}/card/audit-history`
+  );
+
+/**
+ * What the issue-card dialog opens with: the card this user holds today, and
+ * the name, spend limit and shipping address a replacement should start from.
+ *
+ * Read when the dialog opens rather than with the card panel — it calls the
+ * issuer for the live card and the cardholder record, which is worth doing
+ * when support is about to act on it and not on every page view.
+ */
+export const getCardIssuanceContext = (userId: string) =>
+  api.get<{ data: CardIssuanceContext }>(
+    `/admin/v1/users/${userId}/card/issuance-context`
+  );
+
+/**
+ * Issue a card to this user, cancelling the one they hold first unless
+ * `cancelExisting` says otherwise.
+ *
+ * This is the answer to a cardholder whose card details have leaked: the app
+ * only offers a freeze, and a frozen card still carries the leaked number.
+ * Cancelling is irreversible, and the backend does it *before* issuing — if
+ * the cancel fails nothing is issued, so the user is never left holding the
+ * compromised card alongside a new one.
+ *
+ * The admin identity comes from the Firebase token server-side, never from
+ * here, so the audit row names whoever is actually signed in.
+ */
+export const issueUserCard = (userId: string, request: IssueCardRequest) =>
+  api.post<{ data: IssueCardResult }>(
+    `/admin/v1/users/${userId}/card/issue`,
+    request
+  );
 
 /**
  * Freeze or unfreeze a user's card. The admin identity is taken from the

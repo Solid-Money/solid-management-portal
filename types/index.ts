@@ -1259,10 +1259,17 @@ export interface WirexSpendContext {
   safePaused: boolean;
 }
 
-/** One entry in the admin audit trail for a card freeze or unfreeze. */
-export interface CardFreezeAuditEntry {
+/** Every admin action the card panel lists against one cardholder. */
+export type CardAuditAction =
+  | "card_frozen"
+  | "card_unfrozen"
+  | "card_issued"
+  | "card_canceled";
+
+/** One entry in the admin audit trail for a card action. */
+export interface CardAuditEntry {
   _id: string;
-  action: "card_frozen" | "card_unfrozen";
+  action: CardAuditAction;
   adminEmail: string;
   adminUsername: string;
   targetUserId: string;
@@ -1272,6 +1279,97 @@ export interface CardFreezeAuditEntry {
   error?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
+}
+
+export type CardType = "virtual" | "physical";
+
+/** Rain's rolling windows for a spend cap, with amounts always in cents. */
+export type CardLimitFrequency =
+  | "per24HourPeriod"
+  | "per7DayPeriod"
+  | "per30DayPeriod"
+  | "perYearPeriod"
+  | "allTime"
+  | "perAuthorization";
+
+export interface CardLimit {
+  /** Cents. Rain's issuing API is in minor units throughout. */
+  amount: number;
+  frequency: CardLimitFrequency | string;
+}
+
+export interface CardShippingAddress {
+  firstName?: string;
+  lastName?: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  region?: string;
+  postalCode: string;
+  countryCode: string;
+  phoneNumber: string;
+}
+
+/** The card being replaced, as the issuer holds it right now. */
+export interface IssuanceCurrentCard {
+  cardId: string;
+  type?: CardType;
+  /** Our status for it. */
+  status?: string;
+  /** The issuer's own word — the one that says `canceled`. */
+  issuerStatus?: string;
+  last4?: string;
+  /** MM/YY. */
+  expiration?: string;
+  limit?: CardLimit;
+}
+
+/**
+ * What the issue-card dialog opens pre-filled with.
+ *
+ * Mirrors `AdminCardIssuanceContext` in accounts-service. Everything here is
+ * what the cardholder already has — the point of the dialog is that support
+ * reviews and edits it rather than retyping an address from a chat transcript.
+ */
+export interface CardIssuanceContext {
+  canIssue: boolean;
+  /** Why not, when `canIssue` is false. Shown verbatim. */
+  blockedReason?: string;
+  provider?: CardProvider;
+  /** Issuer customer id the new card would be issued against. */
+  providerCustomerId?: string;
+  currentCard?: IssuanceCurrentCard;
+  defaults: {
+    type: CardType;
+    displayName?: string;
+    limit?: CardLimit;
+    shipping?: Partial<CardShippingAddress>;
+  };
+  cardholder?: { firstName?: string; lastName?: string; email?: string };
+}
+
+export interface IssueCardRequest {
+  type: CardType;
+  /** Cancel the card they hold today, at the issuer. Irreversible. */
+  cancelExisting: boolean;
+  displayName?: string;
+  limit?: CardLimit;
+  shipping?: CardShippingAddress;
+  reason?: string;
+}
+
+export interface IssueCardResult {
+  userId: string;
+  cardId: string;
+  provider: CardProvider;
+  type: CardType;
+  status: string;
+  last4?: string;
+  expiration?: string;
+  previousCardId?: string;
+  previousCardCanceled: boolean;
+  adminUsername: string;
+  reason?: string;
 }
 
 export type VaultKey = "USDC" | "FUSE" | "ETH";
