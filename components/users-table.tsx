@@ -205,7 +205,12 @@ export default function UsersTable() {
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {user.username}
+                      <div className="flex items-center gap-2">
+                        {user.username}
+                        {/* A closed account is otherwise indistinguishable
+                            from an open one in this list. */}
+                        {user.isDeleted && <Badge variant="danger">Closed</Badge>}
+                      </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.email}

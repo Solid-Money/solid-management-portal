@@ -10,6 +10,7 @@ import {
   IssueCardResult,
   IssueTierTrialRequest,
   IssueTierTrialResult,
+  ReinstateAccountResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   TierTrial,
@@ -129,6 +130,18 @@ export const issueUserCard = (userId: string, request: IssueCardRequest) =>
   api.post<{ data: IssueCardResult }>(
     `/admin/v1/users/${userId}/card/issue`,
     request
+  );
+
+/**
+ * Reopen an account its owner closed from the app. The reason is required —
+ * this overrides something the owner asked for — and the admin identity is
+ * taken from the Firebase token server-side, so the audit row names whoever is
+ * actually signed in.
+ */
+export const reinstateUserAccount = (userId: string, reason: string) =>
+  api.post<{ data: ReinstateAccountResult }>(
+    `/admin/v1/users/${userId}/reinstate`,
+    { reason }
   );
 
 /**
