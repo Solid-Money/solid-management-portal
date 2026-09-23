@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { ExternalLink, UserCircle } from "lucide-react";
 
+import { formatDateTime } from "@/lib/utils";
 import { User } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyableValue } from "@/components/ui/copy-button";
+import RecoverAccountDialog from "@/components/user/recover-account-dialog";
 
 function Field({
   label,
@@ -37,8 +39,14 @@ const KYC_VARIANT: Record<string, "success" | "warning" | "danger" | "muted"> = 
  * The referral block answers "where were they referred from?" in one place:
  * the code they entered, and — when we resolved it — the account that owns it,
  * linked so support can walk the chain upward.
+ *
+ * The account status sits first because a closed account changes how every
+ * other panel reads: the user cannot sign in, so "they can't see their funds"
+ * is answered here before anyone goes looking at deposits.
  */
 export default function UserProfileCard({ user }: { user: User }) {
+  const closed = Boolean(user.isDeleted);
+
   return (
     <Card>
       <CardHeader>
@@ -49,6 +57,31 @@ export default function UserProfileCard({ user }: { user: User }) {
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+          <Field label="Account status" wide>
+            <div className="flex flex-wrap items-center gap-2">
+              {closed ? (
+                <>
+                  <Badge variant="danger">Closed</Badge>
+                  <span className="text-gray-600">
+                    {user.deletedAt
+                      ? `Deleted from the app on ${formatDateTime(user.deletedAt)}`
+                      : "Deleted from the app"}{" "}
+                    — they cannot sign in until it is recovered.
+                  </span>
+                </>
+              ) : (
+                <Badge variant="success">Open</Badge>
+              )}
+              <span className={closed ? "ml-auto" : undefined}>
+                <RecoverAccountDialog
+                  userId={user._id}
+                  username={user.username || user.email || user._id}
+                  closed={closed}
+                  closedAt={user.deletedAt}
+                />
+              </span>
+            </div>
+          </Field>
           <Field label="User ID" wide>
             <CopyableValue value={user._id} label="User ID" />
           </Field>

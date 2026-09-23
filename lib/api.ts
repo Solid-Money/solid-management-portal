@@ -2,6 +2,7 @@ import axios from "axios";
 import { auth } from "./firebase";
 import { toast } from "sonner";
 import {
+  AdminAuditEntry,
   BatchIssueTierTrialRequest,
   BatchIssueTierTrialResult,
   CardAuditEntry,
@@ -10,6 +11,7 @@ import {
   IssueCardResult,
   IssueTierTrialRequest,
   IssueTierTrialResult,
+  RecoverAccountResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   TierTrial,
@@ -251,6 +253,27 @@ export const setTransactionCashbackPercentage = (
     )}/cashback-percentage`,
     { percentage, ...(reason ? { reason } : {}) }
   );
+
+/**
+ * Reopen an account its owner closed with the in-app "Delete account".
+ *
+ * Closure never removed what the account is made of — the passkeys, the Safe
+ * and its funds, activity and rewards — so this lets the user sign straight
+ * back in with the passkey they already have. The reason is required: it is
+ * written to the audit trail and posted to Slack with the admin's name.
+ *
+ * Refused with a 409 for an account that is not closed. The admin identity
+ * comes from the Firebase token server-side, never from here.
+ */
+export const recoverUserAccount = (userId: string, reason: string) =>
+  api.post<{ data: RecoverAccountResult }>(
+    `/admin/v1/users/${userId}/account/recover`,
+    { reason }
+  );
+
+/** Every admin action taken on this user, newest first. */
+export const getUserAuditLog = (userId: string) =>
+  api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
 
 // --- Rewards / cohorts -----------------------------------------------------
 

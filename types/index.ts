@@ -39,6 +39,13 @@ export interface User {
     status: string;
     frozen: boolean;
   } | null;
+  /**
+   * The owner closed the account with the in-app "Delete account". The row is
+   * kept rather than removed, so the account can be recovered from its profile.
+   */
+  isDeleted?: boolean;
+  /** When the account was closed. Cleared when it is recovered. */
+  deletedAt?: string | null;
 }
 
 /**
@@ -1279,6 +1286,54 @@ export interface CardAuditEntry {
   error?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
+}
+
+/**
+ * One entry in the admin audit trail — any admin action on a user, not only
+ * card ones. `action` is one of accounts-service's `AdminAuditAction` values;
+ * one this portal does not know yet still renders, under its raw name.
+ */
+export interface AdminAuditEntry {
+  _id: string;
+  action: string;
+  adminEmail: string;
+  adminUsername: string;
+  targetUserId: string;
+  targetUsername?: string;
+  reason?: string;
+  success: boolean;
+  error?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+/** What the backend reports after reopening a closed account. */
+export interface RecoverAccountResult {
+  userId: string;
+  username?: string;
+  /** When the account had been closed — the date this recovery cleared. */
+  closedAt?: string;
+  recoveredAt: string;
+  adminUsername: string;
+  reason: string;
+  cardSpend: {
+    /** The card-spend block closure placed was lifted. */
+    blockLifted: boolean;
+    /**
+     * The Safe is still blocked for another reason — arrears from a failed
+     * sweep, most often — which recovery deliberately left in place.
+     */
+    remainingBlockReason?: string;
+  };
+  /**
+   * Closure deletes the card link (the card itself is never cancelled at the
+   * issuer). Absent when the card state could not be read.
+   */
+  card?: {
+    linked: boolean;
+    /** The user passed card KYC, so there may be an issuer card to re-link. */
+    issuerCustomerOnFile: boolean;
+  };
 }
 
 export type CardType = "virtual" | "physical";
