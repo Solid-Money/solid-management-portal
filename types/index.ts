@@ -39,6 +39,27 @@ export interface User {
     status: string;
     frozen: boolean;
   } | null;
+  /**
+   * The user closed their account from the app. Closing marks the row rather
+   * than removing it, and every sign-in is refused until support reinstates
+   * the account from the user page. Their Safe and its funds are untouched.
+   */
+  isDeleted?: boolean;
+  /** When they closed it. */
+  deletedAt?: string | null;
+}
+
+/** What the backend reports after reinstating a closed account. */
+export interface ReinstateAccountResult {
+  userId: string;
+  /** When the owner had closed it, if the row still said. */
+  closedAt: string | null;
+  /**
+   * Whether card spending, stopped at closure, was turned back on. False when
+   * they had no card config, or their Safe is blocked for another reason —
+   * which stays blocked.
+   */
+  cardSpendingRestored: boolean;
 }
 
 /**

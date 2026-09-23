@@ -3,9 +3,10 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, Eye, Loader2, Snowflake } from "lucide-react";
+import { ArrowLeft, Ban, Eye, Loader2, Snowflake } from "lucide-react";
 
 import api, { getUserCard } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
 import { Activity, Balance, User, UserCardOverview } from "@/types";
 import ActivityList from "@/components/activity-list";
 import BalancesCard from "@/components/balances-card";
@@ -19,6 +20,7 @@ import UserProfileCard from "@/components/user/user-profile-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
 import UserTierTrialCard from "@/components/user/user-tier-trial-card";
+import ReinstateAccountDialog from "@/components/user/reinstate-account-dialog";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -130,10 +132,16 @@ export default function UserDetailPage({
         <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
         <CopyButton value={id} label="User ID" />
         {/*
-          No account-status badge here: users have no status field, so it only
-          ever read "unknown". KYC — the status support actually asks about —
-          is on the profile card, per Bridge customer.
+          The one account status there is: closed by its owner. KYC — the
+          status support otherwise asks about — is on the profile card, per
+          Bridge customer.
         */}
+        {user.isDeleted && (
+          <Badge variant="danger">
+            <Ban className="h-3 w-3" />
+            Account closed
+          </Badge>
+        )}
         {cardOverview?.hasCard && (
           <Badge variant="info">{cardOverview.provider} card</Badge>
         )}
@@ -148,6 +156,26 @@ export default function UserDetailPage({
           Read-only view of what this user sees
         </span>
       </div>
+
+      {/* A closed account looks like any other from here otherwise — the money
+          is still in the Safe — and "they can't get in" is the whole ticket. */}
+      {user.isDeleted && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <Ban className="h-5 w-5 shrink-0 text-red-600" />
+          <div className="min-w-0 flex-1 text-sm text-red-900">
+            <p className="font-semibold">
+              {user.deletedAt
+                ? `Closed by the user on ${formatDateTime(user.deletedAt)}`
+                : "Closed by the user"}
+            </p>
+            <p className="text-red-800">
+              Every sign-in is refused, so they cannot reach the balances below.
+              Their Safe and everything in it are untouched.
+            </p>
+          </div>
+          <ReinstateAccountDialog userId={id} username={displayName} />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SummaryStat
