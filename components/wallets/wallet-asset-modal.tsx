@@ -285,7 +285,17 @@ function TransfersTab({
       }),
   });
 
-  const unsupported = (data?.coverage ?? []).filter((row) => !row.supported);
+  /**
+   * Every chain this list could not fully cover — whether it has no indexer at
+   * all or its lookup failed this time.
+   *
+   * Keyed on `reason` rather than on `supported`: a chain the backend *can*
+   * query but failed to reach still comes back `supported: true`, and filtering
+   * on that flag hid exactly the case where the list is silently short. An
+   * empty transfer list is indistinguishable from "this wallet was never
+   * funded", so any gap has to be said out loud.
+   */
+  const gaps = (data?.coverage ?? []).filter((row) => row.reason);
 
   return (
     <div className="space-y-3">
@@ -313,12 +323,16 @@ function TransfersTab({
         )}
       </div>
 
-      {unsupported.length > 0 && (
-        <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          {unsupported.map((row) => row.chainName).join(", ")}:{" "}
-          {unsupported[0].reason}
+      {/* One line per chain: two chains can be short for different reasons,
+          and collapsing them onto the first chain's reason misattributes it. */}
+      {gaps.map((row) => (
+        <p
+          key={row.chainId}
+          className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+        >
+          <strong>{row.chainName}:</strong> {row.reason}
         </p>
-      )}
+      ))}
 
       {isLoading && <Loading />}
       {error != null && !isLoading && (
