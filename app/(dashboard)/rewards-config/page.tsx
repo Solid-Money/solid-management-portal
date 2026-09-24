@@ -1241,11 +1241,11 @@ export default function RewardsConfigPage() {
               Lock FUSE
             </h4>
             <p className="mb-3 text-xs text-gray-500">
-              Lock soFUSE for a term to hold a tier. These are the same two
-              amounts as &ldquo;FUSE Staking for Tier Unlock&rdquo; above —
-              one pair of numbers, because a tier costs the same FUSE whether it
-              is held or locked. Editing them here edits them there, and they
-              apply even when that section&rsquo;s own toggle is off.
+              Lock soFUSE for a term to hold a tier. These amounts are the
+              lock&rsquo;s own, separate from &ldquo;FUSE Staking for Tier
+              Unlock&rdquo; above: editing one pair does not change the other.
+              A lock is graded against the amounts in force when it was opened,
+              so a change here prices new locks only.
             </p>
             <div className="mb-4">
               <ToggleField
@@ -1297,9 +1297,12 @@ export default function RewardsConfigPage() {
               Retiring Skip-the-Line and Points
             </h4>
             <p className="mb-3 text-xs text-gray-500">
-              Holding FUSE in Savings, and the points ladder, grant a tier only
-              to accounts created before the launch date, and only for the
-              window below. Newer accounts get v3 only. Both dates are read-only
+              Holding FUSE in Savings, and the points ladder, keep granting a
+              tier only to users who held one through them on the launch date —
+              up to the tier they had then — and only for the window below.
+              Everyone else gets v3 only, however old their account. The list is
+              taken with the toggles above as they stand at launch, so a route
+              switched off then grandfathers nobody. Both dates are read-only
               here except the window: the launch date is stamped the first time
               the backend needs it, so it records when v3 actually went live.
             </p>
@@ -1309,7 +1312,7 @@ export default function RewardsConfigPage() {
                 value={asDay(config.tierMembership.legacyGrandfatherFrom)}
                 onChange={() => {}}
                 disabled
-                tooltip="The day rewards v3 went live in this environment. Accounts older than this may keep the old routes; newer ones never get them. Stamped by the backend the first time it is needed, so it records the real launch rather than a value someone typed."
+                tooltip="The day rewards v3 went live in this environment, and the day the grandfather list was taken: users holding a tier through the old routes that day keep it; nobody else gets them. Stamped by the backend the first time it is needed, so it records the real launch rather than a value someone typed."
               />
               <InputField
                 label="Grandfather Window"
@@ -1323,7 +1326,7 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="days"
-                tooltip="How long accounts that predate the launch keep the old routes. Counted from the launch date. The rewards spec commits to at least 30 days' notice before any change of this kind, and six months (180) for this one."
+                tooltip="How long users on the grandfather list keep the old routes. Counted from the launch date. The rewards spec commits to at least 30 days' notice before any change of this kind, and six months (180) for this one."
               />
               <InputField
                 label="Old Routes Stop"

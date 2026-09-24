@@ -1226,12 +1226,13 @@ export interface TierMembershipConfig {
   /** FUSE that must be LOCKED to hold Ultra. See `lockTier2Amount`. */
   lockTier3Amount: number;
   /**
-   * The day rewards v3 went live, ISO. Accounts older than this may keep the
-   * routes it replaces — FUSE held in Savings, and points. Stamped by the
-   * backend the first time it is needed, so it is read here, never set.
+   * The day rewards v3 went live, ISO. Users holding a tier through the routes
+   * it replaces — FUSE held in Savings, and points — that day may keep it.
+   * Stamped by the backend the first time it is needed, so it is read here,
+   * never set.
    */
   legacyGrandfatherFrom: string;
-  /** How long those accounts keep them, counted from the launch date. */
+  /** How long those users keep them, counted from the launch date. */
   legacyGrandfatherDays: number;
   /** Launch date plus the window: when the old routes stop granting anything. */
   legacyGrandfatherUntil: string;
