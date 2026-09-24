@@ -17,6 +17,7 @@ import {
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   TierTrial,
+  TierMembershipView,
   TierTrialView,
 } from "@/types";
 
@@ -160,6 +161,20 @@ export const setUserCardFreeze = (
  */
 export const getUserTierTrials = (userId: string) =>
   api.get<{ data: TierTrialView }>(`/admin/v1/users/${userId}/tier-trial`);
+
+/**
+ * This user's tier membership: what they have locked, what they are paying for,
+ * and the history behind both.
+ *
+ * The same payload the app renders, deliberately — the first question support
+ * is asked about a tier is "why am I not Prime?", and answering it means
+ * looking at exactly what the user is looking at. The lock figures are read
+ * from the chain on every request rather than from a cache of it.
+ */
+export const getUserTierMembership = (userId: string) =>
+  api.get<{ data: TierMembershipView }>(
+    `/admin/v1/users/${userId}/tier-membership`,
+  );
 
 /**
  * Gift this user a temporary tier upgrade.

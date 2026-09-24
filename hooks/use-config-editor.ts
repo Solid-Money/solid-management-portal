@@ -9,6 +9,7 @@ import {
   FullRewardsConfig,
   ProductFeesConfig,
   ReferralCashbackConfig,
+  TierMembershipConfig,
 } from "@/types";
 
 /** Shipped defaults for the referral cashback program (mirrors the backend). */
@@ -56,6 +57,44 @@ export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
 };
 
 /**
+ * Shipped defaults for the v3 purchase routes (mirrors the backend).
+ *
+ * Both routes ship OFF while the points ladder stays ON, so deploying this does
+ * not change what anybody can reach. Turning a route on is a launch decision
+ * made here, once its contract is deployed and its address configured.
+ */
+/**
+ * An annual tier price meaning "this tier is not sold for cash".
+ *
+ * Mirrors the backend's constant of the same name. Negative rather than 0 so a
+ * blank or cleared field cannot be mistaken for a free tier — the backend reads
+ * any non-positive price the same way, so an existing 0 still behaves.
+ */
+export const TIER_PRICE_NOT_PURCHASABLE = -1;
+
+export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
+  pointsUnlockEnabled: true,
+  lockEnabled: false,
+  lockDurationDays: 365,
+  // Equal to the skip-the-line thresholds, which is how they ship. They are
+  // separate keys so they can be moved apart, not because they start apart.
+  lockTier2Amount: 50000,
+  lockTier3Amount: 400000,
+  // Both dates are computed by the backend, so there is nothing sensible to
+  // default them to — the form shows a dash until the config loads.
+  legacyGrandfatherFrom: "",
+  legacyGrandfatherDays: 180,
+  legacyGrandfatherUntil: "",
+  subscriptionEnabled: false,
+  primeAnnualUsd: 199,
+  // -1, not 0: Ultra is held by locking FUSE, and a price of zero would read
+  // as "free" both here and to anyone reading the config later.
+  ultraAnnualUsd: TIER_PRICE_NOT_PURCHASABLE,
+  graceDays: 7,
+  renewalNoticeDays: 7,
+};
+
+/**
  * Fill in fields an older backend may not send yet, so the inputs stay
  * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
  * the working copy and the pristine copy so the defaults don't read as unsaved
@@ -90,6 +129,10 @@ export function withConfigDefaults(
         ...fees?.bankDeposit,
       },
       transfi: { ...PRODUCT_FEES_DEFAULTS.transfi, ...fees?.transfi },
+    },
+    tierMembership: {
+      ...TIER_MEMBERSHIP_DEFAULTS,
+      ...config.tierMembership,
     },
   };
 }

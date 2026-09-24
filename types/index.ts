@@ -242,6 +242,17 @@ export enum TransactionType {
   BORROW_AND_DEPOSIT_TO_CARD = "borrow_and_deposit_to_card",
   BRIDGE_TRANSFER = "bridge_transfer",
   BANK_TRANSFER = "bank_transfer",
+  /**
+   * Wirex bank rails (EUR SEPA / USD ACH) on the user's own virtual account.
+   * Separate from BANK_TRANSFER, which is the Bridge rail and is hard-coded
+   * inbound — a payout under it would read "+" to the support agent.
+   *
+   * These settle into the user's Wirex unified balance and are deliberately not
+   * swept on-chain, so the rows carry no hash. `metadata.settlement` records
+   * where the money actually sits.
+   */
+  WIREX_BANK_DEPOSIT = "wirex_bank_deposit",
+  WIREX_BANK_PAYOUT = "wirex_bank_payout",
   CARD_TRANSACTION = "card_transaction",
   CARD_DEPOSIT = "card_deposit",
   CARD_WITHDRAWAL = "card_withdrawal",
@@ -262,6 +273,10 @@ export enum TransactionType {
   AGENT_WALLET_DEPOSIT = "agent_wallet_deposit",
   GOODDOLLAR_CLAIM = "gooddollar_claim",
   GOODDOLLAR_SWEEP = "gooddollar_sweep",
+  /** soFUSE committed to `SolidTierLock` to hold a rewards v3 membership tier. */
+  TIER_LOCK = "tier_lock",
+  /** The annual USDC the subscription module draws for a membership tier. */
+  TIER_SUBSCRIPTION = "tier_subscription",
 }
 
 /** Mirrors `ActivityStatus` in accounts-service. */
@@ -293,6 +308,7 @@ export enum TransactionCategory {
   WALLET_TRANSFER = "Wallet transfer",
   EXTERNAL_WALLET_TRANSFER = "External wallet transfer",
   BANK_DEPOSIT = "Bank deposit",
+  BANK_WITHDRAWAL = "Bank withdraw",
   CARD_DEPOSIT = "Card deposit",
   CARD_WITHDRAWAL = "Card withdraw",
   REWARD = "Reward",
@@ -304,6 +320,7 @@ export enum TransactionCategory {
   CARD_WELCOME_BONUS = "Card welcome bonus",
   DEPOSIT_BONUS = "Deposit bonus",
   GOODDOLLAR_UBI = "GoodDollar UBI",
+  TIER_MEMBERSHIP = "Tier membership",
   RECEIVE = "Receive",
 }
 
@@ -363,6 +380,14 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
     [TransactionType.BANK_TRANSFER]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.BANK_DEPOSIT,
+    },
+    [TransactionType.WIREX_BANK_DEPOSIT]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.BANK_DEPOSIT,
+    },
+    [TransactionType.WIREX_BANK_PAYOUT]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.BANK_WITHDRAWAL,
     },
     [TransactionType.CARD_TRANSACTION]: {
       sign: TransactionDirection.OUT,
@@ -440,6 +465,17 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.IN,
       category: TransactionCategory.GOODDOLLAR_UBI,
     },
+    // Both leave the Safe. The lock comes back after its term and the annual
+    // fee does not, but the sign describes the movement, not whether it is
+    // recoverable.
+    [TransactionType.TIER_LOCK]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.TIER_MEMBERSHIP,
+    },
+    [TransactionType.TIER_SUBSCRIPTION]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.TIER_MEMBERSHIP,
+    },
   };
 
 /**
@@ -500,6 +536,8 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.BRIDGE_DEPOSIT, label: "Bridge Deposit" },
   { value: TransactionType.BRIDGE_TRANSFER, label: "Bridge Transfer" },
   { value: TransactionType.BANK_TRANSFER, label: "Bank Transfer" },
+  { value: TransactionType.WIREX_BANK_DEPOSIT, label: "Wirex Bank Deposit" },
+  { value: TransactionType.WIREX_BANK_PAYOUT, label: "Wirex Bank Payout" },
   { value: TransactionType.MERCURYO_TRANSACTION, label: "Mercuryo Purchase" },
   { value: TransactionType.CARD_DEPOSIT, label: "Card Deposit" },
   { value: TransactionType.CARD_TRANSACTION, label: "Card Transaction" },
@@ -519,6 +557,8 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.GOODDOLLAR_SWEEP, label: "GoodDollar Sweep" },
   { value: TransactionType.AGENT_X402_PAYMENT, label: "Agent x402 Payment" },
   { value: TransactionType.AGENT_WALLET_DEPOSIT, label: "Agent Wallet Deposit" },
+  { value: TransactionType.TIER_LOCK, label: "Tier Lock" },
+  { value: TransactionType.TIER_SUBSCRIPTION, label: "Tier Membership" },
 ] as const;
 
 export const DEPOSIT_TYPES = [
@@ -1154,6 +1194,60 @@ export interface ProductFeesConfig {
   minChargeUsd: number;
 }
 
+/**
+ * How a tier is bought in rewards v3.
+ *
+ * The FUSE thresholds are deliberately not repeated here: a locked position is
+ * measured against the same `FuseStakingConfig` amounts a held one is, so a tier
+ * costs the same FUSE either way and there is one set of numbers to change.
+ */
+export interface TierMembershipConfig {
+  /**
+   * Whether the points ladder still grants a tier.
+   *
+   * The v3 rollback switch. v3 sells tiers instead of awarding them, but leaving
+   * this on keeps the old ladder working alongside the purchase routes — so the
+   * two can be shipped apart, and the ladder restored without a deploy.
+   */
+  pointsUnlockEnabled: boolean;
+  /** Whether a FUSE lock can buy a tier. */
+  lockEnabled: boolean;
+  /** The term a new lock carries, in days. Existing locks keep their own. */
+  lockDurationDays: number;
+  /**
+   * FUSE that must be LOCKED to hold Prime.
+   *
+   * Separate from `fuseStaking.tier2Amount`, which is what a held balance is
+   * measured against. They started equal and are on different clocks: the lock
+   * is re-priced each quarter against a USD band, while grandfathered holders
+   * keep the terms they joined at.
+   */
+  lockTier2Amount: number;
+  /** FUSE that must be LOCKED to hold Ultra. See `lockTier2Amount`. */
+  lockTier3Amount: number;
+  /**
+   * The day rewards v3 went live, ISO. Users holding a tier through the routes
+   * it replaces — FUSE held in Savings, and points — that day may keep it.
+   * Stamped by the backend the first time it is needed, so it is read here,
+   * never set.
+   */
+  legacyGrandfatherFrom: string;
+  /** How long those users keep them, counted from the launch date. */
+  legacyGrandfatherDays: number;
+  /** Launch date plus the window: when the old routes stop granting anything. */
+  legacyGrandfatherUntil: string;
+  /** Whether a tier can be bought with an annual fee. */
+  subscriptionEnabled: boolean;
+  /** Annual price of Prime, in USD. 0 means it is not sold for cash. */
+  primeAnnualUsd: number;
+  /** Annual price of Ultra, in USD. 0 by default — Ultra is FUSE-only. */
+  ultraAnnualUsd: number;
+  /** Days a membership keeps its tier after a renewal charge first fails. */
+  graceDays: number;
+  /** How far ahead of a renewal the user is told about it. */
+  renewalNoticeDays: number;
+}
+
 export interface FullRewardsConfig {
   tiers: TierThresholds;
   points: PointsEarningConfig;
@@ -1164,6 +1258,80 @@ export interface FullRewardsConfig {
   referralCashback: ReferralCashbackConfig;
   cardWelcomeBonus: CardWelcomeBonusConfig;
   productFees: ProductFeesConfig;
+  tierMembership: TierMembershipConfig;
+}
+
+/** A membership's lifecycle, as the backend reports it. */
+export type TierSubscriptionStatus =
+  | "active"
+  | "past_due"
+  | "cancelled"
+  | "expired";
+
+/** The user's paid membership, if they have one. */
+export interface TierSubscriptionView {
+  id: string;
+  tier: string;
+  status: TierSubscriptionStatus;
+  priceUsd: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  /** When the next renewal is attempted. Null once it will not renew. */
+  nextChargeAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  failedAttempts: number;
+  pastDueSince: string | null;
+  /** When a past-due membership finally loses its tier. */
+  graceEndsAt: string | null;
+  subscribedAt: string;
+}
+
+/** The user's locked FUSE position, read from the chain. */
+export interface TierLockView {
+  enabled: boolean;
+  lockAddress: string | null;
+  durationDays: number;
+  lockedFuse: number;
+  lockedShares: string;
+  unlockedTier: string;
+  lockedSince: string | null;
+  nextUnlockAt: string | null;
+  nextUnlockFuse: number;
+  maturedFuse: number;
+}
+
+/** What one tier costs by each route, and whether the user already holds it. */
+export interface TierOfferView {
+  tier: string;
+  lockFuse: number;
+  lockAvailable: boolean;
+  annualFeeUsd: number;
+  cashAvailable: boolean;
+  held: boolean;
+}
+
+/** The membership payload the app renders, as support reads it. */
+export interface TierMembershipStateView {
+  enabled: boolean;
+  pointsUnlockEnabled: boolean;
+  offers: TierOfferView[];
+  lock: TierLockView;
+  subscription: TierSubscriptionView | null;
+  currentTier: string;
+  memberSince: string | null;
+  contracts: {
+    chainId: number;
+    lockAddress: string | null;
+    subscriptionModuleAddress: string | null;
+    shareTokenAddress: string | null;
+    billingTokenAddress: string | null;
+  };
+}
+
+/** The membership as it stands, plus every one the user has had. */
+export interface TierMembershipView {
+  state: TierMembershipStateView;
+  history: TierSubscriptionView[];
 }
 
 // Campaign Types

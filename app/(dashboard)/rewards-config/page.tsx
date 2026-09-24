@@ -7,6 +7,7 @@ import {
   CreditCard,
   Eye,
   Gift,
+  KeyRound,
   Mail,
   Percent,
   RefreshCw,
@@ -32,6 +33,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useConfigEditor } from "@/hooks/use-config-editor";
+
+/**
+ * An ISO timestamp as the day it names, or a dash.
+ *
+ * The two grandfather dates are the only values on this page the backend
+ * computes rather than stores, and they are read to the day — the window is
+ * measured in days and the time of day is noise.
+ */
+function asDay(iso?: string): string {
+  if (!iso) return "—";
+  const at = new Date(iso);
+
+  return Number.isNaN(at.getTime()) ? "—" : at.toISOString().slice(0, 10);
+}
 
 export default function RewardsConfigPage() {
   const {
@@ -148,6 +163,42 @@ export default function RewardsConfigPage() {
         tier3Amount: Number(config.fuseStaking.tier3Amount),
       },
       "fuseStaking",
+    );
+  };
+
+  /**
+   * Saves the whole v3 section, which spans two config groups.
+   *
+   * The FUSE amounts live under `fuseStaking` because a tier costs the same
+   * FUSE whether it is held or locked — one pair of numbers, two features. The
+   * v3 section edits them in place rather than sending the admin up the page,
+   * so its save has to cover them too. Skipped when untouched, so saving the
+   * annual charge does not rewrite the staking config.
+   */
+  const saveTierMembershipConfig = async () => {
+    if (!config) return;
+
+    if (hasChanges("fuseStaking")) await saveFuseStakingConfig();
+
+    await saveSection(
+      "Tier Membership",
+      "tier-membership",
+      {
+        pointsUnlockEnabled: config.tierMembership.pointsUnlockEnabled,
+        lockEnabled: config.tierMembership.lockEnabled,
+        lockDurationDays: Number(config.tierMembership.lockDurationDays),
+        lockTier2Amount: Number(config.tierMembership.lockTier2Amount),
+        lockTier3Amount: Number(config.tierMembership.lockTier3Amount),
+        legacyGrandfatherDays: Number(
+          config.tierMembership.legacyGrandfatherDays,
+        ),
+        subscriptionEnabled: config.tierMembership.subscriptionEnabled,
+        primeAnnualUsd: Number(config.tierMembership.primeAnnualUsd),
+        ultraAnnualUsd: Number(config.tierMembership.ultraAnnualUsd),
+        graceDays: Number(config.tierMembership.graceDays),
+        renewalNoticeDays: Number(config.tierMembership.renewalNoticeDays),
+      },
+      "tierMembership",
     );
   };
 
@@ -1110,7 +1161,7 @@ export default function RewardsConfigPage() {
         {/* FUSE Staking */}
         <ConfigSection
           title="FUSE Staking for Tier Unlock"
-          description={`"Skip the line": holding FUSE in the soFUSE savings vault unlocks a tier outright, bypassing the points ladder. The tier is held only while the balance stays above the threshold.`}
+          description={`"Skip the line": HOLDING FUSE in the soFUSE savings vault unlocks a tier outright, bypassing the points ladder — the tier lasts only while the balance stays above the threshold. The toggle here gates that route alone. The two amounts are shared with the v3 FUSE lock below and apply to it whether this toggle is on or off, which is why they are editable in both places.`}
           icon={<Wallet className="h-5 w-5 text-orange-600" />}
         >
           <div className="mb-4">
@@ -1118,7 +1169,7 @@ export default function RewardsConfigPage() {
               label="Skip the Line Enabled"
               value={config.fuseStaking.enabled}
               onChange={(v) => updateConfig("fuseStaking", "enabled", v)}
-              tooltip="When off, a FUSE balance grants no tier and the app hides the Skip the line section entirely"
+              tooltip="When off, a FUSE balance grants no tier to anyone — grandfathered users included — and the app hides the Skip the line section. Leave it on through the grandfather window: the app already hides it from everyone not on the list."
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1150,6 +1201,219 @@ export default function RewardsConfigPage() {
           >
             <Save className="h-4 w-4 mr-2" />
             Save FUSE Staking Config
+          </button>
+        </ConfigSection>
+
+        {/* Tier Membership (rewards v3) */}
+        <ConfigSection
+          title="Tier Membership (v3)"
+          description="How a tier is bought. Each route has its own switch and its own numbers; a tier costs the same whichever way it is reached."
+          icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
+        >
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <strong>Both purchase routes need their contract deployed first.</strong>{" "}
+            A route with no address configured stays hidden in the app whatever
+            its switch says, so turning one on before its deployment is safe but
+            does nothing.
+          </div>
+
+          {/* 1 — the v2 ladder */}
+          <div className="mb-6 rounded-lg border border-gray-200 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Points
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              The v2 route, and the rollback switch for the whole of v3.
+            </p>
+            <ToggleField
+              label="Points Still Unlock Tiers"
+              value={config.tierMembership.pointsUnlockEnabled}
+              onChange={(v) =>
+                updateConfig("tierMembership", "pointsUnlockEnabled", v)
+              }
+              tooltip="Off retires the points ladder for everyone, grandfathered users included — a tier can then only be bought. Leave it on through the grandfather window: points already take nobody higher than the tier the list caps them at, and the app shows the membership card instead of the points card to everyone they cannot raise."
+            />
+          </div>
+
+          {/* 2 — the lock route, with the numbers it actually uses */}
+          <div className="mb-6 rounded-lg border border-gray-200 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Lock FUSE
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              Lock soFUSE for a term to hold a tier. These amounts are the
+              lock&rsquo;s own, separate from &ldquo;FUSE Staking for Tier
+              Unlock&rdquo; above: editing one pair does not change the other.
+              A lock is graded against the amounts in force when it was opened,
+              so a change here prices new locks only.
+            </p>
+            <div className="mb-4">
+              <ToggleField
+                label="FUSE Lock Enabled"
+                value={config.tierMembership.lockEnabled}
+                onChange={(v) =>
+                  updateConfig("tierMembership", "lockEnabled", v)
+                }
+                tooltip="Whether locking FUSE for a term buys a tier. Locks already taken keep their own term and are unaffected by turning this off."
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InputField
+                label="Prime FUSE Amount"
+                value={config.tierMembership.lockTier2Amount}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "lockTier2Amount", v)
+                }
+                type="number"
+                suffix="FUSE"
+                tooltip="FUSE that must be LOCKED to hold Prime. 0 disables this rung. Separate from the FUSE Staking amount above, which is what a held balance is measured against — raise this one when the lock is re-priced and grandfathered holders keep the terms they joined at."
+              />
+              <InputField
+                label="Ultra FUSE Amount"
+                value={config.tierMembership.lockTier3Amount}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "lockTier3Amount", v)
+                }
+                type="number"
+                suffix="FUSE"
+                tooltip="FUSE that must be LOCKED to hold Ultra. 0 disables this rung. Separate from the FUSE Staking amount above — see the Prime field."
+              />
+              <InputField
+                label="Lock Duration"
+                value={config.tierMembership.lockDurationDays}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "lockDurationDays", v)
+                }
+                type="number"
+                suffix="days"
+                tooltip="The term a NEW lock carries. Each lock stores its own expiry, so raising this cannot extend a commitment a user has already made. Keep it equal to the contract's own lockDuration — this value is what the app promises, the contract's is what binds."
+              />
+            </div>
+          </div>
+
+          {/* 3 — retiring the routes v3 replaces */}
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Retiring Skip-the-Line and Points
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              Holding FUSE in Savings, and the points ladder, keep granting a
+              tier only to users who held one through them on the launch date —
+              up to the tier they had then — and only for the window below.
+              Everyone else gets v3 only, however old their account, and the
+              app shows them only the v3 routes. The list records what each
+              route would grant whatever its toggle says, so a toggle only
+              ever hides a route — for everyone on the list too — and never
+              erases the list. Both dates are read-only
+              here except the window: the launch date is stamped the first time
+              the backend needs it, so it records when v3 actually went live.
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <InputField
+                label="Launched"
+                value={asDay(config.tierMembership.legacyGrandfatherFrom)}
+                onChange={() => {}}
+                disabled
+                tooltip="The day rewards v3 went live in this environment, and the day the grandfather list was taken: users holding a tier through the old routes that day keep it; nobody else gets them. Stamped by the backend the first time it is needed, so it records the real launch rather than a value someone typed."
+              />
+              <InputField
+                label="Grandfather Window"
+                value={config.tierMembership.legacyGrandfatherDays}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "tierMembership",
+                    "legacyGrandfatherDays",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="days"
+                tooltip="How long users on the grandfather list keep the old routes. Counted from the launch date. The rewards spec commits to at least 30 days' notice before any change of this kind, and six months (180) for this one."
+              />
+              <InputField
+                label="Old Routes Stop"
+                value={asDay(config.tierMembership.legacyGrandfatherUntil)}
+                onChange={() => {}}
+                disabled
+                tooltip="Launch date plus the window. After this, holding FUSE and points grant nothing to anyone, and every tier comes from a lock or an annual charge."
+              />
+            </div>
+          </div>
+
+          {/* 4 — the cash route */}
+          <div className="mb-4 rounded-lg border border-gray-200 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Annual Charge
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              Pay once a year in USDC to hold a tier. Nothing to do with the
+              Fees config — this is a membership price, not a rate taken on a
+              transaction.
+            </p>
+            <div className="mb-4">
+              <ToggleField
+                label="Annual Charge Enabled"
+                value={config.tierMembership.subscriptionEnabled}
+                onChange={(v) =>
+                  updateConfig("tierMembership", "subscriptionEnabled", v)
+                }
+                tooltip="Whether a tier can be bought with an annual USDC charge. Off stops new sign-ups; memberships already running keep billing until they are cancelled."
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField
+                label="Prime Annual Charge"
+                value={config.tierMembership.primeAnnualUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "primeAnnualUsd", v)
+                }
+                type="number"
+                suffix="USD"
+                tooltip="Set -1 (or any value at or below 0) to stop selling Prime for cash, leaving the FUSE lock as its only route. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
+              />
+              <InputField
+                label="Ultra Annual Charge"
+                value={config.tierMembership.ultraAnnualUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "ultraAnnualUsd", v)
+                }
+                type="number"
+                suffix="USD"
+                tooltip="-1 by default, meaning not for sale: Ultra is held by locking FUSE, not by paying. Enter a positive price to sell it for cash too, and the app shows both routes. Anything at or below 0 means not sold, and the app hides the cash route entirely rather than showing a $0 offer."
+              />
+              <InputField
+                label="Grace Period"
+                value={config.tierMembership.graceDays}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "graceDays", v)
+                }
+                type="number"
+                suffix="days"
+                tooltip="How long a membership keeps its tier after a renewal charge first fails. The usual cause is a Safe briefly short of USDC; the charge is retried on a backoff throughout. Never applies to a first charge — a membership that has paid for nothing gets no grace."
+              />
+              <InputField
+                label="Renewal Notice"
+                value={config.tierMembership.renewalNoticeDays}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "renewalNoticeDays", v)
+                }
+                type="number"
+                suffix="days"
+                tooltip="How far ahead of a renewal the user is told it is coming."
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={saveTierMembershipConfig}
+            disabled={
+              saving ||
+              (!hasChanges("tierMembership") && !hasChanges("fuseStaking"))
+            }
+            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Tier Membership Config
           </button>
         </ConfigSection>
       </div>
