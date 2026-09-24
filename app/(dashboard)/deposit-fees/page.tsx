@@ -229,7 +229,7 @@ export default function DepositFeesPage() {
             <div className="font-medium text-gray-900">
               {matrix.effectiveAt
                 ? new Date(matrix.effectiveAt).toLocaleString()
-                : "Not launched"}
+                : "Live (no launch time set)"}
             </div>
           </div>
         </div>
