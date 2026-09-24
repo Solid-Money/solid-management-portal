@@ -1169,7 +1169,7 @@ export default function RewardsConfigPage() {
               label="Skip the Line Enabled"
               value={config.fuseStaking.enabled}
               onChange={(v) => updateConfig("fuseStaking", "enabled", v)}
-              tooltip="When off, a FUSE balance grants no tier and the app hides the Skip the line section entirely"
+              tooltip="When off, a FUSE balance grants no tier to anyone — grandfathered users included — and the app hides the Skip the line section. Leave it on through the grandfather window: the app already hides it from everyone not on the list."
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1231,7 +1231,7 @@ export default function RewardsConfigPage() {
               onChange={(v) =>
                 updateConfig("tierMembership", "pointsUnlockEnabled", v)
               }
-              tooltip="Off retires the points ladder — a tier can then only be bought. Leave ON until at least one purchase route is live, or nobody can reach a tier at all. The app also swaps its rewards card on this: ON shows the points progress card, OFF shows the membership teaser."
+              tooltip="Off retires the points ladder for everyone, grandfathered users included — a tier can then only be bought. Leave it on through the grandfather window: points already take nobody higher than the tier the list caps them at, and the app shows the membership card instead of the points card to everyone they cannot raise."
             />
           </div>
 
@@ -1300,9 +1300,11 @@ export default function RewardsConfigPage() {
               Holding FUSE in Savings, and the points ladder, keep granting a
               tier only to users who held one through them on the launch date —
               up to the tier they had then — and only for the window below.
-              Everyone else gets v3 only, however old their account. The list is
-              taken with the toggles above as they stand at launch, so a route
-              switched off then grandfathers nobody. Both dates are read-only
+              Everyone else gets v3 only, however old their account, and the
+              app shows them only the v3 routes. The list records what each
+              route would grant whatever its toggle says, so a toggle only
+              ever hides a route — for everyone on the list too — and never
+              erases the list. Both dates are read-only
               here except the window: the launch date is stamped the first time
               the backend needs it, so it records when v3 actually went live.
             </p>
