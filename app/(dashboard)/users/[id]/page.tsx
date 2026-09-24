@@ -17,6 +17,7 @@ import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserProfileCard from "@/components/user/user-profile-card";
+import UserReferralCard from "@/components/user/user-referral-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
 import UserTierTrialCard from "@/components/user/user-tier-trial-card";
@@ -254,6 +255,9 @@ export default function UserDetailPage({
             cashbackPercentage={user.cashbackPercentage}
           />
           <UserCashbackCard userId={id} />
+          {/* Both sides of the referral program, with the re-evaluate action
+              for rewards the engine reversed or expired. */}
+          <UserReferralCard userId={id} />
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
