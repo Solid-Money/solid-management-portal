@@ -39,6 +39,13 @@ export interface User {
     status: string;
     frozen: boolean;
   } | null;
+  /**
+   * The owner closed the account with the in-app "Delete account". The row is
+   * kept rather than removed, so the account can be recovered from its profile.
+   */
+  isDeleted?: boolean;
+  /** When the account was closed. Cleared when it is recovered. */
+  deletedAt?: string | null;
 }
 
 /**
@@ -609,6 +616,46 @@ export interface ChainBalance {
   topUpRecommendation?: string;
 }
 
+/**
+ * What a wallet is for. The Treasury page groups by this rather than by chain:
+ * a paymaster out of gas breaks the same user journey on every chain, and the
+ * person funding at 2am is looking for the journey, not the RPC.
+ */
+export type WalletRole =
+  | "User deposits"
+  | "Bridging"
+  | "Reward payouts"
+  | "Gas sponsorship"
+  | "Card operations"
+  | "Protocol operations"
+  | "Unclassified";
+
+/**
+ * The order roles are listed in: widest blast radius first.
+ *
+ * A paymaster stops every user at once; a strategist wallet degrades yield.
+ * Both matter, and only one of them is worth waking someone up for.
+ */
+export const WALLET_ROLE_ORDER: WalletRole[] = [
+  "Gas sponsorship",
+  "User deposits",
+  "Bridging",
+  "Reward payouts",
+  "Card operations",
+  "Protocol operations",
+  "Unclassified",
+];
+
+export type WalletFailureSource =
+  | "cashback_payout"
+  | "referral_payout"
+  | "user_activity";
+
+export type WalletForecastSource = "cashback" | "referral";
+
+/** The five assets the page tracks, as the backend names them. */
+export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE";
+
 export interface WalletInfo {
   name: string;
   description: string;
@@ -617,7 +664,137 @@ export interface WalletInfo {
   active?: boolean;
   /** Why an inactive wallet is inactive; absent on active wallets. */
   inactiveReason?: string;
+  role?: WalletRole;
+  /** What this wallet pays for, in product terms. */
+  funds?: string;
+  /** What breaks for users when it is empty — the line that decides urgency. */
+  impactWhenEmpty?: string;
+  /** How to top it up, when sending the token to the address is not the whole story. */
+  topUpHint?: string;
+  /** Whether any failure signal is wired to this wallet at all. */
+  hasFailureSources?: boolean;
+  forecastSource?: WalletForecastSource;
   chains: ChainBalance[];
+}
+
+export interface WalletTransfer {
+  hash: string;
+  timestamp: string;
+  chainId: number;
+  chainName: string;
+  /** Who sent it (incoming) or where it went (outgoing). */
+  counterparty: string;
+  direction: "incoming" | "outgoing";
+  amount: string;
+  symbol: string;
+  asset?: WalletAsset;
+  isNative: boolean;
+  tokenAddress?: string;
+  explorerUrl: string;
+  /** Set when the counterparty is another wallet we operate. */
+  counterpartyWalletName?: string;
+}
+
+export interface WalletTransfersResponse {
+  walletName: string;
+  address: string;
+  transfers: WalletTransfer[];
+  /** Which chains could be queried for transfer history, and which could not. */
+  coverage: Array<{
+    chainId: number;
+    chainName: string;
+    supported: boolean;
+    reason?: string;
+  }>;
+  counterpartyFilter?: string;
+  generatedAt: string;
+}
+
+export interface WalletFailureEvent {
+  source: WalletFailureSource;
+  occurredAt: string;
+  userId?: string;
+  /** What the user was trying to do, in product terms. */
+  action: string;
+  /** What the record says went wrong. */
+  internalCause: string;
+  /** What the user actually saw — often nothing, which is the point. */
+  userMessage?: string;
+  amountUsd?: number;
+  chainId?: number;
+  /** Whether the cause reads as this wallet being out of funds. */
+  attributedToBalance: boolean;
+  reference?: string;
+}
+
+export interface WalletFailuresResponse {
+  walletName: string;
+  /** False means no signal is mapped — an empty list is "not looking", not "fine". */
+  wired: boolean;
+  events: WalletFailureEvent[];
+  summary: {
+    total: number;
+    balanceRelated: number;
+    affectedUsers: number;
+    firstFailureAt?: string;
+    lastFailureAt?: string;
+    amountUsd: number;
+  };
+  note?: string;
+  generatedAt: string;
+}
+
+export interface WalletAssetFlow {
+  chainId: number;
+  chainName: string;
+  asset: WalletAsset;
+  symbol: string;
+  balance: string;
+  threshold: string;
+  status: string;
+  outflowCount: number;
+  outflowTotal: number;
+  outflowPerDay: number;
+  inflowCount: number;
+  inflowTotal: number;
+  /** True drain from balance snapshots, gas fees included. */
+  measuredBurnPerDay?: number;
+  snapshotCount: number;
+  daysOfRunway?: number;
+  /** Which figure the runway was computed from. */
+  runwayBasis?: "measured" | "outflow";
+  activityScore: number;
+}
+
+export interface WalletFlowResponse {
+  walletName: string;
+  address: string;
+  windowDays: number;
+  /** Hottest first — what this wallet actually consumes. */
+  assets: WalletAssetFlow[];
+  degraded: boolean;
+  generatedAt: string;
+}
+
+export interface WalletForecastResponse {
+  walletName: string;
+  source?: WalletForecastSource;
+  /** False when this wallet has no dated obligations to forecast. */
+  available: boolean;
+  overdue: { count: number; usd: number };
+  next10Days: { count: number; usd: number };
+  next30Days: { count: number; usd: number };
+  byDueDate: Array<{ date: string; count: number; usd: number }>;
+  coverage?: {
+    asset: WalletAsset;
+    symbol: string;
+    balance: string;
+    balanceUsd?: number;
+    shortfallUsd?: number;
+    coversUntil?: string;
+  };
+  note?: string;
+  generatedAt: string;
 }
 
 export interface WalletStatusResponse {
@@ -1256,10 +1433,17 @@ export interface WirexSpendContext {
   safePaused: boolean;
 }
 
-/** One entry in the admin audit trail for a card freeze or unfreeze. */
-export interface CardFreezeAuditEntry {
+/** Every admin action the card panel lists against one cardholder. */
+export type CardAuditAction =
+  | "card_frozen"
+  | "card_unfrozen"
+  | "card_issued"
+  | "card_canceled";
+
+/** One entry in the admin audit trail for a card action. */
+export interface CardAuditEntry {
   _id: string;
-  action: "card_frozen" | "card_unfrozen";
+  action: CardAuditAction;
   adminEmail: string;
   adminUsername: string;
   targetUserId: string;
@@ -1269,6 +1453,259 @@ export interface CardFreezeAuditEntry {
   error?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
+}
+
+/**
+ * One entry in the admin audit trail — any admin action on a user, not only
+ * card ones. `action` is one of accounts-service's `AdminAuditAction` values;
+ * one this portal does not know yet still renders, under its raw name.
+ */
+export interface AdminAuditEntry {
+  _id: string;
+  action: string;
+  adminEmail: string;
+  adminUsername: string;
+  targetUserId: string;
+  targetUsername?: string;
+  reason?: string;
+  success: boolean;
+  error?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+/** What the backend reports after reopening a closed account. */
+export interface RecoverAccountResult {
+  userId: string;
+  username?: string;
+  /** When the account had been closed — the date this recovery cleared. */
+  closedAt?: string;
+  recoveredAt: string;
+  adminUsername: string;
+  reason: string;
+  cardSpend: {
+    /** The card-spend block closure placed was lifted. */
+    blockLifted: boolean;
+    /**
+     * The Safe is still blocked for another reason — arrears from a failed
+     * sweep, most often — which recovery deliberately left in place.
+     */
+    remainingBlockReason?: string;
+  };
+  /**
+   * Closure deletes the card link (the card itself is never cancelled at the
+   * issuer). Absent when the card state could not be read.
+   */
+  card?: {
+    linked: boolean;
+    /** The user passed card KYC, so there may be an issuer card to re-link. */
+    issuerCustomerOnFile: boolean;
+  };
+}
+
+/** Ledger state of a referral cashback reward, as rewards-service stores it. */
+export type ReferralRewardStatus =
+  | "pending"
+  | "qualified"
+  | "paid"
+  | "expired"
+  | "reversed"
+  | "under_review";
+
+/** The spend a referral reward is judged on, read live from card data. */
+export interface ReferralSpendReading {
+  /** Settled purchases inside the friend's window, dated by the tap. */
+  qualifiedSpendUsd: number;
+  /** Refunds that came out of that spend. */
+  refundedSpendUsd: number;
+  /** What the bar is measured against: the two above, netted. */
+  netSpendUsd: number;
+  merchantCount: number;
+  hasActiveCard: boolean;
+}
+
+/**
+ * One referral reward as the portal shows it: the row the app shows the
+ * referrer, plus the ledger detail support needs.
+ */
+export interface AdminReferralRewardRow {
+  referredUserId: string;
+  referrerId: string;
+  username: string;
+  /** User-facing stage, as the app shows it. */
+  stage: string;
+  /** Null until the engine has a tracking record for this friend. */
+  status: ReferralRewardStatus | null;
+  signupAt: string;
+  qualifiedAt?: string;
+  payoutDueAt?: string;
+  /** When the payout sweep picks it up. */
+  payoutEtaAt?: string;
+  paidAt?: string;
+  /** Spend net of refunds. */
+  spendUsd: number;
+  merchantCount: number;
+  /**
+   * The bar this reward is measured against — for one that has qualified, the
+   * bar it cleared, which can be lower than today's.
+   */
+  spendTargetUsd: number;
+  merchantTarget: number;
+  hasActiveCard: boolean;
+  rewardUsd: number;
+  payoutToken?: string;
+  payoutTokenAmount?: string;
+  payoutTxUrl?: string;
+  reversedAt?: string;
+  /** account_closed | chargeback | self_referral_suspected */
+  reversalReason?: string;
+  reviewReason?: string;
+  /** An admin re-evaluated it and put it back on track. */
+  reinstatedAt?: string;
+  reinstatedBy?: string;
+  /** Reversed and expired rewards can be put back through the rules. */
+  canReevaluate: boolean;
+}
+
+/** A user's referral cashback from both sides of the program. */
+export interface AdminUserReferrals {
+  program: {
+    enabled: boolean;
+    referrerRewardUsd: number;
+    newUserRewardUsd: number;
+    spendTargetUsd: number;
+    merchantTarget: number;
+    qualifyWindowDays: number;
+    payoutDelayDays: number;
+    reversalWindowDays: number;
+  };
+  /** The reward this user earns as someone's referred friend, if any. */
+  invitedBy:
+    | (AdminReferralRewardRow & { liveSpend: ReferralSpendReading | null })
+    | null;
+  /** One row per friend this user invited. */
+  friends: AdminReferralRewardRow[];
+}
+
+/**
+ * What an admin re-evaluation did: `reinstated` (a reversal no longer
+ * supported by the rules), `still_reversed`, `qualified` (an expired friend who
+ * did clear the bar in their window) or `still_expired`.
+ */
+export type ReferralReevaluationOutcome =
+  | "reinstated"
+  | "still_reversed"
+  | "qualified"
+  | "still_expired";
+
+export interface ReferralReevaluationResult {
+  referredUserId: string;
+  referrerId: string;
+  outcome: ReferralReevaluationOutcome;
+  previousStatus: ReferralRewardStatus;
+  status: ReferralRewardStatus;
+  previousReversalReason?: string;
+  /** Why the rules still void it, for `still_reversed`. */
+  reversalReason?: string;
+  spendTargetUsd: number;
+  merchantTarget: number;
+  qualifyWindowDays: number;
+  spend: ReferralSpendReading;
+  /** When the payout sweep will pick it up, for a reward now owed. */
+  payoutEtaAt?: string;
+  reinstatedAt?: string;
+  reinstatedBy?: string;
+}
+
+export type CardType = "virtual" | "physical";
+
+/** Rain's rolling windows for a spend cap, with amounts always in cents. */
+export type CardLimitFrequency =
+  | "per24HourPeriod"
+  | "per7DayPeriod"
+  | "per30DayPeriod"
+  | "perYearPeriod"
+  | "allTime"
+  | "perAuthorization";
+
+export interface CardLimit {
+  /** Cents. Rain's issuing API is in minor units throughout. */
+  amount: number;
+  frequency: CardLimitFrequency | string;
+}
+
+export interface CardShippingAddress {
+  firstName?: string;
+  lastName?: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  region?: string;
+  postalCode: string;
+  countryCode: string;
+  phoneNumber: string;
+}
+
+/** The card being replaced, as the issuer holds it right now. */
+export interface IssuanceCurrentCard {
+  cardId: string;
+  type?: CardType;
+  /** Our status for it. */
+  status?: string;
+  /** The issuer's own word — the one that says `canceled`. */
+  issuerStatus?: string;
+  last4?: string;
+  /** MM/YY. */
+  expiration?: string;
+  limit?: CardLimit;
+}
+
+/**
+ * What the issue-card dialog opens pre-filled with.
+ *
+ * Mirrors `AdminCardIssuanceContext` in accounts-service. Everything here is
+ * what the cardholder already has — the point of the dialog is that support
+ * reviews and edits it rather than retyping an address from a chat transcript.
+ */
+export interface CardIssuanceContext {
+  canIssue: boolean;
+  /** Why not, when `canIssue` is false. Shown verbatim. */
+  blockedReason?: string;
+  provider?: CardProvider;
+  /** Issuer customer id the new card would be issued against. */
+  providerCustomerId?: string;
+  currentCard?: IssuanceCurrentCard;
+  defaults: {
+    type: CardType;
+    displayName?: string;
+    limit?: CardLimit;
+    shipping?: Partial<CardShippingAddress>;
+  };
+  cardholder?: { firstName?: string; lastName?: string; email?: string };
+}
+
+export interface IssueCardRequest {
+  type: CardType;
+  /** Cancel the card they hold today, at the issuer. Irreversible. */
+  cancelExisting: boolean;
+  displayName?: string;
+  limit?: CardLimit;
+  shipping?: CardShippingAddress;
+  reason?: string;
+}
+
+export interface IssueCardResult {
+  userId: string;
+  cardId: string;
+  provider: CardProvider;
+  type: CardType;
+  status: string;
+  last4?: string;
+  expiration?: string;
+  previousCardId?: string;
+  previousCardCanceled: boolean;
+  adminUsername: string;
+  reason?: string;
 }
 
 export type VaultKey = "USDC" | "FUSE" | "ETH";

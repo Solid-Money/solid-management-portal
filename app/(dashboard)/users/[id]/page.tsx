@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, Eye, Loader2, Snowflake } from "lucide-react";
+import { ArrowLeft, Ban, Eye, Loader2, Snowflake } from "lucide-react";
 
 import api, { getUserCard } from "@/lib/api";
 import { Activity, Balance, User, UserCardOverview } from "@/types";
@@ -13,9 +13,11 @@ import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
 import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
+import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserProfileCard from "@/components/user/user-profile-card";
+import UserReferralCard from "@/components/user/user-referral-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
 import UserTierMembershipCard from "@/components/user/user-tier-membership-card";
@@ -131,10 +133,17 @@ export default function UserDetailPage({
         <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
         <CopyButton value={id} label="User ID" />
         {/*
-          No account-status badge here: users have no status field, so it only
-          ever read "unknown". KYC — the status support actually asks about —
-          is on the profile card, per Bridge customer.
+          The one account status users actually have: closed from the app.
+          There is no generic status field — a badge for it only ever read
+          "unknown". KYC is on the profile card, per Bridge customer, and the
+          recover action sits next to the status there.
         */}
+        {user.isDeleted && (
+          <Badge variant="danger">
+            <Ban className="h-3 w-3" />
+            Account closed
+          </Badge>
+        )}
         {cardOverview?.hasCard && (
           <Badge variant="info">{cardOverview.provider} card</Badge>
         )}
@@ -249,10 +258,14 @@ export default function UserDetailPage({
             cashbackPercentage={user.cashbackPercentage}
           />
           <UserCashbackCard userId={id} />
+          {/* Both sides of the referral program, with the re-evaluate action
+              for rewards the engine reversed or expired. */}
+          <UserReferralCard userId={id} />
         </TabsContent>
 
-        <TabsContent value="support">
+        <TabsContent value="support" className="space-y-4">
           <UserIntercomCard userId={id} />
+          <UserAuditLogCard userId={id} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,5 +1,6 @@
 import {
   Activity,
+  ArrowRightLeft,
   BarChart3,
   BookOpen,
   CreditCard,
@@ -123,7 +124,8 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         href: "/wallets",
         label: "Wallets",
-        description: "Admin wallet balances and what needs topping up",
+        description:
+          "Every production wallet: what it funds, what it burns, and who it has blocked",
         icon: Wallet,
       },
       {
@@ -155,6 +157,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Fees",
         description: "Per-tier fee rates on every product we charge on",
         icon: Percent,
+      },
+      {
+        href: "/deposit-fees",
+        label: "Deposit Fees",
+        description:
+          "The fee on bridged deposits, per route and source chain",
+        icon: ArrowRightLeft,
       },
       {
         href: "/costs-config",
