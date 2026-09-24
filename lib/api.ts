@@ -3,6 +3,7 @@ import { auth } from "./firebase";
 import { toast } from "sonner";
 import {
   AdminAuditEntry,
+  AdminUserReferrals,
   BatchIssueTierTrialRequest,
   BatchIssueTierTrialResult,
   CardAuditEntry,
@@ -12,6 +13,7 @@ import {
   IssueTierTrialRequest,
   IssueTierTrialResult,
   RecoverAccountResult,
+  ReferralReevaluationResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   TierTrial,
@@ -274,6 +276,29 @@ export const recoverUserAccount = (userId: string, reason: string) =>
 /** Every admin action taken on this user, newest first. */
 export const getUserAuditLog = (userId: string) =>
   api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
+
+/**
+ * This user's referral cashback from both sides: the reward they earn as
+ * someone's referred friend, and one row per friend they invited.
+ */
+export const getUserReferrals = (userId: string) =>
+  api.get<{ data: AdminUserReferrals }>(`/admin/v1/users/${userId}/referrals`);
+
+/**
+ * Put a referred friend's reversed or expired reward back through the current
+ * rules, reinstating it if it stands. Never pays out itself: a reinstated
+ * reward is paid by the next payout sweep. The reason is required and lands on
+ * the friend's audit trail with the admin's name, which the backend takes from
+ * the Firebase token, never from here.
+ */
+export const reevaluateReferralReward = (
+  referredUserId: string,
+  reason: string
+) =>
+  api.post<{ data: ReferralReevaluationResult }>(
+    `/admin/v1/users/${referredUserId}/referral-reward/reevaluate`,
+    { reason }
+  );
 
 // --- Rewards / cohorts -----------------------------------------------------
 

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { History, Loader2 } from "lucide-react";
 
 import { getUserAuditLog } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatUsd } from "@/lib/utils";
 import { AdminAuditEntry } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
     tier_trial_gifted: { label: "Tier trial gifted", variant: "info" },
     tier_trial_extended: { label: "Tier trial extended", variant: "info" },
     tier_trial_revoked: { label: "Tier trial revoked", variant: "warning" },
+    referral_reward_reevaluated: {
+      label: "Referral reward re-evaluated",
+      variant: "info",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
@@ -58,8 +62,31 @@ function detailFor(entry: AdminAuditEntry): string | null {
     return parts.length ? parts.join(" · ") : null;
   }
 
+  if (entry.action === "referral_reward_reevaluated") {
+    return referralReevaluationDetail(entry);
+  }
+
   const cardId = stringField(entry, "cardId");
   return cardId ? `card ${cardId.slice(0, 8)}…` : null;
+}
+
+/** "reversed → qualified · $79.77 net against $75" for a re-evaluation. */
+function referralReevaluationDetail(entry: AdminAuditEntry): string | null {
+  const from = stringField(entry, "previousStatus");
+  const to = stringField(entry, "status");
+  const net = entry.metadata?.netSpendUsd;
+  const target = entry.metadata?.spendTargetUsd;
+
+  const parts = [
+    from && to ? `${from} → ${to}` : null,
+    typeof net === "number" && typeof target === "number"
+      ? `${formatUsd(net)} net against ${formatUsd(target, 0)}`
+      : null,
+    stringField(entry, "reversalReason")
+      ? `still void: ${stringField(entry, "reversalReason")}`
+      : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 /**

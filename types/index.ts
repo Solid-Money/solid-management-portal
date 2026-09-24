@@ -1336,6 +1336,120 @@ export interface RecoverAccountResult {
   };
 }
 
+/** Ledger state of a referral cashback reward, as rewards-service stores it. */
+export type ReferralRewardStatus =
+  | "pending"
+  | "qualified"
+  | "paid"
+  | "expired"
+  | "reversed"
+  | "under_review";
+
+/** The spend a referral reward is judged on, read live from card data. */
+export interface ReferralSpendReading {
+  /** Settled purchases inside the friend's window, dated by the tap. */
+  qualifiedSpendUsd: number;
+  /** Refunds that came out of that spend. */
+  refundedSpendUsd: number;
+  /** What the bar is measured against: the two above, netted. */
+  netSpendUsd: number;
+  merchantCount: number;
+  hasActiveCard: boolean;
+}
+
+/**
+ * One referral reward as the portal shows it: the row the app shows the
+ * referrer, plus the ledger detail support needs.
+ */
+export interface AdminReferralRewardRow {
+  referredUserId: string;
+  referrerId: string;
+  username: string;
+  /** User-facing stage, as the app shows it. */
+  stage: string;
+  /** Null until the engine has a tracking record for this friend. */
+  status: ReferralRewardStatus | null;
+  signupAt: string;
+  qualifiedAt?: string;
+  payoutDueAt?: string;
+  /** When the payout sweep picks it up. */
+  payoutEtaAt?: string;
+  paidAt?: string;
+  /** Spend net of refunds. */
+  spendUsd: number;
+  merchantCount: number;
+  /**
+   * The bar this reward is measured against — for one that has qualified, the
+   * bar it cleared, which can be lower than today's.
+   */
+  spendTargetUsd: number;
+  merchantTarget: number;
+  hasActiveCard: boolean;
+  rewardUsd: number;
+  payoutToken?: string;
+  payoutTokenAmount?: string;
+  payoutTxUrl?: string;
+  reversedAt?: string;
+  /** account_closed | chargeback | self_referral_suspected */
+  reversalReason?: string;
+  reviewReason?: string;
+  /** An admin re-evaluated it and put it back on track. */
+  reinstatedAt?: string;
+  reinstatedBy?: string;
+  /** Reversed and expired rewards can be put back through the rules. */
+  canReevaluate: boolean;
+}
+
+/** A user's referral cashback from both sides of the program. */
+export interface AdminUserReferrals {
+  program: {
+    enabled: boolean;
+    referrerRewardUsd: number;
+    newUserRewardUsd: number;
+    spendTargetUsd: number;
+    merchantTarget: number;
+    qualifyWindowDays: number;
+    payoutDelayDays: number;
+    reversalWindowDays: number;
+  };
+  /** The reward this user earns as someone's referred friend, if any. */
+  invitedBy:
+    | (AdminReferralRewardRow & { liveSpend: ReferralSpendReading | null })
+    | null;
+  /** One row per friend this user invited. */
+  friends: AdminReferralRewardRow[];
+}
+
+/**
+ * What an admin re-evaluation did: `reinstated` (a reversal no longer
+ * supported by the rules), `still_reversed`, `qualified` (an expired friend who
+ * did clear the bar in their window) or `still_expired`.
+ */
+export type ReferralReevaluationOutcome =
+  | "reinstated"
+  | "still_reversed"
+  | "qualified"
+  | "still_expired";
+
+export interface ReferralReevaluationResult {
+  referredUserId: string;
+  referrerId: string;
+  outcome: ReferralReevaluationOutcome;
+  previousStatus: ReferralRewardStatus;
+  status: ReferralRewardStatus;
+  previousReversalReason?: string;
+  /** Why the rules still void it, for `still_reversed`. */
+  reversalReason?: string;
+  spendTargetUsd: number;
+  merchantTarget: number;
+  qualifyWindowDays: number;
+  spend: ReferralSpendReading;
+  /** When the payout sweep will pick it up, for a reward now owed. */
+  payoutEtaAt?: string;
+  reinstatedAt?: string;
+  reinstatedBy?: string;
+}
+
 export type CardType = "virtual" | "physical";
 
 /** Rain's rolling windows for a spend cap, with amounts always in cents. */
