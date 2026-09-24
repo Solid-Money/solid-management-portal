@@ -100,7 +100,7 @@ export const getUserIntercomHistory = (userId: string) =>
  */
 export const getCardAuditHistory = (userId: string) =>
   api.get<{ data: CardAuditEntry[] }>(
-    `/admin/v1/users/${userId}/card/audit-history`
+    `/admin/v1/users/${userId}/card/audit-history`,
   );
 
 /**
@@ -113,7 +113,7 @@ export const getCardAuditHistory = (userId: string) =>
  */
 export const getCardIssuanceContext = (userId: string) =>
   api.get<{ data: CardIssuanceContext }>(
-    `/admin/v1/users/${userId}/card/issuance-context`
+    `/admin/v1/users/${userId}/card/issuance-context`,
   );
 
 /**
@@ -132,7 +132,7 @@ export const getCardIssuanceContext = (userId: string) =>
 export const issueUserCard = (userId: string, request: IssueCardRequest) =>
   api.post<{ data: IssueCardResult }>(
     `/admin/v1/users/${userId}/card/issue`,
-    request
+    request,
   );
 
 /**
@@ -143,12 +143,25 @@ export const issueUserCard = (userId: string, request: IssueCardRequest) =>
 export const setUserCardFreeze = (
   userId: string,
   freeze: boolean,
-  reason?: string
+  reason?: string,
 ) =>
   api.post(`/admin/v1/users/${userId}/card/freeze`, {
     freeze,
     ...(reason ? { reason } : {}),
   });
+
+/**
+ * Lift the card-spend block a failed sweep put on a Safe.
+ *
+ * Only clears the block. The arrears hold stays pinned and keeps reducing
+ * the card's spending power, so this is for once the debt is recovered or
+ * written off, not a way to let the user spend it again. The admin identity
+ * comes from the Firebase token server-side.
+ */
+export const unblockCardSpend = (safeAddress: string) =>
+  api.post<{ unblocked: boolean }>(
+    `/admin/v1/cash-ops/safes/${safeAddress}/unblock`,
+  );
 
 /**
  * This user's tier trials: the one that is open — waiting to be started or
@@ -178,11 +191,11 @@ export const getUserTierTrials = (userId: string) =>
  */
 export const issueUserTierTrial = (
   userId: string,
-  request: IssueTierTrialRequest
+  request: IssueTierTrialRequest,
 ) =>
   api.post<{ data: IssueTierTrialResult }>(
     `/admin/v1/users/${userId}/tier-trial`,
-    request
+    request,
   );
 
 /**
@@ -201,7 +214,7 @@ export const issueUserTierTrial = (
 export const batchIssueTierTrials = (request: BatchIssueTierTrialRequest) =>
   api.post<{ data: BatchIssueTierTrialResult }>(
     "/admin/v1/users/tier-trial/batch",
-    request
+    request,
   );
 
 /**
@@ -210,11 +223,11 @@ export const batchIssueTierTrials = (request: BatchIssueTierTrialRequest) =>
  */
 export const revokeUserTierTrial = (
   userId: string,
-  options: { trialId?: string; reason?: string } = {}
+  options: { trialId?: string; reason?: string } = {},
 ) =>
   api.post<{ data: TierTrial }>(
     `/admin/v1/users/${userId}/tier-trial/revoke`,
-    options
+    options,
   );
 
 /**
@@ -230,11 +243,11 @@ export const revokeUserTierTrial = (
 export const setUserCashbackPercentage = (
   userId: string,
   percentage: number | null,
-  reason?: string
+  reason?: string,
 ) =>
   api.post<{ data: SetUserCashbackPercentageResult }>(
     `/admin/v1/users/${userId}/cashback-percentage`,
-    { percentage, ...(reason ? { reason } : {}) }
+    { percentage, ...(reason ? { reason } : {}) },
   );
 
 /**
@@ -247,13 +260,13 @@ export const setUserCashbackPercentage = (
 export const setTransactionCashbackPercentage = (
   transactionId: string,
   percentage: number | null,
-  reason?: string
+  reason?: string,
 ) =>
   api.post<SetTransactionCashbackPercentageResult>(
     `/admin/v1/card-transactions/${encodeURIComponent(
-      transactionId
+      transactionId,
     )}/cashback-percentage`,
-    { percentage, ...(reason ? { reason } : {}) }
+    { percentage, ...(reason ? { reason } : {}) },
   );
 
 /**
@@ -270,7 +283,7 @@ export const setTransactionCashbackPercentage = (
 export const recoverUserAccount = (userId: string, reason: string) =>
   api.post<{ data: RecoverAccountResult }>(
     `/admin/v1/users/${userId}/account/recover`,
-    { reason }
+    { reason },
   );
 
 /** Every admin action taken on this user, newest first. */
@@ -293,11 +306,11 @@ export const getUserReferrals = (userId: string) =>
  */
 export const reevaluateReferralReward = (
   referredUserId: string,
-  reason: string
+  reason: string,
 ) =>
   api.post<{ data: ReferralReevaluationResult }>(
     `/admin/v1/users/${referredUserId}/referral-reward/reevaluate`,
-    { reason }
+    { reason },
   );
 
 // --- Rewards / cohorts -----------------------------------------------------

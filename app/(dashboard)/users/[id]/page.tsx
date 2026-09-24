@@ -152,6 +152,12 @@ export default function UserDetailPage({
             Card frozen
           </Badge>
         )}
+        {cardOverview?.spendBlock?.blocked && (
+          <Badge variant="danger">
+            <Ban className="h-3 w-3" />
+            Card spend blocked
+          </Badge>
+        )}
         <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600">
           <Eye className="h-3.5 w-3.5" />
           Read-only view of what this user sees

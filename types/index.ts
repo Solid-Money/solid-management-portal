@@ -450,7 +450,7 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
  */
 export function getTransactionCategory(
   type: TransactionType,
-  title?: string
+  title?: string,
 ): TransactionCategory | undefined {
   // A deposit headed for the card is written under the plain deposit types —
   // the destination lives in the title, not the type. Without this a crypto
@@ -518,7 +518,10 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.GOODDOLLAR_CLAIM, label: "GoodDollar Claim" },
   { value: TransactionType.GOODDOLLAR_SWEEP, label: "GoodDollar Sweep" },
   { value: TransactionType.AGENT_X402_PAYMENT, label: "Agent x402 Payment" },
-  { value: TransactionType.AGENT_WALLET_DEPOSIT, label: "Agent Wallet Deposit" },
+  {
+    value: TransactionType.AGENT_WALLET_DEPOSIT,
+    label: "Agent Wallet Deposit",
+  },
 ] as const;
 
 export const DEPOSIT_TYPES = [
@@ -607,9 +610,7 @@ export const WALLET_ROLE_ORDER: WalletRole[] = [
 ];
 
 export type WalletFailureSource =
-  | "cashback_payout"
-  | "referral_payout"
-  | "user_activity";
+  "cashback_payout" | "referral_payout" | "user_activity";
 
 export type WalletForecastSource = "cashback" | "referral";
 
@@ -1212,8 +1213,36 @@ export interface UserCardOverview {
   balanceUsd: number;
   /** Why a Wirex card's balance is what it is. Wirex cards only. */
   wirexSpend?: WirexSpendContext;
+  /**
+   * The off-chain card-spend block. Wirex cards only. Absent when it could not
+   * be read, so absence means "unknown", not "not blocked".
+   */
+  spendBlock?: CardSpendBlock;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Whether the backend has stopped this user's card spending, and why.
+ *
+ * Not the on-chain `safePaused`. This is a flag the authorize path checks
+ * before it reads the chain, so a blocked user is declined however healthy
+ * their Safe looks. A failed sweep sets it (arrears), and so does closing the
+ * account.
+ *
+ * Mirrors `AdminSpendBlock` in accounts-service.
+ */
+export interface CardSpendBlock {
+  blocked: boolean;
+  /** As the blocker wrote it, e.g. `Sweep failed for op <id>: <reason>`. */
+  reason?: string;
+  /** The Safe the block is keyed on — what the unblock call takes. */
+  safeAddress?: string;
+  /**
+   * The block closure placed. Recovering the account lifts it; unblocking
+   * directly would let a closed account spend.
+   */
+  accountClosure: boolean;
 }
 
 /**
@@ -1268,10 +1297,7 @@ export interface WirexSpendContext {
 
 /** Every admin action the card panel lists against one cardholder. */
 export type CardAuditAction =
-  | "card_frozen"
-  | "card_unfrozen"
-  | "card_issued"
-  | "card_canceled";
+  "card_frozen" | "card_unfrozen" | "card_issued" | "card_canceled";
 
 /** One entry in the admin audit trail for a card action. */
 export interface CardAuditEntry {
@@ -1338,12 +1364,7 @@ export interface RecoverAccountResult {
 
 /** Ledger state of a referral cashback reward, as rewards-service stores it. */
 export type ReferralRewardStatus =
-  | "pending"
-  | "qualified"
-  | "paid"
-  | "expired"
-  | "reversed"
-  | "under_review";
+  "pending" | "qualified" | "paid" | "expired" | "reversed" | "under_review";
 
 /** The spend a referral reward is judged on, read live from card data. */
 export interface ReferralSpendReading {
@@ -1426,10 +1447,7 @@ export interface AdminUserReferrals {
  * did clear the bar in their window) or `still_expired`.
  */
 export type ReferralReevaluationOutcome =
-  | "reinstated"
-  | "still_reversed"
-  | "qualified"
-  | "still_expired";
+  "reinstated" | "still_reversed" | "qualified" | "still_expired";
 
 export interface ReferralReevaluationResult {
   referredUserId: string;
@@ -1631,10 +1649,7 @@ export type TierTrialSource = "admin_gift" | "promotion";
  * the user accepts it — the duration is theirs to start.
  */
 export type TierTrialStatus =
-  | "pending_activation"
-  | "active"
-  | "expired"
-  | "revoked";
+  "pending_activation" | "active" | "expired" | "revoked";
 
 /**
  * A temporary tier upgrade: the user holds `tier` for `durationDays` from the
