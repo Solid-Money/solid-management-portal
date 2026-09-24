@@ -1,12 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { CreditCard, Loader2, Snowflake } from "lucide-react";
+import { Ban, CreditCard, Loader2, Snowflake } from "lucide-react";
 
 import { getCardAuditHistory } from "@/lib/api";
 import {
   CardAuditAction,
   CardAuditEntry,
+  CardSpendBlock,
   UserCardOverview,
   WirexSpendContext,
 } from "@/types";
@@ -21,6 +22,7 @@ import {
 import { CopyableValue } from "@/components/ui/copy-button";
 import FreezeCardDialog from "@/components/user/freeze-card-dialog";
 import IssueCardDialog from "@/components/user/issue-card-dialog";
+import UnblockCardSpendDialog from "@/components/user/unblock-card-spend-dialog";
 
 const PROVIDER_LABELS: Record<string, string> = {
   rain: "Rain",
@@ -63,12 +65,19 @@ const cap = (value: number | null | undefined) =>
 /**
  * The binding constraint on this card, named outright.
  *
- * Ordered by which one actually decides the next tap: a module-wide pause makes
- * the user's own balance irrelevant, a revoked module is not a funding problem,
- * and an exhausted cap is not an empty Safe. Support needs the first one that
+ * Ordered by which one actually decides the next tap: the backend block is
+ * checked before the chain is read, a module-wide pause makes the user's own
+ * balance irrelevant, a revoked module is not a funding problem, and an
+ * exhausted cap is not an empty Safe. Support needs the first one that
  * applies, because each sends them somewhere different.
  */
-function describeBlocker(spend: WirexSpendContext): string | null {
+function describeBlocker(
+  spend: WirexSpendContext,
+  block?: CardSpendBlock,
+): string | null {
+  if (block?.blocked) {
+    return "Card spending is blocked by the backend. Every tap is declined, however healthy the Safe looks.";
+  }
   if (spend.modulePaused) {
     return "Card spending is paused for everyone. This is a module-wide pause, not something about this user.";
   }
@@ -114,7 +123,8 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
     );
   }
 
-  const blocker = describeBlocker(spend);
+  const blocker = describeBlocker(spend, card.spendBlock);
+  const blocked = card.spendBlock?.blocked === true;
   const paused = spend.modulePaused || spend.safePaused;
 
   return (
@@ -124,9 +134,21 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
           Wirex spending power
         </h4>
         <Badge
-          variant={paused ? "danger" : spend.registered ? "success" : "warning"}
+          variant={
+            blocked || paused
+              ? "danger"
+              : spend.registered
+                ? "success"
+                : "warning"
+          }
         >
-          {paused ? "Paused" : spend.registered ? "Registered" : "Not registered"}
+          {blocked
+            ? "Blocked"
+            : paused
+              ? "Paused"
+              : spend.registered
+                ? "Registered"
+                : "Not registered"}
         </Badge>
       </div>
 
@@ -160,6 +182,61 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
         {blocker ??
           "This card spends the user's own assets directly — there is no balance to top up."}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The backend's card-spend block, and the way to lift it.
+ *
+ * Shown on its own, not only inside the spending-power breakdown. The block
+ * is not chain state, so it has to be visible even when the chain read failed
+ * and that panel is empty. A closure block gets no button: recovering the
+ * account is what lifts it, and lifting it here would let a closed account
+ * spend.
+ */
+function SpendBlockNotice({
+  userId,
+  username,
+  block,
+}: {
+  userId: string;
+  username: string;
+  block?: CardSpendBlock;
+}) {
+  if (!block?.blocked) return null;
+
+  const { safeAddress } = block;
+
+  return (
+    <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="flex items-center gap-1.5 font-medium">
+            <Ban className="h-3.5 w-3.5" />
+            {block.accountClosure
+              ? "Card spending blocked: account closed"
+              : "Card spending blocked: arrears"}
+          </p>
+          <p>
+            {block.accountClosure
+              ? "Closing the account set this block. Recovering the account lifts it. It cannot be unblocked here."
+              : "A sweep failed after Wirex settled, so we never collected the spend. Every new tap is declined until this is lifted."}
+          </p>
+        </div>
+        {!block.accountClosure && safeAddress && (
+          <UnblockCardSpendDialog
+            userId={userId}
+            username={username}
+            block={{ ...block, safeAddress }}
+          />
+        )}
+      </div>
+      {block.reason && (
+        <p className="break-words font-mono text-[11px] text-red-700">
+          {block.reason}
+        </p>
+      )}
     </div>
   );
 }
@@ -414,6 +491,12 @@ export default function UserCardPanel({
                 </dd>
               </div>
             </dl>
+
+            <SpendBlockNotice
+              userId={userId}
+              username={username}
+              block={card.spendBlock}
+            />
 
             <WirexSpendBreakdown card={card} />
 
