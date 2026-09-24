@@ -76,6 +76,15 @@ export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
   pointsUnlockEnabled: true,
   lockEnabled: false,
   lockDurationDays: 365,
+  // Equal to the skip-the-line thresholds, which is how they ship. They are
+  // separate keys so they can be moved apart, not because they start apart.
+  lockTier2Amount: 50000,
+  lockTier3Amount: 400000,
+  // Both dates are computed by the backend, so there is nothing sensible to
+  // default them to — the form shows a dash until the config loads.
+  legacyGrandfatherFrom: "",
+  legacyGrandfatherDays: 180,
+  legacyGrandfatherUntil: "",
   subscriptionEnabled: false,
   primeAnnualUsd: 199,
   // -1, not 0: Ultra is held by locking FUSE, and a price of zero would read

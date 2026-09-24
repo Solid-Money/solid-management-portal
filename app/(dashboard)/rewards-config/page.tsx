@@ -34,6 +34,20 @@ import {
 } from "@/components/ui/tooltip";
 import { useConfigEditor } from "@/hooks/use-config-editor";
 
+/**
+ * An ISO timestamp as the day it names, or a dash.
+ *
+ * The two grandfather dates are the only values on this page the backend
+ * computes rather than stores, and they are read to the day — the window is
+ * measured in days and the time of day is noise.
+ */
+function asDay(iso?: string): string {
+  if (!iso) return "—";
+  const at = new Date(iso);
+
+  return Number.isNaN(at.getTime()) ? "—" : at.toISOString().slice(0, 10);
+}
+
 export default function RewardsConfigPage() {
   const {
     config,
@@ -173,6 +187,11 @@ export default function RewardsConfigPage() {
         pointsUnlockEnabled: config.tierMembership.pointsUnlockEnabled,
         lockEnabled: config.tierMembership.lockEnabled,
         lockDurationDays: Number(config.tierMembership.lockDurationDays),
+        lockTier2Amount: Number(config.tierMembership.lockTier2Amount),
+        lockTier3Amount: Number(config.tierMembership.lockTier3Amount),
+        legacyGrandfatherDays: Number(
+          config.tierMembership.legacyGrandfatherDays,
+        ),
         subscriptionEnabled: config.tierMembership.subscriptionEnabled,
         primeAnnualUsd: Number(config.tierMembership.primeAnnualUsd),
         ultraAnnualUsd: Number(config.tierMembership.ultraAnnualUsd),
@@ -1241,23 +1260,23 @@ export default function RewardsConfigPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <InputField
                 label="Prime FUSE Amount"
-                value={config.fuseStaking.tier2Amount}
+                value={config.tierMembership.lockTier2Amount}
                 onChange={(v) =>
-                  handleNumericUpdate("fuseStaking", "tier2Amount", v)
+                  handleNumericUpdate("tierMembership", "lockTier2Amount", v)
                 }
                 type="number"
                 suffix="FUSE"
-                tooltip="FUSE that must be locked to hold Prime. 0 disables this rung — it never unlocks, for either route. Shared with the FUSE Staking section above."
+                tooltip="FUSE that must be LOCKED to hold Prime. 0 disables this rung. Separate from the FUSE Staking amount above, which is what a held balance is measured against — raise this one when the lock is re-priced and grandfathered holders keep the terms they joined at."
               />
               <InputField
                 label="Ultra FUSE Amount"
-                value={config.fuseStaking.tier3Amount}
+                value={config.tierMembership.lockTier3Amount}
                 onChange={(v) =>
-                  handleNumericUpdate("fuseStaking", "tier3Amount", v)
+                  handleNumericUpdate("tierMembership", "lockTier3Amount", v)
                 }
                 type="number"
                 suffix="FUSE"
-                tooltip="FUSE that must be locked to hold Ultra. 0 disables this rung — it never unlocks, for either route. Shared with the FUSE Staking section above."
+                tooltip="FUSE that must be LOCKED to hold Ultra. 0 disables this rung. Separate from the FUSE Staking amount above — see the Prime field."
               />
               <InputField
                 label="Lock Duration"
@@ -1272,7 +1291,51 @@ export default function RewardsConfigPage() {
             </div>
           </div>
 
-          {/* 3 — the cash route */}
+          {/* 3 — retiring the routes v3 replaces */}
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">
+              Retiring Skip-the-Line and Points
+            </h4>
+            <p className="mb-3 text-xs text-gray-500">
+              Holding FUSE in Savings, and the points ladder, grant a tier only
+              to accounts created before the launch date, and only for the
+              window below. Newer accounts get v3 only. Both dates are read-only
+              here except the window: the launch date is stamped the first time
+              the backend needs it, so it records when v3 actually went live.
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <InputField
+                label="Launched"
+                value={asDay(config.tierMembership.legacyGrandfatherFrom)}
+                onChange={() => {}}
+                disabled
+                tooltip="The day rewards v3 went live in this environment. Accounts older than this may keep the old routes; newer ones never get them. Stamped by the backend the first time it is needed, so it records the real launch rather than a value someone typed."
+              />
+              <InputField
+                label="Grandfather Window"
+                value={config.tierMembership.legacyGrandfatherDays}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "tierMembership",
+                    "legacyGrandfatherDays",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="days"
+                tooltip="How long accounts that predate the launch keep the old routes. Counted from the launch date. The rewards spec commits to at least 30 days' notice before any change of this kind, and six months (180) for this one."
+              />
+              <InputField
+                label="Old Routes Stop"
+                value={asDay(config.tierMembership.legacyGrandfatherUntil)}
+                onChange={() => {}}
+                disabled
+                tooltip="Launch date plus the window. After this, holding FUSE and points grant nothing to anyone, and every tier comes from a lock or an annual charge."
+              />
+            </div>
+          </div>
+
+          {/* 4 — the cash route */}
           <div className="mb-4 rounded-lg border border-gray-200 p-4">
             <h4 className="mb-1 text-sm font-semibold text-gray-900">
               Annual Charge
