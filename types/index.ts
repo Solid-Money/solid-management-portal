@@ -1037,6 +1037,27 @@ export interface TierMembershipConfig {
   lockEnabled: boolean;
   /** The term a new lock carries, in days. Existing locks keep their own. */
   lockDurationDays: number;
+  /**
+   * FUSE that must be LOCKED to hold Prime.
+   *
+   * Separate from `fuseStaking.tier2Amount`, which is what a held balance is
+   * measured against. They started equal and are on different clocks: the lock
+   * is re-priced each quarter against a USD band, while grandfathered holders
+   * keep the terms they joined at.
+   */
+  lockTier2Amount: number;
+  /** FUSE that must be LOCKED to hold Ultra. See `lockTier2Amount`. */
+  lockTier3Amount: number;
+  /**
+   * The day rewards v3 went live, ISO. Accounts older than this may keep the
+   * routes it replaces — FUSE held in Savings, and points. Stamped by the
+   * backend the first time it is needed, so it is read here, never set.
+   */
+  legacyGrandfatherFrom: string;
+  /** How long those accounts keep them, counted from the launch date. */
+  legacyGrandfatherDays: number;
+  /** Launch date plus the window: when the old routes stop granting anything. */
+  legacyGrandfatherUntil: string;
   /** Whether a tier can be bought with an annual fee. */
   subscriptionEnabled: boolean;
   /** Annual price of Prime, in USD. 0 means it is not sold for cash. */
