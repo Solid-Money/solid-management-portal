@@ -206,6 +206,15 @@ export default function UsersTable() {
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {user.username}
+                      {user.isDeleted && (
+                        <Badge
+                          variant="danger"
+                          className="ml-2"
+                          title="Closed from the app — recoverable from the profile"
+                        >
+                          closed
+                        </Badge>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {user.email}

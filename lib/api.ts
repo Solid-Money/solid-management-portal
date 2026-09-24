@@ -2,10 +2,18 @@ import axios from "axios";
 import { auth } from "./firebase";
 import { toast } from "sonner";
 import {
+  AdminAuditEntry,
+  AdminUserReferrals,
   BatchIssueTierTrialRequest,
   BatchIssueTierTrialResult,
+  CardAuditEntry,
+  CardIssuanceContext,
+  IssueCardRequest,
+  IssueCardResult,
   IssueTierTrialRequest,
   IssueTierTrialResult,
+  RecoverAccountResult,
+  ReferralReevaluationResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   TierTrial,
@@ -83,8 +91,50 @@ export const getUserCashback = (userId: string) =>
 export const getUserIntercomHistory = (userId: string) =>
   api.get(`/admin/v1/users/${userId}/intercom`);
 
-export const getCardFreezeHistory = (userId: string) =>
-  api.get(`/admin/v1/users/${userId}/card/freeze-history`);
+/**
+ * Every admin action on this user's card — frozen, unfrozen, canceled,
+ * issued — newest first.
+ *
+ * Wider than the freeze history on purpose: a cancel and the issue that
+ * followed it are one replacement, and either half read alone tells the wrong
+ * story about why this cardholder's card looks the way it does.
+ */
+export const getCardAuditHistory = (userId: string) =>
+  api.get<{ data: CardAuditEntry[] }>(
+    `/admin/v1/users/${userId}/card/audit-history`
+  );
+
+/**
+ * What the issue-card dialog opens with: the card this user holds today, and
+ * the name, spend limit and shipping address a replacement should start from.
+ *
+ * Read when the dialog opens rather than with the card panel — it calls the
+ * issuer for the live card and the cardholder record, which is worth doing
+ * when support is about to act on it and not on every page view.
+ */
+export const getCardIssuanceContext = (userId: string) =>
+  api.get<{ data: CardIssuanceContext }>(
+    `/admin/v1/users/${userId}/card/issuance-context`
+  );
+
+/**
+ * Issue a card to this user, cancelling the one they hold first unless
+ * `cancelExisting` says otherwise.
+ *
+ * This is the answer to a cardholder whose card details have leaked: the app
+ * only offers a freeze, and a frozen card still carries the leaked number.
+ * Cancelling is irreversible, and the backend does it *before* issuing — if
+ * the cancel fails nothing is issued, so the user is never left holding the
+ * compromised card alongside a new one.
+ *
+ * The admin identity comes from the Firebase token server-side, never from
+ * here, so the audit row names whoever is actually signed in.
+ */
+export const issueUserCard = (userId: string, request: IssueCardRequest) =>
+  api.post<{ data: IssueCardResult }>(
+    `/admin/v1/users/${userId}/card/issue`,
+    request
+  );
 
 /**
  * Freeze or unfreeze a user's card. The admin identity is taken from the
@@ -219,6 +269,50 @@ export const setTransactionCashbackPercentage = (
       transactionId
     )}/cashback-percentage`,
     { percentage, ...(reason ? { reason } : {}) }
+  );
+
+/**
+ * Reopen an account its owner closed with the in-app "Delete account".
+ *
+ * Closure never removed what the account is made of — the passkeys, the Safe
+ * and its funds, activity and rewards — so this lets the user sign straight
+ * back in with the passkey they already have. The reason is required: it is
+ * written to the audit trail and posted to Slack with the admin's name.
+ *
+ * Refused with a 409 for an account that is not closed. The admin identity
+ * comes from the Firebase token server-side, never from here.
+ */
+export const recoverUserAccount = (userId: string, reason: string) =>
+  api.post<{ data: RecoverAccountResult }>(
+    `/admin/v1/users/${userId}/account/recover`,
+    { reason }
+  );
+
+/** Every admin action taken on this user, newest first. */
+export const getUserAuditLog = (userId: string) =>
+  api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
+
+/**
+ * This user's referral cashback from both sides: the reward they earn as
+ * someone's referred friend, and one row per friend they invited.
+ */
+export const getUserReferrals = (userId: string) =>
+  api.get<{ data: AdminUserReferrals }>(`/admin/v1/users/${userId}/referrals`);
+
+/**
+ * Put a referred friend's reversed or expired reward back through the current
+ * rules, reinstating it if it stands. Never pays out itself: a reinstated
+ * reward is paid by the next payout sweep. The reason is required and lands on
+ * the friend's audit trail with the admin's name, which the backend takes from
+ * the Firebase token, never from here.
+ */
+export const reevaluateReferralReward = (
+  referredUserId: string,
+  reason: string
+) =>
+  api.post<{ data: ReferralReevaluationResult }>(
+    `/admin/v1/users/${referredUserId}/referral-reward/reevaluate`,
+    { reason }
   );
 
 // --- Rewards / cohorts -----------------------------------------------------
