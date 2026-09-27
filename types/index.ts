@@ -697,6 +697,17 @@ export interface WalletFailuresResponse {
   generatedAt: string;
 }
 
+/** What to send and when, in days of cover rather than a fixed amount. */
+export interface WalletRefillPlan {
+  floorDays: number;
+  targetDays: number;
+  floorAmount: number;
+  targetAmount: number;
+  /** What to actually send now. Zero when the balance already covers it. */
+  refillAmount: number;
+  belowFloor: boolean;
+}
+
 export interface WalletAssetFlow {
   chainId: number;
   chainName: string;
@@ -705,17 +716,31 @@ export interface WalletAssetFlow {
   balance: string;
   threshold: string;
   status: string;
+  /** Whether this asset is a user's money passing through this wallet. */
+  isFloat: boolean;
   outflowCount: number;
   outflowTotal: number;
   outflowPerDay: number;
   inflowCount: number;
   inflowTotal: number;
-  /** True drain from balance snapshots, gas fees included. */
-  measuredBurnPerDay?: number;
+  /** Of the inflow, what we sent — the top-ups. */
+  fundingCount: number;
+  fundingTotal: number;
+  /** Of the inflow, what a user sent to pass through. Never charged as cost. */
+  turnoverCount: number;
+  turnoverTotal: number;
+  turnoverPerDay: number;
+  /**
+   * Money that left and is not coming back: gas burned as fees, payouts owed,
+   * a float that did not balance. Net of funding, so a user's money passing
+   * through nets to zero rather than reading as spend.
+   */
+  realCostPerDay?: number;
   snapshotCount: number;
   daysOfRunway?: number;
   /** Which figure the runway was computed from. */
   runwayBasis?: "measured" | "outflow";
+  plan?: WalletRefillPlan;
   activityScore: number;
 }
 
@@ -747,6 +772,86 @@ export interface WalletForecastResponse {
     coversUntil?: string;
   };
   note?: string;
+  generatedAt: string;
+}
+
+/** One top-up: someone sending money to one of our wallets. */
+export interface FundingLedgerEntry {
+  walletName: string;
+  from: string;
+  /** Set when the sender is another wallet of ours, or a known funder. */
+  fromWalletName?: string;
+  chainId: number;
+  chainName: string;
+  asset?: WalletAsset;
+  symbol: string;
+  amount: string;
+  /** Absent rather than guessed when the asset cannot be priced. */
+  amountUsd?: number;
+  timestamp: string;
+  hash: string;
+  explorerUrl: string;
+}
+
+export interface FundingLedgerBucket {
+  /** `YYYY-MM-DD`; for a week, the Monday. */
+  date: string;
+  count: number;
+  usd: number;
+  /** Rows with no price, so the total reads as a floor rather than a fact. */
+  unpricedCount: number;
+}
+
+export interface FundingLedgerResponse {
+  windowDays: number;
+  entries: FundingLedgerEntry[];
+  byDay: FundingLedgerBucket[];
+  byWeek: FundingLedgerBucket[];
+  totals: {
+    count: number;
+    usd: number;
+    unpricedCount: number;
+    walletsFunded: number;
+  };
+  byWallet: Array<{
+    walletName: string;
+    count: number;
+    usd: number;
+    unpricedCount: number;
+  }>;
+  /** Wallets or chains that could not be read, so a zero is not read as none. */
+  gaps: Array<{ walletName: string; chainId?: number; reason: string }>;
+  generatedAt: string;
+}
+
+/** A prepaid balance held with a third party, as last recorded by a person. */
+export interface ExternalAccountStatus {
+  name: string;
+  provider: string;
+  role: WalletRole | "Unclassified";
+  funds: string;
+  impactWhenEmpty: string;
+  dashboardUrl: string;
+  /** Why the figure has to be recorded by hand rather than fetched. */
+  readNote: string;
+  chainIds: number[];
+  currency: string;
+  latest?: {
+    balance: number;
+    recordedAt: string;
+    recordedBy: string;
+    note?: string;
+    ageHours: number;
+    stale: boolean;
+  };
+  drawPerDay?: number;
+  daysOfRunway?: number;
+  plan?: WalletRefillPlan;
+  history: Array<{ balance: number; recordedAt: string; recordedBy: string }>;
+}
+
+export interface ExternalAccountsResponse {
+  accounts: ExternalAccountStatus[];
   generatedAt: string;
 }
 

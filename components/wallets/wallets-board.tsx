@@ -20,6 +20,7 @@ import {
   WalletAssetFlow,
   WalletFilter,
   WalletInfo,
+  WalletRefillPlan,
   WalletStatusResponse,
   WALLET_ROLE_ORDER,
 } from "@/types";
@@ -33,6 +34,7 @@ import {
   monitoredAssets,
   severityOf,
   truncateAddress,
+  assetVerdict,
   walletSeverity,
   walletStatuses,
 } from "@/lib/wallets";
@@ -99,14 +101,24 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
         <p className="text-sm text-gray-500">
           Balances as of {new Date(data.lastUpdated).toLocaleString()}
         </p>
+        {/* Counted from the configured thresholds, which is all that is known
+            without a flow request per wallet. An opened card restates its own
+            verdict from measured days of cover and can disagree with this, so
+            the label says which measure it is rather than implying one. */}
         {criticalCount > 0 && (
-          <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
-            {criticalCount} critical
+          <span
+            className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white"
+            title="Below its configured threshold. Open a wallet to see its cover in days, which can be better or worse than this."
+          >
+            {criticalCount} below configured floor
           </span>
         )}
         {lowCount > 0 && (
-          <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-            {lowCount} low
+          <span
+            className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"
+            title="Near its configured threshold. Open a wallet to see its cover in days."
+          >
+            {lowCount} near configured floor
           </span>
         )}
         <span className="ml-auto text-xs text-gray-500">
@@ -176,7 +188,7 @@ function WalletCard({
   ) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const severity = walletSeverity(wallet);
+  const configuredSeverity = walletSeverity(wallet);
 
   // Fetched only once the card is opened. The flow call reads a wallet's
   // transfer history across every chain it runs on; doing that eagerly for
@@ -196,6 +208,39 @@ function WalletCard({
     );
     return map;
   }, [flow]);
+
+  /**
+   * Whether any asset is inside its measured floor.
+   *
+   * Separate from the configured statuses, which are fixed amounts that drift
+   * out of meaning as usage grows: a wallet can be "OK" against one and still
+   * be a few hours from empty.
+   */
+  const belowFloor = useMemo(
+    () => (flow?.assets ?? []).some((asset) => asset.plan?.belowFloor),
+    [flow]
+  );
+
+  /**
+   * The card's verdict, restated from measured cover once the flow arrives.
+   *
+   * Until then it is the configured reading, which is what the board is
+   * ordered by and is available without a request per wallet. Re-deriving it
+   * here keeps the badge from contradicting the rows underneath it — a card
+   * headed CRITICAL with every row reading OK is worse than either alone.
+   */
+  const severity = useMemo(() => {
+    if (!flow?.assets.length) return configuredSeverity;
+    return severityOf(
+      flow.assets.map((asset) =>
+        assetVerdict(
+          asset.status as BalanceStatus,
+          asset.plan,
+          asset.daysOfRunway
+        )
+      )
+    );
+  }, [flow, configuredSeverity]);
 
   /**
    * Every monitored asset across every chain, hottest first.
@@ -311,6 +356,7 @@ function WalletCard({
                 chainName={chain.chainName}
                 balance={reading.balance}
                 threshold={reading.threshold}
+                plan={assetFlow?.plan}
                 status={reading.status}
                 runwayDays={assetFlow?.daysOfRunway}
               />
@@ -349,7 +395,9 @@ function WalletCard({
               <tr>
                 <th className="px-4 py-2">Token / chain</th>
                 <th className="px-4 py-2">Balance vs floor</th>
-                <th className="px-4 py-2">Burn / day</th>
+                {/* "Cost", not "burn": what leaves and does not come back.
+                    Money passing through to users is reported separately. */}
+                <th className="px-4 py-2">Cost / day</th>
                 <th className="px-4 py-2">Runway</th>
                 <th className="px-4 py-2">Activity</th>
                 <th className="px-4 py-2" />
@@ -377,18 +425,30 @@ function WalletCard({
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <StatusText status={reading.status} />
+                    <StatusText
+                      status={assetVerdict(
+                        reading.status,
+                        assetFlow?.plan,
+                        assetFlow?.daysOfRunway
+                      )}
+                    />
                     <div className="text-xs text-gray-500">
                       {formatAmount(reading.balance)} /{" "}
-                      {formatAmount(reading.threshold)}
+                      {formatAmount(
+                        assetFlow?.plan?.floorAmount ?? reading.threshold
+                      )}
+                      {assetFlow?.plan && (
+                        <span
+                          className="ml-1 text-gray-400"
+                          title={`A floor of ${assetFlow.plan.floorDays} days at the measured cost, rather than the fixed ${formatAmount(reading.threshold)} configured.`}
+                        >
+                          ({assetFlow.plan.floorDays}d)
+                        </span>
+                      )}
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-gray-700">
-                    {assetFlow?.measuredBurnPerDay != null
-                      ? formatAmount(assetFlow.measuredBurnPerDay)
-                      : assetFlow && assetFlow.outflowPerDay > 0
-                      ? `~${formatAmount(assetFlow.outflowPerDay)}`
-                      : "—"}
+                  <td className="px-4 py-2">
+                    <CostCell flow={assetFlow} />
                   </td>
                   <td className="px-4 py-2">
                     <RunwayCell flow={assetFlow} />
@@ -406,7 +466,12 @@ function WalletCard({
             </tbody>
           </table>
 
-          {severity < 2 && <TopUpInstruction wallet={wallet} />}
+          {/* Also shown when nothing has tripped its configured threshold but
+              an asset is inside its measured floor — the Connect Wallet FUSE
+              case, comfortably above a stale 1,000 and under a day of cover. */}
+          {(severity < 2 || belowFloor) && (
+            <TopUpInstruction wallet={wallet} flowByAsset={flowByKey} />
+          )}
         </div>
       )}
     </div>
@@ -416,20 +481,46 @@ function WalletCard({
 /**
  * What to send, and where, for every chain that is short.
  *
- * Kept verbatim from the old page, because it is the one part of it that
- * already did its job: "Send at least 100 soUSD on Fuse" is what someone
- * actually needs at 2am.
+ * The amount is now what brings the wallet back to its target cover rather
+ * than what clears its floor. Sending the floor is what produced the daily
+ * refill treadmill: Connect Wallet's FUSE floor was 1,000 against a cost of
+ * ~990 a day, so every top-up bought a single day and someone had to come
+ * back the next morning. Where no cost has been measured yet, it falls back to
+ * the configured threshold and says so.
  */
-function TopUpInstruction({ wallet }: { wallet: WalletInfo }) {
+function TopUpInstruction({
+  wallet,
+  flowByAsset,
+}: {
+  wallet: WalletInfo;
+  flowByAsset: Map<string, WalletAssetFlow>;
+}) {
   const shortfalls = wallet.chains
     .map((chain) => ({
       chain,
       needs: monitoredAssets(chain)
-        .filter(
-          (reading) =>
-            reading.status === "LOW" || reading.status === "CRITICAL"
-        )
-        .map((reading) => `${formatAmount(reading.threshold)} ${reading.label}`),
+        .map((reading) => {
+          const flow = flowByAsset.get(`${chain.chainId}:${reading.asset}`);
+          const plan = flow?.plan;
+
+          if (plan?.refillAmount && plan.refillAmount > 0) {
+            return {
+              text: `${formatAmount(plan.refillAmount)} ${reading.label}`,
+              detail: `brings it to ${plan.targetDays} days of cover`,
+              urgent: plan.belowFloor,
+            };
+          }
+          // No measured cost to plan from, so fall back to the fixed floor.
+          if (reading.status === "LOW" || reading.status === "CRITICAL") {
+            return {
+              text: `${formatAmount(reading.threshold)} ${reading.label}`,
+              detail: "its configured floor — no cost measured yet",
+              urgent: reading.status === "CRITICAL",
+            };
+          }
+          return null;
+        })
+        .filter((need): need is NonNullable<typeof need> => need !== null),
     }))
     .filter((row) => row.needs.length > 0);
 
@@ -439,15 +530,62 @@ function TopUpInstruction({ wallet }: { wallet: WalletInfo }) {
     <div className="border-t border-gray-200 px-4 py-3">
       {shortfalls.map(({ chain, needs }) => (
         <p key={chain.chainId} className="text-sm text-gray-800">
-          Send at least <strong>{needs.join(" and ")}</strong> on{" "}
+          Send at least{" "}
+          <strong>{needs.map((need) => need.text).join(" and ")}</strong> on{" "}
           {chain.chainName} to{" "}
           <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
             {wallet.address}
           </code>
+          <span className="ml-1 text-xs text-gray-500">
+            ({needs[0].detail})
+          </span>
         </p>
       ))}
       {wallet.topUpHint && (
         <p className="mt-2 text-xs text-indigo-900">{wallet.topUpHint}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What this asset costs us per day, with turnover kept out of it.
+ *
+ * The distinction is the point: a bridging wallet can move 16,000 USDC through
+ * itself in a week and cost us 27 of it. Showing the 16,000 as burn is what
+ * made every float wallet on this page look like it was on fire.
+ */
+function CostCell({ flow }: { flow?: WalletAssetFlow }) {
+  if (!flow) return <span className="text-gray-400">—</span>;
+
+  const cost =
+    flow.realCostPerDay != null
+      ? formatAmount(flow.realCostPerDay)
+      : !flow.isFloat && flow.outflowPerDay > 0
+      ? `~${formatAmount(flow.outflowPerDay)}`
+      : "—";
+
+  return (
+    <div>
+      <div
+        className="text-gray-700"
+        title={
+          flow.realCostPerDay != null
+            ? "Measured from balance history net of top-ups, so gas burned as fees is included and money passing through to users is not."
+            : flow.isFloat
+            ? "No cost measured yet. Gross outflow is not shown here because on this asset it is a user's money leaving, not ours."
+            : "Estimated from transfers out only — gas spent as fees is not counted, so this is optimistic."
+        }
+      >
+        {cost}
+      </div>
+      {flow.turnoverPerDay > 0 && (
+        <div
+          className="text-[11px] text-gray-400"
+          title={`${flow.turnoverCount} transfers of users' money passing through in the window. Not a cost to us.`}
+        >
+          +{formatAmount(flow.turnoverPerDay)}/d through
+        </div>
       )}
     </div>
   );
@@ -490,11 +628,19 @@ function RunwayCell({ flow }: { flow?: WalletAssetFlow }) {
   );
 }
 
+/**
+ * One asset's balance against its floor, at a glance.
+ *
+ * Shows the measured floor once there is one, so the chip and the table below
+ * it cannot quote two different floors for the same asset — and so a chip does
+ * not read as healthy against a fixed threshold the asset has outgrown.
+ */
 function AssetChip({
   label,
   chainName,
   balance,
   threshold,
+  plan,
   status,
   runwayDays,
 }: {
@@ -502,23 +648,31 @@ function AssetChip({
   chainName: string;
   balance: string;
   threshold: string;
+  plan?: WalletRefillPlan;
   status: BalanceStatus;
   runwayDays?: number;
 }) {
+  const verdict = assetVerdict(status, plan, runwayDays);
   const tone =
-    status === "CRITICAL"
+    verdict === "CRITICAL"
       ? "bg-red-100 text-red-900 border-red-200"
-      : status === "LOW"
+      : verdict === "LOW"
       ? "bg-yellow-100 text-yellow-900 border-yellow-200"
       : "bg-gray-100 text-gray-700 border-gray-200";
+
+  const floor = plan ? plan.floorAmount : threshold;
 
   return (
     <span
       className={`rounded border px-1.5 py-0.5 text-[11px] ${tone}`}
-      title={`${label} on ${chainName}: ${balance} held against a floor of ${threshold}`}
+      title={
+        plan
+          ? `${label} on ${chainName}: ${balance} held against a floor of ${formatAmount(floor)}, which is ${plan.floorDays} days at the measured cost. Configured threshold is ${formatAmount(threshold)}.`
+          : `${label} on ${chainName}: ${balance} held against a floor of ${threshold}`
+      }
     >
       {label} {formatAmount(balance)}
-      <span className="opacity-60"> / {formatAmount(threshold)}</span>
+      <span className="opacity-60"> / {formatAmount(floor)}</span>
       {runwayDays != null && runwayDays < 7 && (
         <span className="ml-1 font-medium">· {formatRunway(runwayDays)}</span>
       )}
