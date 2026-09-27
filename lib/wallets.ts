@@ -2,11 +2,15 @@ import api from "@/lib/api";
 import { formatDateTime as formatDateTimeUtil, formatNumber, formatUsd } from "@/lib/utils";
 import {
   ChainBalance,
+  ExternalAccountStatus,
+  ExternalAccountsResponse,
+  FundingLedgerResponse,
   WalletAsset,
   WalletFailuresResponse,
   WalletFlowResponse,
   WalletForecastResponse,
   WalletInfo,
+  WalletRefillPlan,
   WalletRole,
   WalletTransfersResponse,
 } from "@/types";
@@ -63,6 +67,32 @@ export const getWalletBalanceSeries = (
     .get<Array<{ capturedAt: string; balance: number }>>(
       path(walletName, "balance-series"),
       { params: { chainId, asset, windowDays } }
+    )
+    .then((response) => response.data);
+
+/** Every top-up across every wallet, with per-day and per-week totals. */
+export const getFundingLedger = (windowDays = 30) =>
+  api
+    .get<FundingLedgerResponse>("/admin/v1/wallets/funding-ledger", {
+      params: { windowDays },
+    })
+    .then((response) => response.data);
+
+export const getExternalAccounts = () =>
+  api
+    .get<ExternalAccountsResponse>("/admin/v1/wallets/external-accounts")
+    .then((response) => response.data);
+
+export const recordExternalBalance = (body: {
+  account: string;
+  balance: number;
+  toppedUpBy?: number;
+  note?: string;
+}) =>
+  api
+    .post<ExternalAccountStatus>(
+      "/admin/v1/wallets/external-accounts/readings",
+      body
     )
     .then((response) => response.data);
 
@@ -166,6 +196,33 @@ export const severityOf = (statuses: BalanceStatus[]): 0 | 1 | 2 => {
   if (statuses.includes("CRITICAL")) return 0;
   if (statuses.includes("LOW")) return 1;
   return 2;
+};
+
+/**
+ * One asset's verdict, preferring the measured floor over the configured one.
+ *
+ * The configured thresholds are fixed amounts that drift out of meaning as
+ * usage changes, in both directions: Connect Wallet's Fuse USDC sat at
+ * CRITICAL against a floor of 50 while holding a week of cover, and its FUSE
+ * read OK against a floor of 1,000 with a day and a half left. Where a real
+ * cost has been measured, days of cover is the better answer, so it wins.
+ *
+ * The configured status is still what the Slack alerts and the balance checker
+ * fire on — this only changes what the page tells a reader.
+ */
+export const assetVerdict = (
+  status: BalanceStatus,
+  plan?: WalletRefillPlan,
+  daysOfRunway?: number
+): BalanceStatus => {
+  if (status === "N/A") return "N/A";
+  if (!plan) return status;
+  // Inside a day is a different kind of problem from inside the floor: one
+  // needs funding today, the other this week.
+  if (plan.belowFloor) {
+    return daysOfRunway != null && daysOfRunway < 1 ? "CRITICAL" : "LOW";
+  }
+  return "OK";
 };
 
 export const chainStatuses = (chain: ChainBalance): BalanceStatus[] =>
