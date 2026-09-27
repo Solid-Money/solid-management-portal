@@ -1792,6 +1792,11 @@ export interface UserRewardsData {
   yieldBoostPercentage: number;
   yieldBoostCap: number;
   yieldBoostEarned: number;
+  /**
+   * Savings balance the tier's boost is paid on, in USD (Prime $10K, Ultra
+   * $25K; 0 when unboosted). Optional until every backend sends it.
+   */
+  yieldBoostBalanceCap?: number;
   subscriptionDiscountRate: number;
   subscriptionCategoryLimit: number;
   fuseSkipLine?: {
