@@ -19,6 +19,8 @@ type BadgeVariant = "warning" | "success" | "info" | "danger" | "muted";
 const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
   {
     account_recovered: { label: "Account recovered", variant: "success" },
+    recovery_code_sent: { label: "Recovery code sent", variant: "info" },
+    account_email_set: { label: "Recovery email changed", variant: "danger" },
     card_frozen: { label: "Card frozen", variant: "warning" },
     card_unfrozen: { label: "Card unfrozen", variant: "success" },
     card_issued: { label: "Card issued", variant: "info" },
@@ -64,6 +66,22 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "referral_reward_reevaluated") {
     return referralReevaluationDetail(entry);
+  }
+
+  if (entry.action === "recovery_code_sent") {
+    const emailHint = stringField(entry, "emailHint");
+    return emailHint ? `sent to ${emailHint}` : null;
+  }
+
+  if (entry.action === "account_email_set") {
+    // Both addresses in full: this row is the record of which inbox was put in
+    // control of the account, and a masked one could not settle a later
+    // dispute about it.
+    const previous = stringField(entry, "previousEmail");
+    const next =
+      stringField(entry, "email") ?? stringField(entry, "attemptedEmail");
+    if (!next) return null;
+    return `${previous ?? "none on file"} → ${next}`;
   }
 
   const cardId = stringField(entry, "cardId");
