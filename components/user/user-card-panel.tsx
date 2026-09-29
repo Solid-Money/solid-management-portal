@@ -481,7 +481,11 @@ export default function UserCardPanel({
               </div>
               <div className="col-span-2">
                 <dt className="text-xs font-medium uppercase text-gray-500">
-                  Issuer customer ID
+                  {/* Wirex keys card calls on the wallet, not on its own user
+                      id — that one is in the profile card. */}
+                  {card.provider === "wirex"
+                    ? "Issuer customer ID (wallet)"
+                    : "Issuer customer ID"}
                 </dt>
                 <dd className="mt-1">
                   <CopyableValue
