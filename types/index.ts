@@ -1649,6 +1649,49 @@ export interface RecoverAccountResult {
   };
 }
 
+/**
+ * Whether a locked-out user can get back in without support, and what is
+ * stopping them. Answers a lockout ticket in one read, across the two systems
+ * that between them decide it: the account row, and Turnkey.
+ */
+export interface RecoveryEligibility {
+  userId: string;
+  username?: string;
+  hasEmail: boolean;
+  /** Masked, e.g. `o•••••@gmail.com`. Absent when there is no address. */
+  emailHint?: string;
+  /** Credentials Turnkey holds. `null` when Turnkey could not be reached. */
+  turnkeyCredentialCount: number | null;
+  /** Credentials the account row remembers, which can lag Turnkey's. */
+  storedCredentialCount: number;
+  canSelfRecover: boolean;
+  /** Why not, in words support can read out. Empty when they can. */
+  blockers: string[];
+  accountClosed: boolean;
+  platforms?: string[];
+  lastActivityAt?: string;
+}
+
+/** What the backend reports after mailing an account its recovery code. */
+export interface SendRecoveryCodeResult {
+  userId: string;
+  username?: string;
+  /** Masked address it went to. The code itself never reaches the portal. */
+  emailHint: string;
+  sentAt: string;
+  adminUsername: string;
+}
+
+/** What the backend reports after changing the address an account recovers through. */
+export interface SetAccountEmailResult {
+  userId: string;
+  username?: string;
+  previousEmailHint?: string;
+  emailHint: string;
+  updatedAt: string;
+  adminUsername: string;
+}
+
 /** Ledger state of a referral cashback reward, as rewards-service stores it. */
 export type ReferralRewardStatus =
   "pending" | "qualified" | "paid" | "expired" | "reversed" | "under_review";

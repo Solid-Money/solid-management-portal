@@ -13,6 +13,9 @@ import {
   IssueTierTrialRequest,
   IssueTierTrialResult,
   RecoverAccountResult,
+  RecoveryEligibility,
+  SendRecoveryCodeResult,
+  SetAccountEmailResult,
   ReferralReevaluationResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
@@ -304,6 +307,40 @@ export const recoverUserAccount = (userId: string, reason: string) =>
 /** Every admin action taken on this user, newest first. */
 export const getUserAuditLog = (userId: string) =>
   api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
+
+/**
+ * Whether this user can get back in on their own, and what is stopping them.
+ * Read-only — the first thing to check on a lockout ticket.
+ */
+export const getRecoveryEligibility = (userId: string) =>
+  api.get<{ data: RecoveryEligibility }>(
+    `/admin/v1/users/${userId}/account/recovery-eligibility`,
+  );
+
+/**
+ * Mail a recovery code to the account's own address, for a user who cannot
+ * reach the recovery screen. The code never comes back to us.
+ */
+export const sendRecoveryCode = (userId: string, reason: string) =>
+  api.post<{ data: SendRecoveryCodeResult }>(
+    `/admin/v1/users/${userId}/account/send-recovery-code`,
+    { reason },
+  );
+
+/**
+ * Set or correct the address this account recovers through. Whoever holds it
+ * can start a recovery, so this is only ever used once the request has been
+ * tied to the account's owner some other way.
+ */
+export const setAccountEmail = (
+  userId: string,
+  email: string,
+  reason: string,
+) =>
+  api.post<{ data: SetAccountEmailResult }>(
+    `/admin/v1/users/${userId}/account/email`,
+    { email, reason },
+  );
 
 /**
  * This user's referral cashback from both sides: the reward they earn as

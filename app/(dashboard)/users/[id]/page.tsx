@@ -17,6 +17,7 @@ import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserProfileCard from "@/components/user/user-profile-card";
+import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserReferralCard from "@/components/user/user-referral-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
@@ -270,6 +271,9 @@ export default function UserDetailPage({
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
+          {/* First on the tab: a lockout ticket is answered by whether they can
+              recover on their own, before anything else is worth reading. */}
+          <UserRecoveryCard userId={id} username={displayName} />
           <UserIntercomCard userId={id} />
           <UserAuditLogCard userId={id} />
         </TabsContent>
