@@ -26,6 +26,20 @@ export interface User {
     kycStatus: string;
     createdAt: string;
   }[];
+  /**
+   * Rain / Wirex card customers. `providerUserId` is the id to look the user
+   * up by in the issuer's dashboard — the Rain user id, or the Wirex user id.
+   * `providerCustomerId` is what card calls are keyed on: the same Rain id,
+   * but the user's wallet address for Wirex. Null until the issuer registers
+   * the user.
+   */
+  cardCustomers?: {
+    provider: CardProvider;
+    providerUserId: string | null;
+    providerCustomerId: string | null;
+    kycStatus: string;
+    createdAt?: string;
+  }[];
   hasRainCard?: boolean;
   /**
    * Card cashback rate pinned to this cardholder, as a fraction — 0.03 is 3%.

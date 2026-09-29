@@ -33,6 +33,11 @@ const KYC_VARIANT: Record<string, "success" | "warning" | "danger" | "muted"> = 
   rejected: "danger",
 };
 
+const CARD_PROVIDER_LABEL: Record<string, string> = {
+  rain: "Rain",
+  wirex: "Wirex",
+};
+
 /**
  * Where the user came from and how to find them elsewhere.
  *
@@ -171,6 +176,33 @@ export default function UserProfileCard({ user }: { user: User }) {
               </span>
             )}
           </Field>
+
+          {user.cardCustomers?.map((customer, i) => {
+            const label = `${CARD_PROVIDER_LABEL[customer.provider] ?? customer.provider} user ID`;
+            return (
+              <Field
+                key={`${customer.provider}-${customer.providerUserId ?? i}`}
+                label={label}
+                wide
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  {customer.providerUserId ? (
+                    <CopyableValue
+                      value={customer.providerUserId}
+                      label={label}
+                    />
+                  ) : (
+                    <span className="text-gray-500">
+                      Not registered with the issuer yet
+                    </span>
+                  )}
+                  <Badge variant={KYC_VARIANT[customer.kycStatus] ?? "muted"}>
+                    {customer.kycStatus}
+                  </Badge>
+                </div>
+              </Field>
+            );
+          })}
 
           {user.bridgeCustomers && user.bridgeCustomers.length > 0 && (
             <Field label="Bridge.xyz customers (legacy)" wide>
