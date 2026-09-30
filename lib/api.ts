@@ -20,6 +20,7 @@ import {
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   TierTrial,
+  TierLockReevaluationResult,
   TierMembershipView,
   TierTrialView,
 } from "@/types";
@@ -190,6 +191,18 @@ export const getUserTierTrials = (userId: string) =>
 export const getUserTierMembership = (userId: string) =>
   api.get<{ data: TierMembershipView }>(
     `/admin/v1/users/${userId}/tier-membership`,
+  );
+
+/**
+ * Re-read a user's locked FUSE from the chain and record what each tranche was
+ * worth when it was locked, so the tier stops following the live soFUSE rate.
+ * Only ever holds a tier up; safe to repeat. The admin's name on the audit row
+ * comes from the Firebase token, never from here.
+ */
+export const reevaluateTierLock = (userId: string, reason?: string) =>
+  api.post<{ data: TierLockReevaluationResult }>(
+    `/admin/v1/users/${userId}/tier-lock/reevaluate`,
+    { reason: reason || undefined },
   );
 
 /**

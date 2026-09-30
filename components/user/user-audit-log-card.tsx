@@ -45,6 +45,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Referral reward re-evaluated",
       variant: "info",
     },
+    tier_lock_reevaluated: { label: "Tier lock re-evaluated", variant: "info" },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
@@ -66,6 +67,12 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "referral_reward_reevaluated") {
     return referralReevaluationDetail(entry);
+  }
+
+  if (entry.action === "tier_lock_reevaluated") {
+    const from = stringField(entry, "lockTierBefore");
+    const to = stringField(entry, "lockTierAfter");
+    return from && to ? `lock grants ${from} → ${to}` : null;
   }
 
   if (entry.action === "recovery_code_sent") {
