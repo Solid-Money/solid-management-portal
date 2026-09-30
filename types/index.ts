@@ -261,6 +261,8 @@ export enum TransactionType {
   WRAP = "wrap",
   UNWRAP = "unwrap",
   MERKL_CLAIM = "merkl_claim",
+  /** A tiered yield boost payout, in soFUSE from the yield boost payout wallet. */
+  YIELD_BOOST_CLAIM = "yield_boost_claim",
   CARD_WELCOME_BONUS = "card_welcome_bonus",
   DEPOSIT_BONUS = "deposit_bonus",
   FAST_WITHDRAW = "fast_withdraw",
@@ -417,6 +419,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.IN,
       category: TransactionCategory.REWARD,
     },
+    [TransactionType.YIELD_BOOST_CLAIM]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.REWARD,
+    },
     [TransactionType.CARD_WELCOME_BONUS]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.REWARD,
@@ -553,6 +559,7 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.CARD_WELCOME_BONUS, label: "Card Welcome Bonus" },
   { value: TransactionType.DEPOSIT_BONUS, label: "Deposit Bonus" },
   { value: TransactionType.MERKL_CLAIM, label: "Merkl Claim" },
+  { value: TransactionType.YIELD_BOOST_CLAIM, label: "Yield Boost Claim" },
   { value: TransactionType.GOODDOLLAR_CLAIM, label: "GoodDollar Claim" },
   { value: TransactionType.GOODDOLLAR_SWEEP, label: "GoodDollar Sweep" },
   { value: TransactionType.AGENT_X402_PAYMENT, label: "Agent x402 Payment" },
@@ -1249,6 +1256,66 @@ export interface TierMembershipConfig {
   renewalNoticeDays: number;
 }
 
+/** One tier's yield boost. */
+export interface TierYieldBoostConfig {
+  /** Extra APY as a fraction (0.02 = +2%), accrued a day at a time. */
+  apy: number;
+  /**
+   * Savings, in USD across soUSD, soETH and soFUSE together, the boost applies
+   * to. Balance above it earns the base yield only; 0 grants no boost.
+   */
+  maxDepositUsd: number;
+}
+
+/**
+ * The tiered yield boost: an APY on top of the vaults' own, earned daily on a
+ * user's total savings and claimed in soFUSE from the payout wallet.
+ *
+ * The three limits are the brakes on that wallet. Whatever the accrual computes,
+ * no claim and no day can pay out more than they allow.
+ */
+export interface YieldBoostConfig {
+  /** Master switch for the daily accrual. Off stops new boost being earned. */
+  enabled: boolean;
+  /**
+   * Switch for payouts alone, so an incident can stop money leaving the wallet
+   * without costing anybody a day of boost.
+   */
+  claimsEnabled: boolean;
+  tier1: TierYieldBoostConfig;
+  tier2: TierYieldBoostConfig;
+  tier3: TierYieldBoostConfig;
+  /** Most one claim may pay in USD, and so one user in any rolling 24 hours. */
+  maxClaimUsd: number;
+  /** Most one claim may pay in soFUSE, whatever the price feed says. */
+  maxClaimSoFuse: number;
+  /** Most the payout wallet may send across every user in one UTC day, in USD. */
+  maxDailyPayoutUsd: number;
+}
+
+/** What one run of the yield boost accrual did, as the backend reports it. */
+export interface YieldBoostRunResult {
+  /** The UTC day the run earned, YYYY-MM-DD. */
+  dayKey: string;
+  outcome: "disabled" | "skipped" | "completed" | "partial" | "failed";
+  stats?: {
+    usersScanned: number;
+    /** Safes holding at least $1 of savings. */
+    holders: number;
+    /** Users this run wrote the day for. */
+    accrued: number;
+    /** Users an earlier run had already written the day for. */
+    alreadyAccrued: number;
+    /** Holders whose tier earns no boost. */
+    notEligible: number;
+    /** Safes whose balances could not be read, left for the next pass. */
+    incomplete: number;
+    totalUsd: number;
+    totalSoFuse: string;
+  };
+  error?: string;
+}
+
 export interface FullRewardsConfig {
   tiers: TierThresholds;
   points: PointsEarningConfig;
@@ -1260,6 +1327,7 @@ export interface FullRewardsConfig {
   cardWelcomeBonus: CardWelcomeBonusConfig;
   productFees: ProductFeesConfig;
   tierMembership: TierMembershipConfig;
+  yieldBoost: YieldBoostConfig;
 }
 
 /** A membership's lifecycle, as the backend reports it. */
