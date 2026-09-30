@@ -12,6 +12,7 @@ import {
 } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ReevaluateTierLockDialog from "@/components/user/reevaluate-tier-lock-dialog";
 
 const TIER_VARIANT: Record<string, "info" | "success"> = {
   prime: "info",
@@ -163,9 +164,12 @@ export default function UserTierMembershipCard({
 
             {lock && lock.lockedFuse > 0 ? (
               <div className="rounded-md border border-gray-200 p-3">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
-                  <Lock className="h-3.5 w-3.5 text-gray-500" />
-                  Locked FUSE
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                    <Lock className="h-3.5 w-3.5 text-gray-500" />
+                    Locked FUSE
+                  </div>
+                  <ReevaluateTierLockDialog userId={userId} />
                 </div>
                 <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <Stat label="Locked" value={formatFuse(lock.lockedFuse)} />

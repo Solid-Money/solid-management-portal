@@ -1420,6 +1420,32 @@ export interface TierLockView {
   maturedFuse: number;
 }
 
+/** Where a re-evaluated tranche's lock-time value came from. */
+export type TierLockTrancheValueSource = "recorded" | "activity" | "live";
+
+/** One tranche of a re-evaluated lock. */
+export interface TierLockTrancheReport {
+  shares: string;
+  /** What the tranche is graded on at minimum: its FUSE value when locked. */
+  fuseAtLock: number;
+  /** What it is worth at today's soFUSE rate. */
+  liveFuse: number;
+  source: TierLockTrancheValueSource;
+  lockedAt: string | null;
+  unlocksAt: string | null;
+}
+
+/** What re-evaluating a user's lock found and changed. */
+export interface TierLockReevaluationResult {
+  safeAddress: string;
+  /** The tier the lock alone granted before, and grants now. */
+  lockTierBefore: string;
+  lockTierAfter: string;
+  /** The user's tier by every route, afterwards. */
+  currentTier: string;
+  tranches: TierLockTrancheReport[];
+}
+
 /** What one tier costs by each route, and whether the user already holds it. */
 export interface TierOfferView {
   tier: string;
