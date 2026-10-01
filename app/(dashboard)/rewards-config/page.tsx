@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useConfigEditor } from "@/hooks/use-config-editor";
 import api from "@/lib/api";
-import { YieldBoostRunResult } from "@/types";
+import { SubscriptionDiscountCategory, YieldBoostRunResult } from "@/types";
 
 /**
  * An ISO timestamp as the day it names, or a dash.
@@ -123,25 +123,72 @@ export default function RewardsConfigPage() {
   const [accrualResult, setAccrualResult] =
     useState<YieldBoostRunResult | null>(null);
 
-  const updateCategoryMerchants = (index: number, rawMerchants: string) => {
+  const updateCategory = (
+    index: number,
+    patch: Partial<SubscriptionDiscountCategory>,
+  ) => {
     setConfig((prev) => {
       if (!prev) return prev;
       const categories = prev.subscriptionDiscount.categories.map((cat, i) =>
-        i === index
-          ? {
-              ...cat,
-              merchants: rawMerchants
-                .split(",")
-                .map((m) => m.trim())
-                .filter((m) => m.length > 0),
-            }
-          : cat,
+        i === index ? { ...cat, ...patch } : cat,
       );
       return {
         ...prev,
         subscriptionDiscount: { ...prev.subscriptionDiscount, categories },
       };
     });
+  };
+
+  const updateCategoryMerchants = (index: number, rawMerchants: string) => {
+    updateCategory(index, {
+      merchants: rawMerchants
+        .split(",")
+        .map((m) => m.trim())
+        .filter((m) => m.length > 0),
+    });
+  };
+
+  /**
+   * Set (or clear) one tier's rate on one category.
+   *
+   * The field is in percentage points and stored as a fraction. Clearing it
+   * drops the key so the category falls back to the tier's flat percentage —
+   * which is NOT the same as typing 0, and the difference is load-bearing:
+   * 0 locks the category for that tier (Airlines for Prime), while absent means
+   * "price it like everything else".
+   */
+  const updateCategoryRate = (
+    index: number,
+    tierKey: "tier1" | "tier2" | "tier3",
+    rawPercent: string,
+  ) => {
+    const current = config?.subscriptionDiscount.categories[index];
+    if (!current) return;
+
+    const rates = { ...(current.rates ?? {}) };
+    const trimmed = rawPercent.trim();
+    const parsed = Number(trimmed);
+
+    if (trimmed === "" || !Number.isFinite(parsed) || parsed < 0) {
+      delete rates[tierKey];
+    } else {
+      rates[tierKey] = parsed / 100;
+    }
+
+    updateCategory(index, {
+      rates: Object.keys(rates).length > 0 ? rates : undefined,
+    });
+  };
+
+  /** A stored fraction as the percentage-point string the input shows. */
+  const rateFieldValue = (
+    category: SubscriptionDiscountCategory,
+    tierKey: "tier1" | "tier2" | "tier3",
+  ): string => {
+    const rate = category.rates?.[tierKey];
+    return typeof rate === "number" && Number.isFinite(rate)
+      ? String(Number((rate * 100).toFixed(4)))
+      : "";
   };
 
   const saveTierThresholds = async () => {
@@ -1251,7 +1298,7 @@ export default function RewardsConfigPage() {
         {/* Subscription Discount */}
         <ConfigSection
           title="Category-based Subscription Discounts"
-          description="Up to 50% back on monthly subscriptions (Netflix, Spotify, ChatGPT…). Prime unlocks 2 categories/month, Ultra unlocks 4. One subscription per category per month (first-paid-wins); paid as soUSD and drawn from the same monthly cashback cap."
+          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins), paid as soUSD and drawn from the same monthly cashback cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
         >
           <ToggleField
@@ -1273,13 +1320,13 @@ export default function RewardsConfigPage() {
               }
               type="number"
               suffix="$"
-              tooltip="Most cashback one eligible service can earn in a calendar month (e.g. $50). Caps the cashback, NOT the charge: a $200 subscription at Prime's 25% earns $50, not 25% of the first $50. Rewards Terms §5 promises this figure — changing it changes what the published terms owe."
+              tooltip="Most cashback one eligible service can earn in a calendar month (e.g. $50). Caps the cashback, NOT the charge: a $600 subscription at Prime's 10% earns $50, not 10% of the first $50. Rewards Terms §5 promises this figure — changing it changes what the published terms owe."
             />
           </div>
           <div className="mt-4 space-y-3">
             <label className="text-sm font-medium text-gray-700 block">
-              Categories &amp; Eligible Merchants
-              <InfoTooltip text="Each category's merchants (comma-separated). A card transaction is matched to a category when its merchant name contains one of these aliases (case/punctuation-insensitive)." />
+              Categories, Rates &amp; Eligible Merchants
+              <InfoTooltip text="Each category's merchants (comma-separated) and what each tier earns on it. A card transaction is matched to a category when its merchant name contains one of these aliases (case/punctuation-insensitive), and the matched category's rate for the cardholder's tier is what gets paid. A blank rate falls back to the tier default below; 0 locks the category for that tier." />
             </label>
             {config.subscriptionDiscount.categories?.map((cat, index) => (
               <div
@@ -1288,6 +1335,9 @@ export default function RewardsConfigPage() {
               >
                 <div className="text-sm font-semibold text-gray-800 mb-1">
                   {cat.label}
+                  <span className="ml-2 font-mono text-xs font-normal text-gray-500">
+                    {cat.key}
+                  </span>
                 </div>
                 <textarea
                   value={cat.merchants.join(", ")}
@@ -1297,13 +1347,40 @@ export default function RewardsConfigPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={2}
                 />
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  {(
+                    [
+                      ["tier1", "Core %"],
+                      ["tier2", "Prime %"],
+                      ["tier3", "Ultra %"],
+                    ] as const
+                  ).map(([tierKey, label]) => (
+                    <InputField
+                      key={tierKey}
+                      label={label}
+                      value={rateFieldValue(cat, tierKey)}
+                      onChange={(v) => updateCategoryRate(index, tierKey, v)}
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      suffix="%"
+                      tooltip={`What ${label.replace(" %", "")} earns on ${cat.label}. Leave BLANK to use this tier's default rate below. Enter 0 to lock the category for the tier — that is not the same thing, and it is how Airlines stays Ultra-only.`}
+                    />
+                  ))}
+                </div>
+                {!cat.rates && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    No rates set — this category pays each tier&apos;s default
+                    rate below.
+                  </p>
+                )}
               </div>
             ))}
           </div>
           <TierGrid>
             <TierCard tier="Tier 1">
               <InputField
-                label="Discount %"
+                label="Default Discount %"
                 value={
                   (config.subscriptionDiscount.tier1.percentage as any) === ""
                     ? ""
@@ -1320,7 +1397,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="1"
-                tooltip="Percentage of an eligible subscription charge paid back as cashback, before the per-service monthly cap above (Core 0%, Prime 25%, Ultra 50%). Paid instead of this tier's regular card cashback on that charge, not on top of it."
+                tooltip="This tier's DEFAULT rate, used only by categories that set no rate of their own above (Gaming today). Every category that prices itself ignores it. Paid instead of this tier's regular card cashback on that charge, not on top of it."
               />
               <InputField
                 label="Categories / month"
@@ -1338,7 +1415,7 @@ export default function RewardsConfigPage() {
             </TierCard>
             <TierCard tier="Tier 2">
               <InputField
-                label="Discount %"
+                label="Default Discount %"
                 value={
                   (config.subscriptionDiscount.tier2.percentage as any) === ""
                     ? ""
@@ -1355,6 +1432,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="1"
+                tooltip="This tier's DEFAULT rate, used only by categories that set no rate of their own above (Gaming today). Every category that prices itself ignores it. Paid instead of this tier's regular card cashback on that charge, not on top of it."
               />
               <InputField
                 label="Categories / month"
@@ -1372,7 +1450,7 @@ export default function RewardsConfigPage() {
             </TierCard>
             <TierCard tier="Tier 3">
               <InputField
-                label="Discount %"
+                label="Default Discount %"
                 value={
                   (config.subscriptionDiscount.tier3.percentage as any) === ""
                     ? ""
@@ -1389,6 +1467,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="1"
+                tooltip="This tier's DEFAULT rate, used only by categories that set no rate of their own above (Gaming today). Every category that prices itself ignores it. Paid instead of this tier's regular card cashback on that charge, not on top of it."
               />
               <InputField
                 label="Categories / month"

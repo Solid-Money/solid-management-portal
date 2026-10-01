@@ -1190,6 +1190,11 @@ export interface DepositBoostConfig {
 }
 
 export interface TierSubscriptionDiscountConfig {
+  /**
+   * The tier's default subscription rate. Only applies to a category that
+   * carries no `rates` of its own — every category that prices itself ignores
+   * it.
+   */
   percentage: number;
   /** @deprecated Superseded by categoryLimit. */
   serviceLimit: number;
@@ -1197,10 +1202,31 @@ export interface TierSubscriptionDiscountConfig {
   categoryLimit: number;
 }
 
+/**
+ * Per-tier rates for one category, as fractions (0.1 = 10%).
+ *
+ * Every key is optional: a tier left out earns that tier's flat
+ * `tierN.percentage`. An explicit 0 is different — it locks the category for
+ * that tier, which is how Airlines is sold as Ultra-only.
+ */
+export interface SubscriptionDiscountCategoryRates {
+  /** Core. */
+  tier1?: number;
+  /** Prime. */
+  tier2?: number;
+  /** Ultra. */
+  tier3?: number;
+}
+
 export interface SubscriptionDiscountCategory {
   key: string;
   label: string;
   merchants: string[];
+  /**
+   * What each tier earns on this category. Absent means the category tracks
+   * the tier's flat percentage.
+   */
+  rates?: SubscriptionDiscountCategoryRates;
 }
 
 export interface SubscriptionDiscountConfig {
