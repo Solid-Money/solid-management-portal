@@ -10,6 +10,7 @@ import {
   ProductFeesConfig,
   ReferralCashbackConfig,
   TierMembershipConfig,
+  YieldBoostConfig,
 } from "@/types";
 
 /** Shipped defaults for the referral cashback program (mirrors the backend). */
@@ -95,6 +96,21 @@ export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
 };
 
 /**
+ * Shipped yield boost (mirrors the backend): Prime +2% on the first $10K of
+ * savings, Ultra +3% on the first $25K, Core nothing.
+ */
+export const YIELD_BOOST_DEFAULTS: YieldBoostConfig = {
+  enabled: true,
+  claimsEnabled: true,
+  tier1: { apy: 0, maxDepositUsd: 0 },
+  tier2: { apy: 0.02, maxDepositUsd: 10000 },
+  tier3: { apy: 0.03, maxDepositUsd: 25000 },
+  maxClaimUsd: 250,
+  maxClaimSoFuse: 100000,
+  maxDailyPayoutUsd: 2500,
+};
+
+/**
  * Fill in fields an older backend may not send yet, so the inputs stay
  * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
  * the working copy and the pristine copy so the defaults don't read as unsaved
@@ -104,6 +120,7 @@ export function withConfigDefaults(
   config: FullRewardsConfig,
 ): FullRewardsConfig {
   const fees = config.productFees;
+  const boost = config.yieldBoost;
 
   return {
     ...config,
@@ -133,6 +150,13 @@ export function withConfigDefaults(
     tierMembership: {
       ...TIER_MEMBERSHIP_DEFAULTS,
       ...config.tierMembership,
+    },
+    yieldBoost: {
+      ...YIELD_BOOST_DEFAULTS,
+      ...boost,
+      tier1: { ...YIELD_BOOST_DEFAULTS.tier1, ...boost?.tier1 },
+      tier2: { ...YIELD_BOOST_DEFAULTS.tier2, ...boost?.tier2 },
+      tier3: { ...YIELD_BOOST_DEFAULTS.tier3, ...boost?.tier3 },
     },
   };
 }

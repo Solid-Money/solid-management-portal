@@ -10,12 +10,15 @@ import {
   KeyRound,
   Mail,
   Percent,
+  Play,
   RefreshCw,
   Save,
   Settings,
+  TrendingUp,
   Users,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   ConfigSection,
@@ -33,6 +36,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useConfigEditor } from "@/hooks/use-config-editor";
+import api from "@/lib/api";
+import { YieldBoostRunResult } from "@/types";
 
 /**
  * An ISO timestamp as the day it names, or a dash.
@@ -46,6 +51,54 @@ function asDay(iso?: string): string {
   const at = new Date(iso);
 
   return Number.isNaN(at.getTime()) ? "—" : at.toISOString().slice(0, 10);
+}
+
+const usd = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+/**
+ * A stored fraction as the percent its box shows, or blank mid-edit. Rounded,
+ * because 0.07 * 100 is 7.000000000000001 in floating point.
+ */
+function fractionAsPercent(value: number): number | string {
+  return (value as unknown) === "" ? "" : Math.round(value * 1e6) / 1e4;
+}
+
+const YIELD_BOOST_TIERS = [
+  { key: "tier1", label: "Tier 1" },
+  { key: "tier2", label: "Tier 2" },
+  { key: "tier3", label: "Tier 3" },
+] as const;
+
+/** One line on what an accrual run did, for the admin who started it. */
+function describeAccrualRun(result: YieldBoostRunResult): string {
+  const { dayKey, outcome, stats, error } = result;
+
+  if (outcome === "disabled") {
+    return `Accrual is switched off, so nothing was earned for ${dayKey}.`;
+  }
+  if (outcome === "skipped") {
+    // A finished day is re-run on request, so the only reason to skip now is
+    // another run holding the day.
+    return `Another run is working on ${dayKey} right now. Try again in a minute.`;
+  }
+  if (outcome === "failed" || !stats) {
+    return `${dayKey} could not run: ${error ?? "unknown error"}. The hourly pass retries it.`;
+  }
+
+  const earned =
+    `${dayKey}: ${stats.accrued} users earned ${usd.format(stats.totalUsd)} ` +
+    `(${stats.totalSoFuse} soFUSE); ${stats.alreadyAccrued} already had the day` +
+    // Holders whose tier earns no boost — the usual reason a run pays nobody.
+    (stats.notEligible > 0
+      ? `; ${stats.notEligible} hold savings but their tier earns no boost.`
+      : ".");
+
+  return outcome === "partial"
+    ? `${earned} ${stats.incomplete} Safes could not be read and are retried hourly.`
+    : earned;
 }
 
 export default function RewardsConfigPage() {
@@ -63,6 +116,12 @@ export default function RewardsConfigPage() {
   } = useConfigEditor();
   const [tierUsersModal, setTierUsersModal] = useState<number | null>(null);
   const [tierEmailModal, setTierEmailModal] = useState<number | null>(null);
+  const [accrualDay, setAccrualDay] = useState<"yesterday" | "today">(
+    "yesterday",
+  );
+  const [runningAccrual, setRunningAccrual] = useState(false);
+  const [accrualResult, setAccrualResult] =
+    useState<YieldBoostRunResult | null>(null);
 
   const updateCategoryMerchants = (index: number, rawMerchants: string) => {
     setConfig((prev) => {
@@ -263,6 +322,63 @@ export default function RewardsConfigPage() {
       },
       "points",
     );
+  };
+
+  const saveYieldBoostConfig = async () => {
+    if (!config) return;
+
+    const boost = config.yieldBoost;
+    const amounts = {
+      tier1Apy: boost.tier1.apy,
+      tier1MaxDepositUsd: boost.tier1.maxDepositUsd,
+      tier2Apy: boost.tier2.apy,
+      tier2MaxDepositUsd: boost.tier2.maxDepositUsd,
+      tier3Apy: boost.tier3.apy,
+      tier3MaxDepositUsd: boost.tier3.maxDepositUsd,
+      maxClaimUsd: boost.maxClaimUsd,
+      maxClaimSoFuse: boost.maxClaimSoFuse,
+      maxDailyPayoutUsd: boost.maxDailyPayoutUsd,
+    };
+
+    // These size real transfers. A cleared box would go out as 0 and quietly
+    // switch a tier's boost — or every claim — off, so it is refused instead.
+    if (Object.values(amounts).some((value) => (value as unknown) === "")) {
+      toast.error("Fill in every Yield Boost field before saving");
+      return;
+    }
+
+    await saveSection(
+      "Yield Boost",
+      "yield-boost",
+      {
+        enabled: boost.enabled,
+        claimsEnabled: boost.claimsEnabled,
+        ...Object.fromEntries(
+          Object.entries(amounts).map(([field, value]) => [
+            field,
+            Number(value),
+          ]),
+        ),
+      },
+      "yieldBoost",
+    );
+  };
+
+  const runYieldBoostAccrual = async () => {
+    try {
+      setRunningAccrual(true);
+      setAccrualResult(null);
+      const response = await api.post<YieldBoostRunResult>(
+        "/admin/v1/rewards-config/yield-boost/run-accrual",
+        { day: accrualDay },
+      );
+      setAccrualResult(response.data);
+    } catch (error) {
+      console.error("Failed to run the yield boost accrual:", error);
+      toast.error("Failed to run the yield boost accrual");
+    } finally {
+      setRunningAccrual(false);
+    }
   };
 
   const saveCardWelcomeBonusConfig = async () => {
@@ -935,6 +1051,147 @@ export default function RewardsConfigPage() {
             <Save className="h-4 w-4 mr-2" />
             Save Cashback Config
           </button>
+        </ConfigSection>
+
+        {/* Yield Boost */}
+        <ConfigSection
+          title="Yield Boost"
+          description="Extra APY on each user's total savings across soUSD, soETH and soFUSE, earned daily and claimed in soFUSE from the payout wallet"
+          icon={<TrendingUp className="h-5 w-5 text-emerald-600" />}
+        >
+          <div className="flex flex-wrap items-center gap-6">
+            <ToggleField
+              label="Accrual Enabled"
+              value={config.yieldBoost.enabled}
+              onChange={(v) => updateConfig("yieldBoost", "enabled", v)}
+              tooltip="Off stops new boost being earned. Boost already earned stays claimable."
+            />
+            <ToggleField
+              label="Claims Enabled"
+              value={config.yieldBoost.claimsEnabled}
+              onChange={(v) => updateConfig("yieldBoost", "claimsEnabled", v)}
+              tooltip="Off refuses every claim, so nothing leaves the payout wallet. Accrual carries on, so nobody loses a day."
+            />
+          </div>
+          <TierGrid>
+            {YIELD_BOOST_TIERS.map(({ key, label }) => {
+              const tier = config.yieldBoost[key];
+              const yearly = Number(tier.apy) * Number(tier.maxDepositUsd);
+
+              return (
+                <TierCard key={key} tier={label}>
+                  <InputField
+                    label="Boost APY"
+                    value={fractionAsPercent(tier.apy)}
+                    onChange={(v) =>
+                      handleNumericUpdate("yieldBoost", `${key}.apy`, v, true)
+                    }
+                    type="number"
+                    suffix="%"
+                    step="0.1"
+                    tooltip="Extra APY on top of the vaults' own, paid in soFUSE. 0 means no boost for this tier."
+                  />
+                  <InputField
+                    label="Max Boosted Savings"
+                    value={tier.maxDepositUsd}
+                    onChange={(v) =>
+                      handleNumericUpdate(
+                        "yieldBoost",
+                        `${key}.maxDepositUsd`,
+                        v,
+                      )
+                    }
+                    type="number"
+                    suffix="$"
+                    tooltip="Savings across all three vaults together that the boost applies to. Anything above earns the base yield only."
+                  />
+                  <p className="text-xs text-gray-500">
+                    {Number.isFinite(yearly) && yearly > 0
+                      ? `At most ${usd.format(yearly)} a year per user`
+                      : "No boost"}
+                  </p>
+                </TierCard>
+              );
+            })}
+          </TierGrid>
+          <div>
+            <h4 className="mb-2 text-sm font-semibold text-gray-800">
+              Payout Limits
+              <InfoTooltip text="The brakes on the payout wallet. Whatever the accrual computes — even if a vault's price or APY jumps — no claim and no day can pay more than these allow." />
+            </h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <InputField
+                label="Max Per Claim"
+                value={config.yieldBoost.maxClaimUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("yieldBoost", "maxClaimUsd", v)
+                }
+                type="number"
+                suffix="$"
+                tooltip="Most one claim transaction may pay, and so one user in any rolling 24 hours. Anything above stays claimable later."
+              />
+              <InputField
+                label="Max Per Claim (soFUSE)"
+                value={config.yieldBoost.maxClaimSoFuse}
+                onChange={(v) =>
+                  handleNumericUpdate("yieldBoost", "maxClaimSoFuse", v)
+                }
+                type="number"
+                suffix="soFUSE"
+                tooltip="The same ceiling in tokens, so a wrong FUSE price cannot size an oversized transfer."
+              />
+              <InputField
+                label="Daily Payout Budget"
+                value={config.yieldBoost.maxDailyPayoutUsd}
+                onChange={(v) =>
+                  handleNumericUpdate("yieldBoost", "maxDailyPayoutUsd", v)
+                }
+                type="number"
+                suffix="$"
+                tooltip="Most the payout wallet may send across all users in one UTC day. Claims past it are refused until the next day, and the team is alerted."
+              />
+            </div>
+          </div>
+          <button
+            onClick={saveYieldBoostConfig}
+            disabled={saving || !hasChanges("yieldBoost")}
+            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Yield Boost Config
+          </button>
+          <div className="border-t border-gray-200 pt-4">
+            <h4 className="text-sm font-semibold text-gray-800">
+              Run Accrual Now
+              <InfoTooltip text="The accrual runs every hour and earns each finished UTC day, so this is for testing on QA, recovering a day after an outage, or applying a rate change to today. A day can be run again: users who already have it are left as they are, and anyone eligible who doesn't earns it on their balance right now." />
+            </h4>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <select
+                value={accrualDay}
+                onChange={(event) =>
+                  setAccrualDay(event.target.value as "yesterday" | "today")
+                }
+                disabled={runningAccrual}
+                className="block w-40 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              >
+                <option value="yesterday">Yesterday</option>
+                <option value="today">Today</option>
+              </select>
+              <button
+                onClick={runYieldBoostAccrual}
+                disabled={runningAccrual}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {runningAccrual ? "Running…" : "Run Accrual"}
+              </button>
+            </div>
+            {accrualResult && (
+              <p className="mt-2 text-sm text-gray-700">
+                {describeAccrualRun(accrualResult)}
+              </p>
+            )}
+          </div>
         </ConfigSection>
 
         {/* Card Welcome Bonus */}

@@ -100,9 +100,11 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
                 label="Yield boost"
                 value={`${rewards.yieldBoostPercentage}%`}
                 hint={
-                  rewards.yieldBoostCap > 0
-                    ? `$${rewards.yieldBoostEarned.toFixed(2)} of $${rewards.yieldBoostCap.toFixed(2)} earned`
-                    : undefined
+                  (rewards.yieldBoostBalanceCap ?? 0) > 0
+                    ? `On the first $${(rewards.yieldBoostBalanceCap ?? 0).toLocaleString("en-US")} of savings`
+                    : rewards.yieldBoostCap > 0
+                      ? `$${rewards.yieldBoostEarned.toFixed(2)} of $${rewards.yieldBoostCap.toFixed(2)} earned`
+                      : undefined
                 }
               />
               <Stat
