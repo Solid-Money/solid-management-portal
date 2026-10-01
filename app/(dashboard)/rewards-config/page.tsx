@@ -37,7 +37,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useConfigEditor } from "@/hooks/use-config-editor";
 import api from "@/lib/api";
-import { SubscriptionDiscountCategory, YieldBoostRunResult } from "@/types";
+import {
+  SubscriptionCategoryRatesMigrationResult,
+  SubscriptionDiscountCategory,
+  YieldBoostRunResult,
+} from "@/types";
 
 /**
  * An ISO timestamp as the day it names, or a dash.
@@ -114,6 +118,9 @@ export default function RewardsConfigPage() {
     "yesterday",
   );
   const [runningAccrual, setRunningAccrual] = useState(false);
+  const [migratingRates, setMigratingRates] = useState(false);
+  const [migrationResult, setMigrationResult] =
+    useState<SubscriptionCategoryRatesMigrationResult | null>(null);
   const [accrualResult, setAccrualResult] =
     useState<YieldBoostRunResult | null>(null);
 
@@ -419,6 +426,51 @@ export default function RewardsConfigPage() {
       toast.error("Failed to run the yield boost accrual");
     } finally {
       setRunningAccrual(false);
+    }
+  };
+
+  /**
+   * Preview or commit the move onto per-category subscription rates.
+   *
+   * Rewards config is seeded from code once and owned by the database after
+   * that, so deploying new rates does not move an environment that has run
+   * before — this is what moves it. Both buttons hit the same endpoint and the
+   * same planner, so the preview is exactly what Apply will write.
+   *
+   * Safe to press more than once: the backend recomputes the plan from live
+   * config every call, so committing against already-migrated config writes
+   * nothing and comes back `alreadyApplied`.
+   */
+  const runCategoryRatesMigration = async (apply: boolean) => {
+    try {
+      setMigratingRates(true);
+      const response =
+        await api.post<SubscriptionCategoryRatesMigrationResult>(
+          "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
+          { apply },
+        );
+      setMigrationResult(response.data);
+
+      if (response.data.applied) {
+        toast.success("Category rates migrated", {
+          description: `${response.data.changes.length} change(s) written. The config cache has been cleared.`,
+        });
+        // Pull the written config back so the fields below show the new rates.
+        await refetch();
+      } else if (response.data.alreadyApplied) {
+        toast.success("Already up to date", {
+          description: "Stored config already matches the shipped rates.",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to migrate category rates:", error);
+      toast.error(
+        apply
+          ? "Failed to apply the category rates migration"
+          : "Failed to preview the category rates migration",
+      );
+    } finally {
+      setMigratingRates(false);
     }
   };
 
@@ -1478,6 +1530,74 @@ export default function RewardsConfigPage() {
               />
             </TierCard>
           </TierGrid>
+          {/*
+            One-time move onto per-category rates. Config is seeded from code
+            once and owned by the database afterwards, so a deploy alone does
+            not move an environment that has run before.
+          */}
+          <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-4">
+            <div className="text-sm font-semibold text-gray-800">
+              Migrate to per-category rates
+              <InfoTooltip text="Writes the shipped category list and per-tier rates over this environment's stored config, and moves the tier default rates to 10% / 20%. Merchant aliases you added by hand are kept, categories you added that we do not ship are left alone, and category limits are not touched. Preview first — it writes nothing." />
+            </div>
+            <p className="mt-1 text-xs text-gray-600">
+              Rewards config is seeded from code the first time it is read and
+              owned by the database after that, so deploying new rates does not
+              move an environment that has run before. Safe to press more than
+              once: the plan is recomputed from live config each time, so
+              applying twice writes nothing. Already-accrued cashback is not
+              repriced.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => runCategoryRatesMigration(false)}
+                disabled={migratingRates}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {migratingRates ? "Working…" : "Preview changes"}
+              </button>
+              <button
+                onClick={() => runCategoryRatesMigration(true)}
+                disabled={
+                  migratingRates ||
+                  // Nothing to apply until a preview has shown changes. This is
+                  // belt-and-braces: the backend no-ops an unnecessary apply.
+                  !migrationResult ||
+                  migrationResult.alreadyApplied
+                }
+                className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {migratingRates ? "Working…" : "Apply migration"}
+              </button>
+              {migrationResult?.alreadyApplied && (
+                <span className="text-sm font-medium text-green-700">
+                  ✓ Already migrated — nothing to change
+                </span>
+              )}
+            </div>
+            {migrationResult && !migrationResult.alreadyApplied && (
+              <div className="mt-3">
+                <p className="text-sm font-medium text-gray-800">
+                  {migrationResult.applied
+                    ? `Applied ${migrationResult.changes.length} change(s):`
+                    : `${migrationResult.changes.length} change(s) would be made:`}
+                </p>
+                <ul className="mt-1 list-disc pl-5 text-sm text-gray-700">
+                  {migrationResult.changes.map((change) => (
+                    <li key={`${change.kind}:${change.key}`}>
+                      {change.detail}
+                    </li>
+                  ))}
+                </ul>
+                {!migrationResult.applied && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Nothing has been written yet.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           <button
             onClick={saveSubscriptionDiscountConfig}
             disabled={saving || !hasChanges("subscriptionDiscount")}
