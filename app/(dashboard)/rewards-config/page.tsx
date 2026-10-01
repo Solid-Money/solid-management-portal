@@ -80,15 +80,21 @@ function describeAccrualRun(result: YieldBoostRunResult): string {
     return `Accrual is switched off, so nothing was earned for ${dayKey}.`;
   }
   if (outcome === "skipped") {
-    return `${dayKey} is already complete, or another run is working on it.`;
+    // A finished day is re-run on request, so the only reason to skip now is
+    // another run holding the day.
+    return `Another run is working on ${dayKey} right now. Try again in a minute.`;
   }
   if (outcome === "failed" || !stats) {
     return `${dayKey} could not run: ${error ?? "unknown error"}. The hourly pass retries it.`;
   }
 
-  const earned = `${dayKey}: ${stats.accrued} users earned ${usd.format(
-    stats.totalUsd,
-  )} (${stats.totalSoFuse} soFUSE); ${stats.alreadyAccrued} already had the day.`;
+  const earned =
+    `${dayKey}: ${stats.accrued} users earned ${usd.format(stats.totalUsd)} ` +
+    `(${stats.totalSoFuse} soFUSE); ${stats.alreadyAccrued} already had the day` +
+    // Holders whose tier earns no boost — the usual reason a run pays nobody.
+    (stats.notEligible > 0
+      ? `; ${stats.notEligible} hold savings but their tier earns no boost.`
+      : ".");
 
   return outcome === "partial"
     ? `${earned} ${stats.incomplete} Safes could not be read and are retried hourly.`
@@ -1157,7 +1163,7 @@ export default function RewardsConfigPage() {
           <div className="border-t border-gray-200 pt-4">
             <h4 className="text-sm font-semibold text-gray-800">
               Run Accrual Now
-              <InfoTooltip text="The accrual runs every hour and earns each finished UTC day once, so this is for testing on QA or recovering a day after an outage. Running today early earns it on the balances as they stand now; savings added later today will not earn for today." />
+              <InfoTooltip text="The accrual runs every hour and earns each finished UTC day, so this is for testing on QA, recovering a day after an outage, or applying a rate change to today. A day can be run again: users who already have it are left as they are, and anyone eligible who doesn't earns it on their balance right now." />
             </h4>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <select
