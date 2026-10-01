@@ -1126,6 +1126,34 @@ export interface SubscriptionDiscountConfig {
   tier3: TierSubscriptionDiscountConfig;
 }
 
+/** One thing the category-rates migration would change. */
+export interface SubscriptionCategoryRatesChange {
+  kind:
+    | "category-added"
+    | "category-rates-changed"
+    | "category-aliases-added"
+    | "tier-default-changed";
+  /** Category key, or config key for a tier default. */
+  key: string;
+  /** One line to show the operator. */
+  detail: string;
+}
+
+/**
+ * Result of previewing or committing the move onto per-category rates.
+ *
+ * `alreadyApplied` means the stored config already matches the shipped rates,
+ * so there is nothing to do. `applied` means THIS call wrote — false for a
+ * preview, and false for a commit against already-migrated config.
+ */
+export interface SubscriptionCategoryRatesMigrationResult {
+  alreadyApplied: boolean;
+  applied: boolean;
+  changes: SubscriptionCategoryRatesChange[];
+  categories: SubscriptionDiscountCategory[];
+  config: FullRewardsConfig;
+}
+
 export interface FuseStakingConfig {
   /** Master switch for the "skip the line" FUSE tier unlock. */
   enabled: boolean;
