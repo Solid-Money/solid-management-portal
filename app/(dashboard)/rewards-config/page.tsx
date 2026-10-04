@@ -187,6 +187,21 @@ export default function RewardsConfigPage() {
     });
   };
 
+  /**
+   * Whether a category is live.
+   *
+   * Absent means live: categories stored before the toggle existed carry no
+   * flag, and reading a missing value as "off" would silently pause every one
+   * of them the first time this page loads.
+   */
+  const isCategoryEnabled = (category: SubscriptionDiscountCategory): boolean =>
+    category.enabled !== false;
+
+  /** Categories currently switched on, for the count above the list. */
+  const liveCategoryCount = (
+    config?.subscriptionDiscount.categories ?? []
+  ).filter(isCategoryEnabled).length;
+
   /** A stored fraction as the percentage-point string the input shows. */
   const rateFieldValue = (
     category: SubscriptionDiscountCategory,
@@ -1378,18 +1393,43 @@ export default function RewardsConfigPage() {
           <div className="mt-4 space-y-3">
             <label className="text-sm font-medium text-gray-700 block">
               Categories, Rates &amp; Eligible Merchants
-              <InfoTooltip text="Each category's merchants (comma-separated) and what each tier earns on it. A card transaction is matched to a category when its merchant name contains one of these aliases (case/punctuation-insensitive), and the matched category's rate for the cardholder's tier is what gets paid. A blank rate falls back to the tier default below; 0 locks the category for that tier." />
+              <InfoTooltip text="Each category's merchants (comma-separated) and what each tier earns on it. A card transaction is matched to a category when its merchant name contains one of these aliases (case/punctuation-insensitive), and the matched category's rate for the cardholder's tier is what gets paid. A blank rate falls back to the tier default below; 0 locks the category for that tier. The per-category switch is separate from both: off takes the category off the app and stops it paying anyone, where 0 only locks it for one tier and still advertises the upgrade." />
             </label>
+            <p className="text-xs text-gray-600">
+              {liveCategoryCount} of{" "}
+              {config.subscriptionDiscount.categories?.length ?? 0} categories
+              live.{" "}
+              {liveCategoryCount === 0
+                ? "With none on, the app hides subscription cashback entirely and every eligible charge earns regular tier cashback."
+                : "A paused category is hidden in the app and pays nobody."}
+            </p>
             {config.subscriptionDiscount.categories?.map((cat, index) => (
               <div
                 key={cat.key}
-                className="border border-gray-200 rounded-md p-3 bg-gray-50"
+                className={`border rounded-md p-3 ${
+                  isCategoryEnabled(cat)
+                    ? "border-gray-200 bg-gray-50"
+                    : "border-gray-300 bg-gray-100"
+                }`}
               >
-                <div className="text-sm font-semibold text-gray-800 mb-1">
-                  {cat.label}
-                  <span className="ml-2 font-mono text-xs font-normal text-gray-500">
-                    {cat.key}
-                  </span>
+                <div className="mb-1 flex items-start justify-between gap-3">
+                  <div className="text-sm font-semibold text-gray-800">
+                    {cat.label}
+                    <span className="ml-2 font-mono text-xs font-normal text-gray-500">
+                      {cat.key}
+                    </span>
+                    {!isCategoryEnabled(cat) && (
+                      <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        Paused
+                      </span>
+                    )}
+                  </div>
+                  <ToggleField
+                    label={isCategoryEnabled(cat) ? "On" : "Off"}
+                    value={isCategoryEnabled(cat)}
+                    onChange={(v) => updateCategory(index, { enabled: v })}
+                    tooltip={`Turn ${cat.label} on or off. Off hides it from the app and pauses the payout — a matching charge earns regular tier cashback instead and does not use up one of the cardholder's category slots. Cashback already accrued on it is not touched, and this month's claims keep their slots. Save the section to apply.`}
+                  />
                 </div>
                 <textarea
                   value={cat.merchants.join(", ")}
@@ -1544,7 +1584,7 @@ export default function RewardsConfigPage() {
           <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-4">
             <div className="text-sm font-semibold text-gray-800">
               Migrate to per-category rates
-              <InfoTooltip text="Writes the shipped category list and per-tier rates over this environment's stored config, and moves the tier default rates to 10% / 20%. Merchant aliases you added by hand are kept, categories you added that we do not ship are left alone, and category limits are not touched. Preview first — it writes nothing." />
+              <InfoTooltip text="Writes the shipped category list and per-tier rates over this environment's stored config, and moves the tier default rates to 10% / 20%. Merchant aliases you added by hand are kept, categories you added that we do not ship are left alone, and category limits are not touched. A category this environment has never had is added PAUSED — switch it on above once you are happy with it. Categories that already exist keep whatever you set their switch to. Preview first — it writes nothing." />
             </div>
             <p className="mt-1 text-xs text-gray-600">
               Rewards config is seeded from code the first time it is read and
@@ -1552,7 +1592,8 @@ export default function RewardsConfigPage() {
               move an environment that has run before. Safe to press more than
               once: the plan is recomputed from live config each time, so
               applying twice writes nothing. Already-accrued cashback is not
-              repriced.
+              repriced. Categories it adds arrive switched off, so nothing
+              starts paying until you turn it on above and save.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
