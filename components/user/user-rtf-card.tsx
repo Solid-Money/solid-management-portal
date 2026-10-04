@@ -346,9 +346,6 @@ export default function UserRtfCard({ userId }: { userId: string }) {
             ))}
             <p className="text-xs text-gray-500">
               Terms version {status.terms.version}
-              {status.legacyRevokeAvailable
-                ? " · Legacy operator allowances may now be revoked — Rain has confirmed the reversal-enabled upgrade."
-                : " · Legacy operator allowance must stay in place until Rain confirms the reversal-enabled upgrade."}
             </p>
           </div>
         )}

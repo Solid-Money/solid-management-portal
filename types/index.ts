@@ -2559,6 +2559,5 @@ export interface RainRtfStatus {
     body: string;
     consentLabel: string;
   };
-  legacyRevokeAvailable: boolean;
   chains: RainRtfChain[];
 }
