@@ -10,6 +10,7 @@ import {
   CardIssuanceContext,
   IssueCardRequest,
   IssueCardResult,
+  RainRtfStatus,
   IssueTierTrialRequest,
   IssueTierTrialResult,
   RecoverAccountResult,
@@ -103,6 +104,18 @@ export const getCardAuditHistory = (userId: string) =>
   api.get<{ data: CardAuditEntry[] }>(
     `/admin/v1/users/${userId}/card/audit-history`,
   );
+
+/**
+ * Real-Time Funding: whether this cardholder's wallet is authorized to be
+ * pulled from at swipe time, on which chains, and for which spenders.
+ *
+ * The allowances come back read live from the chain. That is the point of
+ * having this on the user page at all — our own record says only that the
+ * cardholder once consented, and "they revoked it from MetaMask yesterday" is
+ * exactly the case support gets called about.
+ */
+export const getUserRtf = (userId: string) =>
+  api.get<{ data: RainRtfStatus }>(`/admin/v1/users/${userId}/rtf`);
 
 /**
  * What the issue-card dialog opens with: the card this user holds today, and
