@@ -1108,6 +1108,17 @@ export interface SubscriptionDiscountCategory {
    * the tier's flat percentage.
    */
   rates?: SubscriptionDiscountCategoryRates;
+  /**
+   * Whether the category is live. `false` pauses it: the app stops listing it
+   * and a matching card charge earns regular tier cashback instead, without
+   * using up one of the cardholder's category slots for the month.
+   *
+   * **Absent means live** — categories stored before the toggle existed carry
+   * no flag and must keep paying — so read it as `enabled !== false`. The
+   * category-rates migration is the exception: a category it introduces is
+   * written paused, waiting for someone here to switch it on.
+   */
+  enabled?: boolean;
 }
 
 export interface SubscriptionDiscountConfig {
