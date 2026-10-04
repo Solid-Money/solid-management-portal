@@ -777,6 +777,64 @@ export interface WalletRefillPlan {
   belowFloor: boolean;
 }
 
+/** The verdict to render: one rule, computed server-side. */
+export type WalletVerdict = "OK" | "LOW" | "CRITICAL" | "N/A";
+
+/**
+ * What the verdict was derived from.
+ *
+ * Carried alongside the verdict rather than inferred, because "CRITICAL
+ * because it has four hours of cover" and "CRITICAL because it is under a
+ * fixed number somebody typed in 2024" deserve different responses, and the
+ * reader cannot tell them apart from the colour.
+ */
+export type WalletVerdictBasis =
+  | "measured"
+  | "estimated"
+  | "configured"
+  | "residue"
+  | "warming-up";
+
+/**
+ * One asset's verdict and refill plan, for every wallet at once.
+ *
+ * The cheap half of `WalletAssetFlow`: enough to colour a card and count a
+ * header without the per-wallet transfer history an opened card asks for.
+ * Fetched alongside the status so the board settles its colours once rather
+ * than showing a threshold reading it is about to contradict.
+ */
+export interface WalletAssetPlan {
+  walletName: string;
+  address: string;
+  chainId: number;
+  chainName: string;
+  asset: WalletAsset;
+  symbol: string;
+  balance: string;
+  threshold: string;
+  /** What the fixed configured threshold says, kept so the two can be compared. */
+  configuredStatus: WalletVerdict;
+  isFloat: boolean;
+  /** True for a router that should settle empty — a balance here is a fault. */
+  isResidue: boolean;
+  realCostPerDay?: number;
+  daysOfRunway?: number;
+  runwayBasis?: "measured" | "outflow";
+  snapshotCount: number;
+  plan?: WalletRefillPlan;
+  verdict: WalletVerdict;
+  verdictBasis: WalletVerdictBasis;
+  verdictReason: string;
+}
+
+export interface WalletPlansResponse {
+  windowDays: number;
+  assets: WalletAssetPlan[];
+  /** Wallets judged on their configured thresholds alone, and why. */
+  gaps: Array<{ walletName: string; reason: string }>;
+  generatedAt: string;
+}
+
 export interface WalletAssetFlow {
   chainId: number;
   chainName: string;
@@ -810,6 +868,14 @@ export interface WalletAssetFlow {
   /** Which figure the runway was computed from. */
   runwayBasis?: "measured" | "outflow";
   plan?: WalletRefillPlan;
+  /**
+   * The verdict to render. Optional only so a page deployed ahead of the
+   * backend keeps working — it falls back to `status`, which is what it
+   * showed before.
+   */
+  verdict?: WalletVerdict;
+  verdictBasis?: WalletVerdictBasis;
+  verdictReason?: string;
   activityScore: number;
 }
 

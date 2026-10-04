@@ -18,8 +18,10 @@ import {
   ChainBalance,
   WalletAsset,
   WalletAssetFlow,
+  WalletAssetPlan,
   WalletFilter,
   WalletInfo,
+  WalletPlansResponse,
   WalletRefillPlan,
   WalletStatusResponse,
   WALLET_ROLE_ORDER,
@@ -30,13 +32,17 @@ import {
   formatAmount,
   formatRunway,
   getWalletFlow,
+  getWalletPlans,
   groupByRole,
+  indexPlans,
   monitoredAssets,
+  planKey,
   severityOf,
   truncateAddress,
   assetVerdict,
   walletSeverity,
   walletStatuses,
+  walletVerdictSeverity,
 } from "@/lib/wallets";
 import WalletAssetModal from "@/components/wallets/wallet-asset-modal";
 
@@ -61,6 +67,32 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
     refetchInterval: 60000,
   });
 
+  /**
+   * The verdicts, for every wallet, fetched once rather than per opened card.
+   *
+   * Separate from the status call so the board paints as soon as balances
+   * land: this one fans out over the whole registry behind a five-minute
+   * cache and can take a moment on a cold one. Until it arrives no card
+   * claims a verdict — see `WalletCard`.
+   *
+   * A failure here is not fatal. `plans` stays undefined, every card falls
+   * back to its configured threshold, and the banner below says the page is
+   * reading fixed numbers.
+   */
+  const {
+    data: plans,
+    isLoading: plansLoading,
+    isError: plansFailed,
+  } = useQuery<WalletPlansResponse>({
+    queryKey: ["wallet-plans"],
+    queryFn: () => getWalletPlans(7),
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const planIndex = useMemo(() => indexPlans(plans), [plans]);
+  const plansReady = !plansLoading;
+
   const groups = useMemo(() => {
     if (!data) return [];
     const visible = data.wallets.filter((wallet) => {
@@ -68,8 +100,17 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
       const active = wallet.active !== false;
       return filter === "active" ? active : !active;
     });
-    return groupByRole(visible, WALLET_ROLE_ORDER);
-  }, [data, filter]);
+    return groupByRole(
+      visible,
+      WALLET_ROLE_ORDER,
+      // Ordered on the verdict the cards are coloured by, so the worst wallet
+      // is at the top of its group rather than the one with the lowest ratio
+      // to a number somebody fixed two years ago.
+      (wallet) =>
+        walletVerdictSeverity(wallet, planIndex, plansReady) ??
+        walletSeverity(wallet)
+    );
+  }, [data, filter, planIndex, plansReady]);
 
   if (isLoading) {
     return (
@@ -92,8 +133,13 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
   }
 
   const shown = groups.flatMap((group) => group.wallets);
-  const criticalCount = shown.filter((w) => walletSeverity(w) === 0).length;
-  const lowCount = shown.filter((w) => walletSeverity(w) === 1).length;
+  const severities = shown.map(
+    (wallet) =>
+      walletVerdictSeverity(wallet, planIndex, plansReady) ??
+      walletSeverity(wallet)
+  );
+  const criticalCount = severities.filter((s) => s === 0).length;
+  const lowCount = severities.filter((s) => s === 1).length;
 
   return (
     <div className="space-y-5">
@@ -101,24 +147,30 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
         <p className="text-sm text-gray-500">
           Balances as of {new Date(data.lastUpdated).toLocaleString()}
         </p>
-        {/* Counted from the configured thresholds, which is all that is known
-            without a flow request per wallet. An opened card restates its own
-            verdict from measured days of cover and can disagree with this, so
-            the label says which measure it is rather than implying one. */}
-        {criticalCount > 0 && (
-          <span
-            className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white"
-            title="Below its configured threshold. Open a wallet to see its cover in days, which can be better or worse than this."
-          >
-            {criticalCount} below configured floor
+        {/* Counted from the same verdicts the cards are coloured by. They used
+            to be counted from the configured thresholds alone, so the header
+            could read "3 below configured floor" over three cards that had
+            each turned green when somebody opened them. */}
+        {!plansReady && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Working out how long each wallet has left
           </span>
         )}
-        {lowCount > 0 && (
+        {plansReady && criticalCount > 0 && (
+          <span
+            className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white"
+            title="Inside a day of running out, or holding funds that should have moved on."
+          >
+            {criticalCount} need funding today
+          </span>
+        )}
+        {plansReady && lowCount > 0 && (
           <span
             className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"
-            title="Near its configured threshold. Open a wallet to see its cover in days."
+            title="Inside its floor — worth funding this week."
           >
-            {lowCount} near configured floor
+            {lowCount} need funding this week
           </span>
         )}
         <span className="ml-auto text-xs text-gray-500">
@@ -126,6 +178,24 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
           what it still owes.
         </span>
       </div>
+
+      {plansFailed && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          Days of cover could not be read, so every wallet below is judged
+          against its fixed configured threshold. Those drift as usage changes:
+          a wallet can read healthy with a day left, or critical with a
+          fortnight.
+        </div>
+      )}
+
+      {plans && plans.gaps.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          No transfer history for{" "}
+          {plans.gaps.map((gap) => gap.walletName).join(", ")}, so{" "}
+          {plans.gaps.length === 1 ? "it is" : "they are"} judged against
+          configured thresholds rather than days of cover.
+        </div>
+      )}
 
       {shown.length === 0 && <Notice>No {filter} wallets to display.</Notice>}
 
@@ -145,6 +215,8 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
               <WalletCard
                 key={wallet.name}
                 wallet={wallet}
+                plans={planIndex}
+                plansReady={plansReady}
                 onOpenAsset={(chain, asset, flow) => {
                   setTarget({
                     wallet,
@@ -178,9 +250,13 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
 
 function WalletCard({
   wallet,
+  plans,
+  plansReady,
   onOpenAsset,
 }: {
   wallet: WalletInfo;
+  plans: Map<string, WalletAssetPlan>;
+  plansReady: boolean;
   onOpenAsset: (
     chain: ChainBalance,
     asset: WalletAsset,
@@ -188,12 +264,13 @@ function WalletCard({
   ) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const configuredSeverity = walletSeverity(wallet);
 
   // Fetched only once the card is opened. The flow call reads a wallet's
   // transfer history across every chain it runs on; doing that eagerly for
   // fourteen wallets on every page load would cost far more than it tells
-  // anyone whose wallets are all healthy.
+  // anyone whose wallets are all healthy. The verdicts do not wait on it —
+  // they come from the board-wide `plans` call — so opening a card adds the
+  // cost, the activity and the transfers, and never changes a colour.
   const { data: flow, isLoading: flowLoading } = useQuery({
     queryKey: ["wallet-flow", wallet.name],
     queryFn: () => getWalletFlow(wallet.name, 7),
@@ -209,6 +286,13 @@ function WalletCard({
     return map;
   }, [flow]);
 
+  /** This wallet's plan rows, by chain and asset. */
+  const planFor = useMemo(
+    () => (chainId: number, asset: WalletAsset) =>
+      plans.get(planKey(wallet.name, chainId, asset)),
+    [plans, wallet.name]
+  );
+
   /**
    * Whether any asset is inside its measured floor.
    *
@@ -217,52 +301,58 @@ function WalletCard({
    * be a few hours from empty.
    */
   const belowFloor = useMemo(
-    () => (flow?.assets ?? []).some((asset) => asset.plan?.belowFloor),
-    [flow]
+    () =>
+      wallet.chains.some((chain) =>
+        monitoredAssets(chain).some(
+          (reading) => planFor(chain.chainId, reading.asset)?.plan?.belowFloor
+        )
+      ),
+    [wallet.chains, planFor]
   );
 
   /**
-   * The card's verdict, restated from measured cover once the flow arrives.
+   * The card's verdict, or `undefined` while the verdicts are still loading.
    *
-   * Until then it is the configured reading, which is what the board is
-   * ordered by and is available without a request per wallet. Re-deriving it
-   * here keeps the badge from contradicting the rows underneath it — a card
-   * headed CRITICAL with every row reading OK is worse than either alone.
+   * It used to start from the configured threshold and be restated once a
+   * flow call landed, which is why a card could read CRITICAL, then LOW, then
+   * OK without anything on chain having moved — the balance stayed put and
+   * the floor underneath it changed. Rendering "assessing" until there is an
+   * answer is one transition from unknown to known, rather than two from
+   * confidently wrong to confidently different.
    */
-  const severity = useMemo(() => {
-    if (!flow?.assets.length) return configuredSeverity;
-    return severityOf(
-      flow.assets.map((asset) =>
-        assetVerdict(
-          asset.status as BalanceStatus,
-          asset.plan,
-          asset.daysOfRunway
-        )
-      )
-    );
-  }, [flow, configuredSeverity]);
+  const severity = useMemo(
+    () => walletVerdictSeverity(wallet, plans, plansReady),
+    [wallet, plans, plansReady]
+  );
 
   /**
-   * Every monitored asset across every chain, hottest first.
+   * Every monitored asset across every chain, worst first then hottest.
    *
-   * While the flow call is in flight the list is still ordered — by severity —
-   * so the card never reflows from "correct" to "differently correct" under the
-   * reader's cursor, and an empty asset is at the top either way.
+   * The verdict it sorts on arrives with the board, so the order is already
+   * right when a card opens; the flow call only breaks ties between equally
+   * healthy assets. That is what stops the list reflowing from "correct" to
+   * "differently correct" under the reader's cursor.
    */
   const rows = useMemo(() => {
     const all = wallet.chains.flatMap((chain) =>
-      monitoredAssets(chain).map((reading) => ({
-        chain,
-        reading,
-        flow: flowByKey.get(`${chain.chainId}:${reading.asset}`),
-      }))
+      monitoredAssets(chain).map((reading) => {
+        const assetFlow = flowByKey.get(`${chain.chainId}:${reading.asset}`);
+        const assetPlan = planFor(chain.chainId, reading.asset);
+        return {
+          chain,
+          reading,
+          flow: assetFlow,
+          plan: assetPlan,
+          verdict: assetVerdict(reading.status, assetPlan, assetFlow),
+        };
+      })
     );
 
     return all
       .map((row, index) => ({ row, index }))
       .sort((a, b) => {
         const severityDiff =
-          severityOf([a.row.reading.status]) - severityOf([b.row.reading.status]);
+          severityOf([a.row.verdict]) - severityOf([b.row.verdict]);
         if (severityDiff !== 0) return severityDiff;
         const scoreDiff =
           (b.row.flow?.activityScore ?? 0) - (a.row.flow?.activityScore ?? 0);
@@ -270,7 +360,7 @@ function WalletCard({
         return a.index - b.index;
       })
       .map(({ row }) => row);
-  }, [wallet.chains, flowByKey]);
+  }, [wallet.chains, flowByKey, planFor]);
 
   const tone =
     severity === 0
@@ -317,6 +407,15 @@ function WalletCard({
                 LOW
               </span>
             )}
+            {severity === undefined && (
+              <span
+                className="inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
+                title="Working out what this wallet costs per day, which is what its floor is set from."
+              >
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                assessing cover
+              </span>
+            )}
             {wallet.hasFailureSources === false && (
               <span
                 className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
@@ -332,8 +431,9 @@ function WalletCard({
           </p>
 
           {/* Shown only when it matters. On a healthy wallet this is noise; on
-              an empty one it is the line that decides whether to act now. */}
-          {severity < 2 && wallet.impactWhenEmpty && (
+              an empty one it is the line that decides whether to act now, so
+              it waits for a verdict rather than guessing from a threshold. */}
+          {severity != null && severity < 2 && wallet.impactWhenEmpty && (
             <p
               className={`mt-1 text-sm ${
                 severity === 0 ? "text-red-800" : "text-yellow-900"
@@ -349,18 +449,20 @@ function WalletCard({
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <AddressChip address={wallet.address} />
-            {rows.slice(0, 4).map(({ chain, reading, flow: assetFlow }) => (
-              <AssetChip
-                key={`${chain.chainId}:${reading.asset}`}
-                label={reading.label}
-                chainName={chain.chainName}
-                balance={reading.balance}
-                threshold={reading.threshold}
-                plan={assetFlow?.plan}
-                status={reading.status}
-                runwayDays={assetFlow?.daysOfRunway}
-              />
-            ))}
+            {rows
+              .slice(0, 4)
+              .map(({ chain, reading, flow: assetFlow, plan, verdict }) => (
+                <AssetChip
+                  key={`${chain.chainId}:${reading.asset}`}
+                  label={reading.label}
+                  chainName={chain.chainName}
+                  balance={reading.balance}
+                  threshold={reading.threshold}
+                  plan={assetFlow?.plan ?? plan?.plan}
+                  verdict={verdict}
+                  runwayDays={assetFlow?.daysOfRunway ?? plan?.daysOfRunway}
+                />
+              ))}
             {rows.length > 4 && (
               <span className="text-xs text-gray-400">
                 +{rows.length - 4} more
@@ -404,7 +506,16 @@ function WalletCard({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.map(({ chain, reading, flow: assetFlow }, index) => (
+              {rows.map(
+                (
+                  { chain, reading, flow: assetFlow, plan, verdict },
+                  index
+                ) => {
+                  // The flow row carries the same plan once a card is open;
+                  // before that the board-wide one is already here, so the
+                  // floor quoted never changes when the detail arrives.
+                  const refill = assetFlow?.plan ?? plan?.plan;
+                  return (
                 <tr
                   key={`${chain.chainId}:${reading.asset}`}
                   onClick={() => onOpenAsset(chain, reading.asset, assetFlow)}
@@ -425,24 +536,24 @@ function WalletCard({
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <StatusText
-                      status={assetVerdict(
-                        reading.status,
-                        assetFlow?.plan,
-                        assetFlow?.daysOfRunway
-                      )}
-                    />
+                    <StatusText status={verdict} reason={plan?.verdictReason} />
                     <div className="text-xs text-gray-500">
                       {formatAmount(reading.balance)} /{" "}
-                      {formatAmount(
-                        assetFlow?.plan?.floorAmount ?? reading.threshold
-                      )}
-                      {assetFlow?.plan && (
+                      {formatAmount(refill?.floorAmount ?? reading.threshold)}
+                      {refill && (
                         <span
                           className="ml-1 text-gray-400"
-                          title={`A floor of ${assetFlow.plan.floorDays} days at the measured cost, rather than the fixed ${formatAmount(reading.threshold)} configured.`}
+                          title={`A floor of ${refill.floorDays} days at the measured cost, rather than the fixed ${formatAmount(reading.threshold)} configured.`}
                         >
-                          ({assetFlow.plan.floorDays}d)
+                          ({refill.floorDays}d)
+                        </span>
+                      )}
+                      {plan?.isResidue && (
+                        <span
+                          className="ml-1 text-gray-400"
+                          title="A router that should settle empty. The figure on the right is the remainder we tolerate, not a floor to stay above."
+                        >
+                          (ceiling)
                         </span>
                       )}
                     </div>
@@ -462,15 +573,21 @@ function WalletCard({
                     Details →
                   </td>
                 </tr>
-              ))}
+                  );
+                }
+              )}
             </tbody>
           </table>
 
           {/* Also shown when nothing has tripped its configured threshold but
               an asset is inside its measured floor — the Connect Wallet FUSE
               case, comfortably above a stale 1,000 and under a day of cover. */}
-          {(severity < 2 || belowFloor) && (
-            <TopUpInstruction wallet={wallet} flowByAsset={flowByKey} />
+          {((severity != null && severity < 2) || belowFloor) && (
+            <TopUpInstruction
+              wallet={wallet}
+              flowByAsset={flowByKey}
+              planFor={planFor}
+            />
           )}
         </div>
       )}
@@ -479,43 +596,65 @@ function WalletCard({
 }
 
 /**
- * What to send, and where, for every chain that is short.
+ * What to do about it, and where — a top-up for most wallets, and the opposite
+ * for a router.
  *
- * The amount is now what brings the wallet back to its target cover rather
- * than what clears its floor. Sending the floor is what produced the daily
- * refill treadmill: Connect Wallet's FUSE floor was 1,000 against a cost of
- * ~990 a day, so every top-up bought a single day and someone had to come
- * back the next morning. Where no cost has been measured yet, it falls back to
- * the configured threshold and says so.
+ * The amount is what brings the wallet back to its target cover rather than
+ * what clears its floor. Sending the floor is what produced the daily refill
+ * treadmill: Connect Wallet's FUSE floor was 1,000 against a cost of ~990 a
+ * day, so every top-up bought a single day and someone had to come back the
+ * next morning. Where no cost has been measured yet, it falls back to the
+ * configured threshold and says so.
+ *
+ * A residue wallet is excluded from all of that and told apart explicitly. It
+ * is a router that should settle empty, so its threshold is a ceiling on
+ * tolerated dust — and reading it as a floor had this panel instructing an
+ * operator to send 200 USDC to the Card Deposit Manager, which is the one
+ * action its own config says must never be taken. A balance there is a user's
+ * card deposit that never reached their card.
  */
 function TopUpInstruction({
   wallet,
   flowByAsset,
+  planFor,
 }: {
   wallet: WalletInfo;
   flowByAsset: Map<string, WalletAssetFlow>;
+  planFor: (chainId: number, asset: WalletAsset) => WalletAssetPlan | undefined;
 }) {
+  const stuck: Array<{ chainName: string; text: string }> = [];
+
   const shortfalls = wallet.chains
     .map((chain) => ({
       chain,
       needs: monitoredAssets(chain)
         .map((reading) => {
+          const assetPlan = planFor(chain.chainId, reading.asset);
           const flow = flowByAsset.get(`${chain.chainId}:${reading.asset}`);
-          const plan = flow?.plan;
+          const refill = flow?.plan ?? assetPlan?.plan;
 
-          if (plan?.refillAmount && plan.refillAmount > 0) {
+          if (assetPlan?.isResidue) {
+            if (assetPlan.verdict === "CRITICAL") {
+              stuck.push({
+                chainName: chain.chainName,
+                text: `${formatAmount(reading.balance)} ${reading.label}`,
+              });
+            }
+            return null;
+          }
+
+          if (refill?.refillAmount && refill.refillAmount > 0) {
             return {
-              text: `${formatAmount(plan.refillAmount)} ${reading.label}`,
-              detail: `brings it to ${plan.targetDays} days of cover`,
-              urgent: plan.belowFloor,
+              text: `${formatAmount(refill.refillAmount)} ${reading.label}`,
+              detail: `brings it to ${refill.targetDays} days of cover`,
             };
           }
           // No measured cost to plan from, so fall back to the fixed floor.
-          if (reading.status === "LOW" || reading.status === "CRITICAL") {
+          const verdict = assetVerdict(reading.status, assetPlan, flow);
+          if (verdict === "LOW" || verdict === "CRITICAL") {
             return {
               text: `${formatAmount(reading.threshold)} ${reading.label}`,
               detail: "its configured floor — no cost measured yet",
-              urgent: reading.status === "CRITICAL",
             };
           }
           return null;
@@ -524,10 +663,17 @@ function TopUpInstruction({
     }))
     .filter((row) => row.needs.length > 0);
 
-  if (shortfalls.length === 0) return null;
+  if (shortfalls.length === 0 && stuck.length === 0) return null;
 
   return (
     <div className="border-t border-gray-200 px-4 py-3">
+      {stuck.map(({ chainName, text }) => (
+        <p key={chainName} className="text-sm text-red-900">
+          <strong>Do not top this up.</strong> It is holding {text} on{" "}
+          {chainName} — a deposit that was swept in and never routed on.
+          Investigate where it stopped.
+        </p>
+      ))}
       {shortfalls.map(({ chain, needs }) => (
         <p key={chain.chainId} className="text-sm text-gray-800">
           Send at least{" "}
@@ -541,7 +687,7 @@ function TopUpInstruction({
           </span>
         </p>
       ))}
-      {wallet.topUpHint && (
+      {shortfalls.length > 0 && wallet.topUpHint && (
         <p className="mt-2 text-xs text-indigo-900">{wallet.topUpHint}</p>
       )}
     </div>
@@ -641,7 +787,7 @@ function AssetChip({
   balance,
   threshold,
   plan,
-  status,
+  verdict,
   runwayDays,
 }: {
   label: string;
@@ -649,10 +795,9 @@ function AssetChip({
   balance: string;
   threshold: string;
   plan?: WalletRefillPlan;
-  status: BalanceStatus;
+  verdict: BalanceStatus;
   runwayDays?: number;
 }) {
-  const verdict = assetVerdict(status, plan, runwayDays);
   const tone =
     verdict === "CRITICAL"
       ? "bg-red-100 text-red-900 border-red-200"
@@ -708,7 +853,10 @@ function AddressChip({ address }: { address: string }) {
   );
 }
 
-function SeverityIcon({ severity }: { severity: 0 | 1 | 2 }) {
+/** Undefined severity is the honest state while the verdicts are loading. */
+function SeverityIcon({ severity }: { severity?: 0 | 1 | 2 }) {
+  if (severity === undefined)
+    return <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-gray-300" />;
   if (severity === 0)
     return <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />;
   if (severity === 1)
@@ -716,14 +864,24 @@ function SeverityIcon({ severity }: { severity: 0 | 1 | 2 }) {
   return <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />;
 }
 
-function StatusText({ status }: { status: BalanceStatus }) {
+function StatusText({
+  status,
+  reason,
+}: {
+  status: BalanceStatus;
+  reason?: string;
+}) {
   const tone =
     status === "CRITICAL"
       ? "text-red-700 font-semibold"
       : status === "LOW"
       ? "text-yellow-700 font-medium"
       : "text-green-700";
-  return <span className={`text-xs ${tone}`}>{status}</span>;
+  return (
+    <span className={`text-xs ${tone}`} title={reason}>
+      {status}
+    </span>
+  );
 }
 
 const Notice = ({ children }: { children: React.ReactNode }) => (
