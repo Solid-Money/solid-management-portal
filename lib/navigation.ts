@@ -171,6 +171,12 @@ export const NAV_GROUPS: NavGroup[] = [
         description: "KYC, card and rail costs behind every margin number",
         icon: Receipt,
       },
+      {
+        href: "/general-config",
+        label: "General",
+        description: "One-off switches with no other home, like Rain RTF",
+        icon: SlidersHorizontal,
+      },
     ],
   },
   {

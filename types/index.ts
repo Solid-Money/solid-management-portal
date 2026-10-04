@@ -2279,3 +2279,78 @@ export interface RainRtfStatus {
   };
   chains: RainRtfChain[];
 }
+
+// --- Config → General ------------------------------------------------------
+
+/** Which layer supplied the value the app is actually using. */
+export type RainRtfSettingSource = "database" | "environment" | "default";
+
+/**
+ * One Real-Time Funding setting, with what every layer says about it.
+ *
+ * All three are reported, not just the answer. An operator looking at
+ * "Enabled: true" cannot act on it without knowing whether that came from the
+ * box in front of them or from Helm, and editing the layer that is being
+ * overridden is the commonest way to waste an afternoon on layered config.
+ */
+export interface RainRtfSetting {
+  /** Name shared by every source — "RAIN_RTF_ENABLED". */
+  name: string;
+  /** App config key the dashboard writes to — "rain_rtf.enabled". */
+  configKey: string;
+  label: string;
+  description: string;
+  /** What the dashboard holds, or null when no operator has set it. */
+  stored: string | null;
+  /** What this deployment's environment supplies, or null. */
+  environment: string | null;
+  /** What the code falls back to when neither of the above has a value. */
+  publishedDefault: string | null;
+  /** The value actually in force. */
+  effective: string;
+  source: RainRtfSettingSource;
+}
+
+/** A chain as the registry currently resolves it, overrides applied. */
+export interface RainRtfResolvedChain {
+  chainId: number;
+  name: string;
+  environment: string;
+  operatorAddress: string;
+  assets: Array<{ symbol: string; address: string; decimals: number }>;
+}
+
+export interface RainRtfTokenOverride {
+  chainId: number;
+  /** `symbol:address:decimals`, comma-separated. Empty removes the override. */
+  tokens: string;
+}
+
+export interface RainRtfConfig {
+  settings: RainRtfSetting[];
+  tokenOverrides: RainRtfTokenOverride[];
+  chains: RainRtfResolvedChain[];
+}
+
+export interface GeneralConfig {
+  rainRtf: RainRtfConfig;
+}
+
+/**
+ * An edit to the Real-Time Funding settings.
+ *
+ * Every field is optional and absent means "leave as is", so the page sends
+ * only what changed. An empty string is a distinct instruction: it clears the
+ * stored value and hands the setting back to the environment.
+ */
+export interface UpdateRainRtfConfig {
+  /** `null` clears the stored value, as an empty string does for the text
+   * fields — `undefined` cannot, since it already means "leave as is". */
+  enabled?: boolean | null;
+  approveOperator?: boolean | null;
+  chainIds?: string;
+  operatorSandbox?: string;
+  operatorProduction?: string;
+  termsUrl?: string;
+  tokenOverrides?: RainRtfTokenOverride[];
+}
