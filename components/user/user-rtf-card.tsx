@@ -4,7 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Zap } from "lucide-react";
 
 import { getUserRtf } from "@/lib/api";
-import { RainRtfChain, RainRtfSpenderKind, RainRtfStatus } from "@/types";
+import {
+  RainRtfAsset,
+  RainRtfChain,
+  RainRtfSpenderKind,
+  RainRtfStatus,
+} from "@/types";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -120,21 +125,93 @@ function describeAllowance(
   return `${formatUnits(allowance, decimals) ?? "Unknown"} ${symbol}`;
 }
 
-function ChainRow({ chain }: { chain: RainRtfChain }) {
-  const balance = formatUnits(chain.walletBalance, chain.tokenDecimals);
+function AssetBlock({
+  asset,
+  chainUnreadable,
+}: {
+  asset: RainRtfAsset;
+  chainUnreadable: boolean;
+}) {
+  const balance = formatUnits(asset.walletBalance, asset.tokenDecimals);
 
+  return (
+    <div className="rounded-md border border-gray-200 bg-white p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-medium text-gray-900">
+            {asset.symbol}
+          </span>
+          <CopyableValue value={asset.tokenAddress} truncate />
+        </div>
+        <Badge variant={asset.isApproved ? "success" : "danger"}>
+          {asset.isApproved ? "Approved" : "Not approved"}
+        </Badge>
+      </div>
+
+      <dl className="mt-2 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <dt className="text-xs text-gray-500">Wallet balance</dt>
+          <dd className="font-mono text-xs">
+            {balance === null ? (
+              <span className="text-gray-400">—</span>
+            ) : (
+              `${balance} ${asset.symbol}`
+            )}
+          </dd>
+        </div>
+        {asset.spenders.map((spender) => (
+          <div
+            key={`${spender.kind}-${spender.address}`}
+            className="flex items-center justify-between gap-2"
+          >
+            <dt className="flex items-center gap-1.5 text-xs text-gray-500">
+              {SPENDER_LABELS[spender.kind] ?? spender.kind}
+              <Badge variant={spender.isApproved ? "success" : "muted"}>
+                {spender.isApproved ? "ok" : "pending"}
+              </Badge>
+            </dt>
+            <dd className="font-mono text-xs text-gray-700">
+              {describeAllowance(
+                spender.currentAllowance,
+                asset.tokenDecimals,
+                asset.symbol,
+              )}
+            </dd>
+          </div>
+        ))}
+        {asset.spenders.length === 0 ? (
+          <p className="text-xs text-gray-500">
+            No spender to approve — Rain has provisioned no collateral contract here and the
+            operator is switched off.
+          </p>
+        ) : null}
+      </dl>
+
+      {/* Suppressed when the whole chain is unreadable: "not approved" there
+          means "we could not look", and the chain-level warning already says
+          so. Repeating it per asset would read as several separate problems. */}
+      {!asset.isApproved && !chainUnreadable ? (
+        <p className="mt-2 text-xs text-gray-500">
+          Authorizations in this asset will decline until every spender above is approved.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ChainRow({ chain }: { chain: RainRtfChain }) {
   return (
     <div className="rounded-lg border bg-gray-50 p-3 text-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-medium text-gray-900">{chain.name}</span>
-          <Badge variant="muted">{chain.assetSymbol}</Badge>
+          <Badge variant="muted">{chain.chainId}</Badge>
           {chain.environment === "sandbox" ? (
             <Badge variant="warning">Sandbox</Badge>
           ) : null}
         </div>
         <Badge variant={chain.isApproved ? "success" : "danger"}>
-          {chain.isApproved ? "Approved" : "Not approved"}
+          {chain.isApproved ? "Approved" : `${chain.pendingApprovals} pending`}
         </Badge>
       </div>
 
@@ -153,41 +230,11 @@ function ChainRow({ chain }: { chain: RainRtfChain }) {
           </dd>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-xs text-gray-500">Wallet balance</dt>
-          <dd className="font-mono text-xs">
-            {balance === null ? (
-              <span className="text-gray-400">—</span>
-            ) : (
-              `${balance} ${chain.assetSymbol}`
-            )}
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-2">
           <dt className="text-xs text-gray-500">Collateral contract</dt>
           <dd>
             <CopyableValue value={chain.collateralAddress} truncate />
           </dd>
         </div>
-        {chain.spenders.map((spender) => (
-          <div
-            key={`${spender.kind}-${spender.address}`}
-            className="flex items-center justify-between gap-2"
-          >
-            <dt className="flex items-center gap-1.5 text-xs text-gray-500">
-              {SPENDER_LABELS[spender.kind] ?? spender.kind}
-              <Badge variant={spender.isApproved ? "success" : "muted"}>
-                {spender.isApproved ? "ok" : "pending"}
-              </Badge>
-            </dt>
-            <dd className="font-mono text-xs text-gray-700">
-              {describeAllowance(
-                spender.currentAllowance,
-                chain.tokenDecimals,
-                chain.assetSymbol,
-              )}
-            </dd>
-          </div>
-        ))}
         <div className="flex items-center justify-between gap-2">
           <dt className="text-xs text-gray-500">Terms accepted</dt>
           <dd className="text-xs text-gray-700">
@@ -204,16 +251,29 @@ function ChainRow({ chain }: { chain: RainRtfChain }) {
         ) : null}
       </dl>
 
+      {/* Per asset, because the allowances are per asset. A card fully
+          approved for USDC and unapproved for EURC declines only on EURC,
+          and a single chain-level badge would hide exactly that. */}
+      <div className="mt-3 space-y-2">
+        {chain.assets.map((asset) => (
+          <AssetBlock
+            key={asset.tokenAddress}
+            asset={asset}
+            chainUnreadable={chain.unavailableReason !== null}
+          />
+        ))}
+      </div>
+
       {/* The one state that is not self-evident from the badges above: the
-          cardholder granted the allowance but we never recorded the consent,
+          cardholder granted the allowances but we never recorded the consent,
           which means the confirm call did not land. The card still works —
           the chain is what Rain reads — but the compliance record is missing,
           and that is a thing to go and fix rather than notice at audit. */}
       {chain.isApproved && !chain.hasConsent ? (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-          Allowance is granted on-chain but no terms acceptance was recorded. The card works; the
-          compliance record is missing.
+          Allowances are granted on-chain but no terms acceptance was recorded. The card works;
+          the compliance record is missing.
         </p>
       ) : null}
     </div>

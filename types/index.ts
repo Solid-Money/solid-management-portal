@@ -2507,20 +2507,35 @@ export interface RainRtfSpender {
   isApproved: boolean;
 }
 
+/**
+ * One asset on one chain — the unit of approval.
+ *
+ * An ERC-20 allowance is scoped to one (token, owner, spender) triple, so a
+ * chain with two assets and two spenders carries four independent
+ * allowances. A card can be fully approved for USDC and decline on EURC,
+ * which is only visible if they are listed separately.
+ */
+export interface RainRtfAsset {
+  /** USDT0 on Plasma, USDC elsewhere. A wallet holding the wrong one declines. */
+  symbol: string;
+  tokenAddress: string;
+  tokenDecimals: number;
+  spenders: RainRtfSpender[];
+  /** Smallest units, as a string. `null` when the chain could not be read. */
+  walletBalance: string | null;
+  isApproved: boolean;
+}
+
 export interface RainRtfChain {
   chainId: number;
   name: string;
   environment: "sandbox" | "production";
-  /** USDT0 on Plasma, USDC elsewhere. A wallet holding the wrong one declines. */
-  assetSymbol: string;
-  tokenAddress: string;
-  tokenDecimals: number;
   /** The cardholder's Rain collateral contract (`proxyAddress`). */
   collateralAddress: string | null;
-  spenders: RainRtfSpender[];
+  assets: RainRtfAsset[];
   walletAddress: string | null;
-  /** Smallest units, as a string. `null` when the chain could not be read. */
-  walletBalance: string | null;
+  /** How many `approve` calls this chain still needs. */
+  pendingApprovals: number;
   isApproved: boolean;
   /** We hold a consent record: the cardholder accepted the RTF Terms. */
   hasConsent: boolean;
