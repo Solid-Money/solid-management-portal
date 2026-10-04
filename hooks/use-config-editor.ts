@@ -228,6 +228,10 @@ export interface ConfigEditor {
     field?: string,
   ) => Promise<void>;
   clearCache: () => Promise<void>;
+  /** Republish the country-routing lists. Idempotent. */
+  syncCountryRouting: () => Promise<void>;
+  /** True while {@link syncCountryRouting} is in flight. */
+  syncingCountries: boolean;
   refetch: () => Promise<void>;
 }
 
@@ -243,6 +247,7 @@ export interface ConfigEditor {
 export function useConfigEditor(): ConfigEditor {
   const { user } = useAuth();
   const [config, setConfig] = useState<FullRewardsConfig | null>(null);
+  const [syncingCountries, setSyncingCountries] = useState(false);
   const [originalConfig, setOriginalConfig] =
     useState<FullRewardsConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -413,6 +418,44 @@ export function useConfigEditor(): ConfigEditor {
     [config],
   );
 
+  /**
+   * Republish the country-routing lists to the `cardCountryAccess` documents.
+   *
+   * Routing reads those documents, not the code constants, and a deploy that
+   * changes which issuer serves a market does not take effect until this runs.
+   * Idempotent — it rewrites the same values from the same constants, so
+   * pressing it twice is pressing it once.
+   */
+  const syncCountryRouting = useCallback(async () => {
+    try {
+      setSyncingCountries(true);
+      const { data } = await api.post<{
+        ok: boolean;
+        cardCountries: number;
+        rainCountries: number;
+        wirexCountries: number;
+      }>("/admin/v1/rewards-config/card-country-access/sync");
+
+      toast.success("Country routing published", {
+        // The counts are the proof it did something: a Wirex number that still
+        // includes a closed market means the write did not land.
+        description:
+          `${data.rainCountries} Rain and ${data.wirexCountries} Wirex ` +
+          `jurisdictions written (${data.cardCountries} open for cards in total). ` +
+          `US state licensing refreshed.`,
+        duration: 6000,
+        className: "p-4 text-base",
+      });
+    } catch (error) {
+      console.error("Failed to sync country routing:", error);
+      toast.error("Failed to publish country routing", {
+        description: "Routing is unchanged. Try again, or check the logs.",
+      });
+    } finally {
+      setSyncingCountries(false);
+    }
+  }, []);
+
   const clearCache = useCallback(async () => {
     try {
       await api.post("/admin/v1/rewards-config/clear-cache");
@@ -438,6 +481,8 @@ export function useConfigEditor(): ConfigEditor {
     handleNumericUpdate,
     setConfig,
     saveSection,
+    syncCountryRouting,
+    syncingCountries,
     clearCache,
     refetch: fetchConfig,
   };

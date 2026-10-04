@@ -1,6 +1,12 @@
 "use client";
 
-import { BadgeDollarSign, Percent, RefreshCw, Save } from "lucide-react";
+import {
+  BadgeDollarSign,
+  Globe,
+  Percent,
+  RefreshCw,
+  Save,
+} from "lucide-react";
 
 import {
   ConfigSection,
@@ -90,6 +96,8 @@ export default function FeesConfigPage() {
     handleNumericUpdate,
     saveSection,
     clearCache,
+    syncCountryRouting,
+    syncingCountries,
   } = useConfigEditor();
 
   /**
@@ -284,6 +292,42 @@ export default function FeesConfigPage() {
           </button>
         </ConfigSection>
       ))}
+
+      <ConfigSection
+        title="Country routing"
+        description="Publish which issuer serves each market, and Rain's US state licensing"
+        icon={<Globe className="h-5 w-5 text-amber-600" />}
+      >
+        <div className="space-y-3 text-sm text-gray-600">
+          <p>
+            Routing reads the stored country lists, not the code — so a deploy
+            that moves a market between issuers does nothing until this is
+            pressed. It rewrites both lists from the deployed constants:{" "}
+            <strong>which countries each issuer serves</strong>, and{" "}
+            <strong>which US states Rain is licensed in</strong>.
+          </p>
+          <p>
+            Press it after any deploy that changes issuer coverage. It is
+            idempotent — it writes the same values every time, so pressing it
+            twice is the same as pressing it once, and it is safe to press when
+            you are not sure whether someone already has.
+          </p>
+          <p className="text-gray-500">
+            It does not touch fees, and it cannot open a market that is not in
+            the deployed lists. The toast reports the counts it wrote.
+          </p>
+        </div>
+        <button
+          onClick={syncCountryRouting}
+          disabled={syncingCountries}
+          className="mt-4 inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Globe
+            className={`mr-2 h-4 w-4 ${syncingCountries ? "animate-spin" : ""}`}
+          />
+          {syncingCountries ? "Publishing…" : "Publish country routing"}
+        </button>
+      </ConfigSection>
 
       <ConfigSection
         title="Minimum Charge"
