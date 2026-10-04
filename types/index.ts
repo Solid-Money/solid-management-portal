@@ -2626,8 +2626,10 @@ export interface GeneralConfig {
  * stored value and hands the setting back to the environment.
  */
 export interface UpdateRainRtfConfig {
-  enabled?: boolean;
-  approveOperator?: boolean;
+  /** `null` clears the stored value, as an empty string does for the text
+   * fields — `undefined` cannot, since it already means "leave as is". */
+  enabled?: boolean | null;
+  approveOperator?: boolean | null;
   chainIds?: string;
   operatorSandbox?: string;
   operatorProduction?: string;
