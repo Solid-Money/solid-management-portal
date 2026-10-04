@@ -37,7 +37,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useConfigEditor } from "@/hooks/use-config-editor";
 import api from "@/lib/api";
-import { YieldBoostRunResult } from "@/types";
+import {
+  SubscriptionCategoryRatesMigrationResult,
+  SubscriptionDiscountCategory,
+  YieldBoostRunResult,
+} from "@/types";
 
 /**
  * An ISO timestamp as the day it names, or a dash.
@@ -120,28 +124,93 @@ export default function RewardsConfigPage() {
     "yesterday",
   );
   const [runningAccrual, setRunningAccrual] = useState(false);
+  const [migratingRates, setMigratingRates] = useState(false);
+  const [migrationResult, setMigrationResult] =
+    useState<SubscriptionCategoryRatesMigrationResult | null>(null);
   const [accrualResult, setAccrualResult] =
     useState<YieldBoostRunResult | null>(null);
 
-  const updateCategoryMerchants = (index: number, rawMerchants: string) => {
+  const updateCategory = (
+    index: number,
+    patch: Partial<SubscriptionDiscountCategory>,
+  ) => {
     setConfig((prev) => {
       if (!prev) return prev;
       const categories = prev.subscriptionDiscount.categories.map((cat, i) =>
-        i === index
-          ? {
-              ...cat,
-              merchants: rawMerchants
-                .split(",")
-                .map((m) => m.trim())
-                .filter((m) => m.length > 0),
-            }
-          : cat,
+        i === index ? { ...cat, ...patch } : cat,
       );
       return {
         ...prev,
         subscriptionDiscount: { ...prev.subscriptionDiscount, categories },
       };
     });
+  };
+
+  const updateCategoryMerchants = (index: number, rawMerchants: string) => {
+    updateCategory(index, {
+      merchants: rawMerchants
+        .split(",")
+        .map((m) => m.trim())
+        .filter((m) => m.length > 0),
+    });
+  };
+
+  /**
+   * Set (or clear) one tier's rate on one category.
+   *
+   * The field is in percentage points and stored as a fraction. Clearing it
+   * drops the key so the category falls back to the tier's flat percentage —
+   * which is NOT the same as typing 0, and the difference is load-bearing:
+   * 0 locks the category for that tier (Airlines for Prime), while absent means
+   * "price it like everything else".
+   */
+  const updateCategoryRate = (
+    index: number,
+    tierKey: "tier1" | "tier2" | "tier3",
+    rawPercent: string,
+  ) => {
+    const current = config?.subscriptionDiscount.categories[index];
+    if (!current) return;
+
+    const rates = { ...(current.rates ?? {}) };
+    const trimmed = rawPercent.trim();
+    const parsed = Number(trimmed);
+
+    if (trimmed === "" || !Number.isFinite(parsed) || parsed < 0) {
+      delete rates[tierKey];
+    } else {
+      rates[tierKey] = parsed / 100;
+    }
+
+    updateCategory(index, {
+      rates: Object.keys(rates).length > 0 ? rates : undefined,
+    });
+  };
+
+  /**
+   * Whether a category is live.
+   *
+   * Absent means live: categories stored before the toggle existed carry no
+   * flag, and reading a missing value as "off" would silently pause every one
+   * of them the first time this page loads.
+   */
+  const isCategoryEnabled = (category: SubscriptionDiscountCategory): boolean =>
+    category.enabled !== false;
+
+  /** Categories currently switched on, for the count above the list. */
+  const liveCategoryCount = (
+    config?.subscriptionDiscount.categories ?? []
+  ).filter(isCategoryEnabled).length;
+
+  /** A stored fraction as the percentage-point string the input shows. */
+  const rateFieldValue = (
+    category: SubscriptionDiscountCategory,
+    tierKey: "tier1" | "tier2" | "tier3",
+  ): string => {
+    const rate = category.rates?.[tierKey];
+    return typeof rate === "number" && Number.isFinite(rate)
+      ? String(Number((rate * 100).toFixed(4)))
+      : "";
   };
 
   const saveTierThresholds = async () => {
@@ -378,6 +447,51 @@ export default function RewardsConfigPage() {
       toast.error("Failed to run the yield boost accrual");
     } finally {
       setRunningAccrual(false);
+    }
+  };
+
+  /**
+   * Preview or commit the move onto per-category subscription rates.
+   *
+   * Rewards config is seeded from code once and owned by the database after
+   * that, so deploying new rates does not move an environment that has run
+   * before — this is what moves it. Both buttons hit the same endpoint and the
+   * same planner, so the preview is exactly what Apply will write.
+   *
+   * Safe to press more than once: the backend recomputes the plan from live
+   * config every call, so committing against already-migrated config writes
+   * nothing and comes back `alreadyApplied`.
+   */
+  const runCategoryRatesMigration = async (apply: boolean) => {
+    try {
+      setMigratingRates(true);
+      const response =
+        await api.post<SubscriptionCategoryRatesMigrationResult>(
+          "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
+          { apply },
+        );
+      setMigrationResult(response.data);
+
+      if (response.data.applied) {
+        toast.success("Category rates migrated", {
+          description: `${response.data.changes.length} change(s) written. The config cache has been cleared.`,
+        });
+        // Pull the written config back so the fields below show the new rates.
+        await refetch();
+      } else if (response.data.alreadyApplied) {
+        toast.success("Already up to date", {
+          description: "Stored config already matches the shipped rates.",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to migrate category rates:", error);
+      toast.error(
+        apply
+          ? "Failed to apply the category rates migration"
+          : "Failed to preview the category rates migration",
+      );
+    } finally {
+      setMigratingRates(false);
     }
   };
 
@@ -1251,7 +1365,7 @@ export default function RewardsConfigPage() {
         {/* Subscription Discount */}
         <ConfigSection
           title="Category-based Subscription Discounts"
-          description="Up to 50% back on monthly subscriptions (Netflix, Spotify, ChatGPT…). Prime unlocks 2 categories/month, Ultra unlocks 4. One subscription per category per month (first-paid-wins); paid as soUSD and drawn from the same monthly cashback cap."
+          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins), paid as soUSD and drawn from the same monthly cashback cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
         >
           <ToggleField
@@ -1273,21 +1387,49 @@ export default function RewardsConfigPage() {
               }
               type="number"
               suffix="$"
-              tooltip="Most cashback one eligible service can earn in a calendar month (e.g. $50). Caps the cashback, NOT the charge: a $200 subscription at Prime's 25% earns $50, not 25% of the first $50. Rewards Terms §5 promises this figure — changing it changes what the published terms owe."
+              tooltip="Most cashback one eligible service can earn in a calendar month (e.g. $50). Caps the cashback, NOT the charge: a $600 subscription at Prime's 10% earns $50, not 10% of the first $50. Rewards Terms §5 promises this figure — changing it changes what the published terms owe."
             />
           </div>
           <div className="mt-4 space-y-3">
             <label className="text-sm font-medium text-gray-700 block">
-              Categories &amp; Eligible Merchants
-              <InfoTooltip text="Each category's merchants (comma-separated). A card transaction is matched to a category when its merchant name contains one of these aliases (case/punctuation-insensitive)." />
+              Categories, Rates &amp; Eligible Merchants
+              <InfoTooltip text="Each category's merchants (comma-separated) and what each tier earns on it. A card transaction is matched to a category when its merchant name contains one of these aliases (case/punctuation-insensitive), and the matched category's rate for the cardholder's tier is what gets paid. A blank rate falls back to the tier default below; 0 locks the category for that tier. The per-category switch is separate from both: off takes the category off the app and stops it paying anyone, where 0 only locks it for one tier and still advertises the upgrade." />
             </label>
+            <p className="text-xs text-gray-600">
+              {liveCategoryCount} of{" "}
+              {config.subscriptionDiscount.categories?.length ?? 0} categories
+              live.{" "}
+              {liveCategoryCount === 0
+                ? "With none on, the app hides subscription cashback entirely and every eligible charge earns regular tier cashback."
+                : "A paused category is hidden in the app and pays nobody."}
+            </p>
             {config.subscriptionDiscount.categories?.map((cat, index) => (
               <div
                 key={cat.key}
-                className="border border-gray-200 rounded-md p-3 bg-gray-50"
+                className={`border rounded-md p-3 ${
+                  isCategoryEnabled(cat)
+                    ? "border-gray-200 bg-gray-50"
+                    : "border-gray-300 bg-gray-100"
+                }`}
               >
-                <div className="text-sm font-semibold text-gray-800 mb-1">
-                  {cat.label}
+                <div className="mb-1 flex items-start justify-between gap-3">
+                  <div className="text-sm font-semibold text-gray-800">
+                    {cat.label}
+                    <span className="ml-2 font-mono text-xs font-normal text-gray-500">
+                      {cat.key}
+                    </span>
+                    {!isCategoryEnabled(cat) && (
+                      <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        Paused
+                      </span>
+                    )}
+                  </div>
+                  <ToggleField
+                    label={isCategoryEnabled(cat) ? "On" : "Off"}
+                    value={isCategoryEnabled(cat)}
+                    onChange={(v) => updateCategory(index, { enabled: v })}
+                    tooltip={`Turn ${cat.label} on or off. Off hides it from the app and pauses the payout — a matching charge earns regular tier cashback instead and does not use up one of the cardholder's category slots. Cashback already accrued on it is not touched, and this month's claims keep their slots. Save the section to apply.`}
+                  />
                 </div>
                 <textarea
                   value={cat.merchants.join(", ")}
@@ -1297,13 +1439,40 @@ export default function RewardsConfigPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={2}
                 />
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  {(
+                    [
+                      ["tier1", "Core %"],
+                      ["tier2", "Prime %"],
+                      ["tier3", "Ultra %"],
+                    ] as const
+                  ).map(([tierKey, label]) => (
+                    <InputField
+                      key={tierKey}
+                      label={label}
+                      value={rateFieldValue(cat, tierKey)}
+                      onChange={(v) => updateCategoryRate(index, tierKey, v)}
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      suffix="%"
+                      tooltip={`What ${label.replace(" %", "")} earns on ${cat.label}. Leave BLANK to use this tier's default rate below. Enter 0 to lock the category for the tier — that is not the same thing, and it is how Airlines stays Ultra-only.`}
+                    />
+                  ))}
+                </div>
+                {!cat.rates && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    No rates set — this category pays each tier&apos;s default
+                    rate below.
+                  </p>
+                )}
               </div>
             ))}
           </div>
           <TierGrid>
             <TierCard tier="Tier 1">
               <InputField
-                label="Discount %"
+                label="Default Discount %"
                 value={
                   (config.subscriptionDiscount.tier1.percentage as any) === ""
                     ? ""
@@ -1320,7 +1489,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="1"
-                tooltip="Percentage of an eligible subscription charge paid back as cashback, before the per-service monthly cap above (Core 0%, Prime 25%, Ultra 50%). Paid instead of this tier's regular card cashback on that charge, not on top of it."
+                tooltip="This tier's DEFAULT rate, used only by categories that set no rate of their own above (Gaming today). Every category that prices itself ignores it. Paid instead of this tier's regular card cashback on that charge, not on top of it."
               />
               <InputField
                 label="Categories / month"
@@ -1338,7 +1507,7 @@ export default function RewardsConfigPage() {
             </TierCard>
             <TierCard tier="Tier 2">
               <InputField
-                label="Discount %"
+                label="Default Discount %"
                 value={
                   (config.subscriptionDiscount.tier2.percentage as any) === ""
                     ? ""
@@ -1355,6 +1524,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="1"
+                tooltip="This tier's DEFAULT rate, used only by categories that set no rate of their own above (Gaming today). Every category that prices itself ignores it. Paid instead of this tier's regular card cashback on that charge, not on top of it."
               />
               <InputField
                 label="Categories / month"
@@ -1372,7 +1542,7 @@ export default function RewardsConfigPage() {
             </TierCard>
             <TierCard tier="Tier 3">
               <InputField
-                label="Discount %"
+                label="Default Discount %"
                 value={
                   (config.subscriptionDiscount.tier3.percentage as any) === ""
                     ? ""
@@ -1389,6 +1559,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="1"
+                tooltip="This tier's DEFAULT rate, used only by categories that set no rate of their own above (Gaming today). Every category that prices itself ignores it. Paid instead of this tier's regular card cashback on that charge, not on top of it."
               />
               <InputField
                 label="Categories / month"
@@ -1405,6 +1576,75 @@ export default function RewardsConfigPage() {
               />
             </TierCard>
           </TierGrid>
+          {/*
+            One-time move onto per-category rates. Config is seeded from code
+            once and owned by the database afterwards, so a deploy alone does
+            not move an environment that has run before.
+          */}
+          <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-4">
+            <div className="text-sm font-semibold text-gray-800">
+              Migrate to per-category rates
+              <InfoTooltip text="Writes the shipped category list and per-tier rates over this environment's stored config, and moves the tier default rates to 10% / 20%. Merchant aliases you added by hand are kept, categories you added that we do not ship are left alone, and category limits are not touched. A category this environment has never had is added PAUSED — switch it on above once you are happy with it. Categories that already exist keep whatever you set their switch to. Preview first — it writes nothing." />
+            </div>
+            <p className="mt-1 text-xs text-gray-600">
+              Rewards config is seeded from code the first time it is read and
+              owned by the database after that, so deploying new rates does not
+              move an environment that has run before. Safe to press more than
+              once: the plan is recomputed from live config each time, so
+              applying twice writes nothing. Already-accrued cashback is not
+              repriced. Categories it adds arrive switched off, so nothing
+              starts paying until you turn it on above and save.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => runCategoryRatesMigration(false)}
+                disabled={migratingRates}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {migratingRates ? "Working…" : "Preview changes"}
+              </button>
+              <button
+                onClick={() => runCategoryRatesMigration(true)}
+                disabled={
+                  migratingRates ||
+                  // Nothing to apply until a preview has shown changes. This is
+                  // belt-and-braces: the backend no-ops an unnecessary apply.
+                  !migrationResult ||
+                  migrationResult.alreadyApplied
+                }
+                className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {migratingRates ? "Working…" : "Apply migration"}
+              </button>
+              {migrationResult?.alreadyApplied && (
+                <span className="text-sm font-medium text-green-700">
+                  ✓ Already migrated — nothing to change
+                </span>
+              )}
+            </div>
+            {migrationResult && !migrationResult.alreadyApplied && (
+              <div className="mt-3">
+                <p className="text-sm font-medium text-gray-800">
+                  {migrationResult.applied
+                    ? `Applied ${migrationResult.changes.length} change(s):`
+                    : `${migrationResult.changes.length} change(s) would be made:`}
+                </p>
+                <ul className="mt-1 list-disc pl-5 text-sm text-gray-700">
+                  {migrationResult.changes.map((change) => (
+                    <li key={`${change.kind}:${change.key}`}>
+                      {change.detail}
+                    </li>
+                  ))}
+                </ul>
+                {!migrationResult.applied && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Nothing has been written yet.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           <button
             onClick={saveSubscriptionDiscountConfig}
             disabled={saving || !hasChanges("subscriptionDiscount")}
