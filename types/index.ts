@@ -2481,3 +2481,69 @@ export const COHORT_GROUP_META: Record<
     description: "Retired programs, kept for historical exports",
   },
 };
+
+// --- Rain Real-Time Funding -------------------------------------------------
+
+/**
+ * Who a Real-Time Funding allowance is granted to.
+ *
+ * Two of them while Rain migrates its collateral contracts to the
+ * reversal-enabled version: the `operator` is the spender that pulls today,
+ * `collateral` is the user's own contract and the spender afterwards. A
+ * cardholder mid-migration should hold both, and the one that is missing is
+ * usually the answer to "why did this card decline".
+ */
+export type RainRtfSpenderKind = "collateral" | "operator";
+
+export interface RainRtfSpender {
+  kind: RainRtfSpenderKind;
+  address: string;
+  /**
+   * Allowance granted, in the token's smallest units, as a decimal string.
+   * `"0"` when none, `null` when the chain could not be read — which is not
+   * the same thing and must not be rendered as if it were.
+   */
+  currentAllowance: string | null;
+  isApproved: boolean;
+}
+
+export interface RainRtfChain {
+  chainId: number;
+  name: string;
+  environment: "sandbox" | "production";
+  /** USDT0 on Plasma, USDC elsewhere. A wallet holding the wrong one declines. */
+  assetSymbol: string;
+  tokenAddress: string;
+  tokenDecimals: number;
+  /** The cardholder's Rain collateral contract (`proxyAddress`). */
+  collateralAddress: string | null;
+  spenders: RainRtfSpender[];
+  walletAddress: string | null;
+  /** Smallest units, as a string. `null` when the chain could not be read. */
+  walletBalance: string | null;
+  isApproved: boolean;
+  /** We hold a consent record: the cardholder accepted the RTF Terms. */
+  hasConsent: boolean;
+  consentAt: string | null;
+  transactionHash: string | null;
+  unavailableReason: string | null;
+}
+
+export interface RainRtfStatus {
+  tenantEnabled: boolean;
+  eligible: boolean;
+  /**
+   * Why not, when `eligible` is false: `tenant-disabled`, `no-rain-customer`,
+   * `no-wallet`, `no-supported-chain`, `contracts-unavailable`.
+   */
+  ineligibleReason: string | null;
+  maxAllowance: string;
+  terms: {
+    version: string;
+    url: string;
+    body: string;
+    consentLabel: string;
+  };
+  legacyRevokeAvailable: boolean;
+  chains: RainRtfChain[];
+}
