@@ -46,6 +46,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       variant: "info",
     },
     tier_lock_reevaluated: { label: "Tier lock re-evaluated", variant: "info" },
+    cashback_failed_reevaluated: {
+      label: "Failed cashback re-sent",
+      variant: "info",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
@@ -67,6 +71,13 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "referral_reward_reevaluated") {
     return referralReevaluationDetail(entry);
+  }
+
+  if (entry.action === "cashback_failed_reevaluated") {
+    const count = entry.metadata?.rearmed;
+    return typeof count === "number"
+      ? `${count} row${count === 1 ? "" : "s"} back in the retry queue`
+      : null;
   }
 
   if (entry.action === "tier_lock_reevaluated") {
