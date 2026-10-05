@@ -1595,6 +1595,29 @@ export default function RewardsConfigPage() {
               repriced. Categories it adds arrive switched off, so nothing
               starts paying until you turn it on above and save.
             </p>
+            <p className="mt-2 rounded border border-green-200 bg-green-50 p-2 text-xs text-green-900">
+              <strong>Existing subscriptions are not re-priced.</strong> The
+              first apply that lowers a tier rate also pins today&rsquo;s rates
+              as the grandfather. A subscription a member is already being paid
+              on keeps its current rate for as long as it keeps charging; only
+              subscriptions started after the cutover earn the category rates.
+              The cutover is pinned once and never moved, so pressing Apply
+              again cannot re-price anything.
+              {config.subscriptionDiscount.legacy?.cutoverAt ? (
+                <>
+                  {" "}
+                  Pinned{" "}
+                  {new Date(
+                    config.subscriptionDiscount.legacy.cutoverAt,
+                  ).toLocaleString()}{" "}
+                  at Prime{" "}
+                  {config.subscriptionDiscount.legacy.tier2 * 100}%, Ultra{" "}
+                  {config.subscriptionDiscount.legacy.tier3 * 100}%.
+                </>
+              ) : (
+                <> Nothing pinned yet.</>
+              )}
+            </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
                 onClick={() => runCategoryRatesMigration(false)}
