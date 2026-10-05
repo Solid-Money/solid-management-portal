@@ -1382,8 +1382,30 @@ export interface ProductFeesConfig {
   bankDeposit: FeeRates;
   /** Charged on a settled TransFi buy-crypto order. */
   transfi: FeeRates;
+  /** One-time charge for opening a Rain card. */
+  rainCardOnboarding: FeeFlatCharge;
+  /** One-time charge for opening a Rain USD virtual account. */
+  rainVirtualAccountOnboarding: FeeFlatCharge;
   /** Computed fees below this (USD) are waived rather than charged. */
   minChargeUsd: number;
+}
+
+/**
+ * A one-time charge of a fixed number of dollars, optionally priced per
+ * country.
+ *
+ * Flat rather than per tier because these price an APPLICANT, not a
+ * transaction: what Didit and Rain bill us for an onboarding does not depend on
+ * how many points the applicant holds. `countryOverrides` is keyed by
+ * upper-case ISO 3166-1 alpha-2, so a farmed market can be priced up — or a
+ * strategic one waived with `0` — without a deploy.
+ */
+export interface FeeFlatCharge {
+  enabled: boolean;
+  /** The charge, in USD, everywhere `countryOverrides` does not apply. */
+  amountUsd: number;
+  /** ISO 3166-1 alpha-2 (upper-case) → USD. */
+  countryOverrides: Record<string, number>;
 }
 
 /**

@@ -54,6 +54,14 @@ export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
   offRamp: { ...DEFAULT_RATES },
   bankDeposit: { ...DEFAULT_RATES },
   transfi: { ...DEFAULT_RATES },
+  // $10 is the number the product shipped on, and the same number the savings
+  // gate this replaced asked applicants to hold.
+  rainCardOnboarding: { enabled: false, amountUsd: 10, countryOverrides: {} },
+  rainVirtualAccountOnboarding: {
+    enabled: false,
+    amountUsd: 10,
+    countryOverrides: {},
+  },
   minChargeUsd: 0.01,
 };
 
@@ -146,6 +154,14 @@ export function withConfigDefaults(
         ...fees?.bankDeposit,
       },
       transfi: { ...PRODUCT_FEES_DEFAULTS.transfi, ...fees?.transfi },
+      rainCardOnboarding: {
+        ...PRODUCT_FEES_DEFAULTS.rainCardOnboarding,
+        ...fees?.rainCardOnboarding,
+      },
+      rainVirtualAccountOnboarding: {
+        ...PRODUCT_FEES_DEFAULTS.rainVirtualAccountOnboarding,
+        ...fees?.rainVirtualAccountOnboarding,
+      },
     },
     tierMembership: {
       ...TIER_MEMBERSHIP_DEFAULTS,
@@ -180,11 +196,16 @@ export interface ConfigEditor {
    * last confirmed.
    */
   hasChanges: (section: keyof FullRewardsConfig, field?: string) => boolean;
-  /** Set one field. `field` may be dotted for one level of nesting. */
+  /**
+   * Set one field. `field` may be dotted for one level of nesting.
+   *
+   * A plain record is a value too: the onboarding fees carry a map of country
+   * to amount, which is edited and saved whole rather than field by field.
+   */
   updateConfig: (
     section: keyof FullRewardsConfig,
     field: string,
-    value: string | number | boolean | string[],
+    value: string | number | boolean | string[] | Record<string, number>,
   ) => void;
   /** Set a numeric field, optionally converting a percentage to a fraction. */
   handleNumericUpdate: (
@@ -273,7 +294,7 @@ export function useConfigEditor(): ConfigEditor {
     (
       section: keyof FullRewardsConfig,
       field: string,
-      value: string | number | boolean | string[],
+      value: string | number | boolean | string[] | Record<string, number>,
     ) => {
       setConfig((prev) => {
         if (!prev) return prev;
