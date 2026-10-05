@@ -1121,6 +1121,21 @@ export interface SubscriptionDiscountCategory {
   enabled?: boolean;
 }
 
+/**
+ * The deal members were on before the category rates took effect.
+ *
+ * `cutoverAt` null means nothing is grandfathered. Otherwise a subscription a
+ * member was already being paid on keeps these flat rates for as long as it
+ * keeps charging, and only subscriptions started after that instant earn the
+ * category rates.
+ */
+export interface SubscriptionDiscountLegacy {
+  cutoverAt: string | null;
+  tier1: number;
+  tier2: number;
+  tier3: number;
+}
+
 export interface SubscriptionDiscountConfig {
   enabled: boolean;
   /** @deprecated Legacy flat service list; detection uses categories. */
@@ -1135,6 +1150,8 @@ export interface SubscriptionDiscountConfig {
   tier1: TierSubscriptionDiscountConfig;
   tier2: TierSubscriptionDiscountConfig;
   tier3: TierSubscriptionDiscountConfig;
+  /** Grandfathered rates for subscriptions held before the migration ran. */
+  legacy?: SubscriptionDiscountLegacy;
 }
 
 /** One thing the category-rates migration would change. */
@@ -1143,7 +1160,8 @@ export interface SubscriptionCategoryRatesChange {
     | "category-added"
     | "category-rates-changed"
     | "category-aliases-added"
-    | "tier-default-changed";
+    | "tier-default-changed"
+    | "legacy-rates-pinned";
   /** Category key, or config key for a tier default. */
   key: string;
   /** One line to show the operator. */
