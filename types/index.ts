@@ -2294,6 +2294,27 @@ export interface CashbackHistory {
   failedCount: number;
 }
 
+/** One cashback row put back in the retry queue. */
+export interface ReevaluatedCashbackRow {
+  id: string;
+  transactionId: string;
+  merchantName?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  lastError?: string;
+}
+
+/** What "Re-send failed cashback" did for one user. */
+export interface ReevaluateFailedCashbackResult {
+  userId: string;
+  /** Rows reset to Failed with a fresh retry budget. */
+  rearmed: ReevaluatedCashbackRow[];
+  /** Set when nothing was re-armed because the rows could not pay anyway. */
+  blockedReason?: string;
+  /** The latest the retry cron will pick the rows up. */
+  expectedBy?: string;
+}
+
 export interface IntercomConversationSummary {
   id: string;
   createdAt?: number;
