@@ -281,6 +281,8 @@ export enum TransactionType {
   DEPOSIT_BONUS = "deposit_bonus",
   FAST_WITHDRAW = "fast_withdraw",
   REPAY_AND_WITHDRAW_COLLATERAL = "repay_and_withdraw_collateral",
+  /** Rain card collateral withdrawn to the user's Safe, executed by the app. */
+  WITHDRAW_COLLATERAL = "withdraw_collateral",
   /** External wallet → Solid Safe transfer (step 1 of "Add funds"). */
   FUND = "fund",
   /** Recovery of tokens sent to the user's Turnkey signer address by mistake. */
@@ -461,6 +463,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.OUT,
       category: TransactionCategory.SAVINGS_ACCOUNT,
     },
+    [TransactionType.WITHDRAW_COLLATERAL]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
     [TransactionType.FUND]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.WALLET_TRANSFER,
@@ -570,6 +576,7 @@ export const ACTIVITY_TYPES = [
     value: TransactionType.REPAY_AND_WITHDRAW_COLLATERAL,
     label: "Repay & Withdraw Collateral",
   },
+  { value: TransactionType.WITHDRAW_COLLATERAL, label: "Withdraw Collateral" },
   { value: TransactionType.CARD_WELCOME_BONUS, label: "Card Welcome Bonus" },
   { value: TransactionType.DEPOSIT_BONUS, label: "Deposit Bonus" },
   { value: TransactionType.MERKL_CLAIM, label: "Merkl Claim" },
