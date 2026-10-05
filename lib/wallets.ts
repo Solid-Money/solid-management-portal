@@ -249,21 +249,43 @@ export const indexPlans = (
  * on the reading the page has already disowned, is what happens when the
  * question is answered twice.
  *
- * What is left here is precedence: the flow row if a card is open, the board
- * -wide plan otherwise, and the configured status when neither has landed yet
- * or a backend predates them.
+ * What is left here is precedence, and the order is the whole point: the
+ * board-wide plan wins, and the opened card's flow row is only a fallback for
+ * when there is no plan at all.
+ *
+ * It is tempting to prefer the flow row because it is fresher — the plans
+ * call is cached for five minutes server-side and reads every wallet's
+ * balance in one pass, where a flow call re-reads one wallet on the spot. But
+ * preferring it is how the colours start moving again: the two reads are
+ * taken at different moments, so an asset sitting near its floor can be
+ * `LOW` in one and `OK` in the other, and the card would change its mind the
+ * moment somebody clicked it. Freshness is not what this page needs; a
+ * verdict that stays put while nothing moves is.
  */
 export const assetVerdict = (
   status: BalanceStatus,
   plan?: WalletAssetPlan,
   flow?: WalletAssetFlow
-): BalanceStatus => flow?.verdict ?? plan?.verdict ?? status;
+): BalanceStatus => plan?.verdict ?? flow?.verdict ?? status;
 
-/** The floor to quote: the measured one once there is one. */
-export const assetFloor = (
-  threshold: string,
-  plan?: WalletRefillPlan
-): string | number => plan?.floorAmount ?? threshold;
+/**
+ * The refill plan to quote — the board-wide one, for the reason above.
+ *
+ * The floor is the denominator every balance on the page is shown against, so
+ * it has to come from the same read as the verdict. Quoting the flow's floor
+ * under a plans-derived colour is the same contradiction one level down: the
+ * number would change on expand even though the colour did not.
+ */
+export const assetRefillPlan = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): WalletRefillPlan | undefined => plan?.plan ?? flow?.plan;
+
+/** Days of cover to quote, from the same read as the verdict and the floor. */
+export const assetRunwayDays = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): number | undefined => plan?.daysOfRunway ?? flow?.daysOfRunway;
 
 export const chainStatuses = (chain: ChainBalance): BalanceStatus[] =>
   monitoredAssets(chain).map((reading) => reading.status);

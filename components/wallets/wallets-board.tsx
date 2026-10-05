@@ -40,6 +40,8 @@ import {
   severityOf,
   truncateAddress,
   assetVerdict,
+  assetRefillPlan,
+  assetRunwayDays,
   walletSeverity,
   walletStatuses,
   walletVerdictSeverity,
@@ -304,25 +306,11 @@ function WalletCard({
     () =>
       wallet.chains.some((chain) =>
         monitoredAssets(chain).some(
-          (reading) => planFor(chain.chainId, reading.asset)?.plan?.belowFloor
+          (reading) =>
+            assetRefillPlan(planFor(chain.chainId, reading.asset))?.belowFloor
         )
       ),
     [wallet.chains, planFor]
-  );
-
-  /**
-   * The card's verdict, or `undefined` while the verdicts are still loading.
-   *
-   * It used to start from the configured threshold and be restated once a
-   * flow call landed, which is why a card could read CRITICAL, then LOW, then
-   * OK without anything on chain having moved — the balance stayed put and
-   * the floor underneath it changed. Rendering "assessing" until there is an
-   * answer is one transition from unknown to known, rather than two from
-   * confidently wrong to confidently different.
-   */
-  const severity = useMemo(
-    () => walletVerdictSeverity(wallet, plans, plansReady),
-    [wallet, plans, plansReady]
   );
 
   /**
@@ -344,6 +332,8 @@ function WalletCard({
           flow: assetFlow,
           plan: assetPlan,
           verdict: assetVerdict(reading.status, assetPlan, assetFlow),
+          refill: assetRefillPlan(assetPlan, assetFlow),
+          runwayDays: assetRunwayDays(assetPlan, assetFlow),
         };
       })
     );
@@ -354,13 +344,38 @@ function WalletCard({
         const severityDiff =
           severityOf([a.row.verdict]) - severityOf([b.row.verdict]);
         if (severityDiff !== 0) return severityDiff;
+        // From the plan, not the flow: the chips on a collapsed card are the
+        // first four of these, so a tiebreak that only exists once a card is
+        // open would rearrange them the moment somebody clicked.
         const scoreDiff =
-          (b.row.flow?.activityScore ?? 0) - (a.row.flow?.activityScore ?? 0);
+          (b.row.plan?.activityScore ?? b.row.flow?.activityScore ?? 0) -
+          (a.row.plan?.activityScore ?? a.row.flow?.activityScore ?? 0);
         if (scoreDiff !== 0) return scoreDiff;
         return a.index - b.index;
       })
       .map(({ row }) => row);
   }, [wallet.chains, flowByKey, planFor]);
+
+  /**
+   * The card's verdict, or `undefined` while the verdicts are still loading.
+   *
+   * It used to start from the configured threshold and be restated once a
+   * flow call landed, which is why a card could read CRITICAL, then LOW, then
+   * OK without anything on chain having moved — the balance stayed put and
+   * the floor underneath it changed. Rendering "assessing" until there is an
+   * answer is one transition from unknown to known, rather than two from
+   * confidently wrong to confidently different.
+   *
+   * Taken from the rows rather than recomputed, so the badge cannot disagree
+   * with the table under it. The two would only diverge where there is no
+   * plan for this wallet and an opened card has a flow row instead — rare,
+   * but a card headed CRITICAL over rows all reading OK is worse than either
+   * alone, which is the shape of the bug this whole change is about.
+   */
+  const severity = useMemo(
+    () => (plansReady ? severityOf(rows.map((row) => row.verdict)) : undefined),
+    [rows, plansReady]
+  );
 
   const tone =
     severity === 0
@@ -451,16 +466,16 @@ function WalletCard({
             <AddressChip address={wallet.address} />
             {rows
               .slice(0, 4)
-              .map(({ chain, reading, flow: assetFlow, plan, verdict }) => (
+              .map(({ chain, reading, verdict, refill, runwayDays }) => (
                 <AssetChip
                   key={`${chain.chainId}:${reading.asset}`}
                   label={reading.label}
                   chainName={chain.chainName}
                   balance={reading.balance}
                   threshold={reading.threshold}
-                  plan={assetFlow?.plan ?? plan?.plan}
+                  plan={refill}
                   verdict={verdict}
-                  runwayDays={assetFlow?.daysOfRunway ?? plan?.daysOfRunway}
+                  runwayDays={runwayDays}
                 />
               ))}
             {rows.length > 4 && (
@@ -508,14 +523,17 @@ function WalletCard({
             <tbody className="divide-y divide-gray-100">
               {rows.map(
                 (
-                  { chain, reading, flow: assetFlow, plan, verdict },
+                  {
+                    chain,
+                    reading,
+                    flow: assetFlow,
+                    plan,
+                    verdict,
+                    refill,
+                    runwayDays,
+                  },
                   index
-                ) => {
-                  // The flow row carries the same plan once a card is open;
-                  // before that the board-wide one is already here, so the
-                  // floor quoted never changes when the detail arrives.
-                  const refill = assetFlow?.plan ?? plan?.plan;
-                  return (
+                ) => (
                 <tr
                   key={`${chain.chainId}:${reading.asset}`}
                   onClick={() => onOpenAsset(chain, reading.asset, assetFlow)}
@@ -559,10 +577,14 @@ function WalletCard({
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <CostCell flow={assetFlow} />
+                    <CostCell plan={plan} flow={assetFlow} />
                   </td>
                   <td className="px-4 py-2">
-                    <RunwayCell flow={assetFlow} />
+                    <RunwayCell
+                      plan={plan}
+                      flow={assetFlow}
+                      runwayDays={runwayDays}
+                    />
                   </td>
                   <td className="px-4 py-2 text-xs text-gray-600">
                     {assetFlow
@@ -573,8 +595,7 @@ function WalletCard({
                     Details →
                   </td>
                 </tr>
-                  );
-                }
+                )
               )}
             </tbody>
           </table>
@@ -631,7 +652,7 @@ function TopUpInstruction({
         .map((reading) => {
           const assetPlan = planFor(chain.chainId, reading.asset);
           const flow = flowByAsset.get(`${chain.chainId}:${reading.asset}`);
-          const refill = flow?.plan ?? assetPlan?.plan;
+          const refill = assetRefillPlan(assetPlan, flow);
 
           if (assetPlan?.isResidue) {
             if (assetPlan.verdict === "CRITICAL") {
@@ -701,13 +722,27 @@ function TopUpInstruction({
  * itself in a week and cost us 27 of it. Showing the 16,000 as burn is what
  * made every float wallet on this page look like it was on fire.
  */
-function CostCell({ flow }: { flow?: WalletAssetFlow }) {
-  if (!flow) return <span className="text-gray-400">—</span>;
+function CostCell({
+  plan,
+  flow,
+}: {
+  plan?: WalletAssetPlan;
+  flow?: WalletAssetFlow;
+}) {
+  // The cost comes from the plan, because the floor shown one column to the
+  // left is that cost times the floor days — quoting a flow-measured cost
+  // beside a plan-derived floor makes the arithmetic on screen not add up.
+  const measured = plan?.realCostPerDay ?? flow?.realCostPerDay;
+  const isFloat = plan?.isFloat ?? flow?.isFloat ?? false;
+
+  if (measured == null && !flow) {
+    return <span className="text-gray-400">—</span>;
+  }
 
   const cost =
-    flow.realCostPerDay != null
-      ? formatAmount(flow.realCostPerDay)
-      : !flow.isFloat && flow.outflowPerDay > 0
+    measured != null
+      ? formatAmount(measured)
+      : flow && !isFloat && flow.outflowPerDay > 0
       ? `~${formatAmount(flow.outflowPerDay)}`
       : "—";
 
@@ -716,16 +751,19 @@ function CostCell({ flow }: { flow?: WalletAssetFlow }) {
       <div
         className="text-gray-700"
         title={
-          flow.realCostPerDay != null
+          measured != null
             ? "Measured from balance history net of top-ups, so gas burned as fees is included and money passing through to users is not."
-            : flow.isFloat
+            : isFloat
             ? "No cost measured yet. Gross outflow is not shown here because on this asset it is a user's money leaving, not ours."
             : "Estimated from transfers out only — gas spent as fees is not counted, so this is optimistic."
         }
       >
         {cost}
       </div>
-      {flow.turnoverPerDay > 0 && (
+      {/* Turnover is the one figure only the transfer history can give, so it
+          appears when a card is opened and is additive — it never restates
+          anything already on screen. */}
+      {flow && flow.turnoverPerDay > 0 && (
         <div
           className="text-[11px] text-gray-400"
           title={`${flow.turnoverCount} transfers of users' money passing through in the window. Not a cost to us.`}
@@ -737,37 +775,51 @@ function CostCell({ flow }: { flow?: WalletAssetFlow }) {
   );
 }
 
-function RunwayCell({ flow }: { flow?: WalletAssetFlow }) {
-  if (!flow) return <span className="text-gray-400">—</span>;
-  if (flow.daysOfRunway == null) {
+function RunwayCell({
+  plan,
+  flow,
+  runwayDays,
+}: {
+  plan?: WalletAssetPlan;
+  flow?: WalletAssetFlow;
+  runwayDays?: number;
+}) {
+  // Same read as the chip above it, which already quotes days of cover on
+  // anything inside a week. Two different runways for one asset on one screen
+  // is the contradiction this page exists to remove.
+  const snapshotCount = plan?.snapshotCount ?? flow?.snapshotCount;
+  const basis = plan?.runwayBasis ?? flow?.runwayBasis;
+
+  if (runwayDays == null) {
+    if (snapshotCount == null) return <span className="text-gray-400">—</span>;
     return (
       <span
         className="text-xs text-gray-400"
         title={
-          flow.snapshotCount < 2
+          snapshotCount < 2
             ? "Balance history is still building. Until it spans a few hours, a burn rate would be noise."
             : "Nothing observed leaving this balance in the window."
         }
       >
-        {flow.snapshotCount < 2 ? "warming up" : "not draining"}
+        {snapshotCount < 2 ? "warming up" : "not draining"}
       </span>
     );
   }
 
   // Under a week of cover is worth funding this week whatever the threshold
   // says — a wallet at 3x its floor with two days left needs money today.
-  const urgent = flow.daysOfRunway < 7;
+  const urgent = runwayDays < 7;
   return (
     <span
       className={urgent ? "font-medium text-red-700" : "text-gray-700"}
       title={
-        flow.runwayBasis === "measured"
+        basis === "measured"
           ? "Measured from balance history, gas fees included."
           : "Estimated from transfers out only — gas spent as fees is not counted, so this is optimistic."
       }
     >
-      {formatRunway(flow.daysOfRunway)}
-      {flow.runwayBasis === "outflow" && (
+      {formatRunway(runwayDays)}
+      {basis === "outflow" && (
         <span className="ml-1 text-[11px] text-gray-400">est.</span>
       )}
     </span>

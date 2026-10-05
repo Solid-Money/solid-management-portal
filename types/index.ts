@@ -825,6 +825,12 @@ export interface WalletAssetPlan {
   verdict: WalletVerdict;
   verdictBasis: WalletVerdictBasis;
   verdictReason: string;
+  /**
+   * How often this asset is touched relative to the wallet's others — the
+   * tiebreak the asset order uses, carried here so a collapsed card can sort
+   * its chips without opening.
+   */
+  activityScore: number;
 }
 
 export interface WalletPlansResponse {
