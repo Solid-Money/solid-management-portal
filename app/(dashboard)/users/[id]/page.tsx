@@ -13,6 +13,7 @@ import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
 import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
+import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
@@ -237,6 +238,10 @@ export default function UserDetailPage({
             />
             <UserCashbackCard userId={id} />
           </div>
+          {/* On the card tab rather than the overview, and next to the card
+              panel: under Real-Time Funding a decline is an allowance problem,
+              and the allowance is only legible beside the card it funds. */}
+          <UserRtfCard userId={id} />
           {/* Next to the spending table, because a rate set on one transaction
               beats this one and is edited from a row down there. */}
           <UserCashbackRateCard

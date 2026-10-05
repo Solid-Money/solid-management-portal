@@ -1,6 +1,12 @@
 "use client";
 
-import { Percent, RefreshCw, Save } from "lucide-react";
+import {
+  BadgeDollarSign,
+  Globe,
+  Percent,
+  RefreshCw,
+  Save,
+} from "lucide-react";
 
 import {
   ConfigSection,
@@ -11,8 +17,13 @@ import {
   FeeProductRates,
   type FeeProductDefinition,
 } from "@/components/config/fee-product-rates";
+import {
+  ONBOARDING_FEES,
+  OnboardingFeeCharge,
+  type OnboardingFeeDefinition,
+} from "@/components/config/onboarding-fee-charge";
 import { useConfigEditor } from "@/hooks/use-config-editor";
-import { FeeRates, ProductFeesConfig } from "@/types";
+import { FeeFlatCharge, FeeRates, ProductFeesConfig } from "@/types";
 
 /**
  * Flattens one product's rates into the field names the endpoint expects.
@@ -30,6 +41,29 @@ function productFields(
     [`${key}Tier1Percentage`]: Number(rates.tier1),
     [`${key}Tier2Percentage`]: Number(rates.tier2),
     [`${key}Tier3Percentage`]: Number(rates.tier3),
+  };
+}
+
+/**
+ * Flattens one flat onboarding charge into the field names the endpoint
+ * expects.
+ *
+ * The endpoint keys these on the SHORT names the stored config uses
+ * (`rainVaOnboarding...`), which is not what the config field is called
+ * (`rainVirtualAccountOnboarding`) — so the mapping lives here rather than
+ * being derived from the key.
+ */
+function onboardingFields(
+  key: OnboardingFeeDefinition["key"],
+  charge: FeeFlatCharge,
+): Record<string, number | boolean | Record<string, number>> {
+  const prefix =
+    key === "rainCardOnboarding" ? "rainCardOnboarding" : "rainVaOnboarding";
+
+  return {
+    [`${prefix}Enabled`]: charge.enabled,
+    [`${prefix}AmountUsd`]: Number(charge.amountUsd),
+    [`${prefix}CountryOverrides`]: charge.countryOverrides ?? {},
   };
 }
 
@@ -62,6 +96,8 @@ export default function FeesConfigPage() {
     handleNumericUpdate,
     saveSection,
     clearCache,
+    syncCountryRouting,
+    syncingCountries,
   } = useConfigEditor();
 
   /**
@@ -73,18 +109,27 @@ export default function FeesConfigPage() {
   const savePartial = async (
     label: string,
     field: keyof ProductFeesConfig,
-    overrides: Record<string, number | boolean>,
+    overrides: Record<string, number | boolean | Record<string, number>>,
   ) => {
     if (!config || !savedConfig) return;
 
     const saved = savedConfig.productFees;
-    const published = FEE_PRODUCTS.reduce<Record<string, number | boolean>>(
+    const published = FEE_PRODUCTS.reduce<
+      Record<string, number | boolean | Record<string, number>>
+    >(
       (fields, product) => ({
         ...fields,
         ...productFields(product.key, saved[product.key]),
       }),
       {},
     );
+
+    // The flat onboarding lines ride the same endpoint, so they go out on every
+    // save as well — from the SAVED copy, for the same reason the other five
+    // products do: saving Swaps must not publish a half-typed country override.
+    for (const fee of ONBOARDING_FEES) {
+      Object.assign(published, onboardingFields(fee.key, saved[fee.key]));
+    }
 
     await saveSection(
       label,
@@ -109,6 +154,13 @@ export default function FeesConfigPage() {
       `${product.label} Fees`,
       product.key,
       productFields(product.key, config!.productFees[product.key]),
+    );
+
+  const saveOnboardingFee = (fee: OnboardingFeeDefinition) =>
+    savePartial(
+      `${fee.label} Fee`,
+      fee.key,
+      onboardingFields(fee.key, config!.productFees[fee.key]),
     );
 
   const saveMinimumCharge = () =>
@@ -205,6 +257,77 @@ export default function FeesConfigPage() {
           </button>
         </ConfigSection>
       ))}
+
+      {ONBOARDING_FEES.map((fee) => (
+        <ConfigSection
+          key={fee.key}
+          title={fee.label}
+          description={fee.summary}
+          icon={<BadgeDollarSign className="h-5 w-5 text-amber-600" />}
+        >
+          <OnboardingFeeCharge
+            definition={fee}
+            charge={config.productFees[fee.key]}
+            onToggle={(v) =>
+              updateConfig("productFees", `${fee.key}.enabled`, v)
+            }
+            onAmountChange={(v) =>
+              handleNumericUpdate("productFees", `${fee.key}.amountUsd`, v)
+            }
+            onOverridesChange={(overrides) =>
+              updateConfig(
+                "productFees",
+                `${fee.key}.countryOverrides`,
+                overrides,
+              )
+            }
+          />
+          <button
+            onClick={() => saveOnboardingFee(fee)}
+            disabled={saving || !hasChanges("productFees", fee.key)}
+            className="mt-4 inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Save {fee.label} Fee
+          </button>
+        </ConfigSection>
+      ))}
+
+      <ConfigSection
+        title="Country routing"
+        description="Publish which issuer serves each market, and Rain's US state licensing"
+        icon={<Globe className="h-5 w-5 text-amber-600" />}
+      >
+        <div className="space-y-3 text-sm text-gray-600">
+          <p>
+            Routing reads the stored country lists, not the code — so a deploy
+            that moves a market between issuers does nothing until this is
+            pressed. It rewrites both lists from the deployed constants:{" "}
+            <strong>which countries each issuer serves</strong>, and{" "}
+            <strong>which US states Rain is licensed in</strong>.
+          </p>
+          <p>
+            Press it after any deploy that changes issuer coverage. It is
+            idempotent — it writes the same values every time, so pressing it
+            twice is the same as pressing it once, and it is safe to press when
+            you are not sure whether someone already has.
+          </p>
+          <p className="text-gray-500">
+            It does not touch fees, and it cannot open a market that is not in
+            the deployed lists. The toast reports the counts it wrote.
+          </p>
+        </div>
+        <button
+          onClick={syncCountryRouting}
+          disabled={syncingCountries}
+          className="mt-4 inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Globe
+            className={`mr-2 h-4 w-4 ${syncingCountries ? "animate-spin" : ""}`}
+          />
+          {syncingCountries ? "Publishing…" : "Publish country routing"}
+        </button>
+      </ConfigSection>
 
       <ConfigSection
         title="Minimum Charge"
