@@ -16,6 +16,7 @@ import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
+import UserKycCard from "@/components/user/user-kyc-card";
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserReferralCard from "@/components/user/user-referral-card";
@@ -228,6 +229,10 @@ export default function UserDetailPage({
         </TabsContent>
 
         <TabsContent value="card" className="space-y-4">
+          {/* Above the card itself, because verification is the gate the card
+              is behind: a declined KYC is why most "where is my card?" tickets
+              exist, and the reason codes here are what answer them. */}
+          <UserKycCard userId={id} username={displayName} />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UserCardPanel
               userId={id}

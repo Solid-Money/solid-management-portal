@@ -50,6 +50,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Failed cashback re-sent",
       variant: "info",
     },
+    kyc_verification_reset: {
+      label: "KYC verification reset",
+      variant: "warning",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {

@@ -12,6 +12,8 @@ import {
   IssueCardResult,
   IssueTierTrialRequest,
   IssueTierTrialResult,
+  KycResetEligibility,
+  KycResetResult,
   RecoverAccountResult,
   RecoveryEligibility,
   SendRecoveryCodeResult,
@@ -328,6 +330,29 @@ export const recoverUserAccount = (userId: string, reason: string) =>
     `/admin/v1/users/${userId}/account/recover`,
     { reason },
   );
+
+/**
+ * Whether this user's identity verification can be cleared so they can start a
+ * new one, and what is in the way when it cannot. Read-only — it also carries
+ * the provider's reason codes, so the card can show why they were declined.
+ */
+export const getKycResetEligibility = (userId: string) =>
+  api.get<{ data: KycResetEligibility }>(
+    `/admin/v1/users/${userId}/kyc/reset-eligibility`,
+  );
+
+/**
+ * Clear a declined identity verification so the user can start a new one.
+ *
+ * Narrow by design: it clears our record of the decision and nothing else — no
+ * issuer consumer is deleted, no card is touched, and the provider's own
+ * decision is not overturned. The reason is required; it is written to the
+ * audit trail with the admin's name, and refusals are recorded too.
+ */
+export const resetKycVerification = (userId: string, reason: string) =>
+  api.post<{ data: KycResetResult }>(`/admin/v1/users/${userId}/kyc/reset`, {
+    reason,
+  });
 
 /** Every admin action taken on this user, newest first. */
 export const getUserAuditLog = (userId: string) =>
