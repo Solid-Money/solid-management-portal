@@ -1646,6 +1646,54 @@ export interface AdminAuditEntry {
   createdAt: string;
 }
 
+/** Why a KYC reset is refused, as the backend classifies it. */
+export type KycResetBlocker =
+  | "no_application"
+  | "already_approved"
+  | "verification_in_flight"
+  | "issuer_consumer_exists"
+  | "decided_by_issuer";
+
+/**
+ * Whether a user's identity verification can be cleared so they can start a new
+ * one — and, when it cannot, what is in the way. Read-only.
+ */
+export interface KycResetEligibility {
+  userId: string;
+  eligible: boolean;
+  blocker?: KycResetBlocker;
+  /** Operator-facing sentence for `blocker`. */
+  blockerMessage?: string;
+  kycProvider: "didit" | "sumsub" | "persona" | null;
+  cardProvider: "rain" | "wirex" | null;
+  kycStatus: string | null;
+  diditVerificationStatus: string | null;
+  rainApplicationStatus: string | null;
+  /**
+   * The provider's own codes for the current decision — Didit risk tags, Sumsub
+   * reject labels or Rain rejection labels. What says WHY the user was declined.
+   */
+  reasonCodes: string[];
+  /** Sumsub's RETRY/FINAL, when Sumsub decided. */
+  rejectType: string | null;
+  /**
+   * The provider holds a FINAL decision, so a reset only reopens our side: a new
+   * session reaches the same answer unless the applicant is reset with the
+   * provider too.
+   */
+  providerDecisionIsFinal: boolean;
+}
+
+/** What the backend reports after clearing a verification. */
+export interface KycResetResult {
+  userId: string;
+  kycProvider: "didit" | "sumsub" | "persona" | null;
+  previousKycStatus: string | null;
+  previousReasonCodes: string[];
+  kycStatus: string;
+  providerDecisionIsFinal: boolean;
+}
+
 /** What the backend reports after reopening a closed account. */
 export interface RecoverAccountResult {
   userId: string;

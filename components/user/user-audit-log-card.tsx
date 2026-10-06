@@ -46,6 +46,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       variant: "info",
     },
     tier_lock_reevaluated: { label: "Tier lock re-evaluated", variant: "info" },
+    kyc_verification_reset: {
+      label: "KYC verification reset",
+      variant: "warning",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
