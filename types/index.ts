@@ -275,10 +275,14 @@ export enum TransactionType {
   WRAP = "wrap",
   UNWRAP = "unwrap",
   MERKL_CLAIM = "merkl_claim",
+  /** A tiered yield boost payout, in soFUSE from the yield boost payout wallet. */
+  YIELD_BOOST_CLAIM = "yield_boost_claim",
   CARD_WELCOME_BONUS = "card_welcome_bonus",
   DEPOSIT_BONUS = "deposit_bonus",
   FAST_WITHDRAW = "fast_withdraw",
   REPAY_AND_WITHDRAW_COLLATERAL = "repay_and_withdraw_collateral",
+  /** Rain card collateral withdrawn to the user's Safe, executed by the app. */
+  WITHDRAW_COLLATERAL = "withdraw_collateral",
   /** External wallet → Solid Safe transfer (step 1 of "Add funds"). */
   FUND = "fund",
   /** Recovery of tokens sent to the user's Turnkey signer address by mistake. */
@@ -431,6 +435,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.IN,
       category: TransactionCategory.REWARD,
     },
+    [TransactionType.YIELD_BOOST_CLAIM]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.REWARD,
+    },
     [TransactionType.CARD_WELCOME_BONUS]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.REWARD,
@@ -452,6 +460,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       category: TransactionCategory.CARD_DEPOSIT,
     },
     [TransactionType.REPAY_AND_WITHDRAW_COLLATERAL]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.WITHDRAW_COLLATERAL]: {
       sign: TransactionDirection.OUT,
       category: TransactionCategory.SAVINGS_ACCOUNT,
     },
@@ -564,9 +576,11 @@ export const ACTIVITY_TYPES = [
     value: TransactionType.REPAY_AND_WITHDRAW_COLLATERAL,
     label: "Repay & Withdraw Collateral",
   },
+  { value: TransactionType.WITHDRAW_COLLATERAL, label: "Withdraw Collateral" },
   { value: TransactionType.CARD_WELCOME_BONUS, label: "Card Welcome Bonus" },
   { value: TransactionType.DEPOSIT_BONUS, label: "Deposit Bonus" },
   { value: TransactionType.MERKL_CLAIM, label: "Merkl Claim" },
+  { value: TransactionType.YIELD_BOOST_CLAIM, label: "Yield Boost Claim" },
   { value: TransactionType.GOODDOLLAR_CLAIM, label: "GoodDollar Claim" },
   { value: TransactionType.GOODDOLLAR_SWEEP, label: "GoodDollar Sweep" },
   { value: TransactionType.AGENT_X402_PAYMENT, label: "Agent x402 Payment" },
@@ -1183,6 +1197,11 @@ export interface DepositBoostConfig {
 }
 
 export interface TierSubscriptionDiscountConfig {
+  /**
+   * The tier's default subscription rate. Only applies to a category that
+   * carries no `rates` of its own — every category that prices itself ignores
+   * it.
+   */
   percentage: number;
   /** @deprecated Superseded by categoryLimit. */
   serviceLimit: number;
@@ -1190,10 +1209,57 @@ export interface TierSubscriptionDiscountConfig {
   categoryLimit: number;
 }
 
+/**
+ * Per-tier rates for one category, as fractions (0.1 = 10%).
+ *
+ * Every key is optional: a tier left out earns that tier's flat
+ * `tierN.percentage`. An explicit 0 is different — it locks the category for
+ * that tier, which is how Airlines is sold as Ultra-only.
+ */
+export interface SubscriptionDiscountCategoryRates {
+  /** Core. */
+  tier1?: number;
+  /** Prime. */
+  tier2?: number;
+  /** Ultra. */
+  tier3?: number;
+}
+
 export interface SubscriptionDiscountCategory {
   key: string;
   label: string;
   merchants: string[];
+  /**
+   * What each tier earns on this category. Absent means the category tracks
+   * the tier's flat percentage.
+   */
+  rates?: SubscriptionDiscountCategoryRates;
+  /**
+   * Whether the category is live. `false` pauses it: the app stops listing it
+   * and a matching card charge earns regular tier cashback instead, without
+   * using up one of the cardholder's category slots for the month.
+   *
+   * **Absent means live** — categories stored before the toggle existed carry
+   * no flag and must keep paying — so read it as `enabled !== false`. The
+   * category-rates migration is the exception: a category it introduces is
+   * written paused, waiting for someone here to switch it on.
+   */
+  enabled?: boolean;
+}
+
+/**
+ * The deal members were on before the category rates took effect.
+ *
+ * `cutoverAt` null means nothing is grandfathered. Otherwise a subscription a
+ * member was already being paid on keeps these flat rates for as long as it
+ * keeps charging, and only subscriptions started after that instant earn the
+ * category rates.
+ */
+export interface SubscriptionDiscountLegacy {
+  cutoverAt: string | null;
+  tier1: number;
+  tier2: number;
+  tier3: number;
 }
 
 export interface SubscriptionDiscountConfig {
@@ -1210,6 +1276,37 @@ export interface SubscriptionDiscountConfig {
   tier1: TierSubscriptionDiscountConfig;
   tier2: TierSubscriptionDiscountConfig;
   tier3: TierSubscriptionDiscountConfig;
+  /** Grandfathered rates for subscriptions held before the migration ran. */
+  legacy?: SubscriptionDiscountLegacy;
+}
+
+/** One thing the category-rates migration would change. */
+export interface SubscriptionCategoryRatesChange {
+  kind:
+    | "category-added"
+    | "category-rates-changed"
+    | "category-aliases-added"
+    | "tier-default-changed"
+    | "legacy-rates-pinned";
+  /** Category key, or config key for a tier default. */
+  key: string;
+  /** One line to show the operator. */
+  detail: string;
+}
+
+/**
+ * Result of previewing or committing the move onto per-category rates.
+ *
+ * `alreadyApplied` means the stored config already matches the shipped rates,
+ * so there is nothing to do. `applied` means THIS call wrote — false for a
+ * preview, and false for a commit against already-migrated config.
+ */
+export interface SubscriptionCategoryRatesMigrationResult {
+  alreadyApplied: boolean;
+  applied: boolean;
+  changes: SubscriptionCategoryRatesChange[];
+  categories: SubscriptionDiscountCategory[];
+  config: FullRewardsConfig;
 }
 
 export interface FuseStakingConfig {
@@ -1310,8 +1407,30 @@ export interface ProductFeesConfig {
   bankDeposit: FeeRates;
   /** Charged on a settled TransFi buy-crypto order. */
   transfi: FeeRates;
+  /** One-time charge for opening a Rain card. */
+  rainCardOnboarding: FeeFlatCharge;
+  /** One-time charge for opening a Rain USD virtual account. */
+  rainVirtualAccountOnboarding: FeeFlatCharge;
   /** Computed fees below this (USD) are waived rather than charged. */
   minChargeUsd: number;
+}
+
+/**
+ * A one-time charge of a fixed number of dollars, optionally priced per
+ * country.
+ *
+ * Flat rather than per tier because these price an APPLICANT, not a
+ * transaction: what Didit and Rain bill us for an onboarding does not depend on
+ * how many points the applicant holds. `countryOverrides` is keyed by
+ * upper-case ISO 3166-1 alpha-2, so a farmed market can be priced up — or a
+ * strategic one waived with `0` — without a deploy.
+ */
+export interface FeeFlatCharge {
+  enabled: boolean;
+  /** The charge, in USD, everywhere `countryOverrides` does not apply. */
+  amountUsd: number;
+  /** ISO 3166-1 alpha-2 (upper-case) → USD. */
+  countryOverrides: Record<string, number>;
 }
 
 /**
@@ -1368,6 +1487,66 @@ export interface TierMembershipConfig {
   renewalNoticeDays: number;
 }
 
+/** One tier's yield boost. */
+export interface TierYieldBoostConfig {
+  /** Extra APY as a fraction (0.02 = +2%), accrued a day at a time. */
+  apy: number;
+  /**
+   * Savings, in USD across soUSD, soETH and soFUSE together, the boost applies
+   * to. Balance above it earns the base yield only; 0 grants no boost.
+   */
+  maxDepositUsd: number;
+}
+
+/**
+ * The tiered yield boost: an APY on top of the vaults' own, earned daily on a
+ * user's total savings and claimed in soFUSE from the payout wallet.
+ *
+ * The three limits are the brakes on that wallet. Whatever the accrual computes,
+ * no claim and no day can pay out more than they allow.
+ */
+export interface YieldBoostConfig {
+  /** Master switch for the daily accrual. Off stops new boost being earned. */
+  enabled: boolean;
+  /**
+   * Switch for payouts alone, so an incident can stop money leaving the wallet
+   * without costing anybody a day of boost.
+   */
+  claimsEnabled: boolean;
+  tier1: TierYieldBoostConfig;
+  tier2: TierYieldBoostConfig;
+  tier3: TierYieldBoostConfig;
+  /** Most one claim may pay in USD, and so one user in any rolling 24 hours. */
+  maxClaimUsd: number;
+  /** Most one claim may pay in soFUSE, whatever the price feed says. */
+  maxClaimSoFuse: number;
+  /** Most the payout wallet may send across every user in one UTC day, in USD. */
+  maxDailyPayoutUsd: number;
+}
+
+/** What one run of the yield boost accrual did, as the backend reports it. */
+export interface YieldBoostRunResult {
+  /** The UTC day the run earned, YYYY-MM-DD. */
+  dayKey: string;
+  outcome: "disabled" | "skipped" | "completed" | "partial" | "failed";
+  stats?: {
+    usersScanned: number;
+    /** Safes holding at least $1 of savings. */
+    holders: number;
+    /** Users this run wrote the day for. */
+    accrued: number;
+    /** Users an earlier run had already written the day for. */
+    alreadyAccrued: number;
+    /** Holders whose tier earns no boost. */
+    notEligible: number;
+    /** Safes whose balances could not be read, left for the next pass. */
+    incomplete: number;
+    totalUsd: number;
+    totalSoFuse: string;
+  };
+  error?: string;
+}
+
 export interface FullRewardsConfig {
   tiers: TierThresholds;
   points: PointsEarningConfig;
@@ -1379,6 +1558,7 @@ export interface FullRewardsConfig {
   cardWelcomeBonus: CardWelcomeBonusConfig;
   productFees: ProductFeesConfig;
   tierMembership: TierMembershipConfig;
+  yieldBoost: YieldBoostConfig;
 }
 
 /** A membership's lifecycle, as the backend reports it. */
@@ -2028,6 +2208,11 @@ export interface UserRewardsData {
   yieldBoostPercentage: number;
   yieldBoostCap: number;
   yieldBoostEarned: number;
+  /**
+   * Savings balance the tier's boost is paid on, in USD (Prime $10K, Ultra
+   * $25K; 0 when unboosted). Optional until every backend sends it.
+   */
+  yieldBoostBalanceCap?: number;
   subscriptionDiscountRate: number;
   subscriptionCategoryLimit: number;
   fuseSkipLine?: {
@@ -2202,6 +2387,27 @@ export interface CashbackHistory {
   totalQualifyingSpend: number;
   pendingCount: number;
   failedCount: number;
+}
+
+/** One cashback row put back in the retry queue. */
+export interface ReevaluatedCashbackRow {
+  id: string;
+  transactionId: string;
+  merchantName?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  lastError?: string;
+}
+
+/** What "Re-send failed cashback" did for one user. */
+export interface ReevaluateFailedCashbackResult {
+  userId: string;
+  /** Rows reset to Failed with a fresh retry budget. */
+  rearmed: ReevaluatedCashbackRow[];
+  /** Set when nothing was re-armed because the rows could not pay anyway. */
+  blockedReason?: string;
+  /** The latest the retry cron will pick the rows up. */
+  expectedBy?: string;
 }
 
 export interface IntercomConversationSummary {

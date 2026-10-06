@@ -21,6 +21,7 @@ import {
   ReferralReevaluationResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
+  ReevaluateFailedCashbackResult,
   TierTrial,
   TierLockReevaluationResult,
   TierMembershipView,
@@ -261,6 +262,17 @@ export const revokeUserTierTrial = (
   api.post<{ data: TierTrial }>(
     `/admin/v1/users/${userId}/tier-trial/revoke`,
     options,
+  );
+
+/**
+ * Put this user's PermanentlyFailed cashback back in the retry queue. The
+ * retry cron pays it through the normal payout path within 30 minutes; safe to
+ * repeat. The admin's name on the audit row comes from the Firebase token.
+ */
+export const reevaluateFailedCashback = (userId: string, reason?: string) =>
+  api.post<{ data: ReevaluateFailedCashbackResult }>(
+    `/admin/v1/users/${userId}/cashback/reevaluate`,
+    { reason: reason || undefined },
   );
 
 /**

@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import DashboardNav from "@/components/dashboard-nav";
+import { useLiveCardTransactions } from "@/hooks/use-live-card-transactions";
 
 export default function DashboardLayout({
   children,
@@ -10,6 +11,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
+  // Card transaction views update as Rain and Wirex report changes.
+  useLiveCardTransactions(!!user);
 
   if (loading) {
     return (

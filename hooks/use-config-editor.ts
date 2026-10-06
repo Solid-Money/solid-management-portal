@@ -10,6 +10,7 @@ import {
   ProductFeesConfig,
   ReferralCashbackConfig,
   TierMembershipConfig,
+  YieldBoostConfig,
 } from "@/types";
 
 /** Shipped defaults for the referral cashback program (mirrors the backend). */
@@ -53,6 +54,14 @@ export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
   offRamp: { ...DEFAULT_RATES },
   bankDeposit: { ...DEFAULT_RATES },
   transfi: { ...DEFAULT_RATES },
+  // $10 is the number the product shipped on, and the same number the savings
+  // gate this replaced asked applicants to hold.
+  rainCardOnboarding: { enabled: false, amountUsd: 10, countryOverrides: {} },
+  rainVirtualAccountOnboarding: {
+    enabled: false,
+    amountUsd: 10,
+    countryOverrides: {},
+  },
   minChargeUsd: 0.01,
 };
 
@@ -95,6 +104,21 @@ export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
 };
 
 /**
+ * Shipped yield boost (mirrors the backend): Prime +2% on the first $10K of
+ * savings, Ultra +3% on the first $25K, Core nothing.
+ */
+export const YIELD_BOOST_DEFAULTS: YieldBoostConfig = {
+  enabled: true,
+  claimsEnabled: true,
+  tier1: { apy: 0, maxDepositUsd: 0 },
+  tier2: { apy: 0.02, maxDepositUsd: 10000 },
+  tier3: { apy: 0.03, maxDepositUsd: 25000 },
+  maxClaimUsd: 250,
+  maxClaimSoFuse: 100000,
+  maxDailyPayoutUsd: 2500,
+};
+
+/**
  * Fill in fields an older backend may not send yet, so the inputs stay
  * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
  * the working copy and the pristine copy so the defaults don't read as unsaved
@@ -104,6 +128,7 @@ export function withConfigDefaults(
   config: FullRewardsConfig,
 ): FullRewardsConfig {
   const fees = config.productFees;
+  const boost = config.yieldBoost;
 
   return {
     ...config,
@@ -129,10 +154,25 @@ export function withConfigDefaults(
         ...fees?.bankDeposit,
       },
       transfi: { ...PRODUCT_FEES_DEFAULTS.transfi, ...fees?.transfi },
+      rainCardOnboarding: {
+        ...PRODUCT_FEES_DEFAULTS.rainCardOnboarding,
+        ...fees?.rainCardOnboarding,
+      },
+      rainVirtualAccountOnboarding: {
+        ...PRODUCT_FEES_DEFAULTS.rainVirtualAccountOnboarding,
+        ...fees?.rainVirtualAccountOnboarding,
+      },
     },
     tierMembership: {
       ...TIER_MEMBERSHIP_DEFAULTS,
       ...config.tierMembership,
+    },
+    yieldBoost: {
+      ...YIELD_BOOST_DEFAULTS,
+      ...boost,
+      tier1: { ...YIELD_BOOST_DEFAULTS.tier1, ...boost?.tier1 },
+      tier2: { ...YIELD_BOOST_DEFAULTS.tier2, ...boost?.tier2 },
+      tier3: { ...YIELD_BOOST_DEFAULTS.tier3, ...boost?.tier3 },
     },
   };
 }
@@ -156,11 +196,16 @@ export interface ConfigEditor {
    * last confirmed.
    */
   hasChanges: (section: keyof FullRewardsConfig, field?: string) => boolean;
-  /** Set one field. `field` may be dotted for one level of nesting. */
+  /**
+   * Set one field. `field` may be dotted for one level of nesting.
+   *
+   * A plain record is a value too: the onboarding fees carry a map of country
+   * to amount, which is edited and saved whole rather than field by field.
+   */
   updateConfig: (
     section: keyof FullRewardsConfig,
     field: string,
-    value: string | number | boolean | string[],
+    value: string | number | boolean | string[] | Record<string, number>,
   ) => void;
   /** Set a numeric field, optionally converting a percentage to a fraction. */
   handleNumericUpdate: (
@@ -249,7 +294,7 @@ export function useConfigEditor(): ConfigEditor {
     (
       section: keyof FullRewardsConfig,
       field: string,
-      value: string | number | boolean | string[],
+      value: string | number | boolean | string[] | Record<string, number>,
     ) => {
       setConfig((prev) => {
         if (!prev) return prev;

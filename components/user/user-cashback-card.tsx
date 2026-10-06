@@ -8,6 +8,7 @@ import { CashbackEntry, CashbackHistory } from "@/types";
 import { cashbackStatusVariant } from "@/lib/card-transactions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ReevaluateFailedCashbackDialog from "@/components/user/reevaluate-failed-cashback-dialog";
 
 /** What a row actually paid out, in the asset it was paid in. */
 function payoutOf(entry: CashbackEntry): string {
@@ -35,6 +36,10 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
 
   const history = data?.data;
   const entries = history?.entries ?? [];
+  // Only these have stopped retrying; a plain Failed row is still in the queue.
+  const permanentlyFailedCount = entries.filter(
+    (entry) => entry.status === "PermanentlyFailed",
+  ).length;
 
   return (
     <Card>
@@ -44,9 +49,17 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
           Cashback received
         </CardTitle>
         {history && (
-          <span className="text-sm font-semibold text-gray-900">
-            ${history.totalPaidUsd.toFixed(2)}
-          </span>
+          <div className="flex items-center gap-3">
+            {permanentlyFailedCount > 0 && (
+              <ReevaluateFailedCashbackDialog
+                userId={userId}
+                permanentlyFailedCount={permanentlyFailedCount}
+              />
+            )}
+            <span className="text-sm font-semibold text-gray-900">
+              ${history.totalPaidUsd.toFixed(2)}
+            </span>
+          </div>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
