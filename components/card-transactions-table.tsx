@@ -45,6 +45,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
+import { LiveBadge } from "@/components/live-badge";
 
 interface CardTransactionsTableProps {
   /**
@@ -361,8 +362,9 @@ export default function CardTransactionsTable({
               />
             </div>
           </div>
-          <div className="ml-auto text-sm text-gray-500">
-            {data?.meta.total ?? 0} total transactions
+          <div className="ml-auto flex items-center gap-3 text-sm text-gray-500">
+            <LiveBadge />
+            <span>{data?.meta.total ?? 0} total transactions</span>
           </div>
         </div>
       </div>
