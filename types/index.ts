@@ -825,12 +825,82 @@ export interface WalletAssetPlan {
   verdict: WalletVerdict;
   verdictBasis: WalletVerdictBasis;
   verdictReason: string;
+  /** What this needs from a person. Only `critical` reaches Slack. */
+  urgency: WalletUrgency;
+  /** Whether the threshold in force is the registry's or an operator's. */
+  thresholdSource: "registry" | "override";
+  thresholdUpdatedBy?: string;
+  thresholdUpdatedAt?: string;
+  /** The ERC-20 the balance is read from; absent for the native gas token. */
+  tokenAddress?: string;
+  /** The explorer page for the contract, or for the wallet when native. */
+  explorerUrl?: string;
+  /** This row's DOM id, so a Slack link can land on it. */
+  anchorId: string;
+  /** Why the balance fell, when the history says so without guessing. */
+  cause?: WalletBalanceCause;
+  /** When it runs out at the current measured rate. */
+  forecast?: WalletBalanceForecast;
+  /** The last time an operator said they had funded this, if still pending. */
+  acknowledgedAt?: string;
+  acknowledgedBy?: string;
   /**
    * How often this asset is touched relative to the wallet's others — the
    * tiebreak the asset order uses, carried here so a collapsed card can sort
    * its chips without opening.
    */
   activityScore: number;
+}
+
+/**
+ * What an asset needs from a person, which is not the same as how far below a
+ * line it is. Only `critical` reaches Slack.
+ */
+export type WalletUrgency = "none" | "info" | "warning" | "critical";
+
+/** Why a balance fell, where the transfer history says so without guessing. */
+export interface WalletBalanceCause {
+  kind:
+    | "single-large-transfer"
+    | "volume-increase"
+    | "gas-cost-increase"
+    | "treasury-transfer"
+    | "steady-spend";
+  summary: string;
+}
+
+/** When this asset runs out, at the rate it is currently going. */
+export interface WalletBalanceForecast {
+  daysToFloor: number;
+  floorAt: string;
+  daysToEmpty: number;
+  emptyAt: string;
+  confidence: "high" | "medium";
+}
+
+/** One entry in the Treasury page's audit trail. */
+export interface WalletTreasuryAuditEntry {
+  action:
+    | "threshold_changed"
+    | "threshold_reset"
+    | "refill_acknowledged"
+    | "setting_changed";
+  walletName?: string;
+  chainId?: number;
+  asset?: WalletAsset;
+  symbol?: string;
+  previousValue?: string;
+  newValue?: string;
+  actor: string;
+  at: string;
+  details?: Record<string, unknown>;
+}
+
+/** Account-wide switches for the Treasury page and its alerting. */
+export interface WalletTreasurySettings {
+  pingOnUrgent: boolean;
+  updatedBy?: string;
+  updatedAt?: string;
 }
 
 export interface WalletPlansResponse {

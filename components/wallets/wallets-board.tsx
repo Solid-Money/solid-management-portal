@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -29,6 +29,7 @@ import {
 import {
   BalanceStatus,
   chainStatuses,
+  formatAge,
   formatAmount,
   formatRunway,
   getWalletFlow,
@@ -47,6 +48,14 @@ import {
   walletVerdictSeverity,
 } from "@/lib/wallets";
 import WalletAssetModal from "@/components/wallets/wallet-asset-modal";
+import ThresholdEditor from "@/components/wallets/threshold-editor";
+import { useAnchorPing } from "@/components/wallets/use-anchor-ping";
+import {
+  assetAnchorId,
+  walletAnchorId,
+  walletSlugFromAnchor,
+  treasurySlug,
+} from "@/lib/treasury-anchors";
 
 /** The unit the popup opens on: a token, on a chain, on a wallet. */
 interface AssetTarget {
@@ -56,9 +65,22 @@ interface AssetTarget {
   asset: WalletAsset;
 }
 
-export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
+export default function WalletsBoard({
+  filter,
+  onRefillableChange,
+}: {
+  filter: WalletFilter;
+  /**
+   * The tokens that currently need funding, lifted to the page so the Refill
+   * button beside the Treasury heading can open the same queue the board is
+   * showing. The board is where they are computed; the button only presents
+   * them, and the two must not be able to disagree about how many there are.
+   */
+  onRefillableChange?: (items: WalletAssetPlan[]) => void;
+}) {
   const [target, setTarget] = useState<AssetTarget | null>(null);
   const [flowForTarget, setFlowForTarget] = useState<WalletAssetFlow | undefined>();
+  const { anchor, pinging } = useAnchorPing();
 
   const { data, isLoading, error } = useQuery<WalletStatusResponse>({
     queryKey: ["wallets"],
@@ -94,6 +116,30 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
 
   const planIndex = useMemo(() => indexPlans(plans), [plans]);
   const plansReady = !plansLoading;
+
+  /**
+   * What needs funding, in the order the refill queue should walk.
+   *
+   * A residue wallet is excluded even though it is critical: it is a router
+   * holding funds that should have moved on, and the one action never to take
+   * on it is to send it more. Putting it in a queue whose only button is
+   * "Confirm Paid" would be an instruction to do exactly that.
+   */
+  const refillable = useMemo(
+    () =>
+      (plans?.assets ?? [])
+        .filter((asset) => asset.urgency === "critical" && !asset.isResidue)
+        .sort(
+          (a, b) =>
+            (a.daysOfRunway ?? Number.POSITIVE_INFINITY) -
+            (b.daysOfRunway ?? Number.POSITIVE_INFINITY)
+        ),
+    [plans]
+  );
+
+  useEffect(() => {
+    onRefillableChange?.(refillable);
+  }, [refillable, onRefillableChange]);
 
   const groups = useMemo(() => {
     if (!data) return [];
@@ -219,6 +265,8 @@ export default function WalletsBoard({ filter }: { filter: WalletFilter }) {
                 wallet={wallet}
                 plans={planIndex}
                 plansReady={plansReady}
+                anchor={anchor}
+                pinging={pinging}
                 onOpenAsset={(chain, asset, flow) => {
                   setTarget({
                     wallet,
@@ -254,18 +302,63 @@ function WalletCard({
   wallet,
   plans,
   plansReady,
+  anchor,
+  pinging,
   onOpenAsset,
 }: {
   wallet: WalletInfo;
   plans: Map<string, WalletAssetPlan>;
   plansReady: boolean;
+  /** The row a Slack link asked for, if this page was opened by one. */
+  anchor?: string;
+  pinging: boolean;
   onOpenAsset: (
     chain: ChainBalance,
     asset: WalletAsset,
     flow?: WalletAssetFlow
   ) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  /**
+   * Null until somebody clicks, then their choice.
+   *
+   * Derived rather than set from an effect so a card opened by a Slack link is
+   * open on its first render — there is no frame where the row the link names
+   * does not exist, which is the frame the scroll below would otherwise miss.
+   * Once the reader expands or collapses it themselves, that wins.
+   */
+  const [expandedOverride, setExpandedOverride] = useState<boolean | null>(
+    null
+  );
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Whether this card holds the row a Slack link asked for.
+   *
+   * Matched on the wallet slug inside the anchor rather than by looking the id
+   * up in the DOM: the row does not exist until the card is expanded, so
+   * waiting to find it would mean waiting for something this decides.
+   */
+  const anchoredHere = useMemo(() => {
+    if (!anchor) return false;
+    if (anchor === walletAnchorId(wallet.name)) return true;
+    return walletSlugFromAnchor(anchor) === treasurySlug(wallet.name);
+  }, [anchor, wallet.name]);
+
+  const expanded = expandedOverride ?? anchoredHere;
+
+  useEffect(() => {
+    if (!anchoredHere) return;
+    // After the row has painted inside the open card, so the scroll lands on
+    // the token rather than on the card's header.
+    const timer = window.setTimeout(() => {
+      const row = anchor ? document.getElementById(anchor) : null;
+      (row ?? cardRef.current)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [anchoredHere, anchor]);
 
   // Fetched only once the card is opened. The flow call reads a wallet's
   // transfer history across every chain it runs on; doing that eagerly for
@@ -377,6 +470,31 @@ function WalletCard({
     [rows, plansReady]
   );
 
+  /** The cause attached to the worst row, which is the one being explained. */
+  const worstCause = rows.find((row) => row.plan?.cause)?.plan?.cause;
+
+  /**
+   * A healthy asset heading for its floor inside the week.
+   *
+   * Only shown when nothing is already wrong: on a card that is red, a note
+   * about next Tuesday is noise competing with today's problem.
+   */
+  const headsUp = useMemo(() => {
+    if (severity !== 2) return undefined;
+    const row = rows.find(
+      (candidate) =>
+        candidate.plan?.urgency === "info" && candidate.plan.forecast
+    );
+    return row?.plan?.forecast
+      ? { symbol: row.reading.label, forecast: row.plan.forecast }
+      : undefined;
+  }, [rows, severity]);
+
+  const pendingRefill = useMemo(
+    () => rows.find((row) => row.plan?.acknowledgedAt)?.plan,
+    [rows]
+  );
+
   const tone =
     severity === 0
       ? "border-red-300 bg-red-50"
@@ -385,7 +503,11 @@ function WalletCard({
       : "border-gray-200 bg-white";
 
   return (
-    <div className={`overflow-hidden rounded-lg border ${tone}`}>
+    <div
+      ref={cardRef}
+      id={walletAnchorId(wallet.name)}
+      className={`overflow-hidden rounded-lg border ${tone} scroll-mt-20`}
+    >
       {/* A div rather than a button: the header carries its own copy-address
           button, and a button inside a button is invalid HTML that React
           reports as a hydration error. role + tabIndex + key handling keep it
@@ -394,11 +516,11 @@ function WalletCard({
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
-        onClick={() => setExpanded((open) => !open)}
+        onClick={() => setExpandedOverride(!expanded)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            setExpanded((open) => !open);
+            setExpandedOverride(!expanded);
           }
         }}
         className="flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left hover:bg-black/[0.02]"
@@ -460,6 +582,34 @@ function WalletCard({
 
           {wallet.active === false && wallet.inactiveReason && (
             <p className="mt-1 text-xs text-gray-500">{wallet.inactiveReason}</p>
+          )}
+
+          {/* Why it fell, where the transfer history evidenced it — and only
+              then. A cause nobody could determine shows nothing at all rather
+              than "unknown", which reads as a field we failed to fill. */}
+          {worstCause && (
+            <p className="mt-1 text-xs text-gray-600">{worstCause.summary}</p>
+          )}
+
+          {/* The forecast lives here and never in Slack: it is for planning in
+              working hours, not for waking somebody at 3am on a rate that may
+              have changed by morning. */}
+          {headsUp && (
+            <p className="mt-1 text-xs text-amber-800">
+              On the current rate, {headsUp.symbol} reaches its floor in{" "}
+              {formatRunway(headsUp.forecast.daysToFloor)}
+              {headsUp.forecast.confidence === "medium" && " (early estimate)"}.
+            </p>
+          )}
+
+          {/* Somebody said they sent money. Shown separately from the balance
+              on purpose: the wallet is not funded until the balance says so. */}
+          {pendingRefill && (
+            <p className="mt-1 text-xs text-indigo-800">
+              {pendingRefill.acknowledgedBy ?? "Someone"} marked{" "}
+              {pendingRefill.symbol} as paid{" "}
+              {formatAge(pendingRefill.acknowledgedAt)} — not yet on chain.
+            </p>
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -536,8 +686,20 @@ function WalletCard({
                 ) => (
                 <tr
                   key={`${chain.chainId}:${reading.asset}`}
+                  id={assetAnchorId(
+                    wallet.name,
+                    chain.chainId,
+                    reading.asset
+                  )}
                   onClick={() => onOpenAsset(chain, reading.asset, assetFlow)}
-                  className="cursor-pointer hover:bg-indigo-50/50"
+                  className={`cursor-pointer scroll-mt-24 hover:bg-indigo-50/50 ${
+                    anchor ===
+                    assetAnchorId(wallet.name, chain.chainId, reading.asset)
+                      ? pinging
+                        ? "treasury-ping"
+                        : "treasury-anchored"
+                      : ""
+                  }`}
                 >
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1.5 font-medium text-gray-900">
@@ -558,6 +720,15 @@ function WalletCard({
                     <div className="text-xs text-gray-500">
                       {formatAmount(reading.balance)} /{" "}
                       {formatAmount(refill?.floorAmount ?? reading.threshold)}
+                      {plan && <ThresholdEditor plan={plan} />}
+                      {plan?.thresholdSource === "override" && (
+                        <span
+                          className="ml-1 text-indigo-500"
+                          title={`Threshold set by ${plan.thresholdUpdatedBy ?? "an admin"}, not the configured default.`}
+                        >
+                          ·edited
+                        </span>
+                      )}
                       {refill && (
                         <span
                           className="ml-1 text-gray-400"

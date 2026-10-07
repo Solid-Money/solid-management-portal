@@ -2,8 +2,6 @@ import api from "@/lib/api";
 import { formatDateTime as formatDateTimeUtil, formatNumber, formatUsd } from "@/lib/utils";
 import {
   ChainBalance,
-  ExternalAccountStatus,
-  ExternalAccountsResponse,
   FundingLedgerResponse,
   WalletAsset,
   WalletAssetFlow,
@@ -16,6 +14,8 @@ import {
   WalletRefillPlan,
   WalletRole,
   WalletTransfersResponse,
+  WalletTreasuryAuditEntry,
+  WalletTreasurySettings,
 } from "@/types";
 
 /**
@@ -64,6 +64,60 @@ export const getWalletPlans = (windowDays = 7) =>
     })
     .then((response) => response.data);
 
+/** Set one asset's threshold, or clear it back to the configured default. */
+export const setWalletThreshold = (
+  walletName: string,
+  body: {
+    chainId: number;
+    asset: WalletAsset;
+    threshold?: string;
+    reset?: boolean;
+  }
+) =>
+  api
+    .put<{ threshold: string; source: "registry" | "override" }>(
+      path(walletName, "thresholds"),
+      body
+    )
+    .then((response) => response.data);
+
+/**
+ * Record that we have sent a top-up.
+ *
+ * Deliberately not a funding event. Nothing here changes a balance or clears
+ * an alert — only the next balance read does that — and the page shows the two
+ * apart so a wallet that was promised money and never received it does not
+ * look handled.
+ */
+export const acknowledgeRefill = (
+  walletName: string,
+  body: { chainId: number; asset: WalletAsset; amount?: number }
+) =>
+  api
+    .post<WalletTreasuryAuditEntry>(
+      path(walletName, "refill-acknowledgements"),
+      body
+    )
+    .then((response) => response.data);
+
+/** Who changed a threshold or acknowledged a refill, newest first. */
+export const getWalletAudit = (limit = 50) =>
+  api
+    .get<{ entries: WalletTreasuryAuditEntry[] }>("/admin/v1/wallets/audit", {
+      params: { limit },
+    })
+    .then((response) => response.data.entries);
+
+export const getTreasurySettings = () =>
+  api
+    .get<WalletTreasurySettings>("/admin/v1/wallets/settings")
+    .then((response) => response.data);
+
+export const updateTreasurySettings = (body: { pingOnUrgent: boolean }) =>
+  api
+    .put<WalletTreasurySettings>("/admin/v1/wallets/settings", body)
+    .then((response) => response.data);
+
 export const getWalletFlow = (walletName: string, windowDays = 7) =>
   api
     .get<WalletFlowResponse>(path(walletName, "flow"), {
@@ -95,24 +149,6 @@ export const getFundingLedger = (windowDays = 30) =>
     .get<FundingLedgerResponse>("/admin/v1/wallets/funding-ledger", {
       params: { windowDays },
     })
-    .then((response) => response.data);
-
-export const getExternalAccounts = () =>
-  api
-    .get<ExternalAccountsResponse>("/admin/v1/wallets/external-accounts")
-    .then((response) => response.data);
-
-export const recordExternalBalance = (body: {
-  account: string;
-  balance: number;
-  toppedUpBy?: number;
-  note?: string;
-}) =>
-  api
-    .post<ExternalAccountStatus>(
-      "/admin/v1/wallets/external-accounts/readings",
-      body
-    )
     .then((response) => response.data);
 
 // --- Reading a chain row by asset -------------------------------------------
