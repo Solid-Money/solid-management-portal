@@ -2481,3 +2481,158 @@ export const COHORT_GROUP_META: Record<
     description: "Retired programs, kept for historical exports",
   },
 };
+
+// --- Rain Real-Time Funding -------------------------------------------------
+
+/**
+ * Who a Real-Time Funding allowance is granted to.
+ *
+ * Two of them while Rain migrates its collateral contracts to the
+ * reversal-enabled version: the `operator` is the spender that pulls today,
+ * `collateral` is the user's own contract and the spender afterwards. A
+ * cardholder mid-migration should hold both, and the one that is missing is
+ * usually the answer to "why did this card decline".
+ */
+export type RainRtfSpenderKind = "collateral" | "operator";
+
+export interface RainRtfSpender {
+  kind: RainRtfSpenderKind;
+  address: string;
+  /**
+   * Allowance granted, in the token's smallest units, as a decimal string.
+   * `"0"` when none, `null` when the chain could not be read — which is not
+   * the same thing and must not be rendered as if it were.
+   */
+  currentAllowance: string | null;
+  isApproved: boolean;
+}
+
+/**
+ * One asset on one chain — the unit of approval.
+ *
+ * An ERC-20 allowance is scoped to one (token, owner, spender) triple, so a
+ * chain with two assets and two spenders carries four independent
+ * allowances. A card can be fully approved for USDC and decline on EURC,
+ * which is only visible if they are listed separately.
+ */
+export interface RainRtfAsset {
+  /** USDT0 on Plasma, USDC elsewhere. A wallet holding the wrong one declines. */
+  symbol: string;
+  tokenAddress: string;
+  tokenDecimals: number;
+  spenders: RainRtfSpender[];
+  /** Smallest units, as a string. `null` when the chain could not be read. */
+  walletBalance: string | null;
+  isApproved: boolean;
+}
+
+export interface RainRtfChain {
+  chainId: number;
+  name: string;
+  environment: "sandbox" | "production";
+  /** The cardholder's Rain collateral contract (`proxyAddress`). */
+  collateralAddress: string | null;
+  assets: RainRtfAsset[];
+  walletAddress: string | null;
+  /** How many `approve` calls this chain still needs. */
+  pendingApprovals: number;
+  isApproved: boolean;
+  /** We hold a consent record: the cardholder accepted the RTF Terms. */
+  hasConsent: boolean;
+  consentAt: string | null;
+  transactionHash: string | null;
+  unavailableReason: string | null;
+}
+
+export interface RainRtfStatus {
+  tenantEnabled: boolean;
+  eligible: boolean;
+  /**
+   * Why not, when `eligible` is false: `tenant-disabled`, `no-rain-customer`,
+   * `no-wallet`, `no-supported-chain`, `contracts-unavailable`.
+   */
+  ineligibleReason: string | null;
+  maxAllowance: string;
+  terms: {
+    version: string;
+    url: string;
+    body: string;
+    consentLabel: string;
+  };
+  chains: RainRtfChain[];
+}
+
+// --- Config → General ------------------------------------------------------
+
+/** Which layer supplied the value the app is actually using. */
+export type RainRtfSettingSource = "database" | "environment" | "default";
+
+/**
+ * One Real-Time Funding setting, with what every layer says about it.
+ *
+ * All three are reported, not just the answer. An operator looking at
+ * "Enabled: true" cannot act on it without knowing whether that came from the
+ * box in front of them or from Helm, and editing the layer that is being
+ * overridden is the commonest way to waste an afternoon on layered config.
+ */
+export interface RainRtfSetting {
+  /** Name shared by every source — "RAIN_RTF_ENABLED". */
+  name: string;
+  /** App config key the dashboard writes to — "rain_rtf.enabled". */
+  configKey: string;
+  label: string;
+  description: string;
+  /** What the dashboard holds, or null when no operator has set it. */
+  stored: string | null;
+  /** What this deployment's environment supplies, or null. */
+  environment: string | null;
+  /** What the code falls back to when neither of the above has a value. */
+  publishedDefault: string | null;
+  /** The value actually in force. */
+  effective: string;
+  source: RainRtfSettingSource;
+}
+
+/** A chain as the registry currently resolves it, overrides applied. */
+export interface RainRtfResolvedChain {
+  chainId: number;
+  name: string;
+  environment: string;
+  operatorAddress: string;
+  assets: Array<{ symbol: string; address: string; decimals: number }>;
+}
+
+export interface RainRtfTokenOverride {
+  chainId: number;
+  /** `symbol:address:decimals`, comma-separated. Empty removes the override. */
+  tokens: string;
+}
+
+export interface RainRtfConfig {
+  settings: RainRtfSetting[];
+  tokenOverrides: RainRtfTokenOverride[];
+  chains: RainRtfResolvedChain[];
+}
+
+export interface GeneralConfig {
+  rainRtf: RainRtfConfig;
+}
+
+/**
+ * An edit to the Real-Time Funding settings.
+ *
+ * Every field is optional and absent means "leave as is", so the page sends
+ * only what changed. An empty string is a distinct instruction: it clears the
+ * stored value and hands the setting back to the environment.
+ */
+export interface UpdateRainRtfConfig {
+  /** `null` clears the stored value, as an empty string does for the text
+   * fields — `undefined` cannot, since it already means "leave as is". */
+  enabled?: boolean | null;
+  approveOperator?: boolean | null;
+  chainIds?: string;
+  operatorSandbox?: string;
+  operatorProduction?: string;
+  termsUrl?: string;
+  tokenOverrides?: RainRtfTokenOverride[];
+}
