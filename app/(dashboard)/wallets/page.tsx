@@ -9,6 +9,7 @@ import WalletsBoard from "@/components/wallets/wallets-board";
 import FundingLedger from "@/components/wallets/funding-ledger";
 import RefillModal from "@/components/wallets/refill-modal";
 import TreasuryAudit from "@/components/wallets/treasury-audit";
+import AlertSettings from "@/components/wallets/alert-settings";
 import { Button } from "@/components/ui/button";
 import {
   getTreasurySettings,
@@ -45,6 +46,28 @@ const TABS: Array<{ value: Tab; label: string; blurb: string }> = [
   },
 ];
 
+/** What changed, in the words the control uses, so the toast confirms the act. */
+function describeSettingChange(
+  next: WalletTreasurySettings,
+  sent: Partial<WalletTreasurySettings>
+): string {
+  if (sent.pingOnUrgent !== undefined) {
+    return next.pingOnUrgent
+      ? "Urgent balance alerts will mention Mark Smargon"
+      : "Urgent balance alerts will not mention anyone";
+  }
+  if (sent.criticalDays !== undefined) {
+    return `Tokens are urgent at ${next.criticalDays} days of cover or less`;
+  }
+  if (sent.lowDays !== undefined) {
+    return `Tokens are low at ${next.lowDays} days of cover or less`;
+  }
+  if (sent.alertIntervalMinutes !== undefined) {
+    return `Slack will hear at most every ${next.alertIntervalMinutes} minutes`;
+  }
+  return "Saved";
+}
+
 export default function WalletsPage() {
   const [filter, setFilter] = useState<WalletFilter>("active");
   const [tab, setTab] = useState<Tab>("wallets");
@@ -65,13 +88,12 @@ export default function WalletsPage() {
 
   const saveSettings = useMutation({
     mutationFn: updateTreasurySettings,
-    onSuccess: (next) => {
+    onSuccess: (next, sent) => {
       queryClient.setQueryData(["treasury-settings"], next);
-      toast.success(
-        next.pingOnUrgent
-          ? "Urgent balance alerts will mention Mark Smargon"
-          : "Urgent balance alerts will not mention anyone"
-      );
+      // Both reads are judged against these numbers, so both are stale now.
+      void queryClient.invalidateQueries({ queryKey: ["wallet-plans"] });
+      void queryClient.invalidateQueries({ queryKey: ["wallet-audit"] });
+      toast.success(describeSettingChange(next, sent));
     },
     onError: (error: Error) =>
       toast.error(error.message || "Could not save that setting"),
@@ -149,6 +171,8 @@ export default function WalletsPage() {
               )}
               Ping Mark Smargon for urgent balance alerts
             </label>
+
+            <AlertSettings settings={settings} save={saveSettings} />
           </div>
         )}
       </div>
