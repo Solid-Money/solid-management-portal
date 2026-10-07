@@ -158,9 +158,19 @@ function Header({
           <h2 className="text-lg font-semibold text-gray-900">
             {label}
             {flow && (
-              <span className="ml-2 text-sm font-normal text-gray-600">
+              /* The measured floor where there is one: the panel below quotes
+                 it, and two different floors for the same asset on the same
+                 screen is the confusion this page exists to remove. */
+              <span
+                className="ml-2 text-sm font-normal text-gray-600"
+                title={
+                  flow.plan
+                    ? `${flow.plan.floorDays} days at the measured cost. The configured threshold is ${formatAmount(flow.threshold)}.`
+                    : "Its configured threshold — no cost has been measured yet."
+                }
+              >
                 {formatAmount(flow.balance)} held against a{" "}
-                {formatAmount(flow.threshold)} floor
+                {formatAmount(flow.plan?.floorAmount ?? flow.threshold)} floor
               </span>
             )}
           </h2>

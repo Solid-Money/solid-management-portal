@@ -2,17 +2,20 @@ import api from "@/lib/api";
 import { formatDateTime as formatDateTimeUtil, formatNumber, formatUsd } from "@/lib/utils";
 import {
   ChainBalance,
-  ExternalAccountStatus,
-  ExternalAccountsResponse,
   FundingLedgerResponse,
   WalletAsset,
+  WalletAssetFlow,
+  WalletAssetPlan,
   WalletFailuresResponse,
   WalletFlowResponse,
   WalletForecastResponse,
   WalletInfo,
+  WalletPlansResponse,
   WalletRefillPlan,
   WalletRole,
   WalletTransfersResponse,
+  WalletTreasuryAuditEntry,
+  WalletTreasurySettings,
 } from "@/types";
 
 /**
@@ -43,6 +46,76 @@ export const getWalletFailures = (
 ) =>
   api
     .get<WalletFailuresResponse>(path(walletName, "failures"), { params })
+    .then((response) => response.data);
+
+/**
+ * Every wallet's verdict and refill plan in one call.
+ *
+ * Paired with `/wallets/status`: that gives live balances against the fixed
+ * configured thresholds, this gives the verdict to actually render. Keeping
+ * them apart means the board paints as soon as balances land and settles its
+ * colours once, rather than showing a threshold reading it is about to
+ * contradict when a card is opened.
+ */
+export const getWalletPlans = (windowDays = 7) =>
+  api
+    .get<WalletPlansResponse>("/admin/v1/wallets/plans", {
+      params: { windowDays },
+    })
+    .then((response) => response.data);
+
+/** Set one asset's threshold, or clear it back to the configured default. */
+export const setWalletThreshold = (
+  walletName: string,
+  body: {
+    chainId: number;
+    asset: WalletAsset;
+    threshold?: string;
+    reset?: boolean;
+  }
+) =>
+  api
+    .put<{ threshold: string; source: "registry" | "override" }>(
+      path(walletName, "thresholds"),
+      body
+    )
+    .then((response) => response.data);
+
+/**
+ * Record that we have sent a top-up.
+ *
+ * Deliberately not a funding event. Nothing here changes a balance or clears
+ * an alert — only the next balance read does that — and the page shows the two
+ * apart so a wallet that was promised money and never received it does not
+ * look handled.
+ */
+export const acknowledgeRefill = (
+  walletName: string,
+  body: { chainId: number; asset: WalletAsset; amount?: number }
+) =>
+  api
+    .post<WalletTreasuryAuditEntry>(
+      path(walletName, "refill-acknowledgements"),
+      body
+    )
+    .then((response) => response.data);
+
+/** Who changed a threshold or acknowledged a refill, newest first. */
+export const getWalletAudit = (limit = 50) =>
+  api
+    .get<{ entries: WalletTreasuryAuditEntry[] }>("/admin/v1/wallets/audit", {
+      params: { limit },
+    })
+    .then((response) => response.data.entries);
+
+export const getTreasurySettings = () =>
+  api
+    .get<WalletTreasurySettings>("/admin/v1/wallets/settings")
+    .then((response) => response.data);
+
+export const updateTreasurySettings = (body: { pingOnUrgent: boolean }) =>
+  api
+    .put<WalletTreasurySettings>("/admin/v1/wallets/settings", body)
     .then((response) => response.data);
 
 export const getWalletFlow = (walletName: string, windowDays = 7) =>
@@ -76,24 +149,6 @@ export const getFundingLedger = (windowDays = 30) =>
     .get<FundingLedgerResponse>("/admin/v1/wallets/funding-ledger", {
       params: { windowDays },
     })
-    .then((response) => response.data);
-
-export const getExternalAccounts = () =>
-  api
-    .get<ExternalAccountsResponse>("/admin/v1/wallets/external-accounts")
-    .then((response) => response.data);
-
-export const recordExternalBalance = (body: {
-  account: string;
-  balance: number;
-  toppedUpBy?: number;
-  note?: string;
-}) =>
-  api
-    .post<ExternalAccountStatus>(
-      "/admin/v1/wallets/external-accounts/readings",
-      body
-    )
     .then((response) => response.data);
 
 // --- Reading a chain row by asset -------------------------------------------
@@ -199,31 +254,74 @@ export const severityOf = (statuses: BalanceStatus[]): 0 | 1 | 2 => {
 };
 
 /**
- * One asset's verdict, preferring the measured floor over the configured one.
+ * The key a plan row is looked up by: a token, on a chain, on a wallet.
  *
- * The configured thresholds are fixed amounts that drift out of meaning as
- * usage changes, in both directions: Connect Wallet's Fuse USDC sat at
- * CRITICAL against a floor of 50 while holding a week of cover, and its FUSE
- * read OK against a floor of 1,000 with a day and a half left. Where a real
- * cost has been measured, days of cover is the better answer, so it wins.
+ * The same triple the backend groups by, so a lookup here cannot drift from
+ * the thing it is looking up.
+ */
+export const planKey = (
+  walletName: string,
+  chainId: number,
+  asset: WalletAsset
+): string => `${walletName}:${chainId}:${asset}`;
+
+/** Plan rows indexed for lookup, from the board-wide `plans` call. */
+export const indexPlans = (
+  plans?: WalletPlansResponse
+): Map<string, WalletAssetPlan> =>
+  new Map(
+    (plans?.assets ?? []).map((asset) => [
+      planKey(asset.walletName, asset.chainId, asset.asset),
+      asset,
+    ])
+  );
+
+/**
+ * One asset's verdict.
  *
- * The configured status is still what the Slack alerts and the balance checker
- * fire on — this only changes what the page tells a reader.
+ * The rule itself lives in the backend, in one place, because the Slack
+ * alerting has to reach the same conclusion as the page — a card that flips
+ * from red to green when somebody expands it, while an alert fires overnight
+ * on the reading the page has already disowned, is what happens when the
+ * question is answered twice.
+ *
+ * What is left here is precedence, and the order is the whole point: the
+ * board-wide plan wins, and the opened card's flow row is only a fallback for
+ * when there is no plan at all.
+ *
+ * It is tempting to prefer the flow row because it is fresher — the plans
+ * call is cached for five minutes server-side and reads every wallet's
+ * balance in one pass, where a flow call re-reads one wallet on the spot. But
+ * preferring it is how the colours start moving again: the two reads are
+ * taken at different moments, so an asset sitting near its floor can be
+ * `LOW` in one and `OK` in the other, and the card would change its mind the
+ * moment somebody clicked it. Freshness is not what this page needs; a
+ * verdict that stays put while nothing moves is.
  */
 export const assetVerdict = (
   status: BalanceStatus,
-  plan?: WalletRefillPlan,
-  daysOfRunway?: number
-): BalanceStatus => {
-  if (status === "N/A") return "N/A";
-  if (!plan) return status;
-  // Inside a day is a different kind of problem from inside the floor: one
-  // needs funding today, the other this week.
-  if (plan.belowFloor) {
-    return daysOfRunway != null && daysOfRunway < 1 ? "CRITICAL" : "LOW";
-  }
-  return "OK";
-};
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): BalanceStatus => plan?.verdict ?? flow?.verdict ?? status;
+
+/**
+ * The refill plan to quote — the board-wide one, for the reason above.
+ *
+ * The floor is the denominator every balance on the page is shown against, so
+ * it has to come from the same read as the verdict. Quoting the flow's floor
+ * under a plans-derived colour is the same contradiction one level down: the
+ * number would change on expand even though the colour did not.
+ */
+export const assetRefillPlan = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): WalletRefillPlan | undefined => plan?.plan ?? flow?.plan;
+
+/** Days of cover to quote, from the same read as the verdict and the floor. */
+export const assetRunwayDays = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): number | undefined => plan?.daysOfRunway ?? flow?.daysOfRunway;
 
 export const chainStatuses = (chain: ChainBalance): BalanceStatus[] =>
   monitoredAssets(chain).map((reading) => reading.status);
@@ -234,10 +332,37 @@ export const walletStatuses = (wallet: WalletInfo): BalanceStatus[] =>
 export const walletSeverity = (wallet: WalletInfo): 0 | 1 | 2 =>
   severityOf(walletStatuses(wallet));
 
+/**
+ * One wallet's severity, from the verdicts rather than the thresholds.
+ *
+ * Returns `undefined` while the plans call is still in flight. The board
+ * renders that as "assessing cover", which is the honest state: showing a
+ * threshold verdict it is about to replace is what made the page appear to
+ * change its mind about wallets nobody had touched.
+ */
+export const walletVerdictSeverity = (
+  wallet: WalletInfo,
+  plans: Map<string, WalletAssetPlan>,
+  ready: boolean
+): 0 | 1 | 2 | undefined => {
+  if (!ready) return undefined;
+  return severityOf(
+    wallet.chains.flatMap((chain) =>
+      monitoredAssets(chain).map((reading) =>
+        assetVerdict(
+          reading.status,
+          plans.get(planKey(wallet.name, chain.chainId, reading.asset))
+        )
+      )
+    )
+  );
+};
+
 /** Grouped by role, roles in blast-radius order, wallets worst-first within each. */
 export function groupByRole(
   wallets: WalletInfo[],
-  roleOrder: WalletRole[]
+  roleOrder: WalletRole[],
+  severityOfWallet: (wallet: WalletInfo) => 0 | 1 | 2 = walletSeverity
 ): Array<{ role: WalletRole; wallets: WalletInfo[] }> {
   const byRole = new Map<WalletRole, WalletInfo[]>();
 
@@ -255,7 +380,7 @@ export function groupByRole(
         .map((wallet, index) => ({ wallet, index }))
         .sort(
           (a, b) =>
-            walletSeverity(a.wallet) - walletSeverity(b.wallet) ||
+            severityOfWallet(a.wallet) - severityOfWallet(b.wallet) ||
             a.index - b.index
         )
         .map(({ wallet }) => wallet),
