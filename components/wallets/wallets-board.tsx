@@ -730,11 +730,17 @@ function WalletCard({
                         </span>
                       )}
                       {refill && (
+                        /* "{n}-day floor", not "({n}d)". The short form sat
+                           beside a balance in a row whose other column reads
+                           "~23h left" and was taken for days remaining — which
+                           made a wallet with under a day of cover look like it
+                           had three, and its CRITICAL badge look wrong. The
+                           number qualifies the floor, never the runway. */
                         <span
                           className="ml-1 text-gray-400"
-                          title={`A floor of ${refill.floorDays} days at the measured cost, rather than the fixed ${formatAmount(reading.threshold)} configured.`}
+                          title={`The floor is ${refill.floorDays} days at the measured cost, rather than the fixed ${formatAmount(reading.threshold)} configured. Time left is in the Runway column.`}
                         >
-                          ({refill.floorDays}d)
+                          ({refill.floorDays}-day floor)
                         </span>
                       )}
                       {plan?.isResidue && (
@@ -1042,7 +1048,10 @@ function AssetChip({
       {label} {formatAmount(balance)}
       <span className="opacity-60"> / {formatAmount(floor)}</span>
       {runwayDays != null && runwayDays < 7 && (
-        <span className="ml-1 font-medium">· {formatRunway(runwayDays)}</span>
+        /* "left", so a duration next to two amounts cannot be read as a third. */
+        <span className="ml-1 font-medium">
+          · {formatRunway(runwayDays)} left
+        </span>
       )}
     </span>
   );
