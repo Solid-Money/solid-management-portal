@@ -113,7 +113,14 @@ export const getTreasurySettings = () =>
     .get<WalletTreasurySettings>("/admin/v1/wallets/settings")
     .then((response) => response.data);
 
-export const updateTreasurySettings = (body: { pingOnUrgent: boolean }) =>
+export const updateTreasurySettings = (
+  body: Partial<
+    Pick<
+      WalletTreasurySettings,
+      "pingOnUrgent" | "criticalDays" | "lowDays" | "alertIntervalMinutes"
+    >
+  >
+) =>
   api
     .put<WalletTreasurySettings>("/admin/v1/wallets/settings", body)
     .then((response) => response.data);

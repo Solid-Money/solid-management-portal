@@ -906,6 +906,12 @@ export interface WalletTreasuryAuditEntry {
 /** Account-wide switches for the Treasury page and its alerting. */
 export interface WalletTreasurySettings {
   pingOnUrgent: boolean;
+  /** Days of cover at or below which an asset is urgent. */
+  criticalDays: number;
+  /** Days of cover at or below which it wants funding this week. */
+  lowDays: number;
+  /** The shortest gap between two Slack digests, in minutes. */
+  alertIntervalMinutes: number;
   updatedBy?: string;
   updatedAt?: string;
 }
