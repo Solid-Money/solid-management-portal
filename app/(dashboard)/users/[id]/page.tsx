@@ -18,6 +18,7 @@ import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserKycCard from "@/components/user/user-kyc-card";
+import UserMicroDepositsCard from "@/components/user/user-micro-deposits-card";
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserReferralCard from "@/components/user/user-referral-card";
@@ -225,8 +226,12 @@ export default function UserDetailPage({
           )}
         </TabsContent>
 
-        <TabsContent value="deposits">
+        <TabsContent value="deposits" className="space-y-4">
           <DepositSummaryCard userId={id} />
+          {/* Under the summary because none of it is money: the bank deposits
+              Rain would not process, which is what a "my bank says it sent
+              two small deposits" ticket is asking about. */}
+          <UserMicroDepositsCard userId={id} />
         </TabsContent>
 
         <TabsContent value="card" className="space-y-4">

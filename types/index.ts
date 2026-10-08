@@ -2784,3 +2784,32 @@ export interface UpdateRainRtfConfig {
   termsUrl?: string;
   tokenOverrides?: RainRtfTokenOverride[];
 }
+
+/**
+ * A deposit under Rain's $2 minimum on a user's virtual account
+ * (`microDeposit.received`). Rain never converts these, so none of it is in
+ * any balance — most are a bank or broker verifying the account by sending a
+ * few cents and asking the user to type the amount back.
+ */
+export interface VirtualAccountMicroDeposit {
+  _id: string;
+  /** Rain's micro-deposit id. */
+  microDepositId: string;
+  userId?: string;
+  rainUserId?: string;
+  /** The Rain payment route the deposit arrived on. */
+  rainAutomationId: string;
+  /** Dollars as a decimal string — "0.23" is 23 cents. */
+  amount: string;
+  currency: string;
+  /** `ach` or `wire`. */
+  rail: string;
+  /** Bank memo. Trial deposits carry `ACCTVERIFY`. */
+  description?: string;
+  originatorName?: string;
+  /** ACH trace number, or IMAD for a wire. */
+  referenceId?: string;
+  isAccountVerification: boolean;
+  receivedAt: string;
+  createdAt: string;
+}

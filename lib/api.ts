@@ -27,6 +27,7 @@ import {
   TierLockReevaluationResult,
   TierMembershipView,
   TierTrialView,
+  VirtualAccountMicroDeposit,
 } from "@/types";
 
 const api = axios.create({
@@ -98,6 +99,15 @@ export const getUserCashback = (userId: string) =>
 
 export const getUserIntercomHistory = (userId: string) =>
   api.get(`/admin/v1/users/${userId}/intercom`);
+
+/**
+ * Deposits under Rain's $2 minimum on the user's virtual account, newest
+ * first — the verification amounts a bank sent, with memo and trace number.
+ */
+export const getUserMicroDeposits = (userId: string) =>
+  api.get<{ data: VirtualAccountMicroDeposit[] }>(
+    `/admin/v1/users/${userId}/micro-deposits`,
+  );
 
 /**
  * Every admin action on this user's card — frozen, unfrozen, canceled,
