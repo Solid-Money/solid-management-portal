@@ -26,6 +26,9 @@ const shortDate = (value?: string) =>
 function statusDetail(row: AdminReferralRewardRow): string | null {
   switch (row.status) {
     case "qualified":
+      if (row.awaitingActivity) {
+        return "Cancelled at payout unless the friend makes one more eligible purchase";
+      }
       return row.payoutEtaAt
         ? `Pays ${formatDateTime(row.payoutEtaAt)}`
         : "Waiting out the payout delay";

@@ -38,6 +38,10 @@ export function reversalReasonLabel(reason: string | undefined): string {
   switch (reason) {
     case "chargeback":
       return "Spend net of refunds fell under the bar at payout";
+    case "ineligible_spend":
+      return "Never cleared the bar on eligible purchases (excluded merchants, purchases under the minimum, or too few merchants with the minimum spent)";
+    case "no_activity_after_qualifying":
+      return "No eligible purchase between qualifying and the payout";
     case "account_closed":
       return "The friend's account no longer exists";
     case "self_referral_suspected":
