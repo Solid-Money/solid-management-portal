@@ -90,26 +90,58 @@ export function createAdminSocket(): Socket | null {
   });
 }
 
-// --- Live status, for the badge ---------------------------------------------
+// --- Live status, for the badges --------------------------------------------
+
+/**
+ * Whether one live feed is connected, readable with `useSyncExternalStore`.
+ *
+ * One store per feed rather than one for the portal: the card feed listens for
+ * as long as an admin is signed in and the errors feed only while its page is
+ * open with Live on, so a single shared status would have each one report the
+ * other's connection.
+ */
+export interface LiveStatusStore<S extends string> {
+  get: () => S;
+  set: (next: S) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+export function createLiveStatusStore<S extends string>(
+  initial: S,
+): LiveStatusStore<S> {
+  let status = initial;
+  const listeners = new Set<() => void>();
+
+  return {
+    get: () => status,
+    set: (next) => {
+      if (next === status) return;
+      status = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
 
 export type LiveStatus = "live" | "offline";
 
-let liveStatus: LiveStatus = "offline";
-const liveStatusListeners = new Set<() => void>();
+/** The card-transaction feed, which `<LiveBadge/>` reports. */
+const cardLiveStatus = createLiveStatusStore<LiveStatus>("offline");
 
-export function setLiveStatus(next: LiveStatus): void {
-  if (next === liveStatus) return;
-  liveStatus = next;
-  liveStatusListeners.forEach((listener) => listener());
-}
+export const setLiveStatus = cardLiveStatus.set;
+export const getLiveStatus = cardLiveStatus.get;
+export const subscribeLiveStatus = cardLiveStatus.subscribe;
 
-export function getLiveStatus(): LiveStatus {
-  return liveStatus;
-}
+/**
+ * The errors feed. "reconnecting" is a feed that was live and dropped, which
+ * Socket.IO is bringing back; "offline" is one that never connected.
+ */
+export type ErrorsLiveStatus = "live" | "reconnecting" | "offline";
 
-export function subscribeLiveStatus(listener: () => void): () => void {
-  liveStatusListeners.add(listener);
-  return () => {
-    liveStatusListeners.delete(listener);
-  };
-}
+export const errorsLiveStatus =
+  createLiveStatusStore<ErrorsLiveStatus>("offline");
