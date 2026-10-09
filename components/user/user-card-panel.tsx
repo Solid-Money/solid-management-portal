@@ -24,6 +24,7 @@ import FreezeCardDialog from "@/components/user/freeze-card-dialog";
 import IssueCardDialog from "@/components/user/issue-card-dialog";
 import UnblockCardSpendDialog from "@/components/user/unblock-card-spend-dialog";
 import CardHoldsSection from "@/components/user/card-holds-section";
+import CardUncollectedSection from "@/components/user/card-uncollected-section";
 
 const PROVIDER_LABELS: Record<string, string> = {
   rain: "Rain",
@@ -506,7 +507,10 @@ export default function UserCardPanel({
             <WirexSpendBreakdown card={card} />
 
             {card.provider === "wirex" && (
-              <CardHoldsSection userId={userId} username={username} />
+              <>
+                <CardUncollectedSection userId={userId} username={username} />
+                <CardHoldsSection userId={userId} username={username} />
+              </>
             )}
 
             <FreezeExplanation card={card} />
