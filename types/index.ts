@@ -249,6 +249,8 @@ export enum TransactionType {
   UNSTAKE = "unstake",
   WITHDRAW = "withdraw",
   SEND = "send",
+  // USDC.e / USDT bridged from Fuse to another network via BridgePaymaster (Stargate).
+  CROSS_CHAIN_SEND = "cross_chain_send",
   RECEIVE = "receive", // Incoming token/native transfers from external sources
   BRIDGE = "bridge",
   CANCEL_WITHDRAW = "cancel_withdraw",
@@ -388,6 +390,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       category: TransactionCategory.SAVINGS_ACCOUNT,
     },
     [TransactionType.BRIDGE_DEPOSIT]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.EXTERNAL_WALLET_TRANSFER,
+    },
+    [TransactionType.CROSS_CHAIN_SEND]: {
       sign: TransactionDirection.OUT,
       category: TransactionCategory.EXTERNAL_WALLET_TRANSFER,
     },
@@ -560,6 +566,7 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.UNWRAP, label: "Unwrap" },
   { value: TransactionType.BRIDGE, label: "Bridge" },
   { value: TransactionType.BRIDGE_DEPOSIT, label: "Bridge Deposit" },
+  { value: TransactionType.CROSS_CHAIN_SEND, label: "Cross-chain Send" },
   { value: TransactionType.BRIDGE_TRANSFER, label: "Bridge Transfer" },
   { value: TransactionType.BANK_TRANSFER, label: "Bank Transfer" },
   { value: TransactionType.WIREX_BANK_DEPOSIT, label: "Wirex Bank Deposit" },

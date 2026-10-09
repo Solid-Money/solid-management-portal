@@ -28,6 +28,11 @@ import {
   TierMembershipView,
   TierTrialView,
 } from "@/types";
+import {
+  CardHolds,
+  ReleaseCardHoldRequest,
+  ReleaseCardHoldResult,
+} from "@/types/cash-holds";
 
 const api = axios.create({
   baseURL:
@@ -182,6 +187,30 @@ export const setUserCardFreeze = (
 export const unblockCardSpend = (safeAddress: string) =>
   api.post<{ unblocked: boolean }>(
     `/admin/v1/cash-ops/safes/${safeAddress}/unblock`,
+  );
+
+/**
+ * Everything reserved against this user's card spending power, on every
+ * instance, each joined to its payment and marked stale when nothing will
+ * ever clear it.
+ */
+export const getUserCardHolds = (userId: string) =>
+  api.get<CardHolds>(`/admin/v1/cash-ops/users/${userId}/holds`);
+
+/**
+ * Release one hold-store entry, handing its amount back to the card. Refused
+ * with a 409 when the entry changed since it was loaded, so re-read and
+ * check it again. The admin identity comes from the Firebase token
+ * server-side.
+ */
+export const releaseUserCardHold = (
+  userId: string,
+  uniqueOperationId: string,
+  body: ReleaseCardHoldRequest,
+) =>
+  api.post<ReleaseCardHoldResult>(
+    `/admin/v1/cash-ops/users/${userId}/holds/${uniqueOperationId}/release`,
+    body,
   );
 
 /**
