@@ -33,6 +33,11 @@ import {
   ReleaseCardHoldRequest,
   ReleaseCardHoldResult,
 } from "@/types/cash-holds";
+import {
+  CollectSettlementRequest,
+  CollectSettlementResult,
+  UncollectedSettlements,
+} from "@/types/cash-collect";
 
 const api = axios.create({
   baseURL:
@@ -210,6 +215,31 @@ export const releaseUserCardHold = (
 ) =>
   api.post<ReleaseCardHoldResult>(
     `/admin/v1/cash-ops/users/${userId}/holds/${uniqueOperationId}/release`,
+    body,
+  );
+
+/**
+ * Card spends Wirex paid for that we never swept from this user's Safe, with
+ * what the Safe can cover right now.
+ */
+export const getUserUncollectedSettlements = (userId: string) =>
+  api.get<UncollectedSettlements>(
+    `/admin/v1/cash-ops/users/${userId}/uncollected`,
+  );
+
+/**
+ * Collect one of them: books the debit and starts the normal sweep from the
+ * user's Safe. Refused with a 409 when the Safe cannot cover it, unless
+ * `force` is set. The admin identity comes from the Firebase token
+ * server-side.
+ */
+export const collectUserSettlement = (
+  userId: string,
+  uniqueOperationId: string,
+  body: CollectSettlementRequest,
+) =>
+  api.post<CollectSettlementResult>(
+    `/admin/v1/cash-ops/users/${userId}/uncollected/${uniqueOperationId}/collect`,
     body,
   );
 
