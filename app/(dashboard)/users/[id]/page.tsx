@@ -18,6 +18,7 @@ import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserKycCard from "@/components/user/user-kyc-card";
+import UserVirtualAccountOnboardingCard from "@/components/user/user-virtual-account-onboarding-card";
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserReferralCard from "@/components/user/user-referral-card";
@@ -234,6 +235,13 @@ export default function UserDetailPage({
               is behind: a declined KYC is why most "where is my card?" tickets
               exist, and the reason codes here are what answer them. */}
           <UserKycCard userId={id} username={displayName} />
+          {/* The USD virtual account has its own verification and its own Rain
+              review, so it gets stuck in places the card's KYC card does not
+              show — and "I paid but got no account" lands on this tab. */}
+          <UserVirtualAccountOnboardingCard
+            userId={id}
+            username={displayName}
+          />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UserCardPanel
               userId={id}

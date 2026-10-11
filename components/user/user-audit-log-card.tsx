@@ -54,6 +54,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "KYC verification reset",
       variant: "warning",
     },
+    virtual_account_onboarding_retried: {
+      label: "Virtual account resubmitted",
+      variant: "info",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
