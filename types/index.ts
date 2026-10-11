@@ -2029,6 +2029,74 @@ export interface KycResetResult {
   providerDecisionIsFinal: boolean;
 }
 
+/**
+ * Where a user's Rain virtual-account onboarding stands, as one step. Mirrors
+ * `VirtualAccountOnboardingStep` in accounts-service.
+ */
+export type VirtualAccountOnboardingStep =
+  | "account_open"
+  | "not_started"
+  | "rain_denied"
+  | "fee_unpaid"
+  | "accept_terms"
+  | "rain_action_required"
+  | "rain_review"
+  | "submit_to_rain"
+  | "verification_declined"
+  | "verification_in_review"
+  | "verification_incomplete";
+
+/** Who has to act for onboarding to move. */
+export type VirtualAccountOnboardingActor =
+  | "admin"
+  | "user"
+  | "rain"
+  | "didit"
+  | "none";
+
+/** Where a user's virtual-account onboarding is stuck, and who moves next. */
+export interface VirtualAccountOnboardingState {
+  userId: string;
+  step: VirtualAccountOnboardingStep;
+  nextActor: VirtualAccountOnboardingActor;
+  /** Only true when the next move is ours: handing an approved user to Rain. */
+  canRetry: boolean;
+  /** Operator-facing explanation of `step`. */
+  message: string;
+  fee: {
+    feeUsd: number;
+    paid: boolean;
+    satisfied: boolean;
+    paidAt?: string;
+  };
+  rainApplication: {
+    kycStatus: string | null;
+    diditSessionId: string | null;
+    diditVerificationStatus: string | null;
+    /** Didit's own status right now, when our record has not reached Approved. */
+    liveDiditStatus: string | null;
+    rainApplicationStatus: string | null;
+    rainApplicationReasons: string[];
+    consumerCreated: boolean;
+    forwardPendingDeposit: boolean;
+    diditRiskCodes: string[];
+  } | null;
+  account: {
+    status: string;
+    rail?: string;
+    createdAt?: string;
+  } | null;
+}
+
+/** What the backend reports after re-submitting a stuck application. */
+export interface VirtualAccountOnboardingRetryResult {
+  userId: string;
+  action: "forwarded" | "relinked";
+  forwardStatus?: string;
+  forwardError?: string;
+  state: VirtualAccountOnboardingState;
+}
+
 /** What the backend reports after reopening a closed account. */
 export interface RecoverAccountResult {
   userId: string;

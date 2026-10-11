@@ -15,6 +15,8 @@ import {
   IssueTierTrialResult,
   KycResetEligibility,
   KycResetResult,
+  VirtualAccountOnboardingRetryResult,
+  VirtualAccountOnboardingState,
   RecoverAccountResult,
   RecoveryEligibility,
   SendRecoveryCodeResult,
@@ -425,6 +427,29 @@ export const resetKycVerification = (userId: string, reason: string) =>
   api.post<{ data: KycResetResult }>(`/admin/v1/users/${userId}/kyc/reset`, {
     reason,
   });
+
+/**
+ * Where this user's Rain virtual-account onboarding is stuck, and who has to act
+ * next. Read-only; asks Didit for the live session status when our record lags.
+ */
+export const getVirtualAccountOnboarding = (userId: string) =>
+  api.get<{ data: VirtualAccountOnboardingState }>(
+    `/admin/v1/users/${userId}/virtual-account/onboarding`,
+  );
+
+/**
+ * Re-submit a Didit-approved virtual-account application that never reached
+ * Rain. Refused (409) unless that is the step the user is stuck on; audited
+ * either way.
+ */
+export const retryVirtualAccountOnboarding = (
+  userId: string,
+  reason?: string,
+) =>
+  api.post<{ data: VirtualAccountOnboardingRetryResult }>(
+    `/admin/v1/users/${userId}/virtual-account/onboarding/retry`,
+    reason ? { reason } : {},
+  );
 
 /** Every admin action taken on this user, newest first. */
 export const getUserAuditLog = (userId: string) =>
