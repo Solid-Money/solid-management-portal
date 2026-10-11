@@ -33,6 +33,34 @@ import {
   type NavGroup,
 } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
+import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
+
+/**
+ * The groups this admin can use (Support is for agents only), and the number
+ * on the Support badge: cases needing a human plus the agent's own.
+ */
+function useVisibleNav(): { groups: NavGroup[]; supportBadge: number } {
+  const { data: me } = useSupportMe();
+  const agent = me?.agent === true;
+  const { data: counts } = useSupportCounts(agent);
+  const live = counts ?? me?.counts ?? null;
+  return {
+    groups: NAV_GROUPS.filter((group) => !group.supportAgentsOnly || agent),
+    supportBadge: agent && live ? (live.needs_human ?? 0) + (live.mine ?? 0) : 0,
+  };
+}
+
+function CountBadge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span
+      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold leading-5 text-white"
+      aria-label={`${count} waiting`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 /** Jump straight to a user from anywhere — the most common support entry point. */
 function UserQuickSearch() {
@@ -60,7 +88,15 @@ function UserQuickSearch() {
   );
 }
 
-function GroupSubmenu({ group, pathname }: { group: NavGroup; pathname: string }) {
+function GroupSubmenu({
+  group,
+  pathname,
+  badge = 0,
+}: {
+  group: NavGroup;
+  pathname: string;
+  badge?: number;
+}) {
   return (
     <NavigationMenuItem>
       <NavigationMenuTrigger
@@ -71,6 +107,7 @@ function GroupSubmenu({ group, pathname }: { group: NavGroup; pathname: string }
       >
         <group.icon className="mr-2 h-4 w-4" />
         {group.label}
+        <CountBadge count={badge} />
       </NavigationMenuTrigger>
       <NavigationMenuContent>
         <ul className="grid w-[22rem] gap-1 p-2">
@@ -115,7 +152,7 @@ function GroupSubmenu({ group, pathname }: { group: NavGroup; pathname: string }
 }
 
 /** Every link in one dropdown, for viewports too narrow for the menu bar. */
-function MobileNav({ pathname }: { pathname: string }) {
+function MobileNav({ pathname, groups }: { pathname: string; groups: NavGroup[] }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -124,7 +161,7 @@ function MobileNav({ pathname }: { pathname: string }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        {NAV_GROUPS.map((group, index) => (
+        {groups.map((group, index) => (
           <div key={group.label}>
             {index > 0 && <DropdownMenuSeparator />}
             {group.href ? (
@@ -234,6 +271,7 @@ export default function DashboardNav() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+  const { groups, supportBadge } = useVisibleNav();
 
   const handleSignOut = async () => {
     setIsSignOutModalOpen(false);
@@ -244,7 +282,7 @@ export default function DashboardNav() {
     <>
       <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <MobileNav pathname={pathname} />
+          <MobileNav pathname={pathname} groups={groups} />
 
           <Link href="/users" className="shrink-0 text-xl font-bold text-indigo-600">
             Solid Admin
@@ -252,7 +290,7 @@ export default function DashboardNav() {
 
           <NavigationMenu className="hidden md:flex" viewport={false}>
             <NavigationMenuList>
-              {NAV_GROUPS.map((group) =>
+              {groups.map((group) =>
                 group.href ? (
                   <NavigationMenuItem key={group.label}>
                     <NavigationMenuLink asChild>
@@ -275,6 +313,7 @@ export default function DashboardNav() {
                     key={group.label}
                     group={group}
                     pathname={pathname}
+                    badge={group.supportAgentsOnly ? supportBadge : 0}
                   />
                 )
               )}
