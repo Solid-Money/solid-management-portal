@@ -38,8 +38,8 @@ export interface NavLink {
 export interface NavGroup {
   label: string;
   icon: LucideIcon;
-  /** Only for admins on SUPPORT_AGENT_EMAILS (the server enforces it too). */
-  supportAgentsOnly?: boolean;
+  /** Shows the count of support cases waiting on a human. */
+  supportBadge?: boolean;
   /** Present for a top-level link with no submenu. */
   href?: string;
   items?: NavLink[];
@@ -67,7 +67,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Support",
     icon: Headphones,
-    supportAgentsOnly: true,
+    supportBadge: true,
     items: [
       {
         href: "/support",

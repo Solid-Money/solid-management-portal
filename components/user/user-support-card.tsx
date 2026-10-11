@@ -4,17 +4,15 @@ import Link from "next/link";
 import { ExternalLink, Headphones, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useSupportMe, useSupportUserCases } from "@/hooks/use-support";
+import { useSupportUserCases } from "@/hooks/use-support";
 import { StatusBadge, dateTime, intentLabel } from "@/components/support/support-format";
 
 /**
  * This user's support cases (imported Intercom history included) and a link
- * into the inbox. Support agents only: other admins see a note instead.
+ * into the inbox.
  */
 export default function UserSupportCard({ userId }: { userId: string }) {
-  const { data: me, isLoading: meLoading } = useSupportMe();
-  const agent = me?.agent === true;
-  const { data, isLoading } = useSupportUserCases(userId, agent);
+  const { data, isLoading, isError } = useSupportUserCases(userId);
   const open = data?.cases.filter((c) => c.status !== "resolved").length ?? 0;
 
   return (
@@ -34,12 +32,10 @@ export default function UserSupportCard({ userId }: { userId: string }) {
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {meLoading || (agent && isLoading) ? (
+        {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-        ) : !agent ? (
-          <p className="text-sm text-gray-500">
-            Support history is shown to support agents (SUPPORT_AGENT_EMAILS).
-          </p>
+        ) : isError ? (
+          <p className="text-sm text-gray-500">Support history could not be loaded.</p>
         ) : !data?.conversationId ? (
           <p className="text-sm text-gray-500">This user has never contacted support.</p>
         ) : (

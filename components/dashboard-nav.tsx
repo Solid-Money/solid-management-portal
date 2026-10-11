@@ -36,18 +36,14 @@ import { cn } from "@/lib/utils";
 import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
 
 /**
- * The groups this admin can use (Support is for agents only), and the number
- * on the Support badge: cases needing a human plus the agent's own.
+ * The number on the Support badge: cases needing a human plus the admin's
+ * own. Loading `me` also puts the admin on the support roster.
  */
-function useVisibleNav(): { groups: NavGroup[]; supportBadge: number } {
+function useSupportBadge(): number {
   const { data: me } = useSupportMe();
-  const agent = me?.agent === true;
-  const { data: counts } = useSupportCounts(agent);
+  const { data: counts } = useSupportCounts();
   const live = counts ?? me?.counts ?? null;
-  return {
-    groups: NAV_GROUPS.filter((group) => !group.supportAgentsOnly || agent),
-    supportBadge: agent && live ? (live.needs_human ?? 0) + (live.mine ?? 0) : 0,
-  };
+  return live ? (live.needs_human ?? 0) + (live.mine ?? 0) : 0;
 }
 
 function CountBadge({ count }: { count: number }) {
@@ -271,7 +267,8 @@ export default function DashboardNav() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
-  const { groups, supportBadge } = useVisibleNav();
+  const groups = NAV_GROUPS;
+  const supportBadge = useSupportBadge();
 
   const handleSignOut = async () => {
     setIsSignOutModalOpen(false);
@@ -313,7 +310,7 @@ export default function DashboardNav() {
                     key={group.label}
                     group={group}
                     pathname={pathname}
-                    badge={group.supportAgentsOnly ? supportBadge : 0}
+                    badge={group.supportBadge ? supportBadge : 0}
                   />
                 )
               )}

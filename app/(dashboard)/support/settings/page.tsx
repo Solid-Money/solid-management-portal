@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import AgentsOnly from "@/components/support/agents-only";
+import SupportMeGate from "@/components/support/support-me-gate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -192,7 +192,8 @@ function SettingsScreen({ me }: { me: SupportMe }) {
   const dirty = Object.keys(patch).length > 0;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setEdits((current) => ({ ...(current ?? saved), [key]: value }));
-  const agents = me.agents ?? [];
+  // Everyone on the roster, plus anyone who already has a profile.
+  const agents = [...new Set([...me.agents, ...draft.agentProfiles.map((profile) => profile.email)])].sort();
   const profileFor = (email: string): SupportAgentProfile =>
     draft.agentProfiles.find((profile) => profile.email === email) ?? { email, name: "" };
   const setProfile = (email: string, changes: Partial<SupportAgentProfile>) => {
@@ -338,8 +339,11 @@ function SettingsScreen({ me }: { me: SupportMe }) {
           </div>
         </div>
         <div className="mt-5">
-          <Label>Agents (from SUPPORT_AGENT_EMAILS)</Label>
-          <p className="text-xs text-gray-500">Customers see the name on replies; the Slack id lets @mentions in notes reach them.</p>
+          <Label>Agents</Label>
+          <p className="text-xs text-gray-500">
+            Every admin who has opened the portal in the last 90 days. Customers see the name on replies; the Slack id
+            lets @mentions in notes reach them.
+          </p>
           <div className="mt-2 divide-y divide-gray-100 rounded-md border border-gray-200">
             {agents.map((email) => (
               <div key={email} className="grid grid-cols-1 items-center gap-2 p-2 sm:grid-cols-[1fr_10rem_10rem]">
@@ -491,5 +495,5 @@ function SettingsScreen({ me }: { me: SupportMe }) {
 }
 
 export default function SupportSettingsPage() {
-  return <AgentsOnly>{(me) => <SettingsScreen me={me} />}</AgentsOnly>;
+  return <SupportMeGate>{(me) => <SettingsScreen me={me} />}</SupportMeGate>;
 }

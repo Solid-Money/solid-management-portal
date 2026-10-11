@@ -13,7 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import AgentsOnly from "@/components/support/agents-only";
+import SupportMeGate from "@/components/support/support-me-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -250,5 +250,5 @@ function ReportsScreen() {
 }
 
 export default function SupportReportsPage() {
-  return <AgentsOnly>{() => <ReportsScreen />}</AgentsOnly>;
+  return <SupportMeGate>{() => <ReportsScreen />}</SupportMeGate>;
 }

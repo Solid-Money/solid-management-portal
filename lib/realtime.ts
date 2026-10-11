@@ -34,9 +34,8 @@ export function isAdminCardTransactionChange(
 }
 
 /**
- * What admins-service tells support agents when the inbox changes: ids only,
- * the portal reads the content over REST. Only agents on
- * `SUPPORT_AGENT_EMAILS` are in the room that receives it.
+ * What admins-service tells the portal when the support inbox changes: ids
+ * only, the portal reads the content over REST.
  */
 export interface SupportQueueChange {
   conversationId: string;
