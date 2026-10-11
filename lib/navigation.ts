@@ -12,6 +12,7 @@ import {
   Percent,
   Receipt,
   Share2,
+  ShieldAlert,
   SlidersHorizontal,
   Sparkles,
   Terminal,
@@ -170,6 +171,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Costs",
         description: "KYC, card and rail costs behind every margin number",
         icon: Receipt,
+      },
+      {
+        href: "/anti-abuse",
+        label: "Anti-abuse",
+        description:
+          "Merchants excluded from cashback and referrals, and referral spend rules",
+        icon: ShieldAlert,
       },
       {
         href: "/general-config",

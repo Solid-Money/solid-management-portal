@@ -2150,8 +2150,17 @@ export interface AdminReferralRewardRow {
   payoutTokenAmount?: string;
   payoutTxUrl?: string;
   reversedAt?: string;
-  /** account_closed | chargeback | self_referral_suspected */
+  /**
+   * account_closed | chargeback | ineligible_spend |
+   * no_activity_after_qualifying | self_referral_suspected
+   */
   reversalReason?: string;
+  /** Spend the referral rules left out (excluded merchants, tiny purchases). */
+  excludedSpendUsd?: number;
+  /** Merchants spent at that have not reached the per-merchant minimum. */
+  merchantsBelowMinimum?: number;
+  /** Qualified, but the friend has not yet made the purchase the payout needs. */
+  awaitingActivity?: boolean;
   reviewReason?: string;
   /** An admin re-evaluated it and put it back on track. */
   reinstatedAt?: string;
@@ -2790,4 +2799,94 @@ export interface UpdateRainRtfConfig {
   operatorProduction?: string;
   termsUrl?: string;
   tokenOverrides?: RainRtfTokenOverride[];
+}
+
+// --- Config → Anti-abuse ---------------------------------------------------
+
+/**
+ * A merchant category that earns nothing — from card cashback, from the
+ * referral spend target, or both. Mirrors `MerchantCategoryExclusion` in
+ * solid-backend's libs/common/src/rewards/reward-exclusions.ts.
+ */
+export interface MerchantCategoryExclusion {
+  /** ISO 18245 code, four digits. */
+  code: string;
+  /** The category's name, recorded on a withheld cashback row as the reason. */
+  label: string;
+  cashback: boolean;
+  referral: boolean;
+}
+
+/**
+ * A merchant, by name, that earns nothing whatever category it arrives under.
+ * Matched as a case-insensitive substring; `*` stands for any run of
+ * characters, so `weixin*scan` matches "WEIXIN*SCAN QR CODE".
+ */
+export interface MerchantNameExclusion {
+  pattern: string;
+  /** Why it is on the list, for the next operator to read. */
+  label?: string;
+  cashback: boolean;
+  referral: boolean;
+}
+
+export interface MerchantExclusionConfig {
+  /** Master switch: off pays cashback on every category. */
+  cashbackEnabled: boolean;
+  /** Master switch: off counts every purchase toward the referral target. */
+  referralEnabled: boolean;
+  categories: MerchantCategoryExclusion[];
+  merchants: MerchantNameExclusion[];
+}
+
+/** What a purchase must be to count toward the referral target. */
+export interface ReferralSpendRuleSettings {
+  minPurchaseUsd: number;
+  minMerchantSpendUsd: number;
+  activityCheckEnabled: boolean;
+  activityMinPurchaseUsd: number;
+}
+
+export interface AntiAbuseConfig {
+  merchantExclusions: MerchantExclusionConfig;
+  referralRules: ReferralSpendRuleSettings;
+  defaults: {
+    merchantExclusions: MerchantExclusionConfig;
+    referralRules: ReferralSpendRuleSettings;
+  };
+  lastUpdate: { at: string; by: string | null } | null;
+}
+
+/** An edit: absent leaves a setting as is; a list replaces the stored list whole. */
+export interface UpdateAntiAbuseConfig {
+  cashbackEnabled?: boolean;
+  referralEnabled?: boolean;
+  categories?: MerchantCategoryExclusion[];
+  merchants?: MerchantNameExclusion[];
+  referralRules?: Partial<ReferralSpendRuleSettings>;
+}
+
+export interface MerchantExclusionPreview {
+  days: number;
+  transactions: number;
+  usd: number;
+  customers: number;
+  merchants: Array<{
+    merchantName: string;
+    merchantCategoryCode: string | null;
+    transactions: number;
+    usd: number;
+  }>;
+  truncated: boolean;
+}
+
+export interface RewardExclusionMatch {
+  kind: "category" | "merchant";
+  value: string;
+  description: string;
+}
+
+export interface MerchantExclusionCheck {
+  cashback: RewardExclusionMatch | null;
+  referral: RewardExclusionMatch | null;
 }
