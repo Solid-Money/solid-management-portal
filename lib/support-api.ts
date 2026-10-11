@@ -18,7 +18,7 @@ import type {
 
 /**
  * The support inbox (`/admin/v1/support/*`). admins-service checks the
- * Firebase token and `SUPPORT_AGENT_EMAILS`, then proxies to
+ * Firebase token (every portal admin is an agent), then proxies to
  * flash-support-service; the agent is always the signed-in admin.
  */
 const base = "/admin/v1/support";

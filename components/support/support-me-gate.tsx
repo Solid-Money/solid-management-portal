@@ -4,8 +4,11 @@ import { Headphones, Loader2 } from "lucide-react";
 import { useSupportMe } from "@/hooks/use-support";
 import type { SupportMe } from "@/types/support";
 
-/** Renders its children for support agents; everyone else gets an explanation. */
-export default function AgentsOnly({ children }: { children: (me: SupportMe) => React.ReactNode }) {
+/**
+ * Loads the signed-in admin's support details (every admin is an agent),
+ * then renders the support screen with them.
+ */
+export default function SupportMeGate({ children }: { children: (me: SupportMe) => React.ReactNode }) {
   const { data: me, isLoading, isError } = useSupportMe();
   if (isLoading) {
     return (
@@ -14,16 +17,12 @@ export default function AgentsOnly({ children }: { children: (me: SupportMe) => 
       </div>
     );
   }
-  if (isError || !me?.agent) {
+  if (isError || !me) {
     return (
       <div className="mx-auto mt-16 max-w-md rounded-lg bg-white p-6 text-center shadow-sm">
         <Headphones className="mx-auto h-8 w-8 text-gray-400" />
-        <h1 className="mt-3 text-lg font-semibold text-gray-900">Support is for support agents</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {isError
-            ? "The support service did not answer. Try again in a moment."
-            : "Customer conversations are only shown to agents. Ask to have your email added to SUPPORT_AGENT_EMAILS."}
-        </p>
+        <h1 className="mt-3 text-lg font-semibold text-gray-900">Support is not available</h1>
+        <p className="mt-1 text-sm text-gray-500">The support service did not answer. Try again in a moment.</p>
       </div>
     );
   }

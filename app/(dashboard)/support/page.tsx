@@ -3,7 +3,7 @@
 import { Suspense, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Inbox, Loader2 } from "lucide-react";
-import AgentsOnly from "@/components/support/agents-only";
+import SupportMeGate from "@/components/support/support-me-gate";
 import ContextPanel from "@/components/support/context-panel";
 import QueueList from "@/components/support/queue-list";
 import ThreadView from "@/components/support/thread-view";
@@ -26,7 +26,7 @@ function InboxScreen({ me }: { me: SupportMe }) {
   const view: SupportQueueView = isView(params.get("view")) ? (params.get("view") as SupportQueueView) : "needs_human";
   const query = params.get("q") ?? "";
   const open = params.get("c");
-  const { data: counts } = useSupportCounts(true);
+  const { data: counts } = useSupportCounts();
 
   const update = useCallback(
     (changes: Record<string, string | null>) => {
@@ -40,7 +40,7 @@ function InboxScreen({ me }: { me: SupportMe }) {
     [params, pathname, router],
   );
 
-  const agents = me.agents?.length ? me.agents : [me.email];
+  const agents = me.agents.length ? me.agents : [me.email];
 
   return (
     <div className="-mx-2 grid h-[calc(100vh-7.5rem)] grid-cols-1 gap-3 lg:grid-cols-[21rem_minmax(0,1fr)] xl:grid-cols-[21rem_minmax(0,1fr)_20rem]">
@@ -79,7 +79,7 @@ export default function SupportInboxPage() {
         </div>
       }
     >
-      <AgentsOnly>{(me) => <InboxScreen me={me} />}</AgentsOnly>
+      <SupportMeGate>{(me) => <InboxScreen me={me} />}</SupportMeGate>
     </Suspense>
   );
 }

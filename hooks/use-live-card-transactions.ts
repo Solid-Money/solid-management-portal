@@ -28,8 +28,7 @@ const REFUSED_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 120_000];
 
 /**
  * Keep the portal's card views current as Rain and Wirex report transactions,
- * and the support inbox current as conversations change (agents only: the
- * server only sends support events to agents).
+ * and the support inbox current as conversations change.
  *
  * Mount once, for the signed-in admin (the dashboard layout). Every change
  * re-reads the card-transaction tables on screen — the all-users list and a

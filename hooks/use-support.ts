@@ -40,7 +40,7 @@ export const SUPPORT_KEYS = {
   report: (from: string, to: string) => ["support", "report", from, to] as const,
 };
 
-/** Whether the signed-in admin is a support agent (and the badge counts if so). */
+/** The signed-in admin, the agents to assign or @mention, and the badge counts. Loading it puts the admin on the roster. */
 export function useSupportMe() {
   const { user } = useAuth();
   return useQuery({
@@ -52,11 +52,12 @@ export function useSupportMe() {
   });
 }
 
-export function useSupportCounts(enabled: boolean) {
+export function useSupportCounts() {
+  const { user } = useAuth();
   return useQuery({
     queryKey: SUPPORT_KEYS.counts,
     queryFn: getSupportCounts,
-    enabled,
+    enabled: !!user,
     // Live events refresh it; this is the fallback when the socket is down.
     refetchInterval: 60_000,
   });
@@ -94,11 +95,10 @@ export function useSupportOlderMessages(id: string | null, firstSeq: number | nu
   });
 }
 
-export function useSupportUserCases(userId: string, enabled: boolean) {
+export function useSupportUserCases(userId: string) {
   return useQuery({
     queryKey: SUPPORT_KEYS.userCases(userId),
     queryFn: () => getSupportUserCases(userId),
-    enabled,
   });
 }
 

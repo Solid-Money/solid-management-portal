@@ -30,12 +30,14 @@ export type SupportQueueCounts = Record<SupportQueueView, number> & {
   urgent: number;
 };
 
+/** The signed-in admin. Every admin is a support agent. */
 export interface SupportMe {
-  agent: boolean;
   email: string;
-  name?: string | null;
-  agents?: string[];
-  counts?: SupportQueueCounts | null;
+  name: string | null;
+  /** Admins who opened the portal in the last 90 days: the assignee and @mention lists. */
+  agents: string[];
+  /** Null when the support service did not answer. */
+  counts: SupportQueueCounts | null;
 }
 
 export interface SupportAttachment {
