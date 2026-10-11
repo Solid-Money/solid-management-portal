@@ -26,8 +26,9 @@ const base = "/admin/v1/support";
 export const getSupportMe = async () =>
   (await api.get<SupportMe>(`${base}/me`)).data;
 
+/** Polled for the nav badge: a failure just leaves the badge off. */
 export const getSupportCounts = async () =>
-  (await api.get<SupportQueueCounts>(`${base}/counts`)).data;
+  (await api.get<SupportQueueCounts>(`${base}/counts`, { quietErrors: true })).data;
 
 export const getSupportQueue = async (query: {
   view: SupportQueueView;
@@ -105,10 +106,12 @@ export const runSupportCaseAction = async (caseId: string, input: CaseAction) =>
     )
   ).data;
 
+/** The user page card shows its own message when this fails. */
 export const getSupportUserCases = async (userId: string) =>
   (
     await api.get<{ conversationId: string | null; cases: SupportAgentCase[] }>(
       `${base}/users/${userId}/cases`,
+      { quietErrors: true },
     )
   ).data;
 
