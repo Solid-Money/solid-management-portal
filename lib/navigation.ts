@@ -1,5 +1,9 @@
 import {
   Activity,
+  BarChart2,
+  Headphones,
+  Inbox,
+  Settings2,
   ArrowRightLeft,
   BarChart3,
   BookOpen,
@@ -34,6 +38,8 @@ export interface NavLink {
 export interface NavGroup {
   label: string;
   icon: LucideIcon;
+  /** Shows the count of support cases waiting on a human. */
+  supportBadge?: boolean;
   /** Present for a top-level link with no submenu. */
   href?: string;
   items?: NavLink[];
@@ -57,6 +63,31 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Users",
     icon: Users,
     href: "/users",
+  },
+  {
+    label: "Support",
+    icon: Headphones,
+    supportBadge: true,
+    items: [
+      {
+        href: "/support",
+        label: "Inbox",
+        description: "Customer conversations, Solid AI drafts and handoffs",
+        icon: Inbox,
+      },
+      {
+        href: "/support/settings",
+        label: "Settings",
+        description: "Solid AI mode, saved replies, incidents and on-call",
+        icon: Settings2,
+      },
+      {
+        href: "/support/reports",
+        label: "Reports",
+        description: "Volume, response times, AI resolution and the complaint register",
+        icon: BarChart2,
+      },
+    ],
   },
   {
     label: "Activity",
