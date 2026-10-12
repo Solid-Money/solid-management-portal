@@ -96,7 +96,8 @@ type CaseAction =
   | { action: "resolve" }
   | { action: "reopen" }
   | { action: "draft/approve" }
-  | { action: "draft/discard"; body: { reason?: string } };
+  | { action: "draft/discard"; body: { reason?: string } }
+  | { action: "hand-back-to-ai" };
 
 export const runSupportCaseAction = async (caseId: string, input: CaseAction) =>
   (
