@@ -105,7 +105,11 @@ export function ReviewQueue() {
   });
   const data = query.data;
   const rows = useMemo(() => data?.rows ?? [], [data]);
-  const selectable = rows.filter((row) => !row.payoutInFlight);
+  // While a new filter or page loads, the table still shows the last one's
+  // rows (`keepPreviousData`). They are not what the filter asks for, so
+  // nothing on them can be selected or decided until the new rows arrive.
+  const stale = query.isPlaceholderData;
+  const selectable = stale ? [] : rows.filter((row) => !row.payoutInFlight);
   const allSelected =
     selectable.length > 0 &&
     selectable.every((row) => selected.has(row.referredUserId));
@@ -238,6 +242,7 @@ export function ReviewQueue() {
               key={action}
               size="sm"
               variant={DECISIONS[action].destructive ? "destructive" : "outline"}
+              disabled={stale}
               onClick={() =>
                 setPending({
                   action,
@@ -258,6 +263,12 @@ export function ReviewQueue() {
           >
             Clear selection
           </Button>
+          {stale && (
+            <span className="flex items-center gap-1 text-xs text-indigo-900">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading…
+            </span>
+          )}
         </div>
       )}
 
@@ -286,7 +297,12 @@ export function ReviewQueue() {
               <th className="px-3 py-2 text-left font-medium">Qualified</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody
+            className={`divide-y divide-gray-100 transition-opacity ${
+              stale ? "opacity-50" : ""
+            }`}
+            aria-busy={stale}
+          >
             {query.isLoading ? (
               <tr>
                 <td colSpan={7} className="py-10 text-center">
@@ -306,6 +322,7 @@ export function ReviewQueue() {
                   row={row}
                   checked={selected.has(row.referredUserId)}
                   onToggle={() => toggle(row)}
+                  disabled={stale}
                 />
               ))
             )}
@@ -410,10 +427,13 @@ function ReviewRow({
   row,
   checked,
   onToggle,
+  disabled,
 }: {
   row: ReferralReviewRow;
   checked: boolean;
   onToggle: () => void;
+  /** The row is from the previous filter while the new one loads. */
+  disabled: boolean;
 }) {
   const status = referralStatus(row.status);
   const block = row.referrerBlockMode ? BLOCK_MODES[row.referrerBlockMode] : null;
@@ -426,7 +446,7 @@ function ReviewRow({
           aria-label={`Select ${row.username || row.referredUserId}`}
           checked={checked}
           onChange={onToggle}
-          disabled={row.payoutInFlight}
+          disabled={disabled || row.payoutInFlight}
           title={row.payoutInFlight ? "Its payout is already in flight" : ""}
         />
       </td>
