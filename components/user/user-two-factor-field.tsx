@@ -228,7 +228,7 @@ function ResetTwoFactorDialog({
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               maxLength={500}
-              placeholder="e.g. Lost the phone with their authenticator. Confirmed over Intercom from the account's email. Intercom 215476346021758"
+              placeholder="e.g. Lost the phone with their authenticator. Confirmed over Intercom from the account's email. Intercom <conversation id>"
               disabled={mutation.isPending}
             />
             <p className="text-muted-foreground text-xs">
