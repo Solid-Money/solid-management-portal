@@ -15,6 +15,7 @@ import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
+import UserErrorsCard from "@/components/user/user-errors-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserIntercomCard from "@/components/user/user-intercom-card";
 import UserProfileCard from "@/components/user/user-profile-card";
@@ -275,6 +276,8 @@ export default function UserDetailPage({
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
+          {/* First: the Ref in a chat below resolves here without a lookup. */}
+          <UserErrorsCard userId={id} />
           <UserIntercomCard userId={id} />
           <UserAuditLogCard userId={id} />
         </TabsContent>

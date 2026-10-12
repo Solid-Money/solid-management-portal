@@ -32,6 +32,7 @@ import {
   isActivePath,
   type NavGroup,
 } from "@/lib/navigation";
+import { isErrorLookupQuery } from "@/lib/error-ref";
 import { cn } from "@/lib/utils";
 
 /** Jump straight to a user from anywhere — the most common support entry point. */
@@ -43,7 +44,12 @@ function UserQuickSearch() {
     event.preventDefault();
     const trimmed = query.trim();
     if (!trimmed) return;
-    router.push(`/users?search=${encodeURIComponent(trimmed)}`);
+    // A Ref pasted from a support chat goes to the error lookup instead.
+    router.push(
+      isErrorLookupQuery(trimmed)
+        ? `/error-lookup?ref=${encodeURIComponent(trimmed)}`
+        : `/users?search=${encodeURIComponent(trimmed)}`,
+    );
   };
 
   return (
@@ -52,8 +58,8 @@ function UserQuickSearch() {
       <Input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Find a user…"
-        aria-label="Find a user by name, email, address or referral code"
+        placeholder="Find a user or Ref…"
+        aria-label="Find a user by name, email, address or referral code, or an error Ref"
         className="h-9 w-56 pl-8"
       />
     </form>
