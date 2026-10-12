@@ -7,6 +7,8 @@ import type {
   HelpCollection,
   HelpCollectionInput,
   HelpImage,
+  HelpImportOptions,
+  HelpImportRun,
   HelpPreview,
   HelpRedirect,
   HelpVersion,
@@ -81,3 +83,15 @@ export const uploadHelpImage = async (file: File) => {
 
 export const listHelpRedirects = async () =>
   (await api.get<HelpRedirect[]>(`${base}/redirects`)).data;
+
+/**
+ * Copy Intercom's help center in (or preview it with `dryRun`). It runs in the
+ * background on the support service; poll `getHelpImport` for the result. A
+ * 409 means one is already running.
+ */
+export const startHelpImport = async (options: HelpImportOptions) =>
+  (await api.post<{ run: HelpImportRun }>(`${base}/import`, options, { quietErrors: true })).data.run;
+
+/** The latest import (null before the first). Polled, so it never toasts. */
+export const getHelpImport = async () =>
+  (await api.get<{ run: HelpImportRun | null }>(`${base}/import`, { quietErrors: true })).data.run;
