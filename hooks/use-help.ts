@@ -5,6 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   deleteHelpCollection,
   getHelpArticle,
+  getHelpImport,
   getHelpVersion,
   helpArticleAction,
   listHelpArticles,
@@ -14,8 +15,9 @@ import {
   reorderHelp,
   restoreHelpVersion,
   saveHelpCollection,
+  startHelpImport,
 } from "@/lib/help-api";
-import type { HelpArticle, HelpArticleQuery, HelpCollectionInput } from "@/types/help";
+import type { HelpArticle, HelpArticleQuery, HelpCollectionInput, HelpImportOptions } from "@/types/help";
 
 export const HELP_KEYS = {
   all: ["help"] as const,
@@ -25,6 +27,7 @@ export const HELP_KEYS = {
   version: (id: string, number: number) => ["help", "version", id, number] as const,
   collections: ["help", "collections"] as const,
   preview: (markdown: string) => ["help", "preview", markdown] as const,
+  import: ["help-import"] as const,
 };
 
 export function useHelpArticles(query: HelpArticleQuery) {
@@ -134,5 +137,24 @@ export function useReorderHelp() {
     mutationFn: (input: { kind: "articles" | "collections"; items: Array<{ id: string; order: number }> }) =>
       reorderHelp(input.kind, input.items),
     onSettled: () => queryClient.invalidateQueries({ queryKey: HELP_KEYS.all }),
+  });
+}
+
+/** The latest Intercom import, polled every 2 s while one is running. Only fetched while `enabled`. */
+export function useHelpImport(enabled: boolean) {
+  return useQuery({
+    queryKey: HELP_KEYS.import,
+    queryFn: getHelpImport,
+    enabled,
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 2000 : false),
+  });
+}
+
+/** Starts an import or a preview; the status query picks it up from there. */
+export function useStartHelpImport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (options: HelpImportOptions) => startHelpImport(options),
+    onSuccess: (run) => queryClient.setQueryData(HELP_KEYS.import, run),
   });
 }

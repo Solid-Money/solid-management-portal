@@ -3,10 +3,11 @@
 import { Suspense, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, Download, ExternalLink, FolderTree, Loader2, Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, CloudDownload, Download, ExternalLink, FolderTree, Loader2, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import SupportMeGate from "@/components/support/support-me-gate";
 import CollectionsDialog, { orderedCollections } from "@/components/help/collections-dialog";
+import ImportDialog from "@/components/help/import-dialog";
 import { ArticleStatus, FeedbackScore, HELP_SITE_URL, personName, shortDate } from "@/components/help/help-format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,7 @@ function ArticlesScreen() {
   const q = useDebouncedValue(search.trim(), 250);
   const [showCollections, setShowCollections] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const reorder = useReorderHelp();
 
   const query: HelpArticleQuery = useMemo(
@@ -217,6 +219,9 @@ function ArticlesScreen() {
           </Button>
           <Button variant="outline" onClick={downloadRedirects} title="Old Intercom and renamed URLs, and where they go">
             <Download /> Redirect map
+          </Button>
+          <Button variant="outline" onClick={() => setShowImport(true)} title="Copy Intercom's help center here">
+            <CloudDownload /> Import from Intercom
           </Button>
           <Button variant="outline" onClick={() => setShowCollections(true)}>
             <FolderTree /> Collections
@@ -374,6 +379,7 @@ function ArticlesScreen() {
       </div>
 
       <CollectionsDialog open={showCollections} onOpenChange={setShowCollections} collections={collections} />
+      <ImportDialog open={showImport} onOpenChange={setShowImport} />
       {showNew && (
         <NewArticleDialog
           open={showNew}
