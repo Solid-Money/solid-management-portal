@@ -1081,6 +1081,12 @@ export interface TierSubscriptionDiscountConfig {
   serviceLimit: number;
   /** Number of subscription categories this tier can earn a discount on per month. */
   categoryLimit: number;
+  /**
+   * Most subscription cashback this tier can earn in a calendar month, in USD,
+   * across all its categories together (Core $50, Prime $100, Ultra $200).
+   * Caps the cashback, not the charge it is earned on.
+   */
+  monthlyCap: number;
 }
 
 /**
@@ -1142,9 +1148,10 @@ export interface SubscriptionDiscountConfig {
   eligibleServices: string[];
   categories: SubscriptionDiscountCategory[];
   /**
-   * Most subscription cashback one eligible service can earn in a month, in USD
-   * (Rewards Terms §5). Caps the cashback, not the charge it is earned on; the
-   * name is left from an earlier reading and is what the API still sends.
+   * Most cashback one payment on a grandfathered subscription can earn at the
+   * old flat rate, in USD (Rewards Terms §6: capped at $50 per payment).
+   * Category-rate charges are not capped per payment, only by each tier's
+   * `monthlyCap`. The name is left from an earlier reading.
    */
   eligibleAmountCap: number;
   tier1: TierSubscriptionDiscountConfig;
