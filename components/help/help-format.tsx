@@ -1,8 +1,17 @@
 import { Badge } from "@/components/ui/badge";
 import type { HelpArticleSummary } from "@/types/help";
 
-/** The public help site (support.solid.xyz in production). */
-export const HELP_SITE_URL = (process.env.NEXT_PUBLIC_HELP_SITE_URL || "https://support.solid.xyz").replace(/\/+$/, "");
+/**
+ * The public help site: `NEXT_PUBLIC_HELP_SITE_URL` when set; otherwise the qa
+ * site for the qa portal (the one that talks to admins-qa), and
+ * support.solid.xyz everywhere else.
+ */
+export const HELP_SITE_URL = (
+  process.env.NEXT_PUBLIC_HELP_SITE_URL ||
+  (/^https:\/\/admins-qa\.solid\.xyz\/?$/i.test(process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL ?? "")
+    ? "https://support-qa.solid.xyz"
+    : "https://support.solid.xyz")
+).replace(/\/+$/, "");
 
 export function shortDate(iso: string | null | undefined): string {
   if (!iso) return "—";
