@@ -76,6 +76,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Inbox,
       },
       {
+        href: "/support/articles",
+        label: "Help Center",
+        description: "Articles on support.solid.xyz, in the app and behind Solid AI",
+        icon: BookOpen,
+      },
+      {
         href: "/support/settings",
         label: "Settings",
         description: "Solid AI mode, saved replies, incidents and on-call",
