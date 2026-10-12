@@ -1,5 +1,9 @@
 import {
   Activity,
+  BarChart2,
+  Headphones,
+  Inbox,
+  Settings2,
   ArrowRightLeft,
   BarChart3,
   BookOpen,
@@ -13,6 +17,7 @@ import {
   Percent,
   Receipt,
   Share2,
+  ShieldAlert,
   SlidersHorizontal,
   Sparkles,
   Terminal,
@@ -34,6 +39,8 @@ export interface NavLink {
 export interface NavGroup {
   label: string;
   icon: LucideIcon;
+  /** Shows the count of support cases waiting on a human. */
+  supportBadge?: boolean;
   /** Present for a top-level link with no submenu. */
   href?: string;
   items?: NavLink[];
@@ -59,6 +66,37 @@ export const NAV_GROUPS: NavGroup[] = [
     href: "/users",
   },
   {
+    label: "Support",
+    icon: Headphones,
+    supportBadge: true,
+    items: [
+      {
+        href: "/support",
+        label: "Inbox",
+        description: "Customer conversations, Solid AI drafts and handoffs",
+        icon: Inbox,
+      },
+      {
+        href: "/error-lookup",
+        label: "Error Lookup",
+        description: "Trace the Ref on a user's failure screen to what happened",
+        icon: CircleAlert,
+      },
+      {
+        href: "/support/settings",
+        label: "Settings",
+        description: "Solid AI mode, saved replies, incidents and on-call",
+        icon: Settings2,
+      },
+      {
+        href: "/support/reports",
+        label: "Reports",
+        description: "Volume, response times, AI resolution and the complaint register",
+        icon: BarChart2,
+      },
+    ],
+  },
+  {
     label: "Activity",
     icon: Activity,
     items: [
@@ -73,12 +111,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Card Transactions",
         description: "Card spend with cashback and the fees charged on it",
         icon: CreditCard,
-      },
-      {
-        href: "/error-lookup",
-        label: "Error Lookup",
-        description: "Trace the Ref on a user's failure screen to what happened",
-        icon: CircleAlert,
       },
     ],
   },
@@ -177,6 +209,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Costs",
         description: "KYC, card and rail costs behind every margin number",
         icon: Receipt,
+      },
+      {
+        href: "/anti-abuse",
+        label: "Anti-abuse",
+        description:
+          "Merchants excluded from cashback and referrals, and referral spend rules",
+        icon: ShieldAlert,
       },
       {
         href: "/general-config",

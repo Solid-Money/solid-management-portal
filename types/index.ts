@@ -26,6 +26,20 @@ export interface User {
     kycStatus: string;
     createdAt: string;
   }[];
+  /**
+   * Rain / Wirex card customers. `providerUserId` is the id to look the user
+   * up by in the issuer's dashboard — the Rain user id, or the Wirex user id.
+   * `providerCustomerId` is what card calls are keyed on: the same Rain id,
+   * but the user's wallet address for Wirex. Null until the issuer registers
+   * the user.
+   */
+  cardCustomers?: {
+    provider: CardProvider;
+    providerUserId: string | null;
+    providerCustomerId: string | null;
+    kycStatus: string;
+    createdAt?: string;
+  }[];
   hasRainCard?: boolean;
   /**
    * Card cashback rate pinned to this cardholder, as a fraction — 0.03 is 3%.
@@ -235,6 +249,8 @@ export enum TransactionType {
   UNSTAKE = "unstake",
   WITHDRAW = "withdraw",
   SEND = "send",
+  // USDC.e / USDT bridged from Fuse to another network via BridgePaymaster (Stargate).
+  CROSS_CHAIN_SEND = "cross_chain_send",
   RECEIVE = "receive", // Incoming token/native transfers from external sources
   BRIDGE = "bridge",
   CANCEL_WITHDRAW = "cancel_withdraw",
@@ -267,6 +283,8 @@ export enum TransactionType {
   DEPOSIT_BONUS = "deposit_bonus",
   FAST_WITHDRAW = "fast_withdraw",
   REPAY_AND_WITHDRAW_COLLATERAL = "repay_and_withdraw_collateral",
+  /** Rain card collateral withdrawn to the user's Safe, executed by the app. */
+  WITHDRAW_COLLATERAL = "withdraw_collateral",
   /** External wallet → Solid Safe transfer (step 1 of "Add funds"). */
   FUND = "fund",
   /** Recovery of tokens sent to the user's Turnkey signer address by mistake. */
@@ -375,6 +393,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       sign: TransactionDirection.OUT,
       category: TransactionCategory.EXTERNAL_WALLET_TRANSFER,
     },
+    [TransactionType.CROSS_CHAIN_SEND]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.EXTERNAL_WALLET_TRANSFER,
+    },
     [TransactionType.BRIDGE_TRANSFER]: {
       sign: TransactionDirection.IN,
       category: TransactionCategory.BANK_DEPOSIT,
@@ -444,6 +466,10 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
       category: TransactionCategory.CARD_DEPOSIT,
     },
     [TransactionType.REPAY_AND_WITHDRAW_COLLATERAL]: {
+      sign: TransactionDirection.OUT,
+      category: TransactionCategory.SAVINGS_ACCOUNT,
+    },
+    [TransactionType.WITHDRAW_COLLATERAL]: {
       sign: TransactionDirection.OUT,
       category: TransactionCategory.SAVINGS_ACCOUNT,
     },
@@ -540,6 +566,7 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.UNWRAP, label: "Unwrap" },
   { value: TransactionType.BRIDGE, label: "Bridge" },
   { value: TransactionType.BRIDGE_DEPOSIT, label: "Bridge Deposit" },
+  { value: TransactionType.CROSS_CHAIN_SEND, label: "Cross-chain Send" },
   { value: TransactionType.BRIDGE_TRANSFER, label: "Bridge Transfer" },
   { value: TransactionType.BANK_TRANSFER, label: "Bank Transfer" },
   { value: TransactionType.WIREX_BANK_DEPOSIT, label: "Wirex Bank Deposit" },
@@ -556,6 +583,7 @@ export const ACTIVITY_TYPES = [
     value: TransactionType.REPAY_AND_WITHDRAW_COLLATERAL,
     label: "Repay & Withdraw Collateral",
   },
+  { value: TransactionType.WITHDRAW_COLLATERAL, label: "Withdraw Collateral" },
   { value: TransactionType.CARD_WELCOME_BONUS, label: "Card Welcome Bonus" },
   { value: TransactionType.DEPOSIT_BONUS, label: "Deposit Bonus" },
   { value: TransactionType.MERKL_CLAIM, label: "Merkl Claim" },
@@ -752,6 +780,157 @@ export interface WalletFailuresResponse {
   generatedAt: string;
 }
 
+/** What to send and when, in days of cover rather than a fixed amount. */
+export interface WalletRefillPlan {
+  floorDays: number;
+  targetDays: number;
+  floorAmount: number;
+  targetAmount: number;
+  /** What to actually send now. Zero when the balance already covers it. */
+  refillAmount: number;
+  belowFloor: boolean;
+}
+
+/** The verdict to render: one rule, computed server-side. */
+export type WalletVerdict = "OK" | "LOW" | "CRITICAL" | "N/A";
+
+/**
+ * What the verdict was derived from.
+ *
+ * Carried alongside the verdict rather than inferred, because "CRITICAL
+ * because it has four hours of cover" and "CRITICAL because it is under a
+ * fixed number somebody typed in 2024" deserve different responses, and the
+ * reader cannot tell them apart from the colour.
+ */
+export type WalletVerdictBasis =
+  | "measured"
+  | "estimated"
+  | "configured"
+  | "residue"
+  | "warming-up";
+
+/**
+ * One asset's verdict and refill plan, for every wallet at once.
+ *
+ * The cheap half of `WalletAssetFlow`: enough to colour a card and count a
+ * header without the per-wallet transfer history an opened card asks for.
+ * Fetched alongside the status so the board settles its colours once rather
+ * than showing a threshold reading it is about to contradict.
+ */
+export interface WalletAssetPlan {
+  walletName: string;
+  address: string;
+  chainId: number;
+  chainName: string;
+  asset: WalletAsset;
+  symbol: string;
+  balance: string;
+  threshold: string;
+  /** What the fixed configured threshold says, kept so the two can be compared. */
+  configuredStatus: WalletVerdict;
+  isFloat: boolean;
+  /** True for a router that should settle empty — a balance here is a fault. */
+  isResidue: boolean;
+  realCostPerDay?: number;
+  daysOfRunway?: number;
+  runwayBasis?: "measured" | "outflow";
+  snapshotCount: number;
+  plan?: WalletRefillPlan;
+  verdict: WalletVerdict;
+  verdictBasis: WalletVerdictBasis;
+  verdictReason: string;
+  /** What this needs from a person. Only `critical` reaches Slack. */
+  urgency: WalletUrgency;
+  /** Whether the threshold in force is the registry's or an operator's. */
+  thresholdSource: "registry" | "override";
+  thresholdUpdatedBy?: string;
+  thresholdUpdatedAt?: string;
+  /** The ERC-20 the balance is read from; absent for the native gas token. */
+  tokenAddress?: string;
+  /** The explorer page for the contract, or for the wallet when native. */
+  explorerUrl?: string;
+  /** This row's DOM id, so a Slack link can land on it. */
+  anchorId: string;
+  /** Why the balance fell, when the history says so without guessing. */
+  cause?: WalletBalanceCause;
+  /** When it runs out at the current measured rate. */
+  forecast?: WalletBalanceForecast;
+  /** The last time an operator said they had funded this, if still pending. */
+  acknowledgedAt?: string;
+  acknowledgedBy?: string;
+  /**
+   * How often this asset is touched relative to the wallet's others — the
+   * tiebreak the asset order uses, carried here so a collapsed card can sort
+   * its chips without opening.
+   */
+  activityScore: number;
+}
+
+/**
+ * What an asset needs from a person, which is not the same as how far below a
+ * line it is. Only `critical` reaches Slack.
+ */
+export type WalletUrgency = "none" | "info" | "warning" | "critical";
+
+/** Why a balance fell, where the transfer history says so without guessing. */
+export interface WalletBalanceCause {
+  kind:
+    | "single-large-transfer"
+    | "volume-increase"
+    | "gas-cost-increase"
+    | "treasury-transfer"
+    | "steady-spend";
+  summary: string;
+}
+
+/** When this asset runs out, at the rate it is currently going. */
+export interface WalletBalanceForecast {
+  daysToFloor: number;
+  floorAt: string;
+  daysToEmpty: number;
+  emptyAt: string;
+  confidence: "high" | "medium";
+}
+
+/** One entry in the Treasury page's audit trail. */
+export interface WalletTreasuryAuditEntry {
+  action:
+    | "threshold_changed"
+    | "threshold_reset"
+    | "refill_acknowledged"
+    | "setting_changed";
+  walletName?: string;
+  chainId?: number;
+  asset?: WalletAsset;
+  symbol?: string;
+  previousValue?: string;
+  newValue?: string;
+  actor: string;
+  at: string;
+  details?: Record<string, unknown>;
+}
+
+/** Account-wide switches for the Treasury page and its alerting. */
+export interface WalletTreasurySettings {
+  pingOnUrgent: boolean;
+  /** Days of cover at or below which an asset is urgent. */
+  criticalDays: number;
+  /** Days of cover at or below which it wants funding this week. */
+  lowDays: number;
+  /** The shortest gap between two Slack digests, in minutes. */
+  alertIntervalMinutes: number;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface WalletPlansResponse {
+  windowDays: number;
+  assets: WalletAssetPlan[];
+  /** Wallets judged on their configured thresholds alone, and why. */
+  gaps: Array<{ walletName: string; reason: string }>;
+  generatedAt: string;
+}
+
 export interface WalletAssetFlow {
   chainId: number;
   chainName: string;
@@ -760,17 +939,39 @@ export interface WalletAssetFlow {
   balance: string;
   threshold: string;
   status: string;
+  /** Whether this asset is a user's money passing through this wallet. */
+  isFloat: boolean;
   outflowCount: number;
   outflowTotal: number;
   outflowPerDay: number;
   inflowCount: number;
   inflowTotal: number;
-  /** True drain from balance snapshots, gas fees included. */
-  measuredBurnPerDay?: number;
+  /** Of the inflow, what we sent — the top-ups. */
+  fundingCount: number;
+  fundingTotal: number;
+  /** Of the inflow, what a user sent to pass through. Never charged as cost. */
+  turnoverCount: number;
+  turnoverTotal: number;
+  turnoverPerDay: number;
+  /**
+   * Money that left and is not coming back: gas burned as fees, payouts owed,
+   * a float that did not balance. Net of funding, so a user's money passing
+   * through nets to zero rather than reading as spend.
+   */
+  realCostPerDay?: number;
   snapshotCount: number;
   daysOfRunway?: number;
   /** Which figure the runway was computed from. */
   runwayBasis?: "measured" | "outflow";
+  plan?: WalletRefillPlan;
+  /**
+   * The verdict to render. Optional only so a page deployed ahead of the
+   * backend keeps working — it falls back to `status`, which is what it
+   * showed before.
+   */
+  verdict?: WalletVerdict;
+  verdictBasis?: WalletVerdictBasis;
+  verdictReason?: string;
   activityScore: number;
 }
 
@@ -802,6 +1003,86 @@ export interface WalletForecastResponse {
     coversUntil?: string;
   };
   note?: string;
+  generatedAt: string;
+}
+
+/** One top-up: someone sending money to one of our wallets. */
+export interface FundingLedgerEntry {
+  walletName: string;
+  from: string;
+  /** Set when the sender is another wallet of ours, or a known funder. */
+  fromWalletName?: string;
+  chainId: number;
+  chainName: string;
+  asset?: WalletAsset;
+  symbol: string;
+  amount: string;
+  /** Absent rather than guessed when the asset cannot be priced. */
+  amountUsd?: number;
+  timestamp: string;
+  hash: string;
+  explorerUrl: string;
+}
+
+export interface FundingLedgerBucket {
+  /** `YYYY-MM-DD`; for a week, the Monday. */
+  date: string;
+  count: number;
+  usd: number;
+  /** Rows with no price, so the total reads as a floor rather than a fact. */
+  unpricedCount: number;
+}
+
+export interface FundingLedgerResponse {
+  windowDays: number;
+  entries: FundingLedgerEntry[];
+  byDay: FundingLedgerBucket[];
+  byWeek: FundingLedgerBucket[];
+  totals: {
+    count: number;
+    usd: number;
+    unpricedCount: number;
+    walletsFunded: number;
+  };
+  byWallet: Array<{
+    walletName: string;
+    count: number;
+    usd: number;
+    unpricedCount: number;
+  }>;
+  /** Wallets or chains that could not be read, so a zero is not read as none. */
+  gaps: Array<{ walletName: string; chainId?: number; reason: string }>;
+  generatedAt: string;
+}
+
+/** A prepaid balance held with a third party, as last recorded by a person. */
+export interface ExternalAccountStatus {
+  name: string;
+  provider: string;
+  role: WalletRole | "Unclassified";
+  funds: string;
+  impactWhenEmpty: string;
+  dashboardUrl: string;
+  /** Why the figure has to be recorded by hand rather than fetched. */
+  readNote: string;
+  chainIds: number[];
+  currency: string;
+  latest?: {
+    balance: number;
+    recordedAt: string;
+    recordedBy: string;
+    note?: string;
+    ageHours: number;
+    stale: boolean;
+  };
+  drawPerDay?: number;
+  daysOfRunway?: number;
+  plan?: WalletRefillPlan;
+  history: Array<{ balance: number; recordedAt: string; recordedBy: string }>;
+}
+
+export interface ExternalAccountsResponse {
+  accounts: ExternalAccountStatus[];
   generatedAt: string;
 }
 
@@ -1474,6 +1755,32 @@ export interface TierLockView {
   maturedFuse: number;
 }
 
+/** Where a re-evaluated tranche's lock-time value came from. */
+export type TierLockTrancheValueSource = "recorded" | "activity" | "live";
+
+/** One tranche of a re-evaluated lock. */
+export interface TierLockTrancheReport {
+  shares: string;
+  /** What the tranche is graded on at minimum: its FUSE value when locked. */
+  fuseAtLock: number;
+  /** What it is worth at today's soFUSE rate. */
+  liveFuse: number;
+  source: TierLockTrancheValueSource;
+  lockedAt: string | null;
+  unlocksAt: string | null;
+}
+
+/** What re-evaluating a user's lock found and changed. */
+export interface TierLockReevaluationResult {
+  safeAddress: string;
+  /** The tier the lock alone granted before, and grants now. */
+  lockTierBefore: string;
+  lockTierAfter: string;
+  /** The user's tier by every route, afterwards. */
+  currentTier: string;
+  tranches: TierLockTrancheReport[];
+}
+
 /** What one tier costs by each route, and whether the user already holds it. */
 export interface TierOfferView {
   tier: string;
@@ -1674,6 +1981,122 @@ export interface AdminAuditEntry {
   createdAt: string;
 }
 
+/** Why a KYC reset is refused, as the backend classifies it. */
+export type KycResetBlocker =
+  | "no_application"
+  | "already_approved"
+  | "verification_in_flight"
+  | "issuer_consumer_exists"
+  | "decided_by_issuer";
+
+/**
+ * Whether a user's identity verification can be cleared so they can start a new
+ * one — and, when it cannot, what is in the way. Read-only.
+ */
+export interface KycResetEligibility {
+  userId: string;
+  eligible: boolean;
+  blocker?: KycResetBlocker;
+  /** Operator-facing sentence for `blocker`. */
+  blockerMessage?: string;
+  kycProvider: "didit" | "sumsub" | "persona" | null;
+  cardProvider: "rain" | "wirex" | null;
+  kycStatus: string | null;
+  diditVerificationStatus: string | null;
+  rainApplicationStatus: string | null;
+  /**
+   * The provider's own codes for the current decision — Didit risk tags, Sumsub
+   * reject labels or Rain rejection labels. What says WHY the user was declined.
+   */
+  reasonCodes: string[];
+  /** Sumsub's RETRY/FINAL, when Sumsub decided. */
+  rejectType: string | null;
+  /**
+   * The provider holds a FINAL decision, so a reset only reopens our side: a new
+   * session reaches the same answer unless the applicant is reset with the
+   * provider too.
+   */
+  providerDecisionIsFinal: boolean;
+}
+
+/** What the backend reports after clearing a verification. */
+export interface KycResetResult {
+  userId: string;
+  kycProvider: "didit" | "sumsub" | "persona" | null;
+  previousKycStatus: string | null;
+  previousReasonCodes: string[];
+  kycStatus: string;
+  providerDecisionIsFinal: boolean;
+}
+
+/**
+ * Where a user's Rain virtual-account onboarding stands, as one step. Mirrors
+ * `VirtualAccountOnboardingStep` in accounts-service.
+ */
+export type VirtualAccountOnboardingStep =
+  | "account_open"
+  | "not_started"
+  | "rain_denied"
+  | "fee_unpaid"
+  | "accept_terms"
+  | "rain_action_required"
+  | "rain_review"
+  | "submit_to_rain"
+  | "verification_declined"
+  | "verification_in_review"
+  | "verification_incomplete";
+
+/** Who has to act for onboarding to move. */
+export type VirtualAccountOnboardingActor =
+  | "admin"
+  | "user"
+  | "rain"
+  | "didit"
+  | "none";
+
+/** Where a user's virtual-account onboarding is stuck, and who moves next. */
+export interface VirtualAccountOnboardingState {
+  userId: string;
+  step: VirtualAccountOnboardingStep;
+  nextActor: VirtualAccountOnboardingActor;
+  /** Only true when the next move is ours: handing an approved user to Rain. */
+  canRetry: boolean;
+  /** Operator-facing explanation of `step`. */
+  message: string;
+  fee: {
+    feeUsd: number;
+    paid: boolean;
+    satisfied: boolean;
+    paidAt?: string;
+  };
+  rainApplication: {
+    kycStatus: string | null;
+    diditSessionId: string | null;
+    diditVerificationStatus: string | null;
+    /** Didit's own status right now, when our record has not reached Approved. */
+    liveDiditStatus: string | null;
+    rainApplicationStatus: string | null;
+    rainApplicationReasons: string[];
+    consumerCreated: boolean;
+    forwardPendingDeposit: boolean;
+    diditRiskCodes: string[];
+  } | null;
+  account: {
+    status: string;
+    rail?: string;
+    createdAt?: string;
+  } | null;
+}
+
+/** What the backend reports after re-submitting a stuck application. */
+export interface VirtualAccountOnboardingRetryResult {
+  userId: string;
+  action: "forwarded" | "relinked";
+  forwardStatus?: string;
+  forwardError?: string;
+  state: VirtualAccountOnboardingState;
+}
+
 /** What the backend reports after reopening a closed account. */
 export interface RecoverAccountResult {
   userId: string;
@@ -1701,6 +2124,49 @@ export interface RecoverAccountResult {
     /** The user passed card KYC, so there may be an issuer card to re-link. */
     issuerCustomerOnFile: boolean;
   };
+}
+
+/**
+ * Whether a locked-out user can get back in without support, and what is
+ * stopping them. Answers a lockout ticket in one read, across the two systems
+ * that between them decide it: the account row, and Turnkey.
+ */
+export interface RecoveryEligibility {
+  userId: string;
+  username?: string;
+  hasEmail: boolean;
+  /** Masked, e.g. `o•••••@gmail.com`. Absent when there is no address. */
+  emailHint?: string;
+  /** Credentials Turnkey holds. `null` when Turnkey could not be reached. */
+  turnkeyCredentialCount: number | null;
+  /** Credentials the account row remembers, which can lag Turnkey's. */
+  storedCredentialCount: number;
+  canSelfRecover: boolean;
+  /** Why not, in words support can read out. Empty when they can. */
+  blockers: string[];
+  accountClosed: boolean;
+  platforms?: string[];
+  lastActivityAt?: string;
+}
+
+/** What the backend reports after mailing an account its recovery code. */
+export interface SendRecoveryCodeResult {
+  userId: string;
+  username?: string;
+  /** Masked address it went to. The code itself never reaches the portal. */
+  emailHint: string;
+  sentAt: string;
+  adminUsername: string;
+}
+
+/** What the backend reports after changing the address an account recovers through. */
+export interface SetAccountEmailResult {
+  userId: string;
+  username?: string;
+  previousEmailHint?: string;
+  emailHint: string;
+  updatedAt: string;
+  adminUsername: string;
 }
 
 /** Ledger state of a referral cashback reward, as rewards-service stores it. */
@@ -1752,8 +2218,17 @@ export interface AdminReferralRewardRow {
   payoutTokenAmount?: string;
   payoutTxUrl?: string;
   reversedAt?: string;
-  /** account_closed | chargeback | self_referral_suspected */
+  /**
+   * account_closed | chargeback | ineligible_spend |
+   * no_activity_after_qualifying | self_referral_suspected
+   */
   reversalReason?: string;
+  /** Spend the referral rules left out (excluded merchants, tiny purchases). */
+  excludedSpendUsd?: number;
+  /** Merchants spent at that have not reached the per-merchant minimum. */
+  merchantsBelowMinimum?: number;
+  /** Qualified, but the friend has not yet made the purchase the payout needs. */
+  awaitingActivity?: boolean;
   reviewReason?: string;
   /** An admin re-evaluated it and put it back on track. */
   reinstatedAt?: string;
@@ -2146,6 +2621,27 @@ export interface CashbackHistory {
   failedCount: number;
 }
 
+/** One cashback row put back in the retry queue. */
+export interface ReevaluatedCashbackRow {
+  id: string;
+  transactionId: string;
+  merchantName?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  lastError?: string;
+}
+
+/** What "Re-send failed cashback" did for one user. */
+export interface ReevaluateFailedCashbackResult {
+  userId: string;
+  /** Rows reset to Failed with a fresh retry budget. */
+  rearmed: ReevaluatedCashbackRow[];
+  /** Set when nothing was re-armed because the rows could not pay anyway. */
+  blockedReason?: string;
+  /** The latest the retry cron will pick the rows up. */
+  expectedBy?: string;
+}
+
 export interface IntercomConversationSummary {
   id: string;
   createdAt?: number;
@@ -2413,4 +2909,94 @@ export interface ClientErrorReport {
 /** A lookup match, with just enough of its user to tell matches apart. */
 export interface ClientErrorMatch extends ClientErrorReport {
   user?: { id: string; username?: string; email?: string };
+}
+
+// --- Config → Anti-abuse ---------------------------------------------------
+
+/**
+ * A merchant category that earns nothing — from card cashback, from the
+ * referral spend target, or both. Mirrors `MerchantCategoryExclusion` in
+ * solid-backend's libs/common/src/rewards/reward-exclusions.ts.
+ */
+export interface MerchantCategoryExclusion {
+  /** ISO 18245 code, four digits. */
+  code: string;
+  /** The category's name, recorded on a withheld cashback row as the reason. */
+  label: string;
+  cashback: boolean;
+  referral: boolean;
+}
+
+/**
+ * A merchant, by name, that earns nothing whatever category it arrives under.
+ * Matched as a case-insensitive substring; `*` stands for any run of
+ * characters, so `weixin*scan` matches "WEIXIN*SCAN QR CODE".
+ */
+export interface MerchantNameExclusion {
+  pattern: string;
+  /** Why it is on the list, for the next operator to read. */
+  label?: string;
+  cashback: boolean;
+  referral: boolean;
+}
+
+export interface MerchantExclusionConfig {
+  /** Master switch: off pays cashback on every category. */
+  cashbackEnabled: boolean;
+  /** Master switch: off counts every purchase toward the referral target. */
+  referralEnabled: boolean;
+  categories: MerchantCategoryExclusion[];
+  merchants: MerchantNameExclusion[];
+}
+
+/** What a purchase must be to count toward the referral target. */
+export interface ReferralSpendRuleSettings {
+  minPurchaseUsd: number;
+  minMerchantSpendUsd: number;
+  activityCheckEnabled: boolean;
+  activityMinPurchaseUsd: number;
+}
+
+export interface AntiAbuseConfig {
+  merchantExclusions: MerchantExclusionConfig;
+  referralRules: ReferralSpendRuleSettings;
+  defaults: {
+    merchantExclusions: MerchantExclusionConfig;
+    referralRules: ReferralSpendRuleSettings;
+  };
+  lastUpdate: { at: string; by: string | null } | null;
+}
+
+/** An edit: absent leaves a setting as is; a list replaces the stored list whole. */
+export interface UpdateAntiAbuseConfig {
+  cashbackEnabled?: boolean;
+  referralEnabled?: boolean;
+  categories?: MerchantCategoryExclusion[];
+  merchants?: MerchantNameExclusion[];
+  referralRules?: Partial<ReferralSpendRuleSettings>;
+}
+
+export interface MerchantExclusionPreview {
+  days: number;
+  transactions: number;
+  usd: number;
+  customers: number;
+  merchants: Array<{
+    merchantName: string;
+    merchantCategoryCode: string | null;
+    transactions: number;
+    usd: number;
+  }>;
+  truncated: boolean;
+}
+
+export interface RewardExclusionMatch {
+  kind: "category" | "merchant";
+  value: string;
+  description: string;
+}
+
+export interface MerchantExclusionCheck {
+  cashback: RewardExclusionMatch | null;
+  referral: RewardExclusionMatch | null;
 }

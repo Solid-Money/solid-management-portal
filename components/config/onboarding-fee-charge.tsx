@@ -2,10 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 
-import {
-  InputField,
-  ToggleField,
-} from "@/components/config/config-fields";
+import { InputField, ToggleField } from "@/components/config/config-fields";
 import { FeeFlatCharge } from "@/types";
 
 /** The config field holding one flat onboarding charge. */
@@ -23,23 +20,21 @@ export interface OnboardingFeeDefinition {
 }
 
 /**
- * The two one-time Rain onboarding charges.
+ * The one-time Rain onboarding charges that this release can actually collect.
  *
- * Separate products, not one shared "Rain onboarding": a user can open a card
- * and later a virtual account, each costs us its own Didit session and its own
- * Rain review, and each is charged once. Sharing a line would let the second
- * ride free on the first one's payment.
+ * Only the virtual account, for now. The card keeps its minimum-deposit gate in
+ * this release, so a "Rain Card Setup" control here would be a switch that
+ * changes nothing — worse than absent, because an operator would reasonably
+ * read it as live. The config field behind it already exists and stays at its
+ * disabled default; this list is what the page offers, not what the backend
+ * understands, and the card line goes in once the card is charged too.
+ *
+ * They are separate products rather than one shared "Rain onboarding" because a
+ * user can open a card and later a virtual account: each costs its own Didit
+ * session and its own Rain review, and each is charged once. Sharing a line
+ * would let the second ride free on the first one's payment.
  */
 export const ONBOARDING_FEES: OnboardingFeeDefinition[] = [
-  {
-    key: "rainCardOnboarding",
-    label: "Rain Card Setup",
-    summary: "Charged once, before a Rain card application is started",
-    toggleTooltip:
-      "Replaces the $10 savings balance applicants used to have to deposit and hold, which recovered none of what they cost us. Wirex applicants are never charged — they cost us nothing per head.",
-    amountTooltip:
-      "Covers roughly $1 for the Didit verification and $2.50 for Rain's own KYC, both paid before the applicant is worth anything.",
-  },
   {
     key: "rainVirtualAccountOnboarding",
     label: "Rain Virtual Account Setup",
@@ -126,9 +121,7 @@ export function OnboardingFeeCharge({
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-700">
-            Country overrides
-          </p>
+          <p className="text-sm font-medium text-gray-700">Country overrides</p>
           <button
             type="button"
             onClick={addOverride}

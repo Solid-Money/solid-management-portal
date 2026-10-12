@@ -158,9 +158,19 @@ function Header({
           <h2 className="text-lg font-semibold text-gray-900">
             {label}
             {flow && (
-              <span className="ml-2 text-sm font-normal text-gray-600">
+              /* The measured floor where there is one: the panel below quotes
+                 it, and two different floors for the same asset on the same
+                 screen is the confusion this page exists to remove. */
+              <span
+                className="ml-2 text-sm font-normal text-gray-600"
+                title={
+                  flow.plan
+                    ? `${flow.plan.floorDays} days at the measured cost. The configured threshold is ${formatAmount(flow.threshold)}.`
+                    : "Its configured threshold — no cost has been measured yet."
+                }
+              >
                 {formatAmount(flow.balance)} held against a{" "}
-                {formatAmount(flow.threshold)} floor
+                {formatAmount(flow.plan?.floorAmount ?? flow.threshold)} floor
               </span>
             )}
           </h2>
@@ -182,17 +192,19 @@ function Header({
       {flow && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat
-            label="Burn / day"
+            label="Cost / day"
             value={
-              flow.measuredBurnPerDay != null
-                ? formatAmount(flow.measuredBurnPerDay)
-                : flow.outflowPerDay > 0
+              flow.realCostPerDay != null
+                ? formatAmount(flow.realCostPerDay)
+                : !flow.isFloat && flow.outflowPerDay > 0
                 ? formatAmount(flow.outflowPerDay)
                 : "—"
             }
             note={
-              flow.measuredBurnPerDay != null
-                ? "measured from balance history"
+              flow.realCostPerDay != null
+                ? "measured net of top-ups — what we actually spend"
+                : flow.isFloat
+                ? "not measured yet; outflow here is users' money, not cost"
                 : flow.outflowPerDay > 0
                 ? "from transfers out — excludes gas spent as fees"
                 : "nothing observed leaving in the window"
@@ -203,7 +215,7 @@ function Header({
             value={formatRunway(flow.daysOfRunway)}
             note={
               flow.runwayBasis === "measured"
-                ? "at the measured burn rate"
+                ? "at the measured cost"
                 : flow.runwayBasis === "outflow"
                 ? "at the observed outflow — likely optimistic"
                 : flow.snapshotCount < 2
@@ -211,16 +223,55 @@ function Header({
                 : "not draining"
             }
           />
+          {/* Turnover gets a tile of its own rather than being folded into
+              burn. On a bridging wallet it is the largest number on the
+              screen and none of it is money we spent. */}
           <Stat
-            label="Transfers out"
-            value={String(flow.outflowCount)}
-            note={`${formatAmount(flow.outflowTotal)} ${label} in the window`}
+            label={flow.isFloat ? "Passing through" : "Transfers out"}
+            value={
+              flow.isFloat
+                ? `${formatAmount(flow.turnoverPerDay)}/d`
+                : String(flow.outflowCount)
+            }
+            note={
+              flow.isFloat
+                ? `${flow.turnoverCount} user transfers in, ${flow.outflowCount} out — not a cost`
+                : `${formatAmount(flow.outflowTotal)} ${label} in the window`
+            }
           />
           <Stat
             label="Top-ups in"
-            value={String(flow.inflowCount)}
-            note={`${formatAmount(flow.inflowTotal)} ${label} in the window`}
+            value={String(flow.fundingCount)}
+            note={`${formatAmount(flow.fundingTotal)} ${label} funded in the window`}
           />
+        </div>
+      )}
+
+      {flow?.plan && (
+        <div
+          className={`mt-3 rounded border px-3 py-2 text-xs ${
+            flow.plan.belowFloor
+              ? "border-red-200 bg-red-50 text-red-900"
+              : "border-gray-200 bg-gray-50 text-gray-700"
+          }`}
+        >
+          {flow.plan.refillAmount > 0 ? (
+            <>
+              <strong>
+                Send {formatAmount(flow.plan.refillAmount)} {label}
+              </strong>{" "}
+              to reach {flow.plan.targetDays} days of cover (
+              {formatAmount(flow.plan.targetAmount)} {label}).
+            </>
+          ) : (
+            <>
+              Covered past {flow.plan.targetDays} days. Nothing to send.
+            </>
+          )}{" "}
+          <span className="opacity-80">
+            Floor is {flow.plan.floorDays} days ={" "}
+            {formatAmount(flow.plan.floorAmount)} {label}.
+          </span>
         </div>
       )}
 

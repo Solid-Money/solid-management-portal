@@ -16,14 +16,43 @@ import {
   RainRtfStatus,
   IssueTierTrialRequest,
   IssueTierTrialResult,
+  KycResetEligibility,
+  KycResetResult,
+  VirtualAccountOnboardingRetryResult,
+  VirtualAccountOnboardingState,
   RecoverAccountResult,
+  RecoveryEligibility,
+  SendRecoveryCodeResult,
+  SetAccountEmailResult,
   ReferralReevaluationResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
+  ReevaluateFailedCashbackResult,
   TierTrial,
+  TierLockReevaluationResult,
   TierMembershipView,
   TierTrialView,
 } from "@/types";
+
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /**
+     * Skip the global error toast: for background reads (polling, side
+     * cards) whose screen shows its own state when they fail.
+     */
+    quietErrors?: boolean;
+  }
+}
+import {
+  CardHolds,
+  ReleaseCardHoldRequest,
+  ReleaseCardHoldResult,
+} from "@/types/cash-holds";
+import {
+  CollectSettlementRequest,
+  CollectSettlementResult,
+  UncollectedSettlements,
+} from "@/types/cash-collect";
 
 const api = axios.create({
   baseURL:
@@ -81,6 +110,9 @@ export function describeApiError(error: unknown): string {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.config?.quietErrors) {
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401) {
       console.error(
         "[API] Unauthorized request - token may be invalid or expired",
@@ -216,6 +248,55 @@ export const unblockCardSpend = (safeAddress: string) =>
   );
 
 /**
+ * Everything reserved against this user's card spending power, on every
+ * instance, each joined to its payment and marked stale when nothing will
+ * ever clear it.
+ */
+export const getUserCardHolds = (userId: string) =>
+  api.get<CardHolds>(`/admin/v1/cash-ops/users/${userId}/holds`);
+
+/**
+ * Release one hold-store entry, handing its amount back to the card. Refused
+ * with a 409 when the entry changed since it was loaded, so re-read and
+ * check it again. The admin identity comes from the Firebase token
+ * server-side.
+ */
+export const releaseUserCardHold = (
+  userId: string,
+  uniqueOperationId: string,
+  body: ReleaseCardHoldRequest,
+) =>
+  api.post<ReleaseCardHoldResult>(
+    `/admin/v1/cash-ops/users/${userId}/holds/${uniqueOperationId}/release`,
+    body,
+  );
+
+/**
+ * Card spends Wirex paid for that we never swept from this user's Safe, with
+ * what the Safe can cover right now.
+ */
+export const getUserUncollectedSettlements = (userId: string) =>
+  api.get<UncollectedSettlements>(
+    `/admin/v1/cash-ops/users/${userId}/uncollected`,
+  );
+
+/**
+ * Collect one of them: books the debit and starts the normal sweep from the
+ * user's Safe. Refused with a 409 when the Safe cannot cover it, unless
+ * `force` is set. The admin identity comes from the Firebase token
+ * server-side.
+ */
+export const collectUserSettlement = (
+  userId: string,
+  uniqueOperationId: string,
+  body: CollectSettlementRequest,
+) =>
+  api.post<CollectSettlementResult>(
+    `/admin/v1/cash-ops/users/${userId}/uncollected/${uniqueOperationId}/collect`,
+    body,
+  );
+
+/**
  * This user's tier trials: the one that is open — waiting to be started or
  * running — plus the history behind it.
  *
@@ -238,6 +319,18 @@ export const getUserTierTrials = (userId: string) =>
 export const getUserTierMembership = (userId: string) =>
   api.get<{ data: TierMembershipView }>(
     `/admin/v1/users/${userId}/tier-membership`,
+  );
+
+/**
+ * Re-read a user's locked FUSE from the chain and record what each tranche was
+ * worth when it was locked, so the tier stops following the live soFUSE rate.
+ * Only ever holds a tier up; safe to repeat. The admin's name on the audit row
+ * comes from the Firebase token, never from here.
+ */
+export const reevaluateTierLock = (userId: string, reason?: string) =>
+  api.post<{ data: TierLockReevaluationResult }>(
+    `/admin/v1/users/${userId}/tier-lock/reevaluate`,
+    { reason: reason || undefined },
   );
 
 /**
@@ -297,6 +390,17 @@ export const revokeUserTierTrial = (
   );
 
 /**
+ * Put this user's PermanentlyFailed cashback back in the retry queue. The
+ * retry cron pays it through the normal payout path within 30 minutes; safe to
+ * repeat. The admin's name on the audit row comes from the Firebase token.
+ */
+export const reevaluateFailedCashback = (userId: string, reason?: string) =>
+  api.post<{ data: ReevaluateFailedCashbackResult }>(
+    `/admin/v1/users/${userId}/cashback/reevaluate`,
+    { reason: reason || undefined },
+  );
+
+/**
  * Pin a cashback rate to this cardholder, or clear it by passing `null`.
  *
  * The rate is a fraction, not a percent — 0.03 is 3% — matching how tier rates
@@ -352,6 +456,52 @@ export const recoverUserAccount = (userId: string, reason: string) =>
     { reason },
   );
 
+/**
+ * Whether this user's identity verification can be cleared so they can start a
+ * new one, and what is in the way when it cannot. Read-only — it also carries
+ * the provider's reason codes, so the card can show why they were declined.
+ */
+export const getKycResetEligibility = (userId: string) =>
+  api.get<{ data: KycResetEligibility }>(
+    `/admin/v1/users/${userId}/kyc/reset-eligibility`,
+  );
+
+/**
+ * Clear a declined identity verification so the user can start a new one.
+ *
+ * Narrow by design: it clears our record of the decision and nothing else — no
+ * issuer consumer is deleted, no card is touched, and the provider's own
+ * decision is not overturned. The reason is required; it is written to the
+ * audit trail with the admin's name, and refusals are recorded too.
+ */
+export const resetKycVerification = (userId: string, reason: string) =>
+  api.post<{ data: KycResetResult }>(`/admin/v1/users/${userId}/kyc/reset`, {
+    reason,
+  });
+
+/**
+ * Where this user's Rain virtual-account onboarding is stuck, and who has to act
+ * next. Read-only; asks Didit for the live session status when our record lags.
+ */
+export const getVirtualAccountOnboarding = (userId: string) =>
+  api.get<{ data: VirtualAccountOnboardingState }>(
+    `/admin/v1/users/${userId}/virtual-account/onboarding`,
+  );
+
+/**
+ * Re-submit a Didit-approved virtual-account application that never reached
+ * Rain. Refused (409) unless that is the step the user is stuck on; audited
+ * either way.
+ */
+export const retryVirtualAccountOnboarding = (
+  userId: string,
+  reason?: string,
+) =>
+  api.post<{ data: VirtualAccountOnboardingRetryResult }>(
+    `/admin/v1/users/${userId}/virtual-account/onboarding/retry`,
+    reason ? { reason } : {},
+  );
+
 /** Every admin action taken on this user, newest first. */
 export const getUserAuditLog = (userId: string) =>
   api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
@@ -371,6 +521,40 @@ export const getUserClientErrors = (userId: string, limit = 20) =>
   api.get<{ data: ClientErrorReport[] }>(`/admin/v1/errors/users/${userId}`, {
     params: { limit },
   });
+
+/**
+ * Whether this user can get back in on their own, and what is stopping them.
+ * Read-only — the first thing to check on a lockout ticket.
+ */
+export const getRecoveryEligibility = (userId: string) =>
+  api.get<{ data: RecoveryEligibility }>(
+    `/admin/v1/users/${userId}/account/recovery-eligibility`,
+  );
+
+/**
+ * Mail a recovery code to the account's own address, for a user who cannot
+ * reach the recovery screen. The code never comes back to us.
+ */
+export const sendRecoveryCode = (userId: string, reason: string) =>
+  api.post<{ data: SendRecoveryCodeResult }>(
+    `/admin/v1/users/${userId}/account/send-recovery-code`,
+    { reason },
+  );
+
+/**
+ * Set or correct the address this account recovers through. Whoever holds it
+ * can start a recovery, so this is only ever used once the request has been
+ * tied to the account's owner some other way.
+ */
+export const setAccountEmail = (
+  userId: string,
+  email: string,
+  reason: string,
+) =>
+  api.post<{ data: SetAccountEmailResult }>(
+    `/admin/v1/users/${userId}/account/email`,
+    { email, reason },
+  );
 
 /**
  * This user's referral cashback from both sides: the reward they earn as
