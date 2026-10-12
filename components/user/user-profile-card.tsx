@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyableValue } from "@/components/ui/copy-button";
 import RecoverAccountDialog from "@/components/user/recover-account-dialog";
+import UserTwoFactorField from "@/components/user/user-two-factor-field";
 
 function Field({
   label,
@@ -86,6 +87,12 @@ export default function UserProfileCard({ user }: { user: User }) {
                 />
               </span>
             </div>
+          </Field>
+          <Field label="Two-factor (authenticator app)" wide>
+            <UserTwoFactorField
+              userId={user._id}
+              username={user.username || user.email || user._id}
+            />
           </Field>
           <Field label="User ID" wide>
             <CopyableValue value={user._id} label="User ID" />
