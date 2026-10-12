@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { EyeOff, FileText, Languages, MoreHorizontal, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { formatErrorRef } from "@/lib/error-ref";
 import { cn } from "@/lib/utils";
 import { dateTime, languageName } from "@/components/support/support-format";
 import type { SupportAgentMessage, SupportAttachment } from "@/types/support";
@@ -115,9 +117,19 @@ export default function MessageBubble({
             {internal ? `Note · ${message.author.name ?? "Agent"}` : (message.author.name ?? (fromCustomer ? "Customer" : "Agent"))}
           </span>
           <span>{dateTime(message.createdAt)}</span>
-          {message.context && !internal && (
-            <span className="rounded bg-black/5 px-1">from {message.context.kind.replace(/_/g, " ")}</span>
-          )}
+          {message.context &&
+            !internal &&
+            (message.context.kind === "error" && message.context.id ? (
+              // Sent from a failure screen: the id is the failure's event ID.
+              <Link
+                href={`/error-lookup?ref=${encodeURIComponent(message.context.id)}`}
+                className="rounded bg-black/5 px-1 underline-offset-2 hover:underline"
+              >
+                from error · Ref {formatErrorRef(message.context.id)}
+              </Link>
+            ) : (
+              <span className="rounded bg-black/5 px-1">from {message.context.kind.replace(/_/g, " ")}</span>
+            ))}
           {!message.redacted && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

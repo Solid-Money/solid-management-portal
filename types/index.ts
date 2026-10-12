@@ -2876,6 +2876,48 @@ export interface UpdateRainRtfConfig {
   tokenOverrides?: RainRtfTokenOverride[];
 }
 
+/**
+ * A failure the app showed a user, as accounts-service recorded it
+ * (`clientErrors`), keyed by the Ref on their screen.
+ */
+export interface ClientErrorReport {
+  id: string;
+  /** 8 uppercase hex characters, no hyphen (`9C1B4F2A`). */
+  ref: string;
+  /** Full GlitchTip event ID. */
+  eventId: string;
+  /** The failing API call's request ID, when one of ours failed. */
+  requestId?: string;
+  userId?: string;
+  /** What the user was doing, e.g. `move_to_card`. */
+  action: string;
+  /** Stable cause, e.g. `PAYMASTER_REJECTED`, `HTTP_502`. */
+  code: string;
+  /** Cause family, e.g. `blockchain`, `server`, `offline`. */
+  kind: string;
+  /** Where it was shown: `sheet`, `toast`, `inline` or `screen`. */
+  surface: string;
+  /** What the user read. */
+  title: string;
+  body?: string;
+  /** Sanitized technical cause. */
+  message?: string;
+  httpStatus?: number;
+  /** True when the app knew no transaction left the device. */
+  nothingSent?: boolean;
+  platform?: string;
+  appVersion?: string;
+  route?: string;
+  details?: { amount?: string; token?: string; network?: string };
+  occurredAt: string;
+  createdAt: string;
+}
+
+/** A lookup match, with just enough of its user to tell matches apart. */
+export interface ClientErrorMatch extends ClientErrorReport {
+  user?: { id: string; username?: string; email?: string };
+}
+
 // --- Config → Anti-abuse ---------------------------------------------------
 
 /**

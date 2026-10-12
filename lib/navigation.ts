@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   BarChart3,
   BookOpen,
+  CircleAlert,
   CreditCard,
   DollarSign,
   Gift,
@@ -74,6 +75,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Inbox",
         description: "Customer conversations, Solid AI drafts and handoffs",
         icon: Inbox,
+      },
+      {
+        href: "/error-lookup",
+        label: "Error Lookup",
+        description: "Trace the Ref on a user's failure screen to what happened",
+        icon: CircleAlert,
       },
       {
         href: "/support/articles",
