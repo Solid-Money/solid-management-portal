@@ -45,6 +45,27 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Referral reward re-evaluated",
       variant: "info",
     },
+    referral_reward_held: { label: "Referral reward held", variant: "warning" },
+    referral_reward_approved: {
+      label: "Referral reward approved",
+      variant: "success",
+    },
+    referral_reward_rejected: {
+      label: "Referral reward rejected",
+      variant: "danger",
+    },
+    referral_reward_rechecked: {
+      label: "Referral reward re-checked",
+      variant: "warning",
+    },
+    referral_referrer_blocked: {
+      label: "Blocked from referral rewards",
+      variant: "danger",
+    },
+    referral_referrer_unblocked: {
+      label: "Referral block lifted",
+      variant: "success",
+    },
     tier_lock_reevaluated: { label: "Tier lock re-evaluated", variant: "info" },
     cashback_failed_reevaluated: {
       label: "Failed cashback re-sent",
@@ -79,6 +100,47 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "referral_reward_reevaluated") {
     return referralReevaluationDetail(entry);
+  }
+
+  if (
+    entry.action === "referral_reward_held" ||
+    entry.action === "referral_reward_approved" ||
+    entry.action === "referral_reward_rejected"
+  ) {
+    const from = stringField(entry, "previousStatus");
+    const to = stringField(entry, "status");
+    const parts = [
+      from && to ? `${from} → ${to}` : null,
+      entry.metadata?.friendOnly === true ? "friend paid only" : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "referral_reward_rechecked") {
+    const outcome = stringField(entry, "outcome");
+    const reasons = entry.metadata?.reasons;
+    return outcome
+      ? `${outcome}${
+          Array.isArray(reasons) && reasons.length
+            ? `: ${reasons.join(", ")}`
+            : ""
+        }`
+      : null;
+  }
+
+  if (entry.action === "referral_referrer_blocked") {
+    const mode = stringField(entry, "mode");
+    const counts = ["held", "voided", "withheld"]
+      .map((key) => {
+        const value = entry.metadata?.[key];
+        return typeof value === "number" && value > 0
+          ? `${value} ${key}`
+          : null;
+      })
+      .filter(Boolean);
+    return [mode ? `mode: ${mode}` : null, ...counts]
+      .filter(Boolean)
+      .join(" · ") || null;
   }
 
   if (entry.action === "cashback_failed_reevaluated") {
