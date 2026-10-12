@@ -140,3 +140,43 @@ export interface HelpCollectionInput {
   parentId?: string | null;
   order?: number;
 }
+
+/** What an Intercom import did, or (a preview) would do. */
+export interface HelpImportReport {
+  dryRun: boolean;
+  collections: Array<{ intercomId: string; name: string; slug: string; action: "created" | "exists" | "would_create" }>;
+  articles: Array<{
+    intercomId: string;
+    title: string;
+    state: string;
+    action: "published" | "draft" | "exists" | "replaced" | "skipped" | "would_publish" | "would_draft";
+    reason?: string;
+    slug?: string;
+    collection?: string | null;
+    redirectsTo?: string;
+  }>;
+  totals: Record<string, number>;
+  images: { rehosted: number; failed: Array<{ intercomId: string; url: string; error: string }> };
+  links: { rewritten: number; dangling: Array<{ intercomId: string; title: string; link: string }> };
+  redirects: Array<{ from: string; to: string }>;
+}
+
+/** One "Import from Intercom" run, as the support service keeps it. */
+export interface HelpImportRun {
+  id: string;
+  dryRun: boolean;
+  skipDrafts: boolean;
+  replaceUnedited: boolean;
+  status: "running" | "done" | "failed";
+  startedBy: { email: string; name: string | null };
+  startedAt: string;
+  finishedAt: string | null;
+  report: HelpImportReport | null;
+  error: string | null;
+}
+
+export interface HelpImportOptions {
+  dryRun: boolean;
+  skipDrafts?: boolean;
+  replaceUnedited?: boolean;
+}
