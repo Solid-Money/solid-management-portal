@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FlaskConical, Loader2, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import {
   useStartRecheck,
 } from "@/hooks/use-referral-review";
 import { reversalReasonLabel, reviewReasonLabel } from "@/lib/referral";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatNumber } from "@/lib/utils";
 import type { ReferralRecheckRun } from "@/types/referral-review";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,17 +26,21 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+/** A count as the page shows it: "1,840". */
+const count = (value: number) => formatNumber(value, 0, 0);
+
 /** The daily payout sweep runs at 02:00 UTC. */
-function nextPayoutSweep(now = new Date()): Date {
+function nextPayoutSweep(now: number): Date {
+  const at = new Date(now);
   const next = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 2),
+    Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate(), 2),
   );
-  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1);
+  if (next.getTime() <= now) next.setUTCDate(next.getUTCDate() + 1);
   return next;
 }
 
-function untilLabel(target: Date): string {
-  const minutes = Math.max(0, Math.round((target.getTime() - Date.now()) / 60000));
+function untilLabel(target: Date, now: number): string {
+  const minutes = Math.max(0, Math.round((target.getTime() - now) / 60000));
   const hours = Math.floor(minutes / 60);
   return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 }
@@ -53,14 +57,22 @@ export function RecheckPanel() {
   const [confirmLive, setConfirmLive] = useState(false);
   const start = useStartRecheck();
 
+  // The countdown to the sweep keeps moving while the page sits open.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const latestId = runs.data?.[0]?.id ?? null;
   const viewing = useRecheckRun(selectedId ?? latestId);
   const lastTrial = runs.data?.find(
     (run) => run.dryRun && run.status === "done",
   );
-  const running = runs.data?.some((run) => run.status === "running") ||
-    viewing.data?.status === "running";
-  const sweep = nextPayoutSweep();
+  // From the list, which polls while a run is going — not from the run on
+  // screen, which can be an older one.
+  const running = runs.data?.some((run) => run.status === "running") ?? false;
+  const sweep = nextPayoutSweep(now);
 
   const startRun = (dryRun: boolean, reason?: string) =>
     start.mutate(
@@ -90,7 +102,7 @@ export function RecheckPanel() {
           </p>
           <p className="text-xs text-gray-500">
             Next payout sweep: {formatDateTime(sweep.toISOString())} (in{" "}
-            {untilLabel(sweep)}). Rewards still qualified then are paid if their
+            {untilLabel(sweep, now)}). Rewards still qualified then are paid if their
             payout delay is over.
           </p>
         </div>
@@ -115,7 +127,23 @@ export function RecheckPanel() {
         </div>
       </div>
 
-      {viewing.data ? (
+      {runs.isError || viewing.isError ? (
+        // A failed read is not an empty history: say so, and offer a retry.
+        <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <span>Could not load the re-check runs.</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              void runs.refetch();
+              if (viewing.isError) void viewing.refetch();
+            }}
+            className="cursor-pointer"
+          >
+            Retry
+          </Button>
+        </div>
+      ) : viewing.data ? (
         <RunView run={viewing.data} />
       ) : runs.isLoading || viewing.isLoading ? (
         <div className="flex h-32 items-center justify-center">
@@ -148,8 +176,8 @@ export function RecheckPanel() {
                     {formatDateTime(run.startedAt)} by {run.startedBy}
                   </span>
                   <span className="text-gray-500">
-                    {run.counts.hold} hold · {run.counts.void} void ·{" "}
-                    {run.counts.stays} stay
+                    {count(run.counts.hold)} hold · {count(run.counts.void)}{" "}
+                    void · {count(run.counts.stays)} stay
                   </span>
                   <RunStatus run={run} />
                 </button>
@@ -159,13 +187,17 @@ export function RecheckPanel() {
         </div>
       )}
 
-      <LiveRunDialog
-        open={confirmLive}
-        lastTrial={lastTrial}
-        pending={start.isPending}
-        onCancel={() => setConfirmLive(false)}
-        onConfirm={(reason) => startRun(false, reason)}
-      />
+      {/* Mounted only while open, so each run starts with an empty reason
+          and never files the last run's on the audit trail. */}
+      {confirmLive && (
+        <LiveRunDialog
+          open
+          lastTrial={lastTrial}
+          pending={start.isPending}
+          onCancel={() => setConfirmLive(false)}
+          onConfirm={(reason) => startRun(false, reason)}
+        />
+      )}
     </div>
   );
 }
@@ -203,7 +235,7 @@ function RunView({ run }: { run: ReferralRecheckRun }) {
             />
           </div>
           <p className="text-xs text-gray-500">
-            {run.processed} of {run.total} rewards checked
+            {count(run.processed)} of {count(run.total)} rewards checked
           </p>
         </div>
       )}
@@ -279,7 +311,7 @@ function Stat({
   return (
     <div className="rounded-md border border-gray-100 p-3">
       <p className="text-[11px] uppercase text-gray-500">{label}</p>
-      <p className={`text-xl font-semibold ${color}`}>{value}</p>
+      <p className={`text-xl font-semibold ${color}`}>{count(value)}</p>
     </div>
   );
 }
@@ -298,7 +330,7 @@ function UserList({
     <div className="rounded-md border border-gray-100">
       <div className="border-b border-gray-100 px-3 py-2">
         <h4 className="text-xs font-semibold text-gray-900">
-          {title} ({rows.length})
+          {title} ({count(rows.length)})
         </h4>
         {description && (
           <p className="text-[11px] text-gray-500">{description}</p>
@@ -352,9 +384,9 @@ function LiveRunDialog({
         {lastTrial ? (
           <p className="rounded-md bg-gray-50 p-3 text-xs text-gray-700">
             Last trial ({formatDateTime(lastTrial.startedAt)}):{" "}
-            <strong>{lastTrial.counts.void}</strong> would be voided,{" "}
-            <strong>{lastTrial.counts.hold}</strong> held,{" "}
-            {lastTrial.counts.stays} stay qualified.
+            <strong>{count(lastTrial.counts.void)}</strong> would be voided,{" "}
+            <strong>{count(lastTrial.counts.hold)}</strong> held,{" "}
+            {count(lastTrial.counts.stays)} stay qualified.
           </p>
         ) : (
           <p className="rounded-md bg-amber-50 p-3 text-xs text-amber-800">

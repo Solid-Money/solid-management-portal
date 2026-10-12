@@ -23,6 +23,19 @@ const BASE = "/admin/v1/referral-review";
 /** Everything a decision can change, refetched after one. */
 const REVIEW_KEY = ["referral-review"] as const;
 
+/**
+ * After a decision or a block: the review page, and any user page that shows
+ * the rewards or the audit trail it touched (`user-referral-card`,
+ * `user-audit-log-card`, keyed `[prefix, userId]`).
+ */
+function invalidateAfterDecision(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  void queryClient.invalidateQueries({ queryKey: REVIEW_KEY });
+  void queryClient.invalidateQueries({ queryKey: ["user-referrals"] });
+  void queryClient.invalidateQueries({ queryKey: ["user-audit-log"] });
+}
+
 const DECISION_PATH: Record<ReferralDecisionAction, string> = {
   hold: "hold",
   approve: "approve",
@@ -65,9 +78,7 @@ export function useReferralDecision() {
           { users, reason },
         )
       ).data,
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: REVIEW_KEY });
-    },
+    onSettled: () => invalidateAfterDecision(queryClient),
   });
 }
 
@@ -90,9 +101,7 @@ export function useBlockReferrer() {
     mutationFn: async (body) =>
       (await api.post<ReferralBlockResult>(`${BASE}/blocked-referrers`, body))
         .data,
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: REVIEW_KEY });
-    },
+    onSettled: () => invalidateAfterDecision(queryClient),
   });
 }
 
@@ -110,17 +119,18 @@ export function useUnblockReferrer() {
           body,
         )
       ).data,
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: REVIEW_KEY });
-    },
+    onSettled: () => invalidateAfterDecision(queryClient),
   });
 }
 
+/** Recent runs; polled while one of them is still going, so it reads done. */
 export function useRecheckRuns() {
   return useQuery<ReferralRecheckRun[]>({
     queryKey: [...REVIEW_KEY, "rechecks"],
     queryFn: async () =>
       (await api.get<ReferralRecheckRun[]>(`${BASE}/recheck`)).data,
+    refetchInterval: (query) =>
+      query.state.data?.some((run) => run.status === "running") ? 3000 : false,
   });
 }
 

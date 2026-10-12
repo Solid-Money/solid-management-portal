@@ -65,7 +65,9 @@ function StatusCell({ row }: { row: AdminReferralRewardRow }) {
       {detail && <p className="text-[11px] text-gray-500">{detail}</p>}
       {row.referrerLegWithheld && (
         <p className="text-[11px] text-amber-700">
-          Referrer&apos;s share withheld — only the friend is paid
+          {row.status === "paid"
+            ? "Referrer's share withheld — only the friend was paid"
+            : "Referrer's share withheld — only the friend's share will pay"}
         </p>
       )}
       {row.reviewApprovedAt && row.status !== "reversed" && (

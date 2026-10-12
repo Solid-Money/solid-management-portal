@@ -12,7 +12,7 @@ import {
   reviewReasonLabel,
   spendAgainstBar,
 } from "@/lib/referral";
-import { formatDateTime, formatUsd } from "@/lib/utils";
+import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 import type {
   ReferralDecisionAction,
   ReferralReviewRow,
@@ -111,8 +111,8 @@ export function ReviewQueue() {
     selectable.every((row) => selected.has(row.referredUserId));
   const pages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 
-  const resetTo = (next: () => void) => {
-    next();
+  /** A filter changed: back to the first page, with nothing selected. */
+  const resetPaging = () => {
     setPage(1);
     setSelected(new Map());
   };
@@ -152,7 +152,10 @@ export function ReviewQueue() {
           return (
             <button
               key={filter.value}
-              onClick={() => resetTo(() => setStatus(filter.value))}
+              onClick={() => {
+                setStatus(filter.value);
+                resetPaging();
+              }}
               className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 status === filter.value
                   ? "border-indigo-600 bg-indigo-600 text-white"
@@ -160,7 +163,7 @@ export function ReviewQueue() {
               }`}
             >
               {filter.label}
-              {data ? ` · ${count}` : ""}
+              {data ? ` · ${formatNumber(count, 0, 0)}` : ""}
             </button>
           );
         })}
@@ -172,9 +175,10 @@ export function ReviewQueue() {
             <span className="block">Held because</span>
             <select
               value={reason}
-              onChange={(event) =>
-                resetTo(() => setReason(event.target.value))
-              }
+              onChange={(event) => {
+                setReason(event.target.value);
+                resetPaging();
+              }}
               className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm"
             >
               <option value="">Any reason</option>
@@ -190,7 +194,8 @@ export function ReviewQueue() {
           className="flex items-end gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            resetTo(() => setReferrer(referrerInput.trim()));
+            setReferrer(referrerInput.trim());
+            resetPaging();
           }}
         >
           <label className="space-y-1 text-xs text-gray-600">
@@ -210,12 +215,11 @@ export function ReviewQueue() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() =>
-                resetTo(() => {
-                  setReferrer("");
-                  setReferrerInput("");
-                })
-              }
+              onClick={() => {
+                setReferrer("");
+                setReferrerInput("");
+                resetPaging();
+              }}
               className="cursor-pointer"
             >
               Clear
@@ -309,10 +313,13 @@ export function ReviewQueue() {
         </table>
       </div>
 
-      {data && data.total > data.limit && (
+      {/* Also past the first page: deciding every row on the last page
+          shrinks the total, and the pager is the only way back. */}
+      {data && (data.total > data.limit || page > 1) && (
         <div className="flex items-center justify-end gap-2 text-xs text-gray-600">
           <span>
-            Page {data.page} of {pages} · {data.total} rewards
+            Page {data.page} of {pages} · {formatNumber(data.total, 0, 0)}{" "}
+            rewards
           </span>
           <Button
             size="icon-sm"

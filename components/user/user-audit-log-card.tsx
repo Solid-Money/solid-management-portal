@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { History, Loader2 } from "lucide-react";
 
 import { getUserAuditLog } from "@/lib/api";
-import { formatDateTime, formatUsd } from "@/lib/utils";
+import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 import { AdminAuditEntry } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,7 +134,7 @@ function detailFor(entry: AdminAuditEntry): string | null {
       .map((key) => {
         const value = entry.metadata?.[key];
         return typeof value === "number" && value > 0
-          ? `${value} ${key}`
+          ? `${formatNumber(value, 0, 0)} ${key}`
           : null;
       })
       .filter(Boolean);

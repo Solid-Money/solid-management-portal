@@ -38,11 +38,8 @@ const MODES = Object.keys(BLOCK_MODES) as ReferralBlockMode[];
  * reward of theirs held, voided, or paid to the friend only.
  */
 export function BlockedReferrers() {
-  const { data, isLoading } = useBlockedReferrers();
-  const [editing, setEditing] = useState<{
-    referrer: string;
-    mode: ReferralBlockMode;
-  } | null>(null);
+  const { data, isLoading, isError, refetch } = useBlockedReferrers();
+  const [editing, setEditing] = useState<BlockDialogInitial | null>(null);
   const [unblocking, setUnblocking] =
     useState<ReferralBlockedReferrerRow | null>(null);
 
@@ -81,6 +78,20 @@ export function BlockedReferrers() {
               <tr>
                 <td colSpan={6} className="py-10 text-center">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin text-gray-400" />
+                </td>
+              </tr>
+            ) : isError ? (
+              // Never "no referrer is blocked" on a failed read: an admin would
+              // take it at its word and miss, or repeat, a block.
+              <tr>
+                <td colSpan={6} className="py-10 text-center text-red-700">
+                  Could not load blocked referrers.{" "}
+                  <button
+                    onClick={() => void refetch()}
+                    className="cursor-pointer underline"
+                  >
+                    Retry
+                  </button>
                 </td>
               </tr>
             ) : !data || data.length === 0 ? (
@@ -136,7 +147,8 @@ export function BlockedReferrers() {
                       variant="outline"
                       onClick={() =>
                         setEditing({
-                          referrer: row.username || row.referrerId,
+                          referrer: row.referrerId,
+                          label: row.username || row.referrerId,
                           mode: row.mode,
                         })
                       }
@@ -176,11 +188,19 @@ export function BlockedReferrers() {
   );
 }
 
+interface BlockDialogInitial {
+  /** What is sent: the referrer's id when changing an existing block. */
+  referrer: string;
+  /** How to name them in the title. */
+  label?: string;
+  mode: ReferralBlockMode;
+}
+
 function BlockDialog({
   initial,
   onClose,
 }: {
-  initial: { referrer: string; mode: ReferralBlockMode };
+  initial: BlockDialogInitial;
   onClose: () => void;
 }) {
   const [referrer, setReferrer] = useState(initial.referrer);
@@ -217,7 +237,9 @@ function BlockDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {isChange ? `Change how ${initial.referrer} is blocked` : "Block a referrer"}
+            {isChange
+              ? `Change how ${initial.label ?? initial.referrer} is blocked`
+              : "Block a referrer"}
           </DialogTitle>
           <DialogDescription>
             Applies to their unpaid rewards now, and to friends who qualify
