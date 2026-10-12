@@ -10,6 +10,7 @@ import {
   Hand,
   RotateCcw,
   Send,
+  Sparkles,
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { runSupportCaseAction } from "@/lib/support-api";
+import { useSupportSettings } from "@/hooks/use-support";
 import {
   COMPLAINT_LABELS,
   ESCALATION_TARGETS,
@@ -94,11 +96,20 @@ export default function CaseActions({
       void queryClient.invalidateQueries({ queryKey: ["support", "queue"] });
       void queryClient.invalidateQueries({ queryKey: ["support", "counts"] });
       if (action.action === "resolve") toast.success(`Case #${supportCase.number} resolved; the customer is asked to rate it`);
+      if (action.action === "hand-back-to-ai")
+        toast.success(`Case #${supportCase.number} is back with Solid AI`);
     },
   });
+  const settings = useSupportSettings();
 
   const resolved = supportCase.status === "resolved";
   const mine = supportCase.assigneeEmail === me;
+  // Escalations and complaints stay with a person; the service refuses them too.
+  const canHandBack =
+    settings.data?.settings.aiMode !== "off" &&
+    supportCase.status !== "ai_handling" &&
+    supportCase.status !== "escalated" &&
+    !supportCase.complaint;
 
   if (resolved) {
     return (
@@ -162,6 +173,18 @@ export default function CaseActions({
       <Button size="sm" variant="outline" onClick={() => setEscalateOpen(true)} disabled={act.isPending}>
         <Send /> Escalate
       </Button>
+
+      {canHandBack && (
+        <Button
+          size="sm"
+          variant="outline"
+          title="Solid AI takes the case again, with no owner, and answers the customer's last message if nobody has"
+          onClick={() => act.mutate({ action: "hand-back-to-ai" })}
+          disabled={act.isPending}
+        >
+          <Sparkles /> Hand back to Solid AI
+        </Button>
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
