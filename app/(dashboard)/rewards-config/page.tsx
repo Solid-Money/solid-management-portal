@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   Calendar,
@@ -885,6 +886,18 @@ export default function RewardsConfigPage() {
           description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield and counts towards the FUSE skip-the-line unlock, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Separate from the points-based referral rewards above."
           icon={<Gift className="h-5 w-5 text-pink-600" />}
         >
+          <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+            Which purchases count toward the target — excluded merchants, the
+            smallest purchase, the spend needed per merchant and the purchase
+            required after qualifying — is set on{" "}
+            <Link
+              href="/anti-abuse"
+              className="font-medium underline hover:text-indigo-700"
+            >
+              Config → Anti-abuse
+            </Link>
+            .
+          </p>
           <div className="flex items-center justify-between">
             <ToggleField
               label="Referral Cashback Enabled"
