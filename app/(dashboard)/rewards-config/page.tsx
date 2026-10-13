@@ -262,9 +262,10 @@ export default function RewardsConfigPage() {
     ];
 
     // A cleared box would go out as 0 and quietly switch a tier's subscription
-    // cashback — or the grandfathered rate — off, so it is refused instead.
-    if (caps.some((cap) => (cap as unknown) === "")) {
-      toast.error("Fill in every subscription cap before saving");
+    // cashback — or the grandfathered rate — off, so it is refused instead. A
+    // negative cap is refused for the same reason.
+    if (caps.some((cap) => (cap as unknown) === "" || Number(cap) < 0)) {
+      toast.error("Every subscription cap needs a value of $0 or more");
       return;
     }
 
