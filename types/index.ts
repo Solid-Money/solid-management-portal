@@ -2176,6 +2176,34 @@ export interface SetAccountEmailResult {
   adminUsername: string;
 }
 
+/** A user's authenticator-app 2FA (TOTP), as support sees it. Never the secret. */
+export interface TwoFactorStatus {
+  userId: string;
+  username?: string;
+  /** An authenticator was set up, finished or not. */
+  enrolled: boolean;
+  /** Setup was finished with a valid code, so every send asks for one. */
+  verified: boolean;
+  enrolledAt?: string;
+  lastUsedAt?: string;
+  failedAttempts: number;
+  /** Too many wrong codes: verification is refused until `lockedUntil`. */
+  locked: boolean;
+  lockedUntil?: string;
+}
+
+/** What the backend reports after removing an account's authenticator. */
+export interface ResetTwoFactorResult {
+  userId: string;
+  username?: string;
+  /** The removed authenticator was on — it was what blocked their sends. */
+  wasVerified: boolean;
+  enrolledAt?: string;
+  lastUsedAt?: string;
+  resetAt: string;
+  adminUsername: string;
+}
+
 /** Ledger state of a referral cashback reward, as rewards-service stores it. */
 export type ReferralRewardStatus =
   "pending" | "qualified" | "paid" | "expired" | "reversed" | "under_review";

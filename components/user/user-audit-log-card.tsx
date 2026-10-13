@@ -21,6 +21,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
     account_recovered: { label: "Account recovered", variant: "success" },
     recovery_code_sent: { label: "Recovery code sent", variant: "info" },
     account_email_set: { label: "Recovery email changed", variant: "danger" },
+    two_factor_reset: { label: "2FA reset", variant: "warning" },
     card_frozen: { label: "Card frozen", variant: "warning" },
     card_unfrozen: { label: "Card unfrozen", variant: "success" },
     card_issued: { label: "Card issued", variant: "info" },
@@ -97,6 +98,23 @@ function detailFor(entry: AdminAuditEntry): string | null {
   if (entry.action === "recovery_code_sent") {
     const emailHint = stringField(entry, "emailHint");
     return emailHint ? `sent to ${emailHint}` : null;
+  }
+
+  if (entry.action === "two_factor_reset") {
+    // When the removed authenticator was set up and last used — what a later
+    // "was that the owner's device?" is answered from. Never its secret.
+    const enrolledAt = stringField(entry, "enrolledAt");
+    const lastUsedAt = stringField(entry, "lastUsedAt");
+    if (!enrolledAt && !lastUsedAt) return null;
+    return [
+      entry.metadata?.wasVerified === false
+        ? "unfinished setup removed"
+        : "authenticator removed",
+      enrolledAt ? `set up ${formatDateTime(enrolledAt)}` : null,
+      lastUsedAt ? `last used ${formatDateTime(lastUsedAt)}` : "never used",
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   if (entry.action === "account_email_set") {

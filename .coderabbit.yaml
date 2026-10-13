@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit is the merge gate for PRs into main: it requests changes when it
+# finds issues and approves once they are fixed. The approval satisfies the
+# branch ruleset's required review, so no human approval is needed.
+# Changes to this file require a code-owner review (see .github/CODEOWNERS).
+language: en-US
+early_access: false
+
+reviews:
+  profile: chill
+  # Approve automatically once every CodeRabbit comment is resolved, the latest
+  # commit has been reviewed and no pre-merge check below is failing.
+  request_changes_workflow: true
+  # The author must not be able to `@coderabbitai approve` / `resolve` their own PR.
+  allow_author_approval: false
+  high_level_summary: true
+  review_status: true
+  # Shows which linked repositories were used as context.
+  review_details: true
+  poem: false
+  in_progress_fortune: false
+  auto_review:
+    enabled: true
+    drafts: false
+    # Empty = default branch (main) only.
+    base_branches: []
+    # Never pause: an unreviewed latest commit means no approval, which blocks merge.
+    auto_pause_after_reviewed_commits: 0
+  # A PR whose files are all excluded here is approved without review, so only
+  # exclude generated output.
+  path_filters:
+    - "!public/**"
+  path_instructions:
+    - path: "{lib/**,types/**}"
+      instructions: |
+        Client for Solid-Money/solid-backend: flash-admins-service (NEXT_PUBLIC_ADMIN_API_BASE_URL, port 5009)
+        and flash-accounts-service. Check every request path, method, param and response field against the
+        controllers and DTOs in the linked solid-backend repository and flag mismatches by name. Flag code that
+        would throw on a missing, null or renamed response field.
+    - path: "app/**"
+      instructions: |
+        Admin dashboard with access to user PII, balances, cards and money-moving admin actions. Flag:
+        pages or route handlers (app/api/**) that skip the Firebase auth check, destructive or money-moving
+        actions without a confirmation step, PII or tokens written to logs or the browser console, and
+        secrets placed in NEXT_PUBLIC_* variables (they are bundled into the client).
+    - path: "**/*.{ts,tsx}"
+      instructions: |
+        Flag changes that look committed by mistake: console.log/debugger left from debugging, commented-out
+        code, hardcoded test or mock values, temporary flags left enabled, local URLs/IPs, and secrets.
+  pre_merge_checks:
+    override_requested_reviewers_only: true
+    title:
+      mode: "off"
+    description:
+      mode: warning
+    docstrings:
+      mode: "off"
+    custom_checks:
+      - name: Backend contract match
+        mode: error
+        instructions: |
+          Fail if the PR adds or changes a call to a Solid-Money/solid-backend endpoint that, according to the
+          backend's default branch, does not exist, uses a different HTTP method, omits a required request
+          field, or reads a response field the backend does not return. Pass if no API calls changed, or if
+          the PR description links the solid-backend PR that adds the change.
+      - name: No secrets or sensitive data leaks
+        mode: error
+        instructions: |
+          Fail if the PR adds a hardcoded secret, private key or server-side API key, stores one in a
+          NEXT_PUBLIC_* variable, or logs a password, JWT, OTP, full card number (PAN), CVV or government ID.
+          Pass otherwise.
+  tools:
+    languagetool:
+      enabled: false
+    biome:
+      enabled: false
+
+chat:
+  auto_reply: true
+  allow_non_org_members: false
+
+knowledge_base:
+  learnings:
+    scope: global
+  code_guidelines:
+    enabled: true
+  linked_repositories:
+    - repository: Solid-Money/solid-backend
+      instructions: >-
+        NestJS monorepo that serves this dashboard's APIs. Admin endpoints live in
+        apps/flash-admins-service/src/**/*.controller.ts with request/response shapes in *.dto.ts;
+        user endpoints in apps/flash-accounts-service.

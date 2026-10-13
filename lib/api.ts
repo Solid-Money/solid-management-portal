@@ -22,8 +22,10 @@ import {
   VirtualAccountOnboardingState,
   RecoverAccountResult,
   RecoveryEligibility,
+  ResetTwoFactorResult,
   SendRecoveryCodeResult,
   SetAccountEmailResult,
+  TwoFactorStatus,
   ReferralReevaluationResult,
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
@@ -554,6 +556,28 @@ export const setAccountEmail = (
   api.post<{ data: SetAccountEmailResult }>(
     `/admin/v1/users/${userId}/account/email`,
     { email, reason },
+  );
+
+/**
+ * Whether this user has authenticator-app 2FA, when it was set up and last
+ * used, and whether wrong codes have locked it. Read-only; never the secret.
+ */
+export const getTwoFactorStatus = (userId: string) =>
+  api.get<{ data: TwoFactorStatus }>(
+    `/admin/v1/users/${userId}/account/two-factor`,
+  );
+
+/**
+ * Remove this user's authenticator-app 2FA, for an owner who lost the device
+ * it lived on. Sends stop asking for a code until they set 2FA up again, so it
+ * is only ever run once the request has been tied to the owner. The reason is
+ * required; it is written to the audit trail and posted to Slack with the
+ * admin's name. Refused with a 409 when there is nothing to reset.
+ */
+export const resetTwoFactor = (userId: string, reason: string) =>
+  api.post<{ data: ResetTwoFactorResult }>(
+    `/admin/v1/users/${userId}/account/two-factor/reset`,
+    { reason },
   );
 
 /**
