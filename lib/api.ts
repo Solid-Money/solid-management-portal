@@ -1,9 +1,12 @@
 import axios from "axios";
 import { auth } from "./firebase";
 import { toast } from "sonner";
+import { formatErrorRef, requestIdOf } from "@/lib/error-ref";
 import {
   AdminAuditEntry,
   AdminUserReferrals,
+  ClientErrorMatch,
+  ClientErrorReport,
   BatchIssueTierTrialRequest,
   BatchIssueTierTrialResult,
   CardAuditEntry,
@@ -32,6 +35,16 @@ import {
   TierMembershipView,
   TierTrialView,
 } from "@/types";
+
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /**
+     * Skip the global error toast: for background reads (polling, side
+     * cards) whose screen shows its own state when they fail.
+     */
+    quietErrors?: boolean;
+  }
+}
 import {
   CardHolds,
   ReleaseCardHoldRequest,
@@ -76,21 +89,59 @@ api.interceptors.request.use(
   },
 );
 
+/**
+ * The backend's own reason for a failed admin call. Validation errors arrive as
+ * an array of messages; axios's "Request failed with status code 500" says
+ * nothing an admin can act on, so it is replaced.
+ */
+export function describeApiError(error: unknown): string {
+  const response = (
+    error as { response?: { status?: number; data?: { message?: unknown } } }
+  )?.response;
+  const message = response?.data?.message;
+  if (Array.isArray(message)) {
+    const joined = message.filter((m) => typeof m === "string").join(" ");
+    if (joined) return joined;
+  }
+  if (typeof message === "string" && message.trim()) return message;
+  if (!response) return "Couldn't reach the server. Check your connection.";
+  return `The server couldn't complete this (${response.status ?? "error"}).`;
+}
+
 // Add response interceptor for better error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.config?.quietErrors) {
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401) {
       console.error(
         "[API] Unauthorized request - token may be invalid or expired",
       );
-      toast.error("Session expired. Please sign in again.");
+      toast.error("Session expired. Please sign in again.", {
+        id: "session-expired",
+      });
     } else {
-      const message =
-        error.response?.data?.message ||
-        error.message ||
-        "An unexpected error occurred";
-      toast.error(message);
+      const message = describeApiError(error);
+      // The request ID ties this toast to the backend's log lines
+      // (`rid=<id>` in Loki); shown as the same short Ref the app uses.
+      const requestId = requestIdOf(error);
+      const ref = requestId ? formatErrorRef(requestId) : undefined;
+      toast.error(message, {
+        // One toast per distinct failure: retries and duplicate calls update it
+        // instead of stacking copies.
+        id: `api-error:${error.response?.status ?? "network"}:${message}`,
+        description: ref ? `Ref ${ref}` : undefined,
+        // The full request ID: unambiguous in Loki and GlitchTip, where the
+        // 8-character Ref may match more than one event.
+        action: requestId
+          ? {
+              label: "Copy ID",
+              onClick: () => void navigator.clipboard?.writeText(requestId),
+            }
+          : undefined,
+      });
     }
     return Promise.reject(error);
   },
@@ -456,6 +507,22 @@ export const retryVirtualAccountOnboarding = (
 /** Every admin action taken on this user, newest first. */
 export const getUserAuditLog = (userId: string) =>
   api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
+
+/**
+ * The failures behind an error Ref a user shared (`9C1B-4F2A`), or behind a
+ * full GlitchTip event ID or request ID. An 8-character Ref can repeat over
+ * months, so each match carries its user.
+ */
+export const lookupClientErrors = (query: string) =>
+  api.get<{ data: ClientErrorMatch[] }>("/admin/v1/errors", {
+    params: { query },
+  });
+
+/** The failures the app showed this user, newest first. */
+export const getUserClientErrors = (userId: string, limit = 20) =>
+  api.get<{ data: ClientErrorReport[] }>(`/admin/v1/errors/users/${userId}`, {
+    params: { limit },
+  });
 
 /**
  * Whether this user can get back in on their own, and what is stopping them.

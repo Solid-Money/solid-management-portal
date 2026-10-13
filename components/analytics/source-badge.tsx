@@ -1,45 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import { formatDistanceStrict } from "date-fns";
+import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { cn } from "@/lib/utils";
-
-/**
- * A shared clock that ticks once a minute.
- *
- * The badge needs "how old is this data", which means reading the clock — an
- * external mutable source, not a pure input. `useSyncExternalStore` is the
- * sanctioned way to read one: the snapshot is stable between ticks (so renders
- * are idempotent), the server snapshot is null (so nothing is rendered against
- * the build machine's clock), and one interval is shared by every badge on the
- * page rather than one per badge.
- */
-const clock = (() => {
-  let tick = Date.now();
-  const listeners = new Set<() => void>();
-  let timer: ReturnType<typeof setInterval> | null = null;
-
-  return {
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      timer ??= setInterval(() => {
-        tick = Date.now();
-        for (const notify of listeners) notify();
-      }, 60_000);
-
-      return () => {
-        listeners.delete(listener);
-        if (listeners.size === 0 && timer) {
-          clearInterval(timer);
-          timer = null;
-        }
-      };
-    },
-    getSnapshot: () => tick,
-    /** No clock on the server: the age resolves after hydration. */
-    getServerSnapshot: () => null,
-  };
-})();
 
 /**
  * Where a panel's numbers come from.
@@ -101,11 +64,7 @@ interface SourceBadgeProps {
 }
 
 export function SourceBadge({ source, updatedAt, className }: SourceBadgeProps) {
-  const now = useSyncExternalStore(
-    clock.subscribe,
-    clock.getSnapshot,
-    clock.getServerSnapshot
-  );
+  const now = useMinuteClock();
 
   const age =
     updatedAt && now !== null ? now - new Date(updatedAt).getTime() : null;

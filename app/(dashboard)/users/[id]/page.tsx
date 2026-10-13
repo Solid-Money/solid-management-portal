@@ -11,12 +11,14 @@ import ActivityList from "@/components/activity-list";
 import BalancesCard from "@/components/balances-card";
 import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
+import UserErrors from "@/components/errors/user-errors";
 import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
+import UserErrorsCard from "@/components/user/user-errors-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
-import UserIntercomCard from "@/components/user/user-intercom-card";
+import UserSupportCard from "@/components/user/user-support-card";
 import UserKycCard from "@/components/user/user-kyc-card";
 import UserVirtualAccountOnboardingCard from "@/components/user/user-virtual-account-onboarding-card";
 import UserProfileCard from "@/components/user/user-profile-card";
@@ -188,6 +190,7 @@ export default function UserDetailPage({
           <TabsTrigger value="card">Card &amp; spending</TabsTrigger>
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
           <TabsTrigger value="support">Support</TabsTrigger>
+          <TabsTrigger value="errors">Errors</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -292,8 +295,14 @@ export default function UserDetailPage({
           {/* First on the tab: a lockout ticket is answered by whether they can
               recover on their own, before anything else is worth reading. */}
           <UserRecoveryCard userId={id} username={displayName} />
-          <UserIntercomCard userId={id} />
+          {/* Above the chats: a Ref quoted in one resolves here without a lookup. */}
+          <UserErrorsCard userId={id} />
+          <UserSupportCard userId={id} />
           <UserAuditLogCard userId={id} />
+        </TabsContent>
+
+        <TabsContent value="errors">
+          <UserErrors userId={id} />
         </TabsContent>
       </Tabs>
     </div>
