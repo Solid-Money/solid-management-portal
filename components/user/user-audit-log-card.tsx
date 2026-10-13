@@ -19,6 +19,9 @@ type BadgeVariant = "warning" | "success" | "info" | "danger" | "muted";
 const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
   {
     account_recovered: { label: "Account recovered", variant: "success" },
+    recovery_code_sent: { label: "Recovery code sent", variant: "info" },
+    account_email_set: { label: "Recovery email changed", variant: "danger" },
+    two_factor_reset: { label: "2FA reset", variant: "warning" },
     card_frozen: { label: "Card frozen", variant: "warning" },
     card_unfrozen: { label: "Card unfrozen", variant: "success" },
     card_issued: { label: "Card issued", variant: "info" },
@@ -43,6 +46,19 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Referral reward re-evaluated",
       variant: "info",
     },
+    tier_lock_reevaluated: { label: "Tier lock re-evaluated", variant: "info" },
+    cashback_failed_reevaluated: {
+      label: "Failed cashback re-sent",
+      variant: "info",
+    },
+    kyc_verification_reset: {
+      label: "KYC verification reset",
+      variant: "warning",
+    },
+    virtual_account_onboarding_retried: {
+      label: "Virtual account resubmitted",
+      variant: "info",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
@@ -64,6 +80,52 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "referral_reward_reevaluated") {
     return referralReevaluationDetail(entry);
+  }
+
+  if (entry.action === "cashback_failed_reevaluated") {
+    const count = entry.metadata?.rearmed;
+    return typeof count === "number"
+      ? `${count} row${count === 1 ? "" : "s"} back in the retry queue`
+      : null;
+  }
+
+  if (entry.action === "tier_lock_reevaluated") {
+    const from = stringField(entry, "lockTierBefore");
+    const to = stringField(entry, "lockTierAfter");
+    return from && to ? `lock grants ${from} → ${to}` : null;
+  }
+
+  if (entry.action === "recovery_code_sent") {
+    const emailHint = stringField(entry, "emailHint");
+    return emailHint ? `sent to ${emailHint}` : null;
+  }
+
+  if (entry.action === "two_factor_reset") {
+    // When the removed authenticator was set up and last used — what a later
+    // "was that the owner's device?" is answered from. Never its secret.
+    const enrolledAt = stringField(entry, "enrolledAt");
+    const lastUsedAt = stringField(entry, "lastUsedAt");
+    if (!enrolledAt && !lastUsedAt) return null;
+    return [
+      entry.metadata?.wasVerified === false
+        ? "unfinished setup removed"
+        : "authenticator removed",
+      enrolledAt ? `set up ${formatDateTime(enrolledAt)}` : null,
+      lastUsedAt ? `last used ${formatDateTime(lastUsedAt)}` : "never used",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  if (entry.action === "account_email_set") {
+    // Both addresses in full: this row is the record of which inbox was put in
+    // control of the account, and a masked one could not settle a later
+    // dispute about it.
+    const previous = stringField(entry, "previousEmail");
+    const next =
+      stringField(entry, "email") ?? stringField(entry, "attemptedEmail");
+    if (!next) return null;
+    return `${previous ?? "none on file"} → ${next}`;
   }
 
   const cardId = stringField(entry, "cardId");

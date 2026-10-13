@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   Calendar,
@@ -266,14 +267,17 @@ export default function RewardsConfigPage() {
         tier1CategoryLimit: Number(
           config.subscriptionDiscount.tier1.categoryLimit,
         ),
+        tier1MonthlyCap: Number(config.subscriptionDiscount.tier1.monthlyCap),
         tier2Percentage: Number(config.subscriptionDiscount.tier2.percentage),
         tier2CategoryLimit: Number(
           config.subscriptionDiscount.tier2.categoryLimit,
         ),
+        tier2MonthlyCap: Number(config.subscriptionDiscount.tier2.monthlyCap),
         tier3Percentage: Number(config.subscriptionDiscount.tier3.percentage),
         tier3CategoryLimit: Number(
           config.subscriptionDiscount.tier3.categoryLimit,
         ),
+        tier3MonthlyCap: Number(config.subscriptionDiscount.tier3.monthlyCap),
       },
       "subscriptionDiscount",
     );
@@ -885,6 +889,18 @@ export default function RewardsConfigPage() {
           description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield and counts towards the FUSE skip-the-line unlock, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Separate from the points-based referral rewards above."
           icon={<Gift className="h-5 w-5 text-pink-600" />}
         >
+          <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+            Which purchases count toward the target — excluded merchants, the
+            smallest purchase, the spend needed per merchant and the purchase
+            required after qualifying — is set on{" "}
+            <Link
+              href="/anti-abuse"
+              className="font-medium underline hover:text-indigo-700"
+            >
+              Config → Anti-abuse
+            </Link>
+            .
+          </p>
           <div className="flex items-center justify-between">
             <ToggleField
               label="Referral Cashback Enabled"
@@ -1365,7 +1381,7 @@ export default function RewardsConfigPage() {
         {/* Subscription Discount */}
         <ConfigSection
           title="Category-based Subscription Discounts"
-          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins), paid as soUSD and drawn from the same monthly cashback cap."
+          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins). Each tier has its own monthly cap on subscription cashback across all categories together (Core $50, Prime $100, Ultra $200) — there is no per-service cap, except on grandfathered subscriptions still paid at the old flat rate. Paid as soUSD and also drawn from the card cashback monthly cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
         >
           <ToggleField
@@ -1376,7 +1392,7 @@ export default function RewardsConfigPage() {
           />
           <div className="mt-4 max-w-xs">
             <InputField
-              label="Max Cashback / Service / Month"
+              label="Grandfathered Cap / Payment"
               value={config.subscriptionDiscount.eligibleAmountCap}
               onChange={(v) =>
                 handleNumericUpdate(
@@ -1387,7 +1403,7 @@ export default function RewardsConfigPage() {
               }
               type="number"
               suffix="$"
-              tooltip="Most cashback one eligible service can earn in a calendar month (e.g. $50). Caps the cashback, NOT the charge: a $600 subscription at Prime's 10% earns $50, not 10% of the first $50. Rewards Terms §5 promises this figure — changing it changes what the published terms owe."
+              tooltip="Applies ONLY to grandfathered subscriptions — ones a member was already being paid on before the category rates took effect, which keep the old flat rate (Prime 25%, Ultra 50%). Most cashback one such payment can earn at that rate (e.g. $50). If the category rate pays more on the charge, the member gets that instead. Category-rate charges are not capped per payment, only by each tier's Monthly Cap below. Rewards Terms §6 promises $50 per payment — changing it changes what the published terms owe."
             />
           </div>
           <div className="mt-4 space-y-3">
@@ -1504,6 +1520,20 @@ export default function RewardsConfigPage() {
                 type="number"
                 tooltip="Number of subscription categories this tier can earn a discount on per month (Core 0, Prime 2, Ultra 4)"
               />
+              <InputField
+                label="Monthly Cap"
+                value={config.subscriptionDiscount.tier1.monthlyCap}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier1.monthlyCap",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="$"
+                tooltip="Most subscription cashback Core can earn in a calendar month, across all its categories together — not per service (default $50). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
+              />
             </TierCard>
             <TierCard tier="Tier 2">
               <InputField
@@ -1539,6 +1569,20 @@ export default function RewardsConfigPage() {
                 type="number"
                 tooltip="Number of subscription categories this tier can earn a discount on per month (Prime: 2)"
               />
+              <InputField
+                label="Monthly Cap"
+                value={config.subscriptionDiscount.tier2.monthlyCap}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier2.monthlyCap",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="$"
+                tooltip="Most subscription cashback Prime can earn in a calendar month, across all its categories together — not per service (default $100). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
+              />
             </TierCard>
             <TierCard tier="Tier 3">
               <InputField
@@ -1573,6 +1617,20 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 tooltip="Number of subscription categories this tier can earn a discount on per month (Ultra: 4)"
+              />
+              <InputField
+                label="Monthly Cap"
+                value={config.subscriptionDiscount.tier3.monthlyCap}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier3.monthlyCap",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="$"
+                tooltip="Most subscription cashback Ultra can earn in a calendar month, across all its categories together — not per service (default $200). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
               />
             </TierCard>
           </TierGrid>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyableValue } from "@/components/ui/copy-button";
 import RecoverAccountDialog from "@/components/user/recover-account-dialog";
+import UserTwoFactorField from "@/components/user/user-two-factor-field";
 
 function Field({
   label,
@@ -31,6 +32,11 @@ const KYC_VARIANT: Record<string, "success" | "warning" | "danger" | "muted"> = 
   approved: "success",
   under_review: "warning",
   rejected: "danger",
+};
+
+const CARD_PROVIDER_LABEL: Record<string, string> = {
+  rain: "Rain",
+  wirex: "Wirex",
 };
 
 /**
@@ -81,6 +87,12 @@ export default function UserProfileCard({ user }: { user: User }) {
                 />
               </span>
             </div>
+          </Field>
+          <Field label="Two-factor (authenticator app)" wide>
+            <UserTwoFactorField
+              userId={user._id}
+              username={user.username || user.email || user._id}
+            />
           </Field>
           <Field label="User ID" wide>
             <CopyableValue value={user._id} label="User ID" />
@@ -171,6 +183,33 @@ export default function UserProfileCard({ user }: { user: User }) {
               </span>
             )}
           </Field>
+
+          {user.cardCustomers?.map((customer, i) => {
+            const label = `${CARD_PROVIDER_LABEL[customer.provider] ?? customer.provider} user ID`;
+            return (
+              <Field
+                key={`${customer.provider}-${customer.providerUserId ?? i}`}
+                label={label}
+                wide
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  {customer.providerUserId ? (
+                    <CopyableValue
+                      value={customer.providerUserId}
+                      label={label}
+                    />
+                  ) : (
+                    <span className="text-gray-500">
+                      Not registered with the issuer yet
+                    </span>
+                  )}
+                  <Badge variant={KYC_VARIANT[customer.kycStatus] ?? "muted"}>
+                    {customer.kycStatus}
+                  </Badge>
+                </div>
+              </Field>
+            );
+          })}
 
           {user.bridgeCustomers && user.bridgeCustomers.length > 0 && (
             <Field label="Bridge.xyz customers (legacy)" wide>

@@ -12,6 +12,7 @@ import {
 } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ReevaluateTierLockDialog from "@/components/user/reevaluate-tier-lock-dialog";
 
 const TIER_VARIANT: Record<string, "info" | "success"> = {
   prime: "info",
@@ -108,7 +109,7 @@ export default function UserTierMembershipCard({
   const lock = state?.lock;
 
   return (
-    <Card>
+    <Card className="@container">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-emerald-600" />
@@ -138,7 +139,7 @@ export default function UserTierMembershipCard({
           </p>
         ) : (
           <div className="space-y-4">
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
               <Stat label="Current tier" value={state.currentTier} />
               <Stat
                 label="Member since"
@@ -163,11 +164,14 @@ export default function UserTierMembershipCard({
 
             {lock && lock.lockedFuse > 0 ? (
               <div className="rounded-md border border-gray-200 p-3">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
-                  <Lock className="h-3.5 w-3.5 text-gray-500" />
-                  Locked FUSE
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                    <Lock className="h-3.5 w-3.5 text-gray-500" />
+                    Locked FUSE
+                  </div>
+                  <ReevaluateTierLockDialog userId={userId} />
                 </div>
-                <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Locked" value={formatFuse(lock.lockedFuse)} />
                   <Stat
                     label="Unlocks tier"
@@ -206,7 +210,7 @@ export default function UserTierMembershipCard({
                     {STATUS_LABEL[subscription.status]}
                   </Badge>
                 </div>
-                <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Tier" value={subscription.tier} />
                   <Stat label="Price" value={`$${subscription.priceUsd}/yr`} />
                   <Stat

@@ -21,6 +21,8 @@ export type ErrorFlow =
 
 // ───────────────────────────── Backend → portal rows
 export interface ErrorEventRefs {
+  errorRef?: string;          // the Ref the user saw, e.g. 9C1B-4F2A
+  requestId?: string;         // X-Request-Id of the failed call; matches backend `rid=` lines
   activityId?: string;
   clientTxId?: string;
   temporalWorkflowId?: string;

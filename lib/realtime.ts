@@ -34,6 +34,31 @@ export function isAdminCardTransactionChange(
 }
 
 /**
+ * What admins-service tells the portal when the support inbox changes: ids
+ * only, the portal reads the content over REST.
+ */
+export interface SupportQueueChange {
+  conversationId: string;
+  caseId?: string;
+  seq?: number;
+  reason: "message" | "case" | "handoff" | "ai_draft";
+  urgent?: boolean;
+}
+
+const SUPPORT_REASONS = new Set(["message", "case", "handoff", "ai_draft"]);
+
+export function isSupportQueueChange(value: unknown): value is SupportQueueChange {
+  if (!value || typeof value !== "object") return false;
+  const change = value as Record<string, unknown>;
+  return (
+    typeof change.conversationId === "string" &&
+    /^[a-f0-9]{24}$/i.test(change.conversationId) &&
+    typeof change.reason === "string" &&
+    SUPPORT_REASONS.has(change.reason)
+  );
+}
+
+/**
  * The socket's origin and path, from the same base URL the API client uses.
  * Socket.IO reads a path in the URL as a namespace, so any path the API is
  * mounted under goes on the Engine.IO path instead.

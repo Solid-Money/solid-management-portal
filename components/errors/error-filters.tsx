@@ -164,7 +164,7 @@ export function ErrorFiltersBar({
       />
       <SearchField
         label="Search"
-        placeholder="Title, message or code"
+        placeholder="Title, message, code or Ref"
         icon={Search}
         value={state.q ?? ""}
         onCommit={(q) => update({ q })}

@@ -39,6 +39,7 @@ import {
   getErrorGroup,
   glitchtipIssueUrl,
   grafanaExploreUrl,
+  requestLogsQuery,
   labelFor,
   patchCachedGroup,
   PLATFORM_LABELS,
@@ -464,6 +465,26 @@ function OccurrenceDetail({
       </span>,
     ]);
   }
+  if (row.refs?.errorRef) {
+    facts.push([
+      "Ref",
+      <span key="ref" className="inline-flex items-center gap-2">
+        <CopyableValue value={row.refs.errorRef} label="Ref" />
+        <Link
+          href={`/error-lookup?ref=${encodeURIComponent(row.refs.errorRef)}`}
+          className="text-xs text-indigo-600 hover:text-indigo-800"
+        >
+          Look up
+        </Link>
+      </span>,
+    ]);
+  }
+  if (row.refs?.requestId) {
+    facts.push([
+      "Request ID",
+      <CopyableValue key="rid" value={row.refs.requestId} label="Request ID" truncate />,
+    ]);
+  }
   if (row.refs?.activityId) {
     facts.push([
       "Activity",
@@ -505,7 +526,13 @@ function OpenIn({ occurrence }: { occurrence: ErrorEventRow | null }) {
   const links = [
     { label: "Temporal", href: temporalWorkflowUrl(refs?.temporalWorkflowId) },
     { label: "GlitchTip", href: glitchtipIssueUrl(refs?.glitchtipIssueId) },
-    { label: "Grafana logs", href: grafanaExploreUrl(refs?.lokiQuery, occurrence?.ts) },
+    {
+      label: "Grafana logs",
+      href: grafanaExploreUrl(
+        refs?.lokiQuery ?? requestLogsQuery(refs?.requestId),
+        occurrence?.ts
+      ),
+    },
     { label: "Amplitude", href: occurrence?.userId ? amplitudeUrl() : null },
   ].filter((link): link is { label: string; href: string } => !!link.href);
 

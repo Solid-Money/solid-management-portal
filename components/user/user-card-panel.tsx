@@ -23,6 +23,8 @@ import { CopyableValue } from "@/components/ui/copy-button";
 import FreezeCardDialog from "@/components/user/freeze-card-dialog";
 import IssueCardDialog from "@/components/user/issue-card-dialog";
 import UnblockCardSpendDialog from "@/components/user/unblock-card-spend-dialog";
+import CardHoldsSection from "@/components/user/card-holds-section";
+import CardUncollectedSection from "@/components/user/card-uncollected-section";
 
 const PROVIDER_LABELS: Record<string, string> = {
   rain: "Rain",
@@ -481,7 +483,11 @@ export default function UserCardPanel({
               </div>
               <div className="col-span-2">
                 <dt className="text-xs font-medium uppercase text-gray-500">
-                  Issuer customer ID
+                  {/* Wirex keys card calls on the wallet, not on its own user
+                      id — that one is in the profile card. */}
+                  {card.provider === "wirex"
+                    ? "Issuer customer ID (wallet)"
+                    : "Issuer customer ID"}
                 </dt>
                 <dd className="mt-1">
                   <CopyableValue
@@ -499,6 +505,13 @@ export default function UserCardPanel({
             />
 
             <WirexSpendBreakdown card={card} />
+
+            {card.provider === "wirex" && (
+              <>
+                <CardUncollectedSection userId={userId} username={username} />
+                <CardHoldsSection userId={userId} username={username} />
+              </>
+            )}
 
             <FreezeExplanation card={card} />
           </>

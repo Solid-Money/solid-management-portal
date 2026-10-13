@@ -16,9 +16,13 @@ import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
+import UserErrorsCard from "@/components/user/user-errors-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
-import UserIntercomCard from "@/components/user/user-intercom-card";
+import UserSupportCard from "@/components/user/user-support-card";
+import UserKycCard from "@/components/user/user-kyc-card";
+import UserVirtualAccountOnboardingCard from "@/components/user/user-virtual-account-onboarding-card";
 import UserProfileCard from "@/components/user/user-profile-card";
+import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserReferralCard from "@/components/user/user-referral-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
@@ -230,6 +234,17 @@ export default function UserDetailPage({
         </TabsContent>
 
         <TabsContent value="card" className="space-y-4">
+          {/* Above the card itself, because verification is the gate the card
+              is behind: a declined KYC is why most "where is my card?" tickets
+              exist, and the reason codes here are what answer them. */}
+          <UserKycCard userId={id} username={displayName} />
+          {/* The USD virtual account has its own verification and its own Rain
+              review, so it gets stuck in places the card's KYC card does not
+              show — and "I paid but got no account" lands on this tab. */}
+          <UserVirtualAccountOnboardingCard
+            userId={id}
+            username={displayName}
+          />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UserCardPanel
               userId={id}
@@ -277,7 +292,12 @@ export default function UserDetailPage({
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
-          <UserIntercomCard userId={id} />
+          {/* First on the tab: a lockout ticket is answered by whether they can
+              recover on their own, before anything else is worth reading. */}
+          <UserRecoveryCard userId={id} username={displayName} />
+          {/* Above the chats: a Ref quoted in one resolves here without a lookup. */}
+          <UserErrorsCard userId={id} />
+          <UserSupportCard userId={id} />
           <UserAuditLogCard userId={id} />
         </TabsContent>
 

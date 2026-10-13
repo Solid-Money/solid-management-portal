@@ -1,0 +1,5 @@
+# Everything else merges on CodeRabbit's approval alone. Changes to the review
+# gate itself (CodeRabbit config, CI workflows, this file) also need a
+# code-owner approval, so a PR cannot switch off its own review.
+/.coderabbit.yaml @MusabShakeel576 @Marksmargon
+/.github/ @MusabShakeel576 @Marksmargon

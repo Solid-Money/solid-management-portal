@@ -209,7 +209,7 @@ export interface ErrorFilters {
   platform?: string;
   /** Username, email or user id — the server resolves which. */
   user?: string;
-  /** Free text in the title, message or code. */
+  /** Free text in the title, message or code; a pasted Ref or request id matches exactly. */
   q?: string;
 }
 
@@ -557,6 +557,15 @@ const AMPLITUDE_ORG_URL = baseUrl(process.env.NEXT_PUBLIC_AMPLITUDE_ORG_URL);
 export function glitchtipIssueUrl(issueId?: string): string | null {
   if (!issueId || !GLITCHTIP_URL) return null;
   return `${GLITCHTIP_URL}/issues/${encodeURIComponent(issueId)}`;
+}
+
+/**
+ * LogQL for every backend line a request wrote: its id is on each of them as
+ * `rid=` (text logs) or `requestId` (JSON logs).
+ */
+export function requestLogsQuery(requestId?: string): string | undefined {
+  if (!requestId || !/^[0-9a-f]{32}$/.test(requestId)) return undefined;
+  return `{namespace="solid-backend"} |= "${requestId}"`;
 }
 
 /**
