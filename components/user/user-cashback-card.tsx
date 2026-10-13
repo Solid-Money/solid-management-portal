@@ -42,7 +42,7 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
   ).length;
 
   return (
-    <Card>
+    <Card className="@container">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Percent className="h-4 w-4 text-gray-400" />
@@ -71,7 +71,7 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
           <p className="text-sm text-red-600">Failed to load cashback.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 @lg:grid-cols-4">
               <div>
                 <p className="text-xs uppercase text-gray-500">Paid</p>
                 <p className="text-sm font-semibold text-gray-900">

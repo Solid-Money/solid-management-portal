@@ -28,8 +28,8 @@ export default function ContextPanel({ conversationId }: { conversationId: strin
   const username = conversation.userLabel ?? "";
 
   return (
-    <aside className="min-h-0 space-y-3 overflow-y-auto">
-      <section className="rounded-lg bg-white p-3 shadow-sm">
+    <aside className="scrollbar-subtle h-full min-h-0 space-y-3 overflow-y-auto pr-1">
+      <section className="rounded-xl border bg-white p-4 shadow-sm">
         <h3 className="text-sm font-semibold text-gray-900">Customer</h3>
         <dl className="mt-2 space-y-1 text-xs">
           <div className="flex justify-between gap-2">
@@ -66,7 +66,7 @@ export default function ContextPanel({ conversationId }: { conversationId: strin
         )}
       </section>
 
-      <section className="rounded-lg bg-white p-3 shadow-sm">
+      <section className="rounded-xl border bg-white p-4 shadow-sm">
         <h3 className="text-sm font-semibold text-gray-900">Support history</h3>
         <ul className="mt-2 space-y-1.5">
           {cases.map((c) => (
@@ -83,7 +83,7 @@ export default function ContextPanel({ conversationId }: { conversationId: strin
       </section>
 
       {userId && (
-        <div className="space-y-3 [&_[data-slot=card]]:shadow-sm">
+        <div className="space-y-3 [&_[data-slot=card-header]]:flex-wrap [&_[data-slot=card-header]]:gap-2 [&_[data-slot=card]]:shadow-sm">
           <UserKycCard userId={userId} username={username} />
           <UserTierMembershipCard userId={userId} />
           <UserCashbackCard userId={userId} />

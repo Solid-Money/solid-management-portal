@@ -43,7 +43,7 @@ function InboxScreen({ me }: { me: SupportMe }) {
   const agents = me.agents.length ? me.agents : [me.email];
 
   return (
-    <div className="-mx-2 grid h-[calc(100vh-7.5rem)] grid-cols-1 gap-3 lg:grid-cols-[21rem_minmax(0,1fr)] xl:grid-cols-[21rem_minmax(0,1fr)_20rem]">
+    <div className="-mx-2 grid h-[calc(100vh-7.5rem)] grid-cols-1 gap-3 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)_22rem] 2xl:grid-cols-[21rem_minmax(0,1fr)_24rem]">
       <QueueList
         view={view}
         query={query}
