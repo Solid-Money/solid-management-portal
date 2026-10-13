@@ -11,6 +11,7 @@ import ActivityList from "@/components/activity-list";
 import BalancesCard from "@/components/balances-card";
 import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
+import UserErrors from "@/components/errors/user-errors";
 import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
@@ -189,6 +190,7 @@ export default function UserDetailPage({
           <TabsTrigger value="card">Card &amp; spending</TabsTrigger>
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
           <TabsTrigger value="support">Support</TabsTrigger>
+          <TabsTrigger value="errors">Errors</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -297,6 +299,10 @@ export default function UserDetailPage({
           <UserErrorsCard userId={id} />
           <UserSupportCard userId={id} />
           <UserAuditLogCard userId={id} />
+        </TabsContent>
+
+        <TabsContent value="errors">
+          <UserErrors userId={id} />
         </TabsContent>
       </Tabs>
     </div>
