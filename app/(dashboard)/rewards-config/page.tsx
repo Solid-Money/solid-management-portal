@@ -254,6 +254,20 @@ export default function RewardsConfigPage() {
   const saveSubscriptionDiscountConfig = async () => {
     if (!config) return;
 
+    const caps = [
+      config.subscriptionDiscount.eligibleAmountCap,
+      config.subscriptionDiscount.tier1.monthlyCap,
+      config.subscriptionDiscount.tier2.monthlyCap,
+      config.subscriptionDiscount.tier3.monthlyCap,
+    ];
+
+    // A cleared box would go out as 0 and quietly switch a tier's subscription
+    // cashback — or the grandfathered rate — off, so it is refused instead.
+    if (caps.some((cap) => (cap as unknown) === "")) {
+      toast.error("Fill in every subscription cap before saving");
+      return;
+    }
+
     await saveSection(
       "Subscription Discount",
       "subscription-discount",
