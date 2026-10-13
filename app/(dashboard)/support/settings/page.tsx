@@ -67,6 +67,25 @@ const MODES: Array<{ value: SupportSettings["aiMode"]; label: string; help: stri
   { value: "on", label: "On", help: "Solid AI answers intents on the allowlist when it is confident; everything else is drafted or handed off." },
 ];
 
+/** The topics an admin can allow; the always-human ones are listed separately. */
+const ANSWERABLE_INTENTS: string[] = SUPPORT_INTENTS.filter((intent) => !ALWAYS_HUMAN_INTENTS.has(intent));
+
+/** How the change history and the save bar name each setting. */
+const FIELD_LABELS: Record<string, string> = {
+  aiMode: "AI mode",
+  intentAllowlist: "Topics",
+  guidance: "Guidance",
+  glossary: "Glossary",
+  coreFacts: "Core facts",
+  expectedReplyText: "Expected reply time",
+  missingFundsThresholdUsd: "Missing-money limit",
+  businessHours: "Business hours",
+  onCall: "On-call",
+  agentProfiles: "Agents",
+  incidents: "Incidents",
+};
+const fieldLabel = (key: string) => FIELD_LABELS[key] ?? key;
+
 type Draft = Pick<
   SupportSettings,
   | "aiMode"
@@ -223,7 +242,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
     );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-24">
+    <div className="mx-auto max-w-5xl space-y-6 pb-24">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Support settings</h1>
@@ -253,17 +272,26 @@ function SettingsScreen({ me }: { me: SupportMe }) {
           ))}
         </div>
 
-        <div className="mt-5">
-          <Label>Intents Solid AI may answer on its own (mode On)</Label>
-          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {SUPPORT_INTENTS.map((intent) => {
-              const humanOnly = ALWAYS_HUMAN_INTENTS.has(intent);
+        <div className="mt-6">
+          <div className="flex items-baseline justify-between gap-3">
+            <Label>Topics Solid AI may answer on its own (mode On)</Label>
+            <div className="flex gap-3 text-xs">
+              <button type="button" className="text-indigo-600 hover:underline" onClick={() => set("intentAllowlist", ANSWERABLE_INTENTS)}>
+                Select all
+              </button>
+              <button type="button" className="text-indigo-600 hover:underline" onClick={() => set("intentAllowlist", [])}>
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-gray-200 p-3 sm:grid-cols-3 lg:grid-cols-4">
+            {ANSWERABLE_INTENTS.map((intent) => {
               const checked = draft.intentAllowlist.includes(intent);
               return (
-                <label key={intent} className={cn("flex items-center gap-2 text-sm", humanOnly && "text-gray-400")} title={humanOnly ? "Always goes to a human" : undefined}>
+                <label key={intent} className="flex cursor-pointer items-center gap-2 text-sm text-gray-800">
                   <input
                     type="checkbox"
-                    disabled={humanOnly}
+                    className="h-4 w-4 accent-indigo-600"
                     checked={checked}
                     onChange={() =>
                       set("intentAllowlist", checked ? draft.intentAllowlist.filter((i) => i !== intent) : [...draft.intentAllowlist, intent])
@@ -274,37 +302,74 @@ function SettingsScreen({ me }: { me: SupportMe }) {
               );
             })}
           </div>
+          <p className="mt-2 text-xs text-gray-500">
+            Always handled by a person: {[...ALWAYS_HUMAN_INTENTS].map((intent) => intentLabel(intent)).join(", ")}. Anything
+            else Solid AI hands off with its reply, and the case goes to Needs a human.
+          </p>
         </div>
+      </Section>
 
-        <div className="mt-5 grid gap-4">
+      <Section
+        title="What Solid AI knows"
+        description="Solid AI quotes numbers only from here, its account tools and the help center. Changes apply to the next turn."
+      >
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <Label htmlFor="core-facts">Core facts (fees, limits, networks)</Label>
+              <span className="text-xs text-gray-400">{draft.coreFacts.length} characters</span>
+            </div>
+            <Textarea
+              id="core-facts"
+              className="scrollbar-subtle h-96 resize-y field-sizing-fixed leading-relaxed"
+              value={draft.coreFacts}
+              onChange={(e) => set("coreFacts", e.target.value)}
+            />
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="guidance">Tone and policy guidance</Label>
-            <Textarea id="guidance" rows={5} value={draft.guidance} onChange={(e) => set("guidance", e.target.value)} />
+            <Textarea
+              id="guidance"
+              className="scrollbar-subtle h-44 resize-y field-sizing-fixed leading-relaxed"
+              value={draft.guidance}
+              onChange={(e) => set("guidance", e.target.value)}
+            />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="glossary">Glossary (one product term per line, never translated)</Label>
-              <Textarea id="glossary" rows={5} value={draft.glossary} onChange={(e) => set("glossary", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="core-facts">Core facts (fees, limits, networks)</Label>
-              <Textarea id="core-facts" rows={5} value={draft.coreFacts} onChange={(e) => set("coreFacts", e.target.value)} />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="expected">Expected reply text (shown in acknowledgements)</Label>
-              <Input id="expected" value={draft.expectedReplyText ?? ""} onChange={(e) => set("expectedReplyText", e.target.value || null)} placeholder="We usually reply within a few hours." />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="threshold">Missing funds at or above this always go to a human (USD)</Label>
-              <Input
-                id="threshold"
-                type="number"
-                min={0}
-                value={draft.missingFundsThresholdUsd ?? ""}
-                onChange={(e) => set("missingFundsThresholdUsd", e.target.value === "" ? null : Number(e.target.value))}
+              <Label htmlFor="glossary">Glossary</Label>
+              <Textarea
+                id="glossary"
+                className="scrollbar-subtle h-28 resize-y field-sizing-fixed"
+                placeholder={"Solid Cash\nsoUSD"}
+                value={draft.glossary}
+                onChange={(e) => set("glossary", e.target.value)}
               />
+              <p className="text-xs text-gray-500">One product name per line. Kept as written in every language.</p>
+            </div>
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="expected">Expected reply time</Label>
+                <Input
+                  id="expected"
+                  value={draft.expectedReplyText ?? ""}
+                  onChange={(e) => set("expectedReplyText", e.target.value || null)}
+                  placeholder="We usually reply within a few hours."
+                />
+                <p className="text-xs text-gray-500">Added to the &ldquo;a teammate will reply&rdquo; message.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="threshold">Missing money that always goes to a person (USD)</Label>
+                <Input
+                  id="threshold"
+                  type="number"
+                  min={0}
+                  placeholder="No limit"
+                  value={draft.missingFundsThresholdUsd ?? ""}
+                  onChange={(e) => set("missingFundsThresholdUsd", e.target.value === "" ? null : Number(e.target.value))}
+                />
+                <p className="text-xs text-gray-500">At or above this amount, Solid AI doesn&rsquo;t answer; it asks for the transfer details.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -460,7 +525,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
                   <td className="py-1.5">{entry.version}</td>
                   <td className="py-1.5">{dateTime(entry.createdAt)}</td>
                   <td className="py-1.5">{entry.updatedBy}</td>
-                  <td className="py-1.5 text-gray-600">{entry.changed.join(", ")}</td>
+                  <td className="py-1.5 text-gray-600">{entry.changed.map(fieldLabel).join(", ")}</td>
                 </tr>
               ))}
             </tbody>
@@ -472,9 +537,9 @@ function SettingsScreen({ me }: { me: SupportMe }) {
 
       {dirty && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
             <span className="text-sm text-gray-600">
-              Unsaved: {Object.keys(patch).join(", ")}
+              Unsaved: {Object.keys(patch).map(fieldLabel).join(", ")}
             </span>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setEdits(null)}>Discard</Button>

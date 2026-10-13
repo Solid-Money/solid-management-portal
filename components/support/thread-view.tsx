@@ -162,7 +162,7 @@ export default function ThreadView({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+      <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto px-3 py-2">
         {hasOlder && (
           <div className="mb-2 flex justify-center">
             <Button variant="ghost" size="xs" onClick={() => void loadOlder()} disabled={loadingOlder}>

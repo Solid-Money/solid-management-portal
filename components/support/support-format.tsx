@@ -34,9 +34,31 @@ export function StatusBadge({ status }: { status: SupportCaseStatus }) {
   return <Badge variant={entry.variant}>{entry.label}</Badge>;
 }
 
+const INTENT_LABELS: Record<string, string> = {
+  kyc: "KYC",
+  deposit: "Deposit",
+  card_declined: "Card declined",
+  cashback_rewards: "Cashback & rewards",
+  withdrawal: "Withdrawal",
+  wallet_pay: "Apple / Google Pay",
+  card_issuance: "Card issuance",
+  referral: "Referral",
+  how_to: "How-to",
+  virtual_account: "Virtual account",
+  add_money: "Add money",
+  login_recovery: "Login & recovery",
+  fees_limits: "Fees & limits",
+  credit_mode: "Credit mode",
+  account_closure: "Account closure",
+  fraud_unauthorized: "Fraud / unauthorized",
+  dispute: "Dispute",
+  complaint: "Complaint",
+  other: "Other",
+};
+
 export function intentLabel(intent: string | null): string {
   if (!intent) return "No intent";
-  return intent.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  return INTENT_LABELS[intent] ?? intent.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export const COMPLAINT_LABELS: Record<string, string> = {

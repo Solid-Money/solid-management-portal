@@ -230,7 +230,7 @@ export default function QueueList({
           />
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
