@@ -2248,9 +2248,13 @@ export interface AdminReferralRewardRow {
   reversedAt?: string;
   /**
    * account_closed | chargeback | ineligible_spend |
-   * no_activity_after_qualifying | self_referral_suspected
+   * no_activity_after_qualifying | self_referral_suspected |
+   * rejected_in_review | referrer_blocked
    */
   reversalReason?: string;
+  /** The admin who rejected or blocked it, and the note they gave. */
+  reversedBy?: string;
+  reversalNote?: string;
   /** Spend the referral rules left out (excluded merchants, tiny purchases). */
   excludedSpendUsd?: number;
   /** Merchants spent at that have not reached the per-merchant minimum. */
@@ -2258,6 +2262,13 @@ export interface AdminReferralRewardRow {
   /** Qualified, but the friend has not yet made the purchase the payout needs. */
   awaitingActivity?: boolean;
   reviewReason?: string;
+  /** Every reason it is held for review. */
+  reviewReasons?: string[];
+  /** An admin approved it out of (or ahead of) review. */
+  reviewApprovedAt?: string;
+  reviewApprovedBy?: string;
+  /** The referrer's share is withheld: the friend is paid, the referrer is not. */
+  referrerLegWithheld?: boolean;
   /** An admin re-evaluated it and put it back on track. */
   reinstatedAt?: string;
   reinstatedBy?: string;

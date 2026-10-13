@@ -13,6 +13,7 @@ import {
   Receipt,
   Share2,
   ShieldAlert,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Terminal,
@@ -208,6 +209,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Referral Lookup",
         description: "Who a referral code belongs to and who used it",
         icon: Share2,
+      },
+      {
+        href: "/referral-review",
+        label: "Referral Review",
+        description:
+          "Approve or reject held referral rewards, block referrers, re-check unpaid",
+        icon: ShieldCheck,
       },
     ],
   },
