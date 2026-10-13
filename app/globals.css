@@ -282,3 +282,12 @@
 .help-prose tr:last-child td { border-bottom: 0; }
 .help-prose .align-center { text-align: center; }
 .help-prose .align-right { text-align: right; }
+
+/* A scrollbar that stays out of the way until the pointer is over the area. */
+@utility scrollbar-subtle {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  &:hover {
+    scrollbar-color: var(--color-gray-300) transparent;
+  }
+}
