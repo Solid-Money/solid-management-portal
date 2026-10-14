@@ -196,7 +196,8 @@ function ArticlesScreen() {
       link.href = url;
       link.download = "help-center-redirects.csv";
       link.click();
-      URL.revokeObjectURL(url);
+      // Some browsers start the download after click() returns.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
       toast.error("Could not load the redirect map");
     }

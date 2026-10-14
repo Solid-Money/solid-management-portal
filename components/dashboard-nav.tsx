@@ -148,12 +148,28 @@ function GroupSubmenu({
 }
 
 /** Every link in one dropdown, for viewports too narrow for the menu bar. */
-function MobileNav({ pathname, groups }: { pathname: string; groups: NavGroup[] }) {
+function MobileNav({
+  pathname,
+  groups,
+  supportBadge,
+}: {
+  pathname: string;
+  groups: NavGroup[];
+  supportBadge: number;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="md:hidden" aria-label="Open navigation">
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative md:hidden"
+          aria-label={supportBadge ? `Open navigation, ${supportBadge} support cases waiting` : "Open navigation"}
+        >
           <Menu className="h-4 w-4" />
+          {supportBadge > 0 && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
@@ -176,8 +192,9 @@ function MobileNav({ pathname, groups }: { pathname: string; groups: NavGroup[] 
               </DropdownMenuItem>
             ) : (
               <>
-                <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
+                <DropdownMenuLabel className="text-muted-foreground flex items-center text-xs uppercase">
                   {group.label}
+                  {group.supportBadge && <CountBadge count={supportBadge} />}
                 </DropdownMenuLabel>
                 {group.items?.map((item) => (
                   <DropdownMenuItem key={item.href} asChild>
@@ -279,7 +296,7 @@ export default function DashboardNav() {
     <>
       <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <MobileNav pathname={pathname} groups={groups} />
+          <MobileNav pathname={pathname} groups={groups} supportBadge={supportBadge} />
 
           <Link href="/users" className="shrink-0 text-xl font-bold text-indigo-600">
             Solid Admin

@@ -5,7 +5,8 @@ import { ExternalLink, Headphones, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSupportUserCases } from "@/hooks/use-support";
-import { StatusBadge, dateTime, intentLabel } from "@/components/support/support-format";
+import { StatusBadge, intentLabel } from "@/components/support/support-format";
+import { formatDateTime } from "@/lib/utils";
 
 /**
  * This user's support cases (imported Intercom history included) and a link
@@ -45,7 +46,7 @@ export default function UserSupportCard({ userId }: { userId: string }) {
                 <li key={c.id} className="flex items-center gap-2 py-1.5 text-sm">
                   <span className="text-gray-400">#{c.number}</span>
                   <span className="truncate text-gray-800">{c.title ?? intentLabel(c.intent)}</span>
-                  <span className="ml-auto shrink-0 text-xs text-gray-500">{dateTime(c.createdAt)}</span>
+                  <span className="ml-auto shrink-0 text-xs text-gray-500">{formatDateTime(c.createdAt)}</span>
                   <StatusBadge status={c.status} />
                   {c.csat && <span className="text-xs text-gray-500">{c.csat.score}/5</span>}
                 </li>

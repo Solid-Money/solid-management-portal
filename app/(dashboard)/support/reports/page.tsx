@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSupportReport } from "@/hooks/use-support";
 import { downloadComplaintRegister } from "@/lib/support-api";
+import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 import {
   duration,
   intentLabel,
@@ -28,6 +29,9 @@ import {
 import type { SupportDurationStats } from "@/types/support";
 
 const DAY = 24 * 60 * 60_000;
+
+/** Whole counts, with thousands separators: 1,234. */
+const formatCount = (value: number) => formatNumber(value, 0, 0);
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -49,7 +53,7 @@ function DurationRow({ label, stats }: { label: string; stats: SupportDurationSt
       <td className="py-2 text-gray-700">{label}</td>
       <td className="py-2 text-right tabular-nums">{duration(stats.median)}</td>
       <td className="py-2 text-right tabular-nums">{duration(stats.p90)}</td>
-      <td className="py-2 text-right tabular-nums text-gray-500">{stats.count}</td>
+      <td className="py-2 text-right tabular-nums text-gray-500">{formatCount(stats.count)}</td>
     </tr>
   );
 }
@@ -67,7 +71,7 @@ function CountTable({ title, rows }: { title: string; rows: Array<{ label: strin
             {rows.map((row) => (
               <tr key={row.label} className="border-t border-gray-100">
                 <td className="py-1.5 text-gray-700">{row.label}</td>
-                <td className="py-1.5 text-right tabular-nums">{row.count}</td>
+                <td className="py-1.5 text-right tabular-nums">{formatCount(row.count)}</td>
                 <td className="w-16 py-1.5 text-right tabular-nums text-gray-500">
                   {total ? `${Math.round((row.count / total) * 100)}%` : ""}
                 </td>
@@ -85,9 +89,14 @@ function ReportsScreen() {
   const [to, setTo] = useState(() => isoDate(new Date()));
   const [downloading, setDownloading] = useState(false);
   // `to` is inclusive for people: the API takes the start of the next day.
+  // A cleared or half-typed date field is not a date: no request, no crash.
   const range = useMemo(() => {
     const start = new Date(`${from}T00:00:00Z`);
-    const end = new Date(new Date(`${to}T00:00:00Z`).getTime() + DAY);
+    const last = new Date(`${to}T00:00:00Z`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(last.getTime())) {
+      return { from: "", to: "", valid: false };
+    }
+    const end = new Date(last.getTime() + DAY);
     return { from: start.toISOString(), to: end.toISOString(), valid: end > start };
   }, [from, to]);
   const { data, isLoading, isError } = useSupportReport(range.valid ? range.from : "", range.valid ? range.to : "");
@@ -126,7 +135,9 @@ function ReportsScreen() {
         </div>
       </div>
 
-      {isLoading ? (
+      {!range.valid ? (
+        <p className="text-sm text-gray-500">Pick a start date on or before the end date.</p>
+      ) : isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
         </div>
@@ -135,22 +146,26 @@ function ReportsScreen() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Tile label="Cases" value={String(data.cases)} />
+            <Tile label="Cases" value={formatCount(data.cases)} />
             <Tile
               label="AI resolution"
               value={percent(data.ai.resolutionRate)}
-              hint={`${data.ai.confirmed} confirmed · ${data.ai.assumed} assumed of ${data.ai.resolved} resolved`}
+              hint={`${formatCount(data.ai.confirmed)} confirmed · ${formatCount(data.ai.assumed)} assumed of ${formatCount(data.ai.resolved)} resolved`}
             />
             <Tile label="Handed to a human" value={percent(data.handoffRate)} />
             <Tile
               label="CSAT"
               value={data.csat.average !== null ? `${data.csat.average} / 5` : "—"}
-              hint={`${data.csat.responses} ratings`}
+              hint={`${formatCount(data.csat.responses)} ratings`}
             />
             <Tile label="First response (median)" value={duration(data.firstResponse.median)} hint="AI answer or acknowledgement" />
             <Tile label="Reopened within 7 days" value={percent(data.reopenRate)} />
-            <Tile label="AI cost per case" value={data.cost.perCaseUsd !== null ? `$${data.cost.perCaseUsd.toFixed(3)}` : "—"} hint={`$${data.cost.totalUsd.toFixed(2)} over ${data.cost.aiRuns} AI turns`} />
-            <Tile label="Waiting over a day, no reply" value={String(data.withoutReply.count)} hint="Open now, any period" />
+            <Tile
+              label="AI cost per case"
+              value={data.cost.perCaseUsd !== null ? formatUsd(data.cost.perCaseUsd, 3) : "—"}
+              hint={`${formatUsd(data.cost.totalUsd)} over ${formatCount(data.cost.aiRuns)} AI turns`}
+            />
+            <Tile label="Waiting over a day, no reply" value={formatCount(data.withoutReply.count)} hint="Open now, any period" />
           </div>
 
           <section className="rounded-lg bg-white p-4 shadow-sm">
@@ -161,7 +176,7 @@ function ReportsScreen() {
                   <CartesianGrid vertical={false} stroke="#f1f1f4" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={(value: string) => new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    tickFormatter={(value: string) => formatDateTime(value, { day: "numeric", month: "short", timeZone: "UTC" })}
                     tick={{ fontSize: 11, fill: "#6b7280" }}
                     tickLine={false}
                     axisLine={false}
@@ -169,8 +184,10 @@ function ReportsScreen() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false} />
                   <Tooltip
                     cursor={{ fill: "#eef2ff" }}
-                    formatter={(value: number) => [value, "Cases"]}
-                    labelFormatter={(value: string) => new Date(value).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                    formatter={(value: number) => [formatCount(value), "Cases"]}
+                    labelFormatter={(value: string) =>
+                      formatDateTime(value, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+                    }
                   />
                   <Bar dataKey="total" fill="#4f46e5" radius={[3, 3, 0, 0]} />
                 </BarChart>
@@ -200,7 +217,7 @@ function ReportsScreen() {
               <div className="mt-1 flex gap-2 text-xs text-gray-600">
                 {(["1", "2", "3", "4", "5"] as const).map((score) => (
                   <span key={score} className="rounded bg-gray-100 px-2 py-0.5">
-                    {score}★ {data.csat.distribution[score]}
+                    {score}★ {formatCount(data.csat.distribution[score])}
                   </span>
                 ))}
               </div>
@@ -216,7 +233,7 @@ function ReportsScreen() {
                     {data.contentGaps.map((gap) => (
                       <tr key={gap.intent} className="border-t border-gray-100">
                         <td className="py-1.5 text-gray-700">{intentLabel(gap.intent)}</td>
-                        <td className="py-1.5 text-right tabular-nums">{gap.count}</td>
+                        <td className="py-1.5 text-right tabular-nums">{formatCount(gap.count)}</td>
                       </tr>
                     ))}
                   </tbody>

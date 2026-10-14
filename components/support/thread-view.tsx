@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSupportConversation } from "@/hooks/use-support";
@@ -78,6 +79,8 @@ export default function ThreadView({
       const page = await getSupportOlderMessages(conversationId, first);
       setOlder((current) => [...page.messages, ...current]);
       setOlderMore(page.hasOlder);
+    } catch {
+      toast.error("Could not load earlier messages");
     } finally {
       setLoadingOlder(false);
     }

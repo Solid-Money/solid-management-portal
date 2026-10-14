@@ -42,7 +42,7 @@ function Stat({
     <div>
       <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm font-semibold text-gray-900">{value}</dd>
-      {hint && <p className="mt-0.5 hidden text-xs text-gray-500 @lg:block">{hint}</p>}
+      {hint && <p className="mt-0.5 break-words text-xs text-gray-500">{hint}</p>}
     </div>
   );
 }
