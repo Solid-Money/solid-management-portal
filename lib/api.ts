@@ -32,6 +32,16 @@ import {
   TierMembershipView,
   TierTrialView,
 } from "@/types";
+
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /**
+     * Skip the global error toast: for background reads (polling, side
+     * cards) whose screen shows its own state when they fail.
+     */
+    quietErrors?: boolean;
+  }
+}
 import {
   CardHolds,
   ReleaseCardHoldRequest,
@@ -80,6 +90,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.config?.quietErrors) {
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401) {
       console.error(
         "[API] Unauthorized request - token may be invalid or expired",

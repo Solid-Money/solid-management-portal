@@ -7,13 +7,20 @@ import {
   createAdminSocket,
   getLiveStatus,
   isAdminCardTransactionChange,
+  isSupportQueueChange,
   setLiveStatus,
   subscribeLiveStatus,
   type LiveStatus,
 } from "@/lib/realtime";
+import { notifySupportAgent, playSupportChime } from "@/lib/support-alerts";
 
 /** Card views re-read once a burst of changes settles, not once per change. */
 const REFRESH_DEBOUNCE_MS = 1_500;
+
+/** The inbox re-reads quickly: an agent is often looking at the thread that changed. */
+const SUPPORT_REFRESH_DEBOUNCE_MS = 300;
+/** A busy queue still refreshes at least this often while events keep coming. */
+const SUPPORT_REFRESH_MAX_WAIT_MS = 2_000;
 
 /**
  * Backoff for a handshake the server refused, which Socket.IO never retries on
@@ -22,7 +29,8 @@ const REFRESH_DEBOUNCE_MS = 1_500;
 const REFUSED_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 120_000];
 
 /**
- * Keep the portal's card views current as Rain and Wirex report transactions.
+ * Keep the portal's card views current as Rain and Wirex report transactions,
+ * and the support inbox current as conversations change.
  *
  * Mount once, for the signed-in admin (the dashboard layout). Every change
  * re-reads the card-transaction tables on screen — the all-users list and a
@@ -43,6 +51,9 @@ export function useLiveCardTransactions(enabled: boolean): void {
     if (!socket) return;
 
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    let supportTimer: ReturnType<typeof setTimeout> | undefined;
+    let supportWaitingSince: number | undefined;
+    const changedConversations = new Set<string>();
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryAttempt = 0;
     let tokenRefreshed = false;
@@ -66,6 +77,33 @@ export function useLiveCardTransactions(enabled: boolean): void {
       refreshTimer = setTimeout(refreshViews, REFRESH_DEBOUNCE_MS);
     };
 
+    // The support inbox: the queue, the badge and any open thread that changed.
+    const refreshSupport = () => {
+      supportTimer = undefined;
+      supportWaitingSince = undefined;
+      void queryClient.invalidateQueries({ queryKey: ["support", "counts"] });
+      void queryClient.invalidateQueries({ queryKey: ["support", "me"] });
+      void queryClient.invalidateQueries({ queryKey: ["support", "queue"] });
+      for (const id of changedConversations) {
+        void queryClient.invalidateQueries({ queryKey: ["support", "conversation", id] });
+      }
+      changedConversations.clear();
+      void queryClient.invalidateQueries({ queryKey: ["support", "user-cases"] });
+    };
+
+    // Debounced, but never past the max wait: a steady stream of events less
+    // than 300 ms apart would otherwise hold the refresh back indefinitely.
+    const scheduleSupportRefresh = () => {
+      const now = Date.now();
+      supportWaitingSince ??= now;
+      if (supportTimer) clearTimeout(supportTimer);
+      const wait = Math.min(
+        SUPPORT_REFRESH_DEBOUNCE_MS,
+        Math.max(0, supportWaitingSince + SUPPORT_REFRESH_MAX_WAIT_MS - now),
+      );
+      supportTimer = setTimeout(refreshSupport, wait);
+    };
+
     const scheduleRetry = () => {
       if (retryTimer) clearTimeout(retryTimer);
       const delay =
@@ -84,8 +122,25 @@ export function useLiveCardTransactions(enabled: boolean): void {
       tokenRefreshed = false;
       setLiveStatus("live");
       // Anything that changed while the socket was away.
-      if (hasBeenLive) scheduleRefresh();
+      if (hasBeenLive) {
+        scheduleRefresh();
+        void queryClient.invalidateQueries({ queryKey: ["support"] });
+      }
       hasBeenLive = true;
+    });
+
+    socket.on("support_queue_updated", (change: unknown) => {
+      if (!isSupportQueueChange(change)) return;
+      changedConversations.add(change.conversationId);
+      scheduleSupportRefresh();
+      if (change.reason === "handoff" || change.reason === "ai_draft" || change.urgent) {
+        playSupportChime();
+        notifySupportAgent({
+          title: change.urgent ? "Urgent support case" : "A case needs a human",
+          body: change.reason === "ai_draft" ? "Solid AI drafted a reply to review." : "Open the inbox to pick it up.",
+          conversationId: change.conversationId,
+        });
+      }
     });
 
     socket.on("card_transaction", (change: unknown) => {
@@ -135,6 +190,7 @@ export function useLiveCardTransactions(enabled: boolean): void {
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
+      if (supportTimer) clearTimeout(supportTimer);
       if (retryTimer) clearTimeout(retryTimer);
       socket.removeAllListeners();
       socket.disconnect();

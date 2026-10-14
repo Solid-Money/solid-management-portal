@@ -33,6 +33,30 @@ import {
   type NavGroup,
 } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
+import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
+
+/**
+ * The number on the Support badge: cases needing a human plus the admin's
+ * own. Loading `me` also puts the admin on the support roster.
+ */
+function useSupportBadge(): number {
+  const { data: me } = useSupportMe();
+  const { data: counts } = useSupportCounts();
+  const live = counts ?? me?.counts ?? null;
+  return live ? (live.needs_human ?? 0) + (live.mine ?? 0) : 0;
+}
+
+function CountBadge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span
+      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold leading-5 text-white"
+      aria-label={`${count} waiting`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 /** Jump straight to a user from anywhere — the most common support entry point. */
 function UserQuickSearch() {
@@ -60,7 +84,15 @@ function UserQuickSearch() {
   );
 }
 
-function GroupSubmenu({ group, pathname }: { group: NavGroup; pathname: string }) {
+function GroupSubmenu({
+  group,
+  pathname,
+  badge = 0,
+}: {
+  group: NavGroup;
+  pathname: string;
+  badge?: number;
+}) {
   return (
     <NavigationMenuItem>
       <NavigationMenuTrigger
@@ -71,6 +103,7 @@ function GroupSubmenu({ group, pathname }: { group: NavGroup; pathname: string }
       >
         <group.icon className="mr-2 h-4 w-4" />
         {group.label}
+        <CountBadge count={badge} />
       </NavigationMenuTrigger>
       <NavigationMenuContent>
         <ul className="grid w-[22rem] gap-1 p-2">
@@ -115,16 +148,32 @@ function GroupSubmenu({ group, pathname }: { group: NavGroup; pathname: string }
 }
 
 /** Every link in one dropdown, for viewports too narrow for the menu bar. */
-function MobileNav({ pathname }: { pathname: string }) {
+function MobileNav({
+  pathname,
+  groups,
+  supportBadge,
+}: {
+  pathname: string;
+  groups: NavGroup[];
+  supportBadge: number;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="md:hidden" aria-label="Open navigation">
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative md:hidden"
+          aria-label={supportBadge ? `Open navigation, ${supportBadge} support cases waiting` : "Open navigation"}
+        >
           <Menu className="h-4 w-4" />
+          {supportBadge > 0 && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        {NAV_GROUPS.map((group, index) => (
+        {groups.map((group, index) => (
           <div key={group.label}>
             {index > 0 && <DropdownMenuSeparator />}
             {group.href ? (
@@ -143,8 +192,9 @@ function MobileNav({ pathname }: { pathname: string }) {
               </DropdownMenuItem>
             ) : (
               <>
-                <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
+                <DropdownMenuLabel className="text-muted-foreground flex items-center text-xs uppercase">
                   {group.label}
+                  {group.supportBadge && <CountBadge count={supportBadge} />}
                 </DropdownMenuLabel>
                 {group.items?.map((item) => (
                   <DropdownMenuItem key={item.href} asChild>
@@ -234,6 +284,8 @@ export default function DashboardNav() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+  const groups = NAV_GROUPS;
+  const supportBadge = useSupportBadge();
 
   const handleSignOut = async () => {
     setIsSignOutModalOpen(false);
@@ -244,7 +296,7 @@ export default function DashboardNav() {
     <>
       <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <MobileNav pathname={pathname} />
+          <MobileNav pathname={pathname} groups={groups} supportBadge={supportBadge} />
 
           <Link href="/users" className="shrink-0 text-xl font-bold text-indigo-600">
             Solid Admin
@@ -252,7 +304,7 @@ export default function DashboardNav() {
 
           <NavigationMenu className="hidden md:flex" viewport={false}>
             <NavigationMenuList>
-              {NAV_GROUPS.map((group) =>
+              {groups.map((group) =>
                 group.href ? (
                   <NavigationMenuItem key={group.label}>
                     <NavigationMenuLink asChild>
@@ -275,6 +327,7 @@ export default function DashboardNav() {
                     key={group.label}
                     group={group}
                     pathname={pathname}
+                    badge={group.supportBadge ? supportBadge : 0}
                   />
                 )
               )}

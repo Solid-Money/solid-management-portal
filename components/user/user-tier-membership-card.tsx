@@ -109,7 +109,7 @@ export default function UserTierMembershipCard({
   const lock = state?.lock;
 
   return (
-    <Card>
+    <Card className="@container">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-emerald-600" />
@@ -139,7 +139,7 @@ export default function UserTierMembershipCard({
           </p>
         ) : (
           <div className="space-y-4">
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
               <Stat label="Current tier" value={state.currentTier} />
               <Stat
                 label="Member since"
@@ -171,7 +171,7 @@ export default function UserTierMembershipCard({
                   </div>
                   <ReevaluateTierLockDialog userId={userId} />
                 </div>
-                <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Locked" value={formatFuse(lock.lockedFuse)} />
                   <Stat
                     label="Unlocks tier"
@@ -210,7 +210,7 @@ export default function UserTierMembershipCard({
                     {STATUS_LABEL[subscription.status]}
                   </Badge>
                 </div>
-                <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Tier" value={subscription.tier} />
                   <Stat label="Price" value={`$${subscription.priceUsd}/yr`} />
                   <Stat

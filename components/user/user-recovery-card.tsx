@@ -52,7 +52,7 @@ function Stat({
     <div>
       <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm font-semibold text-gray-900">{value}</dd>
-      {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}
+      {hint && <p className="mt-0.5 break-words text-xs text-gray-500">{hint}</p>}
     </div>
   );
 }
@@ -87,7 +87,7 @@ export default function UserRecoveryCard({
   };
 
   return (
-    <Card>
+    <Card className="@container">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <KeyRound className="h-4 w-4" />
@@ -110,7 +110,7 @@ export default function UserRecoveryCard({
 
         {data && (
           <>
-            <dl className="grid gap-4 sm:grid-cols-3">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-3">
               <Stat
                 label="Email on file"
                 value={
