@@ -128,12 +128,13 @@ function Field({
 
 /**
  * Whether the issuer already holds the card permanently closed. The backend
- * says so directly; `issuerStatus` is the fallback for a context served before
- * it did, and only ever spoke Rain's word for it.
+ * says so directly; `issuerStatus` is the fallback when it does not, read in
+ * the issuer's own word — Wirex's `Closed`, Rain's `canceled`.
  */
 const isClosedAtIssuer = (context: CardIssuanceContext) =>
   context.currentCard?.closedAtIssuer ??
-  context.currentCard?.issuerStatus === "canceled";
+  context.currentCard?.issuerStatus ===
+    (context.provider === "wirex" ? "Closed" : "canceled");
 
 /** The card being replaced, spelled out so support sees what they are acting on. */
 function CurrentCardSummary({ context }: { context: CardIssuanceContext }) {
