@@ -126,6 +126,15 @@ function Field({
   );
 }
 
+/**
+ * Whether the issuer already holds the card permanently closed. The backend
+ * says so directly; `issuerStatus` is the fallback for a context served before
+ * it did, and only ever spoke Rain's word for it.
+ */
+const isClosedAtIssuer = (context: CardIssuanceContext) =>
+  context.currentCard?.closedAtIssuer ??
+  context.currentCard?.issuerStatus === "canceled";
+
 /** The card being replaced, spelled out so support sees what they are acting on. */
 function CurrentCardSummary({ context }: { context: CardIssuanceContext }) {
   const card = context.currentCard;
@@ -138,7 +147,7 @@ function CurrentCardSummary({ context }: { context: CardIssuanceContext }) {
     );
   }
 
-  const canceled = card.issuerStatus === "canceled";
+  const canceled = isClosedAtIssuer(context);
 
   return (
     <div className="space-y-1.5 rounded-md border border-gray-200 bg-gray-50 p-3">
@@ -186,14 +195,19 @@ function IssueCardForm({
 }) {
   const queryClient = useQueryClient();
   const defaults = context.defaults;
+  // Wirex replaces with a virtual card printed with the verified name it
+  // already holds, under limits it sets itself — so none of the Rain fields
+  // below apply, and the backend refuses them. It also never leaves the old
+  // card open: the app follows one card per user, and a Wirex card left open
+  // behind the new one is a live card nobody can see or freeze.
+  const isWirex = context.provider === "wirex";
+  const alreadyClosed = isClosedAtIssuer(context);
 
   const [type, setType] = useState<CardType>(defaults.type);
   // On by default — a replacement that leaves the old card able to authorize
   // has not solved anything. The exception is a card the issuer has already
   // canceled, where there is nothing left to cancel.
-  const [cancelExisting, setCancelExisting] = useState(
-    context.currentCard?.issuerStatus !== "canceled"
-  );
+  const [cancelExisting, setCancelExisting] = useState(!alreadyClosed);
   const [displayName, setDisplayName] = useState(defaults.displayName ?? "");
   const [withLimit, setWithLimit] = useState(!!defaults.limit);
   const [limitDollars, setLimitDollars] = useState(
@@ -217,12 +231,12 @@ function IssueCardForm({
       : null;
 
   const missingShipping =
-    type === "physical"
+    !isWirex && type === "physical"
       ? REQUIRED_SHIPPING.filter((field) => !shipping[field]?.trim())
       : [];
 
   const blockingProblem =
-    withLimit && limitCents === null
+    !isWirex && withLimit && limitCents === null
       ? "Enter a spending limit above zero, or turn the limit off."
       : missingShipping.length > 0
         ? `A physical card needs a full shipping address — missing ${missingShipping.join(", ")}.`
@@ -230,23 +244,37 @@ function IssueCardForm({
 
   const mutation = useMutation({
     mutationFn: () =>
-      issueUserCard(userId, {
-        type,
-        cancelExisting,
-        ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
-        ...(withLimit && limitCents !== null
-          ? { limit: { amount: limitCents, frequency: limitFrequency } }
-          : {}),
-        ...(type === "physical" ? { shipping } : {}),
-        ...(reason.trim() ? { reason: reason.trim() } : {}),
-      }),
+      issueUserCard(
+        userId,
+        isWirex
+          ? {
+              type: "virtual",
+              cancelExisting: true,
+              ...(reason.trim() ? { reason: reason.trim() } : {}),
+            }
+          : {
+              type,
+              cancelExisting,
+              ...(displayName.trim()
+                ? { displayName: displayName.trim() }
+                : {}),
+              ...(withLimit && limitCents !== null
+                ? { limit: { amount: limitCents, frequency: limitFrequency } }
+                : {}),
+              ...(type === "physical" ? { shipping } : {}),
+              ...(reason.trim() ? { reason: reason.trim() } : {}),
+            }
+      ),
     onMutate: () => onSavingChange(true),
     onSettled: () => onSavingChange(false),
     onSuccess: (response) => {
       const issued = response.data.data;
       toast.success(
         `${issued.type === "physical" ? "Physical" : "Virtual"} card issued for ${username}` +
-          (issued.last4 ? ` (•••• ${issued.last4})` : "")
+          (issued.last4 ? ` (•••• ${issued.last4})` : "") +
+          // Wirex opens a virtual card by itself, normally within seconds; the
+          // cardholder is notified when it does.
+          (issued.status === "pending" ? " — the issuer is still opening it" : "")
       );
       onIssued();
       // The card panel, its history and the balances all move together.
@@ -277,7 +305,23 @@ function IssueCardForm({
       <div className="space-y-4">
         <CurrentCardSummary context={context} />
 
-        {context.currentCard && (
+        {isWirex && (
+          <div className="space-y-1.5 rounded-md border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
+            <p>
+              {alreadyClosed
+                ? "Wirex has already closed this card, so nothing is closed again — a new virtual card is issued in its place."
+                : "The current card is closed at Wirex first — permanently, and before the new one is issued. If the close fails, nothing is issued. A frozen card is only blocked at Wirex, and the cardholder can unfreeze it, so a leaked number stays live until it is closed here."}
+            </p>
+            <p className="text-indigo-700">
+              The new card is virtual, printed with the name on their verified
+              identity, and spends from the same balance — nothing needs moving.
+              It gets a new number, and the cardholder is notified once Wirex
+              opens it.
+            </p>
+          </div>
+        )}
+
+        {!isWirex && context.currentCard && (
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-gray-200 p-3">
             <input
               type="checkbox"
@@ -296,9 +340,10 @@ function IssueCardForm({
           </label>
         )}
 
-        {context.currentCard &&
+        {!isWirex &&
+          context.currentCard &&
           !cancelExisting &&
-          context.currentCard.issuerStatus !== "canceled" && (
+          !alreadyClosed && (
             <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
@@ -313,7 +358,8 @@ function IssueCardForm({
             physical cards are not tracked in the app, so cancelling the card
             they can actually spend on today leaves them with nothing until the
             new one arrives in the post. */}
-        {type === "physical" &&
+        {!isWirex &&
+          type === "physical" &&
           cancelExisting &&
           context.currentCard?.type === "virtual" && (
             <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
@@ -326,192 +372,196 @@ function IssueCardForm({
             </div>
           )}
 
-        <div className="space-y-1.5">
-          <Label className="text-xs">Card type</Label>
-          <div className="flex gap-2">
-            {CARD_TYPES.map((option) => (
-              <Choice
-                key={option.value}
-                selected={type === option.value}
+        {!isWirex && (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Card type</Label>
+              <div className="flex gap-2">
+                {CARD_TYPES.map((option) => (
+                  <Choice
+                    key={option.value}
+                    selected={type === option.value}
+                    disabled={busy}
+                    onClick={() => setType(option.value)}
+                  >
+                    <span className="block font-medium">{option.label}</span>
+                    <span className="block text-xs text-gray-500">
+                      {option.blurb}
+                    </span>
+                  </Choice>
+                ))}
+              </div>
+            </div>
+
+            <Field label="Name on the card" htmlFor="issue-display-name">
+              <Input
+                id="issue-display-name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                maxLength={26}
+                placeholder="Jane Doe"
                 disabled={busy}
-                onClick={() => setType(option.value)}
-              >
-                <span className="block font-medium">{option.label}</span>
-                <span className="block text-xs text-gray-500">
-                  {option.blurb}
+              />
+              <p className="text-muted-foreground text-[11px]">
+                Embossed on physical cards, ignored for virtual ones. Latin letters,
+                digits, spaces, periods and hyphens only — 26 characters at most.
+              </p>
+            </Field>
+
+            <div className="space-y-2 rounded-md border border-gray-200 p-3">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={withLimit}
+                  onChange={(event) => setWithLimit(event.target.checked)}
+                  disabled={busy}
+                  className="h-4 w-4 cursor-pointer accent-indigo-600"
+                />
+                <span className="text-xs font-medium text-gray-900">
+                  Set a spending limit
                 </span>
-              </Choice>
-            ))}
-          </div>
-        </div>
-
-        <Field label="Name on the card" htmlFor="issue-display-name">
-          <Input
-            id="issue-display-name"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            maxLength={26}
-            placeholder="Jane Doe"
-            disabled={busy}
-          />
-          <p className="text-muted-foreground text-[11px]">
-            Embossed on physical cards, ignored for virtual ones. Latin letters,
-            digits, spaces, periods and hyphens only — 26 characters at most.
-          </p>
-        </Field>
-
-        <div className="space-y-2 rounded-md border border-gray-200 p-3">
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={withLimit}
-              onChange={(event) => setWithLimit(event.target.checked)}
-              disabled={busy}
-              className="h-4 w-4 cursor-pointer accent-indigo-600"
-            />
-            <span className="text-xs font-medium text-gray-900">
-              Set a spending limit
-            </span>
-          </label>
-          {withLimit && (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Amount (USD)" htmlFor="issue-limit-amount">
-                <Input
-                  id="issue-limit-amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={limitDollars}
-                  onChange={(event) => setLimitDollars(event.target.value)}
-                  disabled={busy}
-                />
-              </Field>
-              <Field label="Window" htmlFor="issue-limit-frequency">
-                <select
-                  id="issue-limit-frequency"
-                  value={limitFrequency}
-                  onChange={(event) =>
-                    setLimitFrequency(event.target.value as CardLimitFrequency)
-                  }
-                  disabled={busy}
-                  className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {LIMIT_FREQUENCIES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              </label>
+              {withLimit && (
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Amount (USD)" htmlFor="issue-limit-amount">
+                    <Input
+                      id="issue-limit-amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={limitDollars}
+                      onChange={(event) => setLimitDollars(event.target.value)}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Window" htmlFor="issue-limit-frequency">
+                    <select
+                      id="issue-limit-frequency"
+                      value={limitFrequency}
+                      onChange={(event) =>
+                        setLimitFrequency(event.target.value as CardLimitFrequency)
+                      }
+                      disabled={busy}
+                      className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {LIMIT_FREQUENCIES.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              )}
+              <p className="text-muted-foreground text-[11px]">
+                Left off, the card carries whatever limit the issuer applies by
+                default.
+              </p>
             </div>
-          )}
-          <p className="text-muted-foreground text-[11px]">
-            Left off, the card carries whatever limit the issuer applies by
-            default.
-          </p>
-        </div>
 
-        {type === "physical" && (
-          <div className="space-y-3 rounded-md border border-gray-200 p-3">
-            <h4 className="text-xs font-semibold uppercase text-gray-500">
-              Shipping address
-            </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="First name" htmlFor="ship-first">
-                <Input
-                  id="ship-first"
-                  value={shipping.firstName ?? ""}
-                  onChange={setShippingField("firstName")}
-                  disabled={busy}
-                />
-              </Field>
-              <Field label="Last name" htmlFor="ship-last">
-                <Input
-                  id="ship-last"
-                  value={shipping.lastName ?? ""}
-                  onChange={setShippingField("lastName")}
-                  disabled={busy}
-                />
-              </Field>
-              <Field
-                label="Address line 1"
-                htmlFor="ship-line1"
-                className="col-span-2"
-              >
-                <Input
-                  id="ship-line1"
-                  value={shipping.line1}
-                  onChange={setShippingField("line1")}
-                  disabled={busy}
-                />
-              </Field>
-              <Field
-                label="Address line 2"
-                htmlFor="ship-line2"
-                className="col-span-2"
-              >
-                <Input
-                  id="ship-line2"
-                  value={shipping.line2 ?? ""}
-                  onChange={setShippingField("line2")}
-                  disabled={busy}
-                />
-              </Field>
-              <Field label="City" htmlFor="ship-city">
-                <Input
-                  id="ship-city"
-                  value={shipping.city}
-                  onChange={setShippingField("city")}
-                  disabled={busy}
-                />
-              </Field>
-              <Field label="Region / State" htmlFor="ship-region">
-                <Input
-                  id="ship-region"
-                  value={shipping.region ?? ""}
-                  onChange={setShippingField("region")}
-                  disabled={busy}
-                />
-              </Field>
-              <Field label="Postal code" htmlFor="ship-postal">
-                <Input
-                  id="ship-postal"
-                  value={shipping.postalCode}
-                  onChange={setShippingField("postalCode")}
-                  disabled={busy}
-                />
-              </Field>
-              <Field label="Country code" htmlFor="ship-country">
-                <Input
-                  id="ship-country"
-                  value={shipping.countryCode}
-                  onChange={setShippingField("countryCode")}
-                  maxLength={2}
-                  placeholder="FR"
-                  disabled={busy}
-                />
-              </Field>
-              <Field
-                label="Phone number"
-                htmlFor="ship-phone"
-                className="col-span-2"
-              >
-                <Input
-                  id="ship-phone"
-                  value={shipping.phoneNumber}
-                  onChange={setShippingField("phoneNumber")}
-                  placeholder="+33123456789"
-                  disabled={busy}
-                />
-              </Field>
-            </div>
-            <p className="text-muted-foreground text-[11px]">
-              Latin characters only — the issuer rejects accents on a physical
-              order. Pre-filled from their verified identity check; check it
-              against what the cardholder has told you.
-            </p>
-          </div>
+            {type === "physical" && (
+              <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                <h4 className="text-xs font-semibold uppercase text-gray-500">
+                  Shipping address
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="First name" htmlFor="ship-first">
+                    <Input
+                      id="ship-first"
+                      value={shipping.firstName ?? ""}
+                      onChange={setShippingField("firstName")}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Last name" htmlFor="ship-last">
+                    <Input
+                      id="ship-last"
+                      value={shipping.lastName ?? ""}
+                      onChange={setShippingField("lastName")}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field
+                    label="Address line 1"
+                    htmlFor="ship-line1"
+                    className="col-span-2"
+                  >
+                    <Input
+                      id="ship-line1"
+                      value={shipping.line1}
+                      onChange={setShippingField("line1")}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field
+                    label="Address line 2"
+                    htmlFor="ship-line2"
+                    className="col-span-2"
+                  >
+                    <Input
+                      id="ship-line2"
+                      value={shipping.line2 ?? ""}
+                      onChange={setShippingField("line2")}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="City" htmlFor="ship-city">
+                    <Input
+                      id="ship-city"
+                      value={shipping.city}
+                      onChange={setShippingField("city")}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Region / State" htmlFor="ship-region">
+                    <Input
+                      id="ship-region"
+                      value={shipping.region ?? ""}
+                      onChange={setShippingField("region")}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Postal code" htmlFor="ship-postal">
+                    <Input
+                      id="ship-postal"
+                      value={shipping.postalCode}
+                      onChange={setShippingField("postalCode")}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Country code" htmlFor="ship-country">
+                    <Input
+                      id="ship-country"
+                      value={shipping.countryCode}
+                      onChange={setShippingField("countryCode")}
+                      maxLength={2}
+                      placeholder="FR"
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field
+                    label="Phone number"
+                    htmlFor="ship-phone"
+                    className="col-span-2"
+                  >
+                    <Input
+                      id="ship-phone"
+                      value={shipping.phoneNumber}
+                      onChange={setShippingField("phoneNumber")}
+                      placeholder="+33123456789"
+                      disabled={busy}
+                    />
+                  </Field>
+                </div>
+                <p className="text-muted-foreground text-[11px]">
+                  Latin characters only — the issuer rejects accents on a physical
+                  order. Pre-filled from their verified identity check; check it
+                  against what the cardholder has told you.
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         <div className="space-y-2">
@@ -549,9 +599,13 @@ function IssueCardForm({
           className="cursor-pointer"
         >
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-          {cancelExisting && context.currentCard
-            ? "Cancel & issue new card"
-            : "Issue card"}
+          {isWirex
+            ? alreadyClosed
+              ? "Issue new card"
+              : "Close & issue new card"
+            : cancelExisting && context.currentCard
+              ? "Cancel & issue new card"
+              : "Issue card"}
         </Button>
       </DialogFooter>
     </>
