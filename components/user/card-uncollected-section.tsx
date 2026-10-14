@@ -12,6 +12,7 @@ import CollectSettlementDialog from "@/components/user/collect-settlement-dialog
 const CAUSE_LABELS: Record<string, string> = {
   ARREARS: "Sweep failed",
   REFUSED_MANDATORY: "Refused mandatory",
+  WIREX_SETTLED_UNCAPTURED: "Settled, never captured",
 };
 
 /**
