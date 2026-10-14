@@ -2365,8 +2365,14 @@ export interface IssuanceCurrentCard {
   type?: CardType;
   /** Our status for it. */
   status?: string;
-  /** The issuer's own word — the one that says `canceled`. */
+  /** The issuer's own word: Rain's `canceled`, Wirex's `Blocked` or `Closed`. */
   issuerStatus?: string;
+  /**
+   * Whether the issuer already holds the card permanently closed, so the
+   * dialog need not know each issuer's vocabulary. Absent when the issuer
+   * could not be read.
+   */
+  closedAtIssuer?: boolean;
   last4?: string;
   /** MM/YY. */
   expiration?: string;
@@ -2385,7 +2391,10 @@ export interface CardIssuanceContext {
   /** Why not, when `canIssue` is false. Shown verbatim. */
   blockedReason?: string;
   provider?: CardProvider;
-  /** Issuer customer id the new card would be issued against. */
+  /**
+   * Issuer customer id the new card would be issued against: the Rain consumer
+   * id, or the Wirex cardholder's wallet.
+   */
   providerCustomerId?: string;
   currentCard?: IssuanceCurrentCard;
   defaults: {
