@@ -168,10 +168,12 @@ export default function ReevaluateTierLockDialog({
 
   // Held while the preview is being read — the first time and every reopening
   // — so the button is never pressed on a cached answer about a lock that may
-  // have changed since. A preview that fails (a backend from before it
-  // existed) falls back to pressing without one, as before.
+  // have changed since. `isPending` covers a first read that has not started
+  // (offline, its fetch is paused). A preview that fails (a backend from before
+  // it existed) falls back to pressing without one, as before.
+  const previewLoading = preview.isPending || preview.isFetching;
   const canPress =
-    !mutation.isPending && !preview.isFetching && !(needsPrices && pricesError);
+    !mutation.isPending && !previewLoading && !(needsPrices && pricesError);
 
   return (
     <>
@@ -219,7 +221,7 @@ export default function ReevaluateTierLockDialog({
 
               <PricesSection
                 preview={preview.data}
-                isLoading={preview.isFetching}
+                isLoading={previewLoading}
                 prime={prime}
                 ultra={ultra}
                 onPrimeChange={setPrime}
