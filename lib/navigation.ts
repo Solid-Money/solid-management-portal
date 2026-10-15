@@ -78,6 +78,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Inbox,
       },
       {
+        href: "/error-lookup",
+        label: "Error Lookup",
+        description: "Trace the Ref on a user's failure screen to what happened",
+        icon: CircleAlert,
+      },
+      {
         href: "/support/articles",
         label: "Help Center",
         description: "Articles on support.solid.xyz, in the app and behind Solid AI",
@@ -112,12 +118,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Card Transactions",
         description: "Card spend with cashback and the fees charged on it",
         icon: CreditCard,
-      },
-      {
-        href: "/error-lookup",
-        label: "Error Lookup",
-        description: "Trace the Ref on a user's failure screen to what happened",
-        icon: CircleAlert,
       },
     ],
   },
