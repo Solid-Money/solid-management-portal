@@ -39,7 +39,10 @@ export default function ScriptsPage() {
         </div>
       </div>
 
-      <div className="bg-white shadow sm:rounded-lg p-6 max-w-2xl">
+      <div
+        id="cohort-snapshot-script"
+        className="bg-white shadow sm:rounded-lg p-6 max-w-2xl"
+      >
         <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
           Cohort Snapshots
         </h3>

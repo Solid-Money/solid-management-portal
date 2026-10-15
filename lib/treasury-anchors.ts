@@ -32,3 +32,13 @@ export const walletSlugFromAnchor = (anchor: string): string | undefined => {
   const match = /^token-(.+)-\d+-[a-z0-9]+$/.exec(anchor);
   return match?.[1];
 };
+
+/** Whether an anchor names this wallet's card, or a token row inside it. */
+export const anchorNamesWallet = (
+  anchor: string | undefined,
+  walletName: string
+): boolean => {
+  if (!anchor) return false;
+  if (anchor === walletAnchorId(walletName)) return true;
+  return walletSlugFromAnchor(anchor) === treasurySlug(walletName);
+};

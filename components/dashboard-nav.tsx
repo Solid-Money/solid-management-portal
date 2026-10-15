@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, Search, User as UserIcon } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { LogOut, Menu, User as UserIcon } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NavSearchTrigger } from "@/components/command-palette/search-trigger";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +32,6 @@ import {
   isActivePath,
   type NavGroup,
 } from "@/lib/navigation";
-import { isErrorLookupQuery } from "@/lib/error-ref";
 import { cn } from "@/lib/utils";
 import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
 
@@ -56,37 +55,6 @@ function CountBadge({ count }: { count: number }) {
     >
       {count > 99 ? "99+" : count}
     </span>
-  );
-}
-
-/** Jump straight to a user from anywhere — the most common support entry point. */
-function UserQuickSearch() {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    // A Ref pasted from a support chat goes to the error lookup instead.
-    router.push(
-      isErrorLookupQuery(trimmed)
-        ? `/error-lookup?ref=${encodeURIComponent(trimmed)}`
-        : `/users?search=${encodeURIComponent(trimmed)}`,
-    );
-  };
-
-  return (
-    <form onSubmit={submit} className="relative hidden lg:block">
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400" />
-      <Input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Find a user or Ref…"
-        aria-label="Find a user by name, email, address or referral code, or an error Ref"
-        className="h-9 w-56 pl-8"
-      />
-    </form>
   );
 }
 
@@ -341,7 +309,9 @@ export default function DashboardNav() {
           </NavigationMenu>
 
           <div className="ml-auto flex items-center gap-3">
-            <UserQuickSearch />
+            {/* Users, card ids, Refs, pages and settings — the most common
+                support entry point, so it is on every page. */}
+            <NavSearchTrigger />
             <ProfileMenu
               email={user?.email}
               onSignOut={() => setIsSignOutModalOpen(true)}

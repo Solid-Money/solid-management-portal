@@ -51,10 +51,9 @@ import WalletAssetModal from "@/components/wallets/wallet-asset-modal";
 import ThresholdEditor from "@/components/wallets/threshold-editor";
 import { useAnchorPing } from "@/components/wallets/use-anchor-ping";
 import {
+  anchorNamesWallet,
   assetAnchorId,
   walletAnchorId,
-  walletSlugFromAnchor,
-  treasurySlug,
 } from "@/lib/treasury-anchors";
 
 /** The unit the popup opens on: a token, on a chain, on a wallet. */
@@ -144,6 +143,9 @@ export default function WalletsBoard({
   const groups = useMemo(() => {
     if (!data) return [];
     const visible = data.wallets.filter((wallet) => {
+      // A wallet a link names is shown whatever the filter: landing on a page
+      // that hides the one thing the link was about reads as a broken link.
+      if (anchorNamesWallet(anchor, wallet.name)) return true;
       if (filter === "all") return true;
       const active = wallet.active !== false;
       return filter === "active" ? active : !active;
@@ -158,7 +160,7 @@ export default function WalletsBoard({
         walletVerdictSeverity(wallet, planIndex, plansReady) ??
         walletSeverity(wallet)
     );
-  }, [data, filter, planIndex, plansReady]);
+  }, [data, filter, planIndex, plansReady, anchor]);
 
   if (isLoading) {
     return (
@@ -190,7 +192,9 @@ export default function WalletsBoard({
   const lowCount = severities.filter((s) => s === 1).length;
 
   return (
-    <div className="space-y-5">
+    // Lands on its own anchors (opening the card, pinging the row), so the
+    // page-wide section scroller leaves everything in here alone.
+    <div data-anchor-self className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm text-gray-500">
           Balances as of {new Date(data.lastUpdated).toLocaleString()}
@@ -338,11 +342,10 @@ function WalletCard({
    * up in the DOM: the row does not exist until the card is expanded, so
    * waiting to find it would mean waiting for something this decides.
    */
-  const anchoredHere = useMemo(() => {
-    if (!anchor) return false;
-    if (anchor === walletAnchorId(wallet.name)) return true;
-    return walletSlugFromAnchor(anchor) === treasurySlug(wallet.name);
-  }, [anchor, wallet.name]);
+  const anchoredHere = useMemo(
+    () => anchorNamesWallet(anchor, wallet.name),
+    [anchor, wallet.name]
+  );
 
   const expanded = expandedOverride ?? anchoredHere;
 
