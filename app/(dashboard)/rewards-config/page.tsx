@@ -41,8 +41,48 @@ import api from "@/lib/api";
 import {
   SubscriptionCategoryRatesMigrationResult,
   SubscriptionDiscountCategory,
+  SubscriptionMerchantCodeRule,
   YieldBoostRunResult,
 } from "@/types";
+
+/** One "Google: 5815" line per rule, the way the rules box shows them. */
+function formatMerchantCodeRules(
+  rules: SubscriptionMerchantCodeRule[] | undefined,
+): string {
+  return (rules ?? [])
+    .map((rule) => `${rule.merchant}: ${rule.merchantCategoryCodes.join(", ")}`)
+    .join("\n");
+}
+
+/**
+ * Read the rules box: one rule per line, "Merchant name: 5815, 5818".
+ *
+ * The name is everything before the last colon, so a name with a colon in it
+ * still works. A line without a colon, without a name or without a four-digit
+ * code is skipped rather than saved: a rule with no code would match the name
+ * at any code, which is not what the box is for, and the backend drops it
+ * anyway.
+ */
+function parseMerchantCodeRules(raw: string): SubscriptionMerchantCodeRule[] {
+  return raw.split("\n").flatMap((line) => {
+    const colon = line.lastIndexOf(":");
+    if (colon < 0) return [];
+
+    const merchant = line.slice(0, colon).trim();
+    const merchantCategoryCodes = [
+      ...new Set(
+        line
+          .slice(colon + 1)
+          .split(/[\s,]+/)
+          .filter((code) => /^\d{4}$/.test(code)),
+      ),
+    ];
+
+    return merchant && merchantCategoryCodes.length > 0
+      ? [{ merchant, merchantCategoryCodes }]
+      : [];
+  });
+}
 
 /**
  * An ISO timestamp as the day it names, or a dash.
@@ -130,6 +170,16 @@ export default function RewardsConfigPage() {
     useState<SubscriptionCategoryRatesMigrationResult | null>(null);
   const [accrualResult, setAccrualResult] =
     useState<YieldBoostRunResult | null>(null);
+  // What is typed in each category's rules box, by category key. Kept apart
+  // from the config so a half-typed line ("Google:") stays on screen while
+  // only the rules it parses to are saved.
+  const [ruleDrafts, setRuleDrafts] = useState<Record<string, string>>({});
+
+  /** Reload the config, dropping rule drafts it would otherwise sit behind. */
+  const reloadConfig = async () => {
+    setRuleDrafts({});
+    await refetch();
+  };
 
   const updateCategory = (
     index: number,
@@ -153,6 +203,18 @@ export default function RewardsConfigPage() {
         .split(",")
         .map((m) => m.trim())
         .filter((m) => m.length > 0),
+    });
+  };
+
+  const updateCategoryRules = (
+    index: number,
+    category: SubscriptionDiscountCategory,
+    raw: string,
+  ) => {
+    setRuleDrafts((prev) => ({ ...prev, [category.key]: raw }));
+    const rules = parseMerchantCodeRules(raw);
+    updateCategory(index, {
+      merchantCodeRules: rules.length > 0 ? rules : undefined,
     });
   };
 
@@ -496,7 +558,7 @@ export default function RewardsConfigPage() {
           description: `${response.data.changes.length} change(s) written. The config cache has been cleared.`,
         });
         // Pull the written config back so the fields below show the new rates.
-        await refetch();
+        await reloadConfig();
       } else if (response.data.alreadyApplied) {
         toast.success("Already up to date", {
           description: "Stored config already matches the shipped rates.",
@@ -1470,6 +1532,36 @@ export default function RewardsConfigPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={2}
                 />
+                <label className="mt-3 text-xs font-medium text-gray-700 block">
+                  Exact merchant name at codes
+                  <InfoTooltip
+                    text={`One rule per line, as "Merchant name: 5815, 5818". A transaction counts toward ${cat.label} when its WHOLE merchant name is this name (case and punctuation ignored) and its MCC is one of the codes. For an issuer that sends the parent company instead of the service — Wirex sends some YouTube Premium charges as just "Google". Use it where an alias would be too broad: a "Google" alias would also match Google One, Google Play and Google Cloud. Aliases are checked first, in every category.`}
+                  />
+                </label>
+                <textarea
+                  value={
+                    ruleDrafts[cat.key] ??
+                    formatMerchantCodeRules(cat.merchantCodeRules)
+                  }
+                  onChange={(e) =>
+                    updateCategoryRules(index, cat, e.target.value)
+                  }
+                  placeholder="Google: 5815"
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  rows={2}
+                />
+                {ruleDrafts[cat.key] !== undefined && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {cat.merchantCodeRules?.length
+                      ? `Saves as: ${cat.merchantCodeRules
+                          .map(
+                            (rule) =>
+                              `"${rule.merchant}" at ${rule.merchantCategoryCodes.join(", ")}`,
+                          )
+                          .join("; ")}.`
+                      : "No complete rule yet — nothing will be saved for this box."}
+                  </p>
+                )}
                 <div className="mt-3 grid grid-cols-3 gap-3">
                   {(
                     [

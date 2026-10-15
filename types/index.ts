@@ -1386,6 +1386,21 @@ export interface SubscriptionDiscountCategoryRates {
   tier3?: number;
 }
 
+/**
+ * A merchant name that counts toward a category only at these codes, and only
+ * when it is the transaction's whole merchant name.
+ *
+ * For an issuer that names the parent company instead of the service: Wirex
+ * sends some YouTube Premium charges as just "Google", which a "Google" alias
+ * would also match on Google One, Google Play and every other Google product.
+ * At MCC 5815 a charge named exactly "Google" is YouTube.
+ */
+export interface SubscriptionMerchantCodeRule {
+  merchant: string;
+  /** Four-digit MCCs. A rule saved with none is dropped by the backend. */
+  merchantCategoryCodes: string[];
+}
+
 export interface SubscriptionDiscountCategory {
   key: string;
   label: string;
@@ -1395,6 +1410,11 @@ export interface SubscriptionDiscountCategory {
    * the tier's flat percentage.
    */
   rates?: SubscriptionDiscountCategoryRates;
+  /**
+   * Whole merchant names matched only at certain codes. Checked after every
+   * category's aliases, so an alias always wins.
+   */
+  merchantCodeRules?: SubscriptionMerchantCodeRule[];
   /**
    * Whether the category is live. `false` pauses it: the app stops listing it
    * and a matching card charge earns regular tier cashback instead, without
@@ -1448,6 +1468,8 @@ export interface SubscriptionCategoryRatesChange {
     | "category-added"
     | "category-rates-changed"
     | "category-aliases-added"
+    | "category-codes-added"
+    | "category-rules-added"
     | "tier-default-changed"
     | "legacy-rates-pinned";
   /** Category key, or config key for a tier default. */
