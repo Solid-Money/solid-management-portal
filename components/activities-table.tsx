@@ -435,11 +435,18 @@ export default function ActivitiesTable() {
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       <SponsoredGasFee activity={activity} />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                      {activity.status === "failed" &&
-                        (activity.type === "deposit" ||
-                          activity.type === "bridge" ||
-                          activity.type === "bridge_deposit")
+                    {/* Any failed type: a swap's reason (e.g. our paymaster
+                        refusing it on a sponsorship limit) is what the app
+                        recorded. Truncated here, whole on hover. */}
+                    <td
+                      className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate"
+                      title={
+                        activity.status === "failed"
+                          ? (activity.failureReason ?? undefined)
+                          : undefined
+                      }
+                    >
+                      {activity.status === "failed"
                         ? activity.failureReason || "-"
                         : "-"}
                     </td>
