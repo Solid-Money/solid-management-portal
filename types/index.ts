@@ -2754,6 +2754,23 @@ export interface ReevaluateFailedCashbackResult {
   expectedBy?: string;
 }
 
+/** One cashback row withheld by an admin. */
+export interface WithheldCashbackRow {
+  id: string;
+  transactionId: string;
+  merchantName?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  /** The status it was withheld from: Escrowed, Pending or Failed. */
+  previousStatus: string;
+}
+
+export interface WithholdCashbackResult {
+  userId: string;
+  /** Rows now Ineligible, so no cron will pay them. */
+  withheld: WithheldCashbackRow[];
+}
+
 export interface IntercomConversationSummary {
   id: string;
   createdAt?: number;

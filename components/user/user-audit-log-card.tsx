@@ -72,6 +72,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Failed cashback re-sent",
       variant: "info",
     },
+    cashback_withheld: {
+      label: "Unpaid cashback withheld",
+      variant: "danger",
+    },
     kyc_verification_reset: {
       label: "KYC verification reset",
       variant: "warning",
@@ -148,6 +152,13 @@ function detailFor(entry: AdminAuditEntry): string | null {
     const count = entry.metadata?.rearmed;
     return typeof count === "number"
       ? `${count} row${count === 1 ? "" : "s"} back in the retry queue`
+      : null;
+  }
+
+  if (entry.action === "cashback_withheld") {
+    const count = entry.metadata?.withheld;
+    return typeof count === "number"
+      ? `${count} unpaid row${count === 1 ? "" : "s"} withheld`
       : null;
   }
 

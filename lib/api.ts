@@ -30,6 +30,7 @@ import {
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   ReevaluateFailedCashbackResult,
+  WithholdCashbackResult,
   TierTrial,
   TierLockReevaluationPreview,
   TierLockReevaluationResult,
@@ -423,6 +424,18 @@ export const reevaluateFailedCashback = (userId: string, reason?: string) =>
   api.post<{ data: ReevaluateFailedCashbackResult }>(
     `/admin/v1/users/${userId}/cashback/reevaluate`,
     { reason: reason || undefined },
+  );
+
+/**
+ * Withhold this user's unpaid cashback: every Escrowed, Pending or Failed row
+ * is marked Ineligible so no cron pays it. For accounts found abusing rewards;
+ * rows already paid are left alone. The reason is required and goes on the
+ * audit trail with the admin's name from the Firebase token.
+ */
+export const withholdUserCashback = (userId: string, reason: string) =>
+  api.post<{ data: WithholdCashbackResult }>(
+    `/admin/v1/users/${userId}/cashback/withhold`,
+    { reason },
   );
 
 /**
