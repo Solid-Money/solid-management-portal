@@ -15,6 +15,7 @@ import UserCardPanel from "@/components/user/user-card-panel";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
+import UserErrorsCard from "@/components/user/user-errors-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserSupportCard from "@/components/user/user-support-card";
 import UserKycCard from "@/components/user/user-kyc-card";
@@ -292,6 +293,8 @@ export default function UserDetailPage({
           {/* First on the tab: a lockout ticket is answered by whether they can
               recover on their own, before anything else is worth reading. */}
           <UserRecoveryCard userId={id} username={displayName} />
+          {/* Above the chats: a Ref quoted in one resolves here without a lookup. */}
+          <UserErrorsCard userId={id} />
           <UserSupportCard userId={id} />
           <UserAuditLogCard userId={id} />
         </TabsContent>
