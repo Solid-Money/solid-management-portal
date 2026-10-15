@@ -3030,9 +3030,15 @@ export interface ReferralSpendRuleSettings {
 export interface AntiAbuseConfig {
   merchantExclusions: MerchantExclusionConfig;
   referralRules: ReferralSpendRuleSettings;
+  /**
+   * Email domains new accounts may not sign up with, lower-cased. A listed
+   * domain also covers its subdomains. Absent from a backend that predates it.
+   */
+  blockedEmailDomains?: string[];
   defaults: {
     merchantExclusions: MerchantExclusionConfig;
     referralRules: ReferralSpendRuleSettings;
+    blockedEmailDomains?: string[];
   };
   lastUpdate: { at: string; by: string | null } | null;
 }
@@ -3044,6 +3050,7 @@ export interface UpdateAntiAbuseConfig {
   categories?: MerchantCategoryExclusion[];
   merchants?: MerchantNameExclusion[];
   referralRules?: Partial<ReferralSpendRuleSettings>;
+  blockedEmailDomains?: string[];
 }
 
 export interface MerchantExclusionPreview {
