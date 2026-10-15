@@ -5,10 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  getTierLockReevaluationPreview,
-  reevaluateTierLock,
-} from "@/lib/api";
+import { getTierLockReevaluationPreview, reevaluateTierLock } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import {
   TierLockReevaluationPreview,
@@ -62,7 +59,9 @@ function parsePrices(
   ultra: string,
 ): { prices: TierLockThresholds } | { error: string } {
   if (prime.trim() === "" || ultra.trim() === "") {
-    return { error: "Enter both prices. Use 0 for a tier that was not on sale." };
+    return {
+      error: "Enter both prices. Use 0 for a tier that was not on sale.",
+    };
   }
   const tier2Amount = Number(prime);
   const tier3Amount = Number(ultra);
@@ -161,13 +160,18 @@ export default function ReevaluateTierLockDialog({
     if (mutation.isPending) return;
     setOpen(false);
     setResult(null);
+    // Prices are typed for the lock as it was previewed this time; the next
+    // opening reads the lock afresh and must not inherit them.
+    setPrime("");
+    setUltra("");
   };
 
-  // Held until the preview has answered, so the button cannot be pressed on a
-  // lock that turns out to need prices. A preview that fails — a backend from
-  // before it existed — falls back to pressing without one, as before.
+  // Held while the preview is being read — the first time and every reopening
+  // — so the button is never pressed on a cached answer about a lock that may
+  // have changed since. A preview that fails (a backend from before it
+  // existed) falls back to pressing without one, as before.
   const canPress =
-    !mutation.isPending && !preview.isLoading && !(needsPrices && pricesError);
+    !mutation.isPending && !preview.isFetching && !(needsPrices && pricesError);
 
   return (
     <>
@@ -215,7 +219,7 @@ export default function ReevaluateTierLockDialog({
 
               <PricesSection
                 preview={preview.data}
-                isLoading={preview.isLoading}
+                isLoading={preview.isFetching}
                 prime={prime}
                 ultra={ultra}
                 onPrimeChange={setPrime}
@@ -322,8 +326,8 @@ function PricesSection({
   if (preview.lockTimeThresholds) {
     return (
       <p className="rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
-        This lock has no record yet. It will be recorded and pinned at the
-        price on {lockedOn}: {formatPrices(preview.lockTimeThresholds)}.
+        This lock has no record yet. It will be recorded and pinned at the price
+        on {lockedOn}: {formatPrices(preview.lockTimeThresholds)}.
       </p>
     );
   }
@@ -333,10 +337,10 @@ function PricesSection({
       <div className="flex gap-2 text-xs text-amber-900">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          This lock has no record, and it was locked on {lockedOn} — before
-          the lock price history begins, so the price it was bought at is not
-          on record. Enter the lock prices that were in force that day. They
-          are pinned for the rest of the lock&apos;s term and cannot be changed
+          This lock has no record, and it was locked on {lockedOn} — before the
+          lock price history begins, so the price it was bought at is not on
+          record. Enter the lock prices that were in force that day. They are
+          pinned for the rest of the lock&apos;s term and cannot be changed
           afterwards. Today&apos;s prices are{" "}
           {formatPrices(preview.liveThresholds)}; use them only if they were
           already in force then.
