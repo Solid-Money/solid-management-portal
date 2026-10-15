@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
+import { AlertTriangle, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { resetKycVerification } from "@/lib/api";
+import { sumsubApplicantUrl } from "@/lib/sumsub";
 import { KycResetEligibility } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,11 +146,27 @@ export default function ResetKycDialog({
             <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                {eligibility.kycProvider === "sumsub" ? "Sumsub" : "The provider"}{" "}
-                marked this decision <strong>FINAL</strong>. Resetting reopens
-                our side only — the same applicant will be judged the same way
-                unless it is also reset with the provider. Clear that first, or
-                the user will simply be declined again.
+                Sumsub marked this decision <strong>FINAL</strong>, and this
+                reset won&apos;t change that: the user&apos;s next attempt
+                reopens the same Sumsub applicant and is declined again. Reopen
+                it in Sumsub instead with <strong>Request resubmission</strong>
+                {eligibility.sumsubApplicantId && (
+                  <>
+                    {" "}
+                    (
+                    <a
+                      href={sumsubApplicantUrl(eligibility.sumsubApplicantId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 font-medium underline"
+                    >
+                      open applicant <ExternalLink className="h-3 w-3" />
+                    </a>
+                    )
+                  </>
+                )}
+                . The user then moves to Incomplete on their own, with no reset
+                needed.
               </span>
             </div>
           )}

@@ -1,9 +1,16 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
+import {
+  ExternalLink,
+  Loader2,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldQuestion,
+} from "lucide-react";
 
 import { getKycResetEligibility } from "@/lib/api";
+import { sumsubApplicantUrl } from "@/lib/sumsub";
 import { KycResetEligibility } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -159,12 +166,68 @@ export default function UserKycCard({ userId, username }: UserKycCardProps) {
               <p className="text-xs text-gray-500">{data.blockerMessage}</p>
             )}
 
-            {data.eligible && data.providerDecisionIsFinal && (
-              <p className="text-xs text-amber-700">
-                The provider marked this decision final. A reset reopens our side
-                only — clear it with the provider too, or the next attempt is
-                declined the same way.
+            {data.sumsubApplicantId && (
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                Sumsub applicant
+                <span className="break-all font-mono text-gray-900">
+                  {data.sumsubApplicantId}
+                </span>
+                <a
+                  href={sumsubApplicantUrl(data.sumsubApplicantId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-indigo-600 hover:underline"
+                >
+                  Open in Sumsub <ExternalLink className="h-3 w-3" />
+                </a>
               </p>
+            )}
+
+            {/*
+              Only Sumsub sends a FINAL. Resetting our record does not reopen
+              it: the next session is minted for the same Sumsub applicant,
+              which still holds the decision. Reopening it in Sumsub sends a
+              RETRY webhook that moves the user to Incomplete on its own.
+            */}
+            {data.eligible && data.providerDecisionIsFinal && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <p>
+                  Sumsub marked this decision <strong>final</strong>. Resetting
+                  verification here won&apos;t let the user back in: their next
+                  attempt reopens the same Sumsub applicant and is declined
+                  again. Reopen it in Sumsub instead:
+                </p>
+                <ol className="mt-2 list-decimal space-y-0.5 pl-4">
+                  <li>
+                    {data.sumsubApplicantId ? (
+                      <a
+                        href={sumsubApplicantUrl(data.sumsubApplicantId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium underline"
+                      >
+                        Open the applicant in Sumsub
+                      </a>
+                    ) : (
+                      "Find the applicant in Sumsub by searching for this user's ID"
+                    )}
+                    , click <strong>Change applicant status</strong>, then{" "}
+                    <strong>Reject</strong>.
+                  </li>
+                  <li>
+                    Untick every red (final) label
+                    {data.reasonCodes.includes("SPAM") && ", SPAM included"}.
+                  </li>
+                  <li>
+                    Pick the blue resubmission labels for the steps the user
+                    should redo, then click <strong>Request resubmission</strong>.
+                  </li>
+                </ol>
+                <p className="mt-2">
+                  The status here then moves to Incomplete on its own and the
+                  user can continue in the app. No reset is needed.
+                </p>
+              </div>
             )}
           </div>
         )}

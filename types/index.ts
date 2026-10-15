@@ -2019,6 +2019,11 @@ export interface KycResetEligibility {
   /** Sumsub's RETRY/FINAL, when Sumsub decided. */
   rejectType: string | null;
   /**
+   * The Sumsub applicant behind this verification, for the dashboard link.
+   * Optional because backends older than this field do not send it.
+   */
+  sumsubApplicantId?: string | null;
+  /**
    * The provider holds a FINAL decision, so a reset only reopens our side: a new
    * session reaches the same answer unless the applicant is reset with the
    * provider too.
