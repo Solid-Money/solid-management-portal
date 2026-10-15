@@ -37,18 +37,21 @@ import {
 } from "@/types/support";
 
 function Section({
+  id,
   title,
   description,
   children,
   action,
 }: {
+  /** Anchor the admin search links to. */
+  id?: string;
   title: string;
   description?: string;
   children: React.ReactNode;
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg bg-white p-6 shadow-sm">
+    <section id={id} className="rounded-lg bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
@@ -276,7 +279,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
         </div>
       </div>
 
-      <Section title="Solid AI" description="Changes apply to the next turn on every server (within 15 seconds). Off is the kill switch.">
+      <Section id="solid-ai" title="Solid AI" description="Changes apply to the next turn on every server (within 15 seconds). Off is the kill switch.">
         <div className="grid gap-2 sm:grid-cols-3">
           {MODES.map((mode) => (
             <button
@@ -332,6 +335,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
       </Section>
 
       <Section
+        id="ai-knowledge"
         title="What Solid AI knows"
         description="Solid AI quotes numbers only from here, its account tools and the help center. Changes apply to the next turn."
       >
@@ -397,7 +401,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
         </div>
       </Section>
 
-      <Section title="Team" description="Who is on call for urgent cases, and how the inbox names each agent.">
+      <Section id="support-team" title="Team" description="Who is on call for urgent cases, and how the inbox names each agent.">
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-1.5 sm:col-span-3">
             <Label htmlFor="hours">Business hours</Label>
@@ -444,6 +448,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
       </Section>
 
       <Section
+        id="known-incidents"
         title="Known incidents"
         description="Active incidents are shown in the app's chat and given to Solid AI, in the wording you approve here."
         action={
@@ -488,6 +493,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
       </Section>
 
       <Section
+        id="saved-replies"
         title="Saved replies"
         description="Inserted from the composer. Written in English; the customer receives their language."
         action={
@@ -530,7 +536,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
         )}
       </Section>
 
-      <Section title="History" description="Every saved version, newest first.">
+      <Section id="settings-history" title="History" description="Every saved version, newest first.">
         {history.data?.length ? (
           <table className="w-full text-sm">
             <thead>

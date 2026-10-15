@@ -54,12 +54,34 @@ export interface User {
     frozen: boolean;
   } | null;
   /**
+   * Why a search for a card or issuer id found this user — that id is nowhere
+   * else on the row. Only present on search results, and null when the user
+   * matched on something else.
+   */
+  cardMatch?: CardSearchMatch | null;
+  /**
    * The owner closed the account with the in-app "Delete account". The row is
    * kept rather than removed, so the account can be recovered from its profile.
    */
   isDeleted?: boolean;
   /** When the account was closed. Cleared when it is recovered. */
   deletedAt?: string | null;
+}
+
+/**
+ * Which card or issuer id a user search matched. Mirrors `CardReferenceMatch`
+ * in accounts-service.
+ */
+export interface CardSearchMatch {
+  /**
+   * `card_id` is the card they hold today; `previous_card_id` one a
+   * replacement retired; `wirex_user_id` and `provider_user_id` (Rain's
+   * consumer id) are the issuer's ids for the cardholder.
+   */
+  field: "card_id" | "previous_card_id" | "wirex_user_id" | "provider_user_id";
+  provider: CardProvider;
+  /** The whole id, so a search by its first characters shows what it found. */
+  value: string;
 }
 
 /**

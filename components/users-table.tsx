@@ -10,42 +10,49 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Search,
   Loader2,
   Copy,
+  CreditCard,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useDebounce } from "@/hooks/use-debounce";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { UsersSearchTrigger } from "@/components/command-palette/search-trigger";
+import { describeMatch } from "@/lib/search-detect";
 
 import { formatDateTime } from "@/lib/utils";
 export default function UsersTable() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Initialize search from URL query param
-  const initialSearch = searchParams.get("search") || "";
+  // The URL is the source of truth for the search: it is set from the admin
+  // search (the box above the table opens it), and the search can change it
+  // again while this table is already on screen.
+  const search = searchParams.get("search")?.trim() ?? "";
 
-  const [filters, setFilters] = useState<UserFilters>({
-    search: initialSearch,
+  const [filters, setFilters] = useState<Omit<UserFilters, "search">>({
     sort: "createdAt",
     order: "desc",
     page: 1,
     limit: 10,
   });
-
-  const debouncedSearch = useDebounce(filters.search, 500);
+  // A new search starts from its first page.
+  const [searchedFor, setSearchedFor] = useState(search);
+  if (search !== searchedFor) {
+    setSearchedFor(search);
+    setFilters((prev) => ({ ...prev, page: 1 }));
+  }
 
   const { data, isLoading, isError } = useQuery<UsersResponse>({
     // Keep the previous page on screen while the next one loads: the table
-    // used to blank out on every keystroke and page change, which made
-    // scanning a result set feel broken.
+    // used to blank out on every page change, which made scanning a result
+    // set feel broken.
     placeholderData: keepPreviousData,
-    queryKey: ["users", { ...filters, search: debouncedSearch }],
+    queryKey: ["users", { ...filters, search }],
     queryFn: async () => {
       const params = new URLSearchParams({
-        search: debouncedSearch,
+        search,
         sort: filters.sort,
         order: filters.order,
         page: filters.page.toString(),
@@ -63,10 +70,6 @@ export default function UsersTable() {
       order: prev.sort === field && prev.order === "desc" ? "asc" : "desc",
       page: 1,
     }));
-  };
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters((prev) => ({ ...prev, search: e.target.value, page: 1 }));
   };
 
   const handlePageChange = (newPage: number) => {
@@ -116,18 +119,10 @@ export default function UsersTable() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <div className="relative max-w-sm w-full">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            placeholder="Username, email, address, Safe or referral code…"
-            value={filters.search}
-            onChange={handleSearch}
-          />
-        </div>
+        <UsersSearchTrigger
+          search={search}
+          onClear={() => router.replace(pathname)}
+        />
       </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -206,6 +201,19 @@ export default function UsersTable() {
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {user.username}
+                      {user.cardMatch && (
+                        // The card id that found them is nowhere else on
+                        // the row; without this a card search reads as a
+                        // list of strangers.
+                        <Badge
+                          variant="info"
+                          className="ml-2"
+                          title={user.cardMatch.value}
+                        >
+                          <CreditCard className="h-3 w-3" />
+                          {describeMatch(user, search)}
+                        </Badge>
+                      )}
                       {user.isDeleted && (
                         <Badge
                           variant="danger"

@@ -69,6 +69,8 @@ export default function PromotionsBannerPage() {
         </h1>
         {banners.length > 0 && (
           <button
+            id="new-banner"
+            data-search-open
             onClick={handleCreate}
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer"
           >
@@ -141,6 +143,8 @@ export default function PromotionsBannerPage() {
         <div className="bg-white shadow rounded-lg py-20 flex flex-col items-center justify-center space-y-4">
           <p className="text-gray-500 text-lg">No banners created yet.</p>
           <button
+            id="new-banner"
+            data-search-open
             onClick={handleCreate}
             className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm font-medium"
           >

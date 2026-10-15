@@ -48,6 +48,7 @@ export default function GeneralConfigPage() {
 
       {data ? (
         <ConfigSection
+          id="rain-rtf"
           title="Rain Real-Time Funding"
           description="Card authorizations pulled from the cardholder's own wallet at the swipe"
           icon={<CreditCard className="h-5 w-5 text-indigo-600" />}
