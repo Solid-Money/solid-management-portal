@@ -31,7 +31,9 @@ import {
   SetUserCashbackPercentageResult,
   ReevaluateFailedCashbackResult,
   TierTrial,
+  TierLockReevaluationPreview,
   TierLockReevaluationResult,
+  TierLockThresholds,
   TierMembershipView,
   TierTrialView,
 } from "@/types";
@@ -329,10 +331,31 @@ export const getUserTierMembership = (userId: string) =>
  * Only ever holds a tier up; safe to repeat. The admin's name on the audit row
  * comes from the Firebase token, never from here.
  */
-export const reevaluateTierLock = (userId: string, reason?: string) =>
+export const reevaluateTierLock = (
+  userId: string,
+  reason?: string,
+  /**
+   * The prices to pin, only when the preview says `needsThresholds`: the lock
+   * has no record and the price on the day it was opened is not on record.
+   */
+  thresholds?: TierLockThresholds,
+) =>
   api.post<{ data: TierLockReevaluationResult }>(
     `/admin/v1/users/${userId}/tier-lock/reevaluate`,
-    { reason: reason || undefined },
+    { reason: reason || undefined, ...(thresholds ?? {}) },
+  );
+
+/**
+ * What re-evaluating this user's lock would do, without doing it — chiefly
+ * whether the price it was bought at is on record or has to be entered.
+ *
+ * Quiet: the dialog still works without it (a backend from before it existed
+ * has no such route), so a failure here should not toast.
+ */
+export const getTierLockReevaluationPreview = (userId: string) =>
+  api.get<{ data: TierLockReevaluationPreview }>(
+    `/admin/v1/users/${userId}/tier-lock/reevaluate`,
+    { quietErrors: true },
   );
 
 /**

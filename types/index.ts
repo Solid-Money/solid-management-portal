@@ -1777,6 +1777,28 @@ export interface TierLockTrancheReport {
   unlocksAt: string | null;
 }
 
+/** The FUSE a lock costs per tier — what a locked position is graded against. */
+export interface TierLockThresholds {
+  /** FUSE for Prime. */
+  tier2Amount: number;
+  /** FUSE for Ultra. */
+  tier3Amount: number;
+}
+
+/**
+ * Where the prices a lock is graded against came from.
+ *
+ * `existing`: already on the lock's record. `lock-time`: the price in force
+ * the day it was opened, from the config history. `admin`: entered by support
+ * because that day's price is not on record. `live`: today's price, used only
+ * when nothing better was known.
+ */
+export type TierLockThresholdsSource =
+  | "existing"
+  | "lock-time"
+  | "admin"
+  | "live";
+
 /** What re-evaluating a user's lock found and changed. */
 export interface TierLockReevaluationResult {
   safeAddress: string;
@@ -1785,7 +1807,42 @@ export interface TierLockReevaluationResult {
   lockTierAfter: string;
   /** The user's tier by every route, afterwards. */
   currentTier: string;
+  /**
+   * When the position was opened: the day its prices are pinned from.
+   * Optional only because a backend from before it existed omits it.
+   */
+  lockedSince?: string | null;
+  /** The prices the lock is graded against now; null when unpinned. */
+  pinnedThresholds?: TierLockThresholds | null;
+  thresholdsSource?: TierLockThresholdsSource | null;
   tranches: TierLockTrancheReport[];
+}
+
+/**
+ * What re-evaluating a lock would do, read before support presses it.
+ *
+ * Above all, whether the price the lock was bought at is on record. A lock
+ * with no record gets one, pinned for the rest of its term at the price on the
+ * day it was opened; when that day falls before the price history began,
+ * `needsThresholds` is true and support has to enter it.
+ */
+export interface TierLockReevaluationPreview {
+  /** Null when the user has no Safe. */
+  safeAddress: string | null;
+  /** Whether anything is locked on chain. */
+  locked: boolean;
+  /** When the oldest open lock was taken. */
+  lockedSince: string | null;
+  /** Whether the lock already has its record, and so its prices. */
+  recorded: boolean;
+  /** The prices on the existing record. */
+  pinnedThresholds: TierLockThresholds | null;
+  /** The price in force the day the lock was opened; null when not on record. */
+  lockTimeThresholds: TierLockThresholds | null;
+  /** Today's price, for reference only. */
+  liveThresholds: TierLockThresholds;
+  /** Re-evaluating needs support to enter the prices to pin. */
+  needsThresholds: boolean;
 }
 
 /** What one tier costs by each route, and whether the user already holds it. */
