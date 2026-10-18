@@ -9,6 +9,10 @@ import { cashbackStatusVariant } from "@/lib/card-transactions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReevaluateFailedCashbackDialog from "@/components/user/reevaluate-failed-cashback-dialog";
+import WithholdCashbackDialog from "@/components/user/withhold-cashback-dialog";
+
+/** Rows a cron will still pay — what "Withhold unpaid" cancels. */
+const UNPAID_STATUSES = new Set(["Escrowed", "Pending", "Failed"]);
 
 /** What a row actually paid out, in the asset it was paid in. */
 function payoutOf(entry: CashbackEntry): string {
@@ -40,6 +44,9 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
   const permanentlyFailedCount = entries.filter(
     (entry) => entry.status === "PermanentlyFailed",
   ).length;
+  const unpaidCount = entries.filter((entry) =>
+    UNPAID_STATUSES.has(entry.status),
+  ).length;
 
   return (
     <Card className="@container">
@@ -56,6 +63,7 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                 permanentlyFailedCount={permanentlyFailedCount}
               />
             )}
+            <WithholdCashbackDialog userId={userId} unpaidCount={unpaidCount} />
             <span className="text-sm font-semibold text-gray-900">
               ${history.totalPaidUsd.toFixed(2)}
             </span>

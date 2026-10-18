@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Ban,
   Loader2,
+  MailX,
   Plus,
   RotateCcw,
   Save,
@@ -62,6 +63,7 @@ interface Draft {
   categories: MerchantCategoryExclusion[];
   merchants: MerchantNameExclusion[];
   referralRules: ReferralSpendRuleSettings;
+  blockedEmailDomains: string[];
 }
 
 const toDraft = (config: AntiAbuseConfig): Draft => ({
@@ -74,6 +76,7 @@ const toDraft = (config: AntiAbuseConfig): Draft => ({
     ...entry,
   })),
   referralRules: { ...config.referralRules },
+  blockedEmailDomains: [...(config.blockedEmailDomains ?? [])],
 });
 
 const same = (a: unknown, b: unknown) =>
@@ -94,6 +97,27 @@ function patternProblem(pattern: string): string | null {
   }
   if (normalized.split("*").length - 1 > 4)
     return 'Use at most 4 "*" wildcards.';
+  return null;
+}
+
+/** As the backend stores a domain: lower-cased, no leading "@" or trailing dot. */
+const normalizeDomain = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "")
+    .replace(/\.+$/, "");
+
+const DOMAIN_PATTERN =
+  /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$/;
+
+/** Mirrors `emailDomainProblem` in the backend, for an early, friendly answer. */
+function domainProblem(value: string): string | null {
+  const domain = normalizeDomain(value);
+  if (!domain) return "Enter a domain, e.g. merry.pink.";
+  if (domain.includes("@"))
+    return "Enter just the domain — the part after the @.";
+  if (!DOMAIN_PATTERN.test(domain)) return "That isn't a valid domain.";
   return null;
 }
 
@@ -217,6 +241,23 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
         />
       </ConfigSection>
 
+      {config.blockedEmailDomains !== undefined && (
+        <ConfigSection
+          title="Blocked email domains"
+          description="Throwaway-inbox domains new accounts can't sign up with"
+          icon={<MailX className="h-5 w-5 text-rose-600" />}
+          defaultOpen
+        >
+          <EmailDomainList
+            entries={draft.blockedEmailDomains}
+            defaults={config.defaults.blockedEmailDomains ?? []}
+            onChange={(blockedEmailDomains) =>
+              edit((d) => ({ ...d, blockedEmailDomains }))
+            }
+          />
+        </ConfigSection>
+      )}
+
       <ConfigSection
         id="test-a-merchant"
         title="Test a merchant"
@@ -279,15 +320,15 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
         }}
         message={
           <div className="space-y-3 text-sm">
-            <p>These changes let more purchases earn rewards:</p>
+            <p>These changes loosen the anti-abuse rules:</p>
             <ul className="list-disc space-y-1 pl-5">
               {changes.risky.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
             <p className="text-gray-500">
-              They apply to every purchase from the next few minutes on, and to
-              referral rewards not yet paid.
+              They take effect within a few minutes. Purchase rules then apply
+              to every purchase, and to referral rewards not yet paid.
             </p>
           </div>
         }
@@ -337,6 +378,8 @@ function diff(
     after: T[],
     key: (entry: T) => string,
     noun: string,
+    /** What removing an entry allows, when it is not a purchase earning. */
+    removedEffect?: string,
   ) => {
     if (same(before, after)) return false;
     const beforeKeys = new Set(before.map(key));
@@ -353,7 +396,7 @@ function diff(
       risky.push(
         `${removed.length} ${noun} removed: ${removed.map(key).slice(0, 8).join(", ")}${
           removed.length > 8 ? "…" : ""
-        }`,
+        }${removedEffect ? ` — ${removedEffect}` : ""}`,
       );
     }
     return true;
@@ -398,6 +441,18 @@ function diff(
           .join(", ")}`,
       );
     }
+  }
+
+  if (
+    listChange(
+      saved.blockedEmailDomains,
+      draft.blockedEmailDomains,
+      (domain) => domain,
+      "blocked email domains",
+      "new accounts can sign up with them again",
+    )
+  ) {
+    payload.blockedEmailDomains = draft.blockedEmailDomains;
   }
 
   if (!same(saved.referralRules, draft.referralRules)) {
@@ -770,6 +825,135 @@ function MerchantList({
                         )
                       }
                       aria-label={`Remove ${entry.pattern}`}
+                      className="cursor-pointer rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function EmailDomainList({
+  entries,
+  defaults,
+  onChange,
+}: {
+  entries: string[];
+  defaults: string[];
+  onChange: (entries: string[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [domain, setDomain] = useState("");
+
+  const defaultDomains = useMemo(() => new Set(defaults), [defaults]);
+  const needle = search.trim().toLowerCase();
+  const visible = entries.filter((entry) => !needle || entry.includes(needle));
+
+  const normalized = normalizeDomain(domain);
+  const problem = domain ? domainProblem(domain) : null;
+  const duplicate = entries.includes(normalized);
+
+  const add = () => {
+    const issue = domainProblem(domain);
+    if (issue) return toast.error(issue);
+    if (duplicate)
+      return toast.error(`"${normalized}" is already on the list.`);
+    onChange([normalized, ...entries]);
+    setDomain("");
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600">
+        Sign-ups, and changing an account&rsquo;s email, are refused for these
+        domains and their subdomains —{" "}
+        <code className="rounded bg-gray-100 px-1">merry.pink</code> also blocks{" "}
+        <code className="rounded bg-gray-100 px-1">inbox.merry.pink</code>, but
+        not <code className="rounded bg-gray-100 px-1">cherry.pink</code>.
+        Existing accounts on a listed domain can still sign in.
+      </p>
+
+      <div className="space-y-2 rounded-lg border border-dashed border-gray-300 p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+          <input
+            value={domain}
+            onChange={(event) => setDomain(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && add()}
+            placeholder="e.g. merry.pink"
+            spellCheck={false}
+            aria-label="Email domain"
+            className="rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={add}
+            disabled={!domain || !!problem || duplicate}
+            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Add
+          </button>
+        </div>
+        {problem ? (
+          <p className="text-xs text-red-600">{problem}</p>
+        ) : duplicate ? (
+          <p className="text-xs text-amber-700">
+            &ldquo;{normalized}&rdquo; is already on the list.
+          </p>
+        ) : null}
+      </div>
+
+      <ListToolbar
+        search={search}
+        onSearch={setSearch}
+        count={entries.length}
+        differsFromDefaults={!same(entries, defaults)}
+        onRestoreDefaults={() => onChange([...defaults])}
+        placeholder="Filter domains"
+      />
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
+            <tr>
+              <th className="px-3 py-2">Domain</th>
+              <th className="px-3 py-2" aria-label="Remove" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {visible.length === 0 ? (
+              <tr>
+                <td colSpan={2} className="px-3 py-6 text-center text-gray-500">
+                  {entries.length === 0
+                    ? "No email domains are blocked."
+                    : "No domain matches the filter."}
+                </td>
+              </tr>
+            ) : (
+              visible.map((entry) => (
+                <tr key={entry}>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-900">
+                    {entry}
+                    {!defaultDomains.has(entry) && (
+                      <Badge variant="info" className="ml-2 font-sans">
+                        Added
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange(entries.filter((e) => e !== entry))
+                      }
+                      aria-label={`Remove ${entry}`}
                       className="cursor-pointer rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                     >
                       <Trash2 className="h-4 w-4" />

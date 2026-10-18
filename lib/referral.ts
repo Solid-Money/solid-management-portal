@@ -45,7 +45,7 @@ export function reversalReasonLabel(reason: string | undefined): string {
     case "account_closed":
       return "The friend's account no longer exists";
     case "self_referral_suspected":
-      return "Friend shares a wallet or email with the referrer";
+      return "Friend shares a wallet, email or device with the referrer";
     case "rejected_in_review":
       return "Rejected by an admin in referral review";
     case "referrer_blocked":
