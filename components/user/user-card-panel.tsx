@@ -7,6 +7,7 @@ import { getCardAuditHistory } from "@/lib/api";
 import {
   CardAuditAction,
   CardAuditEntry,
+  CardCurrencyAmount,
   CardSpendBlock,
   UserCardOverview,
   WirexSpendContext,
@@ -59,6 +60,27 @@ const usd = (value: number | null | undefined) =>
         maximumFractionDigits: 2,
       })}`
     : "—";
+
+/**
+ * The spendable figure the app shows the cardholder, e.g. "€12.73", or null
+ * when it is missing or unreadable.
+ */
+const cardCurrency = (value?: CardCurrencyAmount) => {
+  // `Number("")` is 0: an empty amount must read as missing, not as nothing
+  // to spend.
+  if (typeof value?.amount !== "string" || !value.amount.trim()) return null;
+  const amount = Number(value.amount);
+  if (!Number.isFinite(amount)) return null;
+  try {
+    return amount.toLocaleString("en-US", {
+      style: "currency",
+      currency: value.currency,
+    });
+  } catch {
+    // Not a currency code Intl knows; still worth showing.
+    return `${value.amount} ${value.currency}`;
+  }
+};
 
 /** A spend cap. `null` means the Safe set no cap of its own, which is not $0. */
 const cap = (value: number | null | undefined) =>
@@ -127,6 +149,7 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
 
   const blocker = describeBlocker(spend, card.spendBlock);
   const blocked = card.spendBlock?.blocked === true;
+  const inCardCurrency = cardCurrency(spend.availableInCardCurrency);
   const paused = spend.modulePaused || spend.safePaused;
 
   return (
@@ -160,6 +183,16 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
           <dd className="mt-0.5 font-medium text-gray-900">
             {usd(spend.spendableUsd)}
           </dd>
+          {inCardCurrency && spend.availableInCardCurrency && (
+            <dd className="text-[11px] text-gray-500">
+              {inCardCurrency} in the app
+              <span className="block">
+                ${spend.availableInCardCurrency.rate} per{" "}
+                {spend.availableInCardCurrency.currency}, Wirex quote of{" "}
+                {formatDateTime(spend.availableInCardCurrency.rateAt)}
+              </span>
+            </dd>
+          )}
         </div>
         <div>
           <dt className="text-gray-500">Cap left</dt>
