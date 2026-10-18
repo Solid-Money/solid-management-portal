@@ -9,6 +9,7 @@ import {
 import {
   FEE_PRODUCTS,
   FeeProductRates,
+  feeSectionId,
   type FeeProductDefinition,
 } from "@/components/config/fee-product-rates";
 import {
@@ -217,6 +218,7 @@ export default function FeesConfigPage() {
       {FEE_PRODUCTS.map((product, index) => (
         <ConfigSection
           key={product.key}
+          id={feeSectionId(product.key)}
           title={product.label}
           description={product.summary}
           icon={<product.icon className="h-5 w-5 text-amber-600" />}
@@ -253,6 +255,7 @@ export default function FeesConfigPage() {
       {ONBOARDING_FEES.map((fee) => (
         <ConfigSection
           key={fee.key}
+          id={feeSectionId(fee.key)}
           title={fee.label}
           description={fee.summary}
           icon={<BadgeDollarSign className="h-5 w-5 text-amber-600" />}
@@ -286,6 +289,7 @@ export default function FeesConfigPage() {
       ))}
 
       <ConfigSection
+        id="minimum-charge"
         title="Minimum Charge"
         description="The floor below which a computed fee is waived instead of charged"
         icon={<Percent className="h-5 w-5 text-amber-600" />}

@@ -221,13 +221,13 @@ function ArticlesScreen() {
           <Button variant="outline" onClick={downloadRedirects} title="Old Intercom and renamed URLs, and where they go">
             <Download /> Redirect map
           </Button>
-          <Button variant="outline" onClick={() => setShowImport(true)} title="Copy Intercom's help center here">
+          <Button id="import-intercom" data-search-open variant="outline" onClick={() => setShowImport(true)} title="Copy Intercom's help center here">
             <CloudDownload /> Import from Intercom
           </Button>
-          <Button variant="outline" onClick={() => setShowCollections(true)}>
+          <Button id="help-collections" data-search-open variant="outline" onClick={() => setShowCollections(true)}>
             <FolderTree /> Collections
           </Button>
-          <Button onClick={() => setShowNew(true)}>
+          <Button id="new-article" data-search-open onClick={() => setShowNew(true)}>
             <Plus /> New article
           </Button>
         </div>

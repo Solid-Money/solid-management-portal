@@ -66,6 +66,8 @@ export default function WhatsNewPage() {
         <h1 className="text-2xl font-bold text-gray-900">What&apos;s New Popups</h1>
         {popups.length > 0 && (
           <button
+            id="new-popup"
+            data-search-open
             onClick={handleCreate}
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer"
           >
@@ -130,6 +132,8 @@ export default function WhatsNewPage() {
         <div className="bg-white shadow rounded-lg py-20 flex flex-col items-center justify-center space-y-4">
           <p className="text-gray-500 text-lg">No popups created yet.</p>
           <button
+            id="new-popup"
+            data-search-open
             onClick={handleCreate}
             className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm font-medium"
           >

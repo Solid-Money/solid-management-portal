@@ -1,9 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import { BlockedReferrers } from "@/components/referral-review/blocked-referrers";
 import { RecheckPanel } from "@/components/referral-review/recheck-panel";
 import { ReviewQueue } from "@/components/referral-review/review-queue";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUrlTab } from "@/hooks/use-url-tab";
+
+const TABS = ["queue", "blocked", "recheck"] as const;
 
 /**
  * Growth → Referral Review: the referral rewards that need a person.
@@ -13,6 +17,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
  * here can stop a payout already in flight.
  */
 export default function ReferralReviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReferralReviewScreen />
+    </Suspense>
+  );
+}
+
+function ReferralReviewScreen() {
+  // In the URL so the admin search can open "Blocked referrers" directly.
+  const [tab, setTab] = useUrlTab(TABS, "queue");
+
   return (
     <div className="space-y-6">
       <div>
@@ -27,7 +42,7 @@ export default function ReferralReviewPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="queue" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="queue">Review queue</TabsTrigger>
           <TabsTrigger value="blocked">Blocked referrers</TabsTrigger>

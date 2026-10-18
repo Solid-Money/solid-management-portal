@@ -168,7 +168,7 @@ function ReportsScreen() {
             <Tile label="Waiting over a day, no reply" value={formatCount(data.withoutReply.count)} hint="Open now, any period" />
           </div>
 
-          <section className="rounded-lg bg-white p-4 shadow-sm">
+          <section id="cases-per-day" className="rounded-lg bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-gray-900">Cases per day</h2>
             <div className="mt-3 h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -196,7 +196,7 @@ function ReportsScreen() {
           </section>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <section className="rounded-lg bg-white p-4 shadow-sm">
+            <section id="response-times" className="rounded-lg bg-white p-4 shadow-sm">
               <h2 className="text-sm font-semibold text-gray-900">Response times</h2>
               <table className="mt-2 w-full text-sm">
                 <thead>
@@ -222,7 +222,7 @@ function ReportsScreen() {
                 ))}
               </div>
             </section>
-            <section className="rounded-lg bg-white p-4 shadow-sm">
+            <section id="content-gaps" className="rounded-lg bg-white p-4 shadow-sm">
               <h2 className="text-sm font-semibold text-gray-900">Content gaps</h2>
               <p className="text-xs text-gray-500">Handoffs where the help center had no answer, by intent: articles to write.</p>
               {data.contentGaps.length === 0 ? (

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 
+import { useHashTarget } from "@/hooks/use-hash-target";
+
 import {
   Tooltip,
   TooltipContent,
@@ -36,6 +38,11 @@ export interface ConfigSectionProps {
   icon: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  /**
+   * Anchor the admin search links to (`/rewards-config#referral-system`).
+   * The section opens itself when the URL points at it.
+   */
+  id?: string;
 }
 
 export function ConfigSection({
@@ -44,11 +51,21 @@ export function ConfigSection({
   icon,
   children,
   defaultOpen = false,
+  id,
 }: ConfigSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
+  // Opened by a search result or a pasted link: a collapsed card would land
+  // the reader on a heading with the setting they came for hidden under it.
+  const target = useHashTarget(id);
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+  if (target && target !== openedFor) {
+    setOpenedFor(target);
+    setIsOpen(true);
+  }
+
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow">
+    <div id={id} className="overflow-hidden rounded-lg bg-white shadow">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex w-full cursor-pointer items-center justify-between bg-gray-50 px-6 py-4 transition-colors hover:bg-gray-100"

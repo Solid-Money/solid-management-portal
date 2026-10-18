@@ -147,6 +147,7 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
   return (
     <div className="space-y-6 pb-24">
       <ConfigSection
+        id="programme-switches"
         title="Programme switches"
         description="Turn the merchant exclusions on or off for each programme"
         icon={<ShieldAlert className="h-5 w-5 text-red-600" />}
@@ -175,6 +176,7 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
       </ConfigSection>
 
       <ConfigSection
+        id="excluded-merchants"
         title="Excluded merchants"
         description="Blocked by name, whatever category they arrive under"
         icon={<Store className="h-5 w-5 text-orange-600" />}
@@ -188,6 +190,7 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
       </ConfigSection>
 
       <ConfigSection
+        id="excluded-mccs"
         title="Excluded merchant categories (MCC)"
         description="Cash, transfers, top-ups, gambling, government payments and other non-purchases"
         icon={<Tags className="h-5 w-5 text-amber-600" />}
@@ -201,6 +204,7 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
       </ConfigSection>
 
       <ConfigSection
+        id="referral-qualification-rules"
         title="Referral qualification rules"
         description="What a referred friend's purchase must be to count toward the target"
         icon={<UserCheck className="h-5 w-5 text-pink-600" />}
@@ -214,6 +218,7 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
       </ConfigSection>
 
       <ConfigSection
+        id="test-a-merchant"
         title="Test a merchant"
         description="See whether a merchant earns cashback and counts for referrals — against your unsaved edits"
         icon={<Wand2 className="h-5 w-5 text-indigo-600" />}

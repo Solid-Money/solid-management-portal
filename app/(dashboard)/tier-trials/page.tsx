@@ -111,6 +111,8 @@ export default function TierTrialsPage() {
           </p>
         </div>
         <Button
+          id="gift-trials"
+          data-search-open
           onClick={() => setIsGiftOpen(true)}
           disabled={batch.isPending}
           className="cursor-pointer"
