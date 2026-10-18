@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { History, Loader2 } from "lucide-react";
 
@@ -146,8 +147,9 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "cashback_failed_reevaluated") {
     const count = entry.metadata?.rearmed;
+    const bulk = stringField(entry, "bulkRunId") ? " — bulk re-send" : "";
     return typeof count === "number"
-      ? `${count} row${count === 1 ? "" : "s"} back in the retry queue`
+      ? `${count} row${count === 1 ? "" : "s"} back in the retry queue${bulk}`
       : null;
   }
 
@@ -258,6 +260,10 @@ export default function UserAuditLogCard({ userId }: { userId: string }) {
                 variant: "muted" as const,
               };
               const detail = detailFor(entry);
+              const bulkRunId =
+                entry.action === "cashback_failed_reevaluated"
+                  ? stringField(entry, "bulkRunId")
+                  : null;
 
               return (
                 <li
@@ -280,6 +286,14 @@ export default function UserAuditLogCard({ userId }: { userId: string }) {
                     </span>
                   </div>
                   {detail && <span className="text-gray-500">{detail}</span>}
+                  {bulkRunId && (
+                    <Link
+                      href={`/failed-cashback?run=${bulkRunId}`}
+                      className="w-fit text-indigo-600 hover:underline"
+                    >
+                      Open the bulk re-send
+                    </Link>
+                  )}
                   {entry.reason && (
                     <span className="whitespace-pre-line text-gray-600">
                       “{entry.reason}”

@@ -16,6 +16,7 @@ import {
   Megaphone,
   Percent,
   Receipt,
+  RefreshCw,
   Share2,
   ShieldAlert,
   ShieldCheck,
@@ -82,6 +83,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Error Lookup",
         description: "Trace the Ref on a user's failure screen to what happened",
         icon: CircleAlert,
+      },
+      {
+        href: "/failed-cashback",
+        label: "Failed Cashback",
+        description:
+          "Re-send cashback that gave up, for many users at once, after a payout wallet outage",
+        icon: RefreshCw,
       },
       {
         href: "/support/articles",

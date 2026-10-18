@@ -30,6 +30,11 @@ import {
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   ReevaluateFailedCashbackResult,
+  BulkResendPreview,
+  BulkResendResult,
+  BulkResendRunReport,
+  BulkResendRunSummary,
+  FailedCashbackSelection,
   TierTrial,
   TierLockReevaluationPreview,
   TierLockReevaluationResult,
@@ -423,6 +428,43 @@ export const reevaluateFailedCashback = (userId: string, reason?: string) =>
   api.post<{ data: ReevaluateFailedCashbackResult }>(
     `/admin/v1/users/${userId}/cashback/reevaluate`,
     { reason: reason || undefined },
+  );
+
+/**
+ * What a bulk re-send of PermanentlyFailed cashback would do for a filter: the
+ * rows (oldest 1000), their owners, the soUSD needed and whether the payout
+ * wallet — read live — covers it. Read-only.
+ */
+export const previewFailedCashbackResend = (
+  selection: FailedCashbackSelection,
+) =>
+  api.post<BulkResendPreview>("/admin/v1/cashback/failed/resend/preview", {
+    selection,
+  });
+
+/**
+ * Put exactly the previewed rows back in the retry queue. Refused as a whole
+ * when the payout wallet cannot cover them; rows already paid are skipped.
+ * The admin's name on the run comes from the Firebase token.
+ */
+export const bulkResendFailedCashback = (request: {
+  cashbackIds: string[];
+  reason?: string;
+  selection?: FailedCashbackSelection;
+}) =>
+  api.post<BulkResendResult>("/admin/v1/cashback/failed/resend", {
+    ...request,
+    reason: request.reason || undefined,
+  });
+
+/** The latest bulk re-sends, newest first. */
+export const getFailedCashbackResendRuns = () =>
+  api.get<BulkResendRunSummary[]>("/admin/v1/cashback/failed/resend/runs");
+
+/** One bulk re-send, with where every row it queued stands now. */
+export const getFailedCashbackResendRun = (runId: string) =>
+  api.get<BulkResendRunReport>(
+    `/admin/v1/cashback/failed/resend/runs/${encodeURIComponent(runId)}`,
   );
 
 /**

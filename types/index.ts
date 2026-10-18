@@ -2754,6 +2754,206 @@ export interface ReevaluateFailedCashbackResult {
   expectedBy?: string;
 }
 
+/**
+ * Why a PermanentlyFailed row gave up, read from its error. Mirrors
+ * `FailedCashbackCause` in accounts-service.
+ *
+ * - `payout_wallet`: the payout wallet was empty or out of gas, so nothing
+ *   was sent. Safe to re-send once it is funded.
+ * - `no_payout_address`: the cardholder had no Safe yet.
+ * - `other`: anything else — including errors that can come after a transfer
+ *   was broadcast, so read them before re-sending.
+ */
+export type FailedCashbackCause = "payout_wallet" | "no_payout_address" | "other";
+
+/** Which PermanentlyFailed rows a bulk re-send is about. */
+export interface FailedCashbackSelection {
+  causes?: FailedCashbackCause[];
+  /** ISO dates, inclusive. */
+  from?: string;
+  to?: string;
+  /** `updatedAt` = when the row last failed; `createdAt` = the purchase. */
+  dateField?: "createdAt" | "updatedAt";
+  /** User ids or usernames. */
+  users?: string[];
+}
+
+/** How a row's payout was estimated — see accounts-service for the rules. */
+export type CashbackEstimateBasis =
+  | "fixed"
+  | "row_rate"
+  | "user_rate"
+  | "max_tier_rate"
+  | "none";
+
+export interface BulkResendPreviewRow {
+  cashbackId: string;
+  userId: string;
+  username?: string;
+  transactionId: string;
+  merchantName?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  type?: string;
+  createdAt?: string;
+  failedAt?: string;
+  cause: FailedCashbackCause;
+  lastError?: string;
+  estimatedUsd: number;
+  estimateBasis: CashbackEstimateBasis;
+  /** Set when the row cannot be sent: no account, closed, or no Safe. */
+  blockedReason?: string;
+}
+
+/** `canceled`: already past the highest cap; `possible`: may cross the lowest. */
+export type BulkResendCapRisk = "canceled" | "possible";
+
+export interface BulkResendPreviewUser {
+  userId: string;
+  username?: string;
+  rows: number;
+  estimatedUsd: number;
+  blockedReason?: string;
+  paidThisMonthUsd: number;
+  capRisk?: BulkResendCapRisk;
+}
+
+/** Whether the Cashback Payout Wallet can cover what would be queued. */
+export interface PayoutWalletCheck {
+  address?: string;
+  soUsdBalance?: number;
+  nativeBalance?: number;
+  gasThreshold?: number;
+  /** Rows already waiting in the retry queue, which draw on the same balance. */
+  alreadyQueuedRows: number;
+  alreadyQueuedSoUsd: number;
+  /** This selection plus what is already queued. */
+  requiredSoUsd: number;
+  covers: boolean;
+  shortfallSoUsd: number;
+  error?: string;
+  warnings: string[];
+}
+
+export interface BulkResendDrain {
+  cronRuns: number;
+  estimatedHours: number;
+}
+
+export interface BulkResendPreview {
+  selection: FailedCashbackSelection;
+  rows: BulkResendPreviewRow[];
+  users: BulkResendPreviewUser[];
+  unresolvedUsers: string[];
+  byCause: { cause: FailedCashbackCause; rows: number; users: number }[];
+  totals: {
+    rows: number;
+    users: number;
+    eligibleRows: number;
+    eligibleUsers: number;
+    blockedRows: number;
+    blockedUsers: number;
+    estimatedUsd: number;
+    estimatedSoUsd: number;
+    soUsdRate?: number;
+    estimateIsUpperBound: boolean;
+  };
+  capRisk: {
+    lowestMonthlyCap?: number;
+    highestMonthlyCap?: number;
+    canceledUsers: number;
+    possibleUsers: number;
+  };
+  wallet: PayoutWalletCheck;
+  /** More rows matched than one run carries; only the oldest 1000 are here. */
+  truncated: boolean;
+  drain: BulkResendDrain;
+  canSend: boolean;
+  blockedReason?: string;
+}
+
+export type BulkResendRowOutcome =
+  | "queued"
+  | "skipped"
+  | "blocked"
+  | "not_sent"
+  | "failed";
+
+export interface BulkResendRowResult {
+  cashbackId: string;
+  userId?: string;
+  username?: string;
+  transactionId?: string;
+  merchantName?: string;
+  fiatAmount?: string;
+  fiatCurrency?: string;
+  outcome: BulkResendRowOutcome;
+  status?: string;
+  detail?: string;
+}
+
+export type BulkResendRunStatus = "running" | "completed" | "blocked";
+
+export interface BulkResendResult {
+  runId: string;
+  status: BulkResendRunStatus;
+  blockedReason?: string;
+  summary: Record<BulkResendRowOutcome, number>;
+  queuedUsers: number;
+  estimatedUsd: number;
+  estimatedSoUsd: number;
+  wallet: PayoutWalletCheck;
+  rows: BulkResendRowResult[];
+  expectedBy?: string;
+  drain: BulkResendDrain;
+}
+
+/** One bulk re-send as the history lists it. */
+export interface BulkResendRunSummary {
+  id: string;
+  adminEmail: string;
+  adminUsername: string;
+  reason?: string;
+  status: BulkResendRunStatus;
+  blockedReason?: string;
+  selection?: FailedCashbackSelection;
+  requestedRows: number;
+  queuedRows: number;
+  skippedRows: number;
+  blockedRows: number;
+  failedRows: number;
+  queuedUsers: number;
+  estimatedUsd: number;
+  estimatedSoUsd: number;
+  soUsdRate?: number;
+  alreadyQueuedSoUsd: number;
+  walletSoUsdBalance?: number;
+  walletNativeBalance?: number;
+  createdAt: string;
+}
+
+export interface BulkResendRunReportRow extends BulkResendRowResult {
+  currentStatus?: string;
+  lastError?: string;
+  payoutTxHash?: string;
+  soUsdAmount?: string;
+  retryCount?: number;
+  nextRetryAt?: string;
+}
+
+/** One run, with where every row it queued stands now. */
+export interface BulkResendRunReport {
+  run: BulkResendRunSummary;
+  progress: {
+    paid: number;
+    retrying: number;
+    failedAgain: number;
+    canceled: number;
+    other: number;
+  };
+  rows: BulkResendRunReportRow[];
+}
+
 export interface IntercomConversationSummary {
   id: string;
   createdAt?: number;
