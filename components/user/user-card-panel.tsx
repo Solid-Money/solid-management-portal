@@ -66,8 +66,11 @@ const usd = (value: number | null | undefined) =>
  * when it is missing or unreadable.
  */
 const cardCurrency = (value?: CardCurrencyAmount) => {
-  const amount = Number(value?.amount);
-  if (!value || !Number.isFinite(amount)) return null;
+  // `Number("")` is 0: an empty amount must read as missing, not as nothing
+  // to spend.
+  if (typeof value?.amount !== "string" || !value.amount.trim()) return null;
+  const amount = Number(value.amount);
+  if (!Number.isFinite(amount)) return null;
   try {
     return amount.toLocaleString("en-US", {
       style: "currency",
