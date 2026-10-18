@@ -63,9 +63,7 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                 permanentlyFailedCount={permanentlyFailedCount}
               />
             )}
-            {unpaidCount > 0 && (
-              <WithholdCashbackDialog userId={userId} unpaidCount={unpaidCount} />
-            )}
+            <WithholdCashbackDialog userId={userId} unpaidCount={unpaidCount} />
             <span className="text-sm font-semibold text-gray-900">
               ${history.totalPaidUsd.toFixed(2)}
             </span>

@@ -434,7 +434,7 @@ export const reevaluateFailedCashback = (userId: string, reason?: string) =>
  */
 export const withholdUserCashback = (userId: string, reason: string) =>
   api.post<{ data: WithholdCashbackResult }>(
-    `/admin/v1/users/${userId}/cashback/withhold`,
+    `/admin/v1/users/${encodeURIComponent(userId)}/cashback/withhold`,
     { reason },
   );
 

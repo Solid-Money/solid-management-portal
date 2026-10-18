@@ -315,15 +315,15 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
         }}
         message={
           <div className="space-y-3 text-sm">
-            <p>These changes let more purchases earn rewards:</p>
+            <p>These changes loosen the anti-abuse rules:</p>
             <ul className="list-disc space-y-1 pl-5">
               {changes.risky.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
             <p className="text-gray-500">
-              They apply to every purchase from the next few minutes on, and to
-              referral rewards not yet paid.
+              They take effect within a few minutes. Purchase rules then apply
+              to every purchase, and to referral rewards not yet paid.
             </p>
           </div>
         }
@@ -373,6 +373,8 @@ function diff(
     after: T[],
     key: (entry: T) => string,
     noun: string,
+    /** What removing an entry allows, when it is not a purchase earning. */
+    removedEffect?: string,
   ) => {
     if (same(before, after)) return false;
     const beforeKeys = new Set(before.map(key));
@@ -389,7 +391,7 @@ function diff(
       risky.push(
         `${removed.length} ${noun} removed: ${removed.map(key).slice(0, 8).join(", ")}${
           removed.length > 8 ? "…" : ""
-        }`,
+        }${removedEffect ? ` — ${removedEffect}` : ""}`,
       );
     }
     return true;
@@ -442,6 +444,7 @@ function diff(
       draft.blockedEmailDomains,
       (domain) => domain,
       "blocked email domains",
+      "new accounts can sign up with them again",
     )
   ) {
     payload.blockedEmailDomains = draft.blockedEmailDomains;

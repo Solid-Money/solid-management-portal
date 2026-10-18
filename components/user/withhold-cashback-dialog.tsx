@@ -6,6 +6,7 @@ import { Ban, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { withholdUserCashback } from "@/lib/api";
+import { formatNumber } from "@/lib/utils";
 import { WithholdCashbackResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +47,7 @@ export default function WithholdCashbackDialog({
     onSuccess: (data) => {
       if (data.withheld.length > 0) {
         toast.success(
-          `${data.withheld.length} cashback row${
+          `${formatNumber(data.withheld.length, 0, 0)} cashback row${
             data.withheld.length === 1 ? "" : "s"
           } withheld`,
         );
@@ -76,15 +77,19 @@ export default function WithholdCashbackDialog({
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => setOpen(true)}
-        className="cursor-pointer text-red-700 hover:text-red-800"
-      >
-        <Ban className="h-3.5 w-3.5" />
-        Withhold unpaid
-      </Button>
+      {/* Only the trigger depends on there being unpaid rows: the dialog stays
+          mounted so its outcome survives the refetch that empties the list. */}
+      {unpaidCount > 0 && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setOpen(true)}
+          className="cursor-pointer text-red-700 hover:text-red-800"
+        >
+          <Ban className="h-3.5 w-3.5" />
+          Withhold unpaid
+        </Button>
+      )}
 
       <Dialog
         open={open}
@@ -98,7 +103,8 @@ export default function WithholdCashbackDialog({
               <DialogHeader>
                 <DialogTitle>Withhold unpaid cashback</DialogTitle>
                 <DialogDescription>
-                  Cancels this user&apos;s {unpaidCount} unpaid cashback row
+                  Cancels this user&apos;s {formatNumber(unpaidCount, 0, 0)}{" "}
+                  unpaid cashback row
                   {unpaidCount === 1 ? "" : "s"} — escrowed, pending or failed —
                   so none of them is paid.
                 </DialogDescription>
@@ -126,7 +132,7 @@ export default function WithholdCashbackDialog({
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   maxLength={500}
-                  placeholder="e.g. merry.pink account farm — Monday ticket 13218630924"
+                  placeholder="e.g. Account farm — support ticket <ID>"
                   disabled={mutation.isPending}
                 />
                 <p className="text-muted-foreground text-xs">
@@ -178,7 +184,7 @@ function WithholdOutcome({
         <DialogTitle className="flex items-center gap-2">
           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           {result.withheld.length > 0
-            ? `${result.withheld.length} row${
+            ? `${formatNumber(result.withheld.length, 0, 0)} row${
                 result.withheld.length === 1 ? "" : "s"
               } withheld`
             : "Nothing to withhold"}
@@ -199,7 +205,8 @@ function WithholdOutcome({
             >
               <span className="text-gray-900">{row.merchantName || "—"}</span>
               <span className="whitespace-nowrap text-gray-600">
-                {Number(row.fiatAmount || 0).toFixed(2)} {row.fiatCurrency} ·{" "}
+                {formatNumber(Number(row.fiatAmount || 0), 2)}{" "}
+                {row.fiatCurrency} ·{" "}
                 was {row.previousStatus}
               </span>
             </li>

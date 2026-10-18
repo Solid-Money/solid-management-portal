@@ -158,7 +158,7 @@ function detailFor(entry: AdminAuditEntry): string | null {
   if (entry.action === "cashback_withheld") {
     const count = entry.metadata?.withheld;
     return typeof count === "number"
-      ? `${count} unpaid row${count === 1 ? "" : "s"} withheld`
+      ? `${formatNumber(count, 0, 0)} unpaid row${count === 1 ? "" : "s"} withheld`
       : null;
   }
 
