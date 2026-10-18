@@ -7,7 +7,6 @@ Admin dashboard for managing Solid users and viewing account balances.
 - User list with search, sorting, and pagination
 - User detail view with balances and activity
 - Dashboard-wide search (⌘K / Ctrl+K, or `/`) — see below
-- Public access (no authentication required for v1)
 
 ## Search
 
@@ -114,14 +113,14 @@ Make sure to set these in your Vercel project settings:
 │   ├── layout.tsx          # Root layout with providers
 │   └── page.tsx            # Root page (redirects to /users)
 ├── components/
-│   ├── auth-provider.tsx   # Auth context (mocked for v1)
+│   ├── auth-provider.tsx   # Firebase sign-in, limited to the admin domain
 │   ├── providers.tsx       # Global providers
 │   ├── users-table.tsx     # Users list table
 │   ├── balances-card.tsx   # User balances display
 │   └── activity-list.tsx   # User activity list
 ├── lib/
 │   ├── api.ts              # Axios instance
-│   └── firebase.ts         # Firebase config (unused in v1)
+│   └── firebase.ts         # Firebase config
 ├── hooks/
 │   └── use-debounce.ts     # Debounce hook
 └── types/

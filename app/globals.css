@@ -301,6 +301,11 @@ main [id] {
   scroll-margin-top: 5rem;
 }
 
+/* Focused by the search on landing (tabindex -1); the flash marks it instead. */
+main [id][tabindex="-1"]:focus {
+  outline: none;
+}
+
 @keyframes section-flash {
   0%,
   100% {

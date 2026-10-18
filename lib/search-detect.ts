@@ -62,7 +62,10 @@ export const abbreviateId = (value: string): string =>
 export function describeMatch(user: User, query: string): string | null {
   if (user.cardMatch) {
     const provider = PROVIDER_LABELS[user.cardMatch.provider] ?? user.cardMatch.provider;
-    return `${provider} ${CARD_FIELD_LABELS[user.cardMatch.field]} ${abbreviateId(user.cardMatch.value)}`;
+    // A match type accounts-service adds later reads as its raw name rather
+    // than "undefined" until this list learns it.
+    const field = CARD_FIELD_LABELS[user.cardMatch.field] ?? user.cardMatch.field;
+    return `${provider} ${field} ${abbreviateId(user.cardMatch.value ?? "")}`;
   }
   const needle = query.trim().toLowerCase();
   if (!needle) return null;

@@ -145,7 +145,7 @@ export default function WalletsBoard({
     const visible = data.wallets.filter((wallet) => {
       // A wallet a link names is shown whatever the filter: landing on a page
       // that hides the one thing the link was about reads as a broken link.
-      if (anchorNamesWallet(anchor, wallet.name)) return true;
+      if (anchorNamesWallet(anchor, wallet)) return true;
       if (filter === "all") return true;
       const active = wallet.active !== false;
       return filter === "active" ? active : !active;
@@ -343,8 +343,8 @@ function WalletCard({
    * waiting to find it would mean waiting for something this decides.
    */
   const anchoredHere = useMemo(
-    () => anchorNamesWallet(anchor, wallet.name),
-    [anchor, wallet.name]
+    () => anchorNamesWallet(anchor, wallet),
+    [anchor, wallet]
   );
 
   const expanded = expandedOverride ?? anchoredHere;

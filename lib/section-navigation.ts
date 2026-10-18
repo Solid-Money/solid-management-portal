@@ -76,7 +76,14 @@ const FLASH_MS = 2200;
  * Returns a cancel, so a newer target supersedes one still being waited for.
  */
 export function scrollToHashTarget(): () => void {
-  const id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+  let id: string;
+  try {
+    id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+  } catch {
+    // A malformed escape in a pasted link (`#%E0%A4%A`) names nothing; it
+    // must not take the page down with it.
+    return () => {};
+  }
   if (!id) return () => {};
 
   const startedAt = Date.now();
@@ -108,9 +115,17 @@ export function scrollToHashTarget(): () => void {
     }
 
     element.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (element.matches("button, a[href], input, select, textarea")) {
-      element.focus({ preventScroll: true });
+    // Keyboard and screen-reader position follows the landing, not just the
+    // viewport. A card or section is made focusable for it (tabindex -1: by
+    // script only, never a Tab stop); the flash below is what sighted
+    // readers see, so its focus ring is suppressed in globals.css.
+    if (
+      !element.matches("button, a[href], input, select, textarea") &&
+      !element.hasAttribute("tabindex")
+    ) {
+      element.setAttribute("tabindex", "-1");
     }
+    element.focus({ preventScroll: true });
     // Restart the animation when the same section is picked twice in a row.
     element.classList.remove(FLASH_CLASS);
     void element.offsetWidth;

@@ -232,7 +232,9 @@ export default function UserDetailPage({
               <SectionAnchor id="user-savings">
                 <UserSavingsCard userId={id} />
               </SectionAnchor>
-              <SectionAnchor id="user-card">
+              {/* The card tab holds the linked `user-card`; ids stay unique
+                  page-wide even though inactive tabs are unmounted. */}
+              <SectionAnchor id="user-overview-card">
                 <UserCardPanel
                   userId={id}
                   username={displayName}
@@ -299,7 +301,7 @@ export default function UserDetailPage({
           </SectionAnchor>
           {/* Next to the spending table, because a rate set on one transaction
               beats this one and is edited from a row down there. */}
-          <SectionAnchor id="user-cashback-rate">
+          <SectionAnchor id="user-card-cashback-rate">
             <UserCashbackRateCard
               userId={id}
               username={displayName}
@@ -334,7 +336,7 @@ export default function UserDetailPage({
               cashbackPercentage={user.cashbackPercentage}
             />
           </SectionAnchor>
-          <SectionAnchor id="user-cashback">
+          <SectionAnchor id="user-rewards-cashback">
             <UserCashbackCard userId={id} />
           </SectionAnchor>
           {/* Both sides of the referral program, with the re-evaluate action

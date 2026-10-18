@@ -405,7 +405,7 @@ const USER_TARGETS: UserTarget[] = [
   { key: "reset-kyc", kind: "action", label: "Reset KYC", tab: "card", anchor: "user-kyc", icon: RefreshCw, keywords: ["redo verification", "kyc retry"] },
   { key: "retry-virtual-account", kind: "action", label: "Retry virtual account onboarding", tab: "card", anchor: "user-virtual-account", icon: RefreshCw, keywords: ["stuck", "rain review"] },
   { key: "set-cashback-rate", kind: "action", label: "Set cashback rate", tab: "rewards", anchor: "user-cashback-rate", icon: Gift, keywords: ["override", "pin rate"] },
-  { key: "reevaluate-cashback", kind: "action", label: "Re-evaluate failed cashback", tab: "rewards", anchor: "user-cashback", icon: RefreshCw, keywords: ["retry cashback", "missing cashback"] },
+  { key: "reevaluate-cashback", kind: "action", label: "Re-evaluate failed cashback", tab: "rewards", anchor: "user-rewards-cashback", icon: RefreshCw, keywords: ["retry cashback", "missing cashback"] },
   { key: "gift-trial", kind: "action", label: "Gift a tier trial", tab: "rewards", anchor: "user-tier-trial", icon: Sparkles, keywords: ["prime", "ultra", "extend", "revoke"] },
   { key: "reevaluate-tier", kind: "action", label: "Re-evaluate tier lock", tab: "rewards", anchor: "user-tier", icon: RefreshCw, keywords: ["tier lock", "downgrade"] },
   { key: "reevaluate-referral", kind: "action", label: "Re-evaluate referral reward", tab: "rewards", anchor: "user-referrals", icon: RefreshCw, keywords: ["referral reward", "reversed", "expired"] },
