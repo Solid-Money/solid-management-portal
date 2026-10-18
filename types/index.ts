@@ -2027,6 +2027,25 @@ export interface WirexSpendContext {
   /** Guardian pauses. `safePaused` is usually arrears or a fraud hold. */
   modulePaused: boolean;
   safePaused: boolean;
+  /**
+   * `spendableUsd` in the currency the cardholder's purchases are billed in —
+   * the figure the app shows them, so the number a declined cardholder quotes
+   * back ("the app said €12.73") can be checked against it. Absent for a USD
+   * card, before any purchase, or when Wirex's latest quote is over a day old.
+   */
+  availableInCardCurrency?: CardCurrencyAmount;
+}
+
+/** An amount converted at Wirex's own quote. */
+export interface CardCurrencyAmount {
+  /** Decimal string, floored to the cent, e.g. `"12.73"`. */
+  amount: string;
+  /** ISO 4217, e.g. `"EUR"`. */
+  currency: string;
+  /** USD per one unit of `currency`, Wirex's quote with its spread. */
+  rate: number;
+  /** When Wirex quoted `rate` — the latest authorization in that currency. */
+  rateAt: string;
 }
 
 /** Every admin action the card panel lists against one cardholder. */
