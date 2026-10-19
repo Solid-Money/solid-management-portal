@@ -39,16 +39,21 @@ export function RecordPayoutDialog({ month }: { month: CardRevenueMonth }) {
   const [note, setNote] = useState("");
   const mutation = useRecordCardPayout();
 
-  const parsed = Number(amount);
-  // The API rejects more than six decimal places, so stop it here with a reason
-  // rather than at the server with a generic failure.
-  const tooPrecise = /\.\d{7,}$/.test(amount.trim());
+  const trimmed = amount.trim();
+  const parsed = Number(trimmed);
+  // Caught here with a reason rather than at the server with a generic failure:
+  // a number input also accepts exponent forms such as 1e-7, and the API takes
+  // a plain amount with at most six decimal places.
+  const amountError =
+    trimmed === ""
+      ? null
+      : !/^(\d+(\.\d*)?|\.\d+)$/.test(trimmed)
+        ? "Enter a plain amount, such as 1250.50."
+        : /\.\d{7,}$/.test(trimmed)
+          ? "Use at most 6 decimal places."
+          : null;
   const valid =
-    amount.trim() !== "" &&
-    Number.isFinite(parsed) &&
-    parsed >= 0 &&
-    !tooPrecise &&
-    !!receivedAt;
+    trimmed !== "" && amountError === null && Number.isFinite(parsed) && !!receivedAt;
 
   const reset = () => {
     setAmount("");
@@ -132,10 +137,13 @@ export function RecordPayoutDialog({ month }: { month: CardRevenueMonth }) {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 disabled={mutation.isPending}
-                aria-invalid={tooPrecise}
+                aria-invalid={amountError !== null}
+                aria-describedby={amountError ? "payout-amount-error" : undefined}
               />
-              {tooPrecise ? (
-                <p className="text-xs text-red-600">Use at most 6 decimal places.</p>
+              {amountError ? (
+                <p id="payout-amount-error" className="text-xs text-red-600">
+                  {amountError}
+                </p>
               ) : null}
             </div>
             <div className="space-y-2">
