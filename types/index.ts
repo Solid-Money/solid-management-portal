@@ -1144,6 +1144,13 @@ export interface CardTransactionCashback {
    */
   cashbackPercentage?: number;
   cashbackPercentageSource?: CashbackPercentageSource;
+  /**
+   * The monthly cap frozen on the row with that rate, in USD. The payout holds
+   * the purchase to the larger of this and the cap of the tier held on payout
+   * day, so a trial that ended in between keeps its cap. Absent on rows from
+   * before the cap was stored.
+   */
+  monthlyCapUsd?: number;
 }
 
 /**
@@ -2583,7 +2590,18 @@ export interface UserRewardsData {
   hasCustomCashbackRate?: boolean;
   nextTierCashbackRate: number;
   cashbackThisMonth: number;
+  /** This month's cashback still in escrow, already held to the cap. */
+  cashbackPendingThisMonth?: number;
+  /** The monthly cap of the tier held now. */
   maxCashbackMonthly: number;
+  /**
+   * The ceiling this month's purchases are actually paid up to. Above
+   * `maxCashbackMonthly` when they were made on a bigger tier — a trial that
+   * has since ended keeps its cap on what was bought during it.
+   */
+  cashbackCapThisMonth?: number;
+  /** What a purchase made now can still earn this month. */
+  cashbackHeadroomThisMonth?: number;
   referralPoints: number;
   hasCard: boolean;
   hasOptedIn: boolean;
@@ -2762,6 +2780,8 @@ export interface CashbackEntry {
   /** The rate the row was created at, and which of the three levels set it. */
   cashbackPercentage?: number;
   cashbackPercentageSource?: CashbackPercentageSource;
+  /** The monthly cap frozen on the row with that rate, in USD. */
+  monthlyCapUsd?: number;
 }
 
 /** Cashback rows plus the totals support is usually actually after. */
