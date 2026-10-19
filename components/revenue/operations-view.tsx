@@ -12,7 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { subDays } from "date-fns";
-import { cn, formatDateTime, formatUsd } from "@/lib/utils";
+import { cn, formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 import {
   FEE_REVENUE_COLORS,
   REVENUE_COLORS,
@@ -239,7 +239,7 @@ function ProductRow({
         ) : (
           <span className="flex items-center gap-1">
             <Users className="h-3 w-3" aria-hidden />
-            {product.users.toLocaleString("en-US")} users
+            {formatNumber(product.users, 0, 0)} users
           </span>
         )}
       </div>

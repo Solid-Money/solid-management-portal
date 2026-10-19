@@ -40,7 +40,15 @@ export function RecordPayoutDialog({ month }: { month: CardRevenueMonth }) {
   const mutation = useRecordCardPayout();
 
   const parsed = Number(amount);
-  const valid = amount.trim() !== "" && Number.isFinite(parsed) && parsed >= 0 && !!receivedAt;
+  // The API rejects more than six decimal places, so stop it here with a reason
+  // rather than at the server with a generic failure.
+  const tooPrecise = /\.\d{7,}$/.test(amount.trim());
+  const valid =
+    amount.trim() !== "" &&
+    Number.isFinite(parsed) &&
+    parsed >= 0 &&
+    !tooPrecise &&
+    !!receivedAt;
 
   const reset = () => {
     setAmount("");
@@ -124,7 +132,11 @@ export function RecordPayoutDialog({ month }: { month: CardRevenueMonth }) {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 disabled={mutation.isPending}
+                aria-invalid={tooPrecise}
               />
+              {tooPrecise ? (
+                <p className="text-xs text-red-600">Use at most 6 decimal places.</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="payout-date">Received on</Label>

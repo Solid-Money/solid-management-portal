@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime, formatNumber } from "@/lib/utils";
 import {
   RAIL_COLORS,
   RAIL_LABELS,
@@ -18,7 +18,7 @@ export function formatPercent(value: number | null | undefined, digits = 1): str
 
 /** A count, en-US, no decimals. */
 export function formatCount(value: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+  return formatNumber(value, 0, 0);
 }
 
 /** `YYYY-MM` as "Sep 2026", read in UTC so a month never shifts by a day. */

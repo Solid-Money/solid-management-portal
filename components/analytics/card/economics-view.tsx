@@ -6,7 +6,7 @@ import { Panel } from "@/components/analytics/panel";
 import { useAnalyticsFilters } from "@/components/analytics/analytics-filters";
 import { EmptyPanel, RailLabel, formatCount } from "@/components/analytics/card/card-shared";
 import { useCardEconomics } from "@/hooks/use-card-analytics";
-import { cn, formatUsd } from "@/lib/utils";
+import { cn, formatNumber, formatUsd } from "@/lib/utils";
 import { COST_INPUT_FIELDS } from "@/types/analytics";
 import type { CardRailEconomics } from "@/types/card-analytics";
 
@@ -117,7 +117,7 @@ function RailEconomics({ rail }: { rail: CardRailEconomics }) {
               <td className="py-1.5 text-gray-700">
                 {cost.label}
                 <span className="block text-[11px] text-gray-400">
-                  {cost.quantity.toLocaleString("en-US", { maximumFractionDigits: 2 })} ×{" "}
+                  {formatNumber(cost.quantity, 2, 0)} ×{" "}
                   {cost.unitUsd === null ? "unset" : formatUsd(cost.unitUsd)}
                 </span>
               </td>
