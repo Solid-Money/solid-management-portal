@@ -234,7 +234,7 @@ function ProductRow({
       </div>
       <div className="flex items-center justify-between text-xs text-gray-500">
         <span>{percentage.toFixed(1)}% of total</span>
-        {product.users === null ? (
+        {product.usersAttributable === false ? (
           <span className="text-gray-400">Not attributable to users</span>
         ) : (
           <span className="flex items-center gap-1">

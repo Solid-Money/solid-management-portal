@@ -148,8 +148,13 @@ export type RevenueBusinessLine =
 export interface ProductRevenue {
   name: string;
   revenue: number;
-  /** Null where revenue is not attributable to users (vault yield, issuer payouts). */
-  users: number | null;
+  /** Distinct users the revenue came from; 0 where `usersAttributable` is false. */
+  users: number;
+  /**
+   * False where revenue is not attributable to users (vault yield, issuer
+   * payouts). Optional: a backend that predates it sends only `users`.
+   */
+  usersAttributable?: boolean;
   /** Formatted change, or "new" when the previous window earned nothing. */
   trend: string;
   changePercent: number | null;
