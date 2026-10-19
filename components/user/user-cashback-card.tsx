@@ -6,6 +6,10 @@ import { ExternalLink, Loader2, Percent } from "lucide-react";
 import { getUserCashback } from "@/lib/api";
 import { CashbackEntry, CashbackHistory } from "@/types";
 import { cashbackStatusVariant } from "@/lib/card-transactions";
+import {
+  formatCashbackRate,
+  formatMonthlyCap,
+} from "@/lib/cashback-percentage";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReevaluateFailedCashbackDialog from "@/components/user/reevaluate-failed-cashback-dialog";
@@ -157,6 +161,22 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                         <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700">
                           {Number(entry.fiatAmount || 0).toFixed(2)}{" "}
                           {entry.fiatCurrency}
+                          {/* The terms the row was made on: what it pays,
+                              and the monthly cap it is held to even after
+                              the tier it was made on (a trial) has ended. */}
+                          {(entry.cashbackPercentage !== undefined ||
+                            entry.monthlyCapUsd !== undefined) && (
+                            <p className="mt-0.5 text-[10px] text-gray-500">
+                              {[
+                                entry.cashbackPercentage !== undefined
+                                  ? formatCashbackRate(entry.cashbackPercentage)
+                                  : undefined,
+                                formatMonthlyCap(entry.monthlyCapUsd),
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right whitespace-nowrap font-medium text-gray-900">
                           {payoutOf(entry)}
