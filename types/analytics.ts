@@ -233,6 +233,10 @@ export interface CostsConfig {
   disputeWirexUsd?: number;
   supportPerTicketUsd?: number;
   pointsConversionRateUsd?: number;
+  /** Fraction of foreign-currency spend Rain pays us as FX revenue. */
+  fxPayoutRateRain?: number;
+  /** The same for Wirex, which publishes no report to read it from. */
+  fxPayoutRateWirex?: number;
 }
 
 export interface CostsConfigResponse {
@@ -246,6 +250,11 @@ export const COST_INPUT_FIELDS: Array<{
   key: keyof CostsConfig;
   label: string;
   hint: string;
+  /**
+   * How the value is entered. Rates are typed as a percentage (0.5) and stored
+   * as a fraction (0.005), the form the backend computes with.
+   */
+  unit?: "usd" | "percent";
 }> = [
   {
     key: "kycSolidUsd",
@@ -301,6 +310,18 @@ export const COST_INPUT_FIELDS: Array<{
     key: "pointsConversionRateUsd",
     label: "Points conversion rate",
     hint: "USD per point. An explicit assumption — there is no market price before TGE.",
+  },
+  {
+    key: "fxPayoutRateRain",
+    label: "FX payout rate — Rain",
+    hint: "Share of foreign-currency spend Rain pays us. Only estimates a month Rain has not reported yet; 0.5% is assumed while unset.",
+    unit: "percent",
+  },
+  {
+    key: "fxPayoutRateWirex",
+    label: "FX payout rate — Wirex",
+    hint: "Share of foreign-currency spend Wirex pays us. Wirex publishes no report, so every Wirex FX figure is this rate until a payout is recorded.",
+    unit: "percent",
   },
 ];
 
