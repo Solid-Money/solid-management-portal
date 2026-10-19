@@ -5,7 +5,7 @@ import { AlertTriangle, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useCostsConfig, useUpdateCostsConfig } from "@/hooks/use-analytics";
 import { COST_INPUT_FIELDS, type CostsConfig } from "@/types/analytics";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 /**
  * The cost inputs behind every unit-economics number.
@@ -30,11 +30,19 @@ export default function CostsConfigPage() {
    */
   const [edits, setEdits] = useState<Partial<Record<string, string>>>({});
 
+  const isPercent = (key: keyof CostsConfig) =>
+    COST_INPUT_FIELDS.find((field) => field.key === key)?.unit === "percent";
+
   const displayed = (key: keyof CostsConfig): string => {
     const edited = edits[key];
     if (edited !== undefined) return edited;
     const saved = data?.config[key];
-    return saved === undefined ? "" : String(saved);
+    if (saved === undefined) return "";
+    // Rates are stored as fractions and shown as percentages; rounded so 0.5%
+    // reads as 0.5 rather than 0.49999999999999994.
+    return isPercent(key)
+      ? String(Number((saved * 100).toPrecision(12)))
+      : String(saved);
   };
 
   const save = () => {
@@ -44,11 +52,16 @@ export default function CostsConfigPage() {
       const raw = displayed(field.key).trim();
       if (!raw) continue;
 
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed) || parsed < 0) {
+      const entered = Number(raw);
+      if (!Number.isFinite(entered) || entered < 0) {
         toast.error(`${field.label} must be a number of 0 or more.`);
         return;
       }
+      if (field.unit === "percent" && entered > 100) {
+        toast.error(`${field.label} is a percentage, so at most 100.`);
+        return;
+      }
+      const parsed = field.unit === "percent" ? entered / 100 : entered;
       // Only send what actually changed, so an untouched field stays unset
       // rather than being written as its own blank.
       if (parsed !== data?.config[field.key]) {
@@ -136,8 +149,13 @@ export default function CostsConfigPage() {
                       <span className="text-xs text-amber-700">Unset</span>
                     ) : null}
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                        $
+                      <span
+                        className={cn(
+                          "pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm text-gray-400",
+                          field.unit === "percent" ? "right-2" : "left-2"
+                        )}
+                      >
+                        {field.unit === "percent" ? "%" : "$"}
                       </span>
                       <input
                         id={field.key}
@@ -152,7 +170,10 @@ export default function CostsConfigPage() {
                           }))
                         }
                         placeholder="—"
-                        className="w-32 rounded border border-gray-300 py-1.5 pl-6 pr-2 text-right text-sm"
+                        className={cn(
+                          "w-32 rounded border border-gray-300 py-1.5 text-right text-sm",
+                          field.unit === "percent" ? "pl-2 pr-6" : "pl-6 pr-2"
+                        )}
                       />
                     </div>
                   </div>
