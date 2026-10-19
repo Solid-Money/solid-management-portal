@@ -1,7 +1,13 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import api from "@/lib/api";
+import { REVENUE_QUERY_KEYS } from "@/types/revenue";
 import {
   CARD_QUERY_KEYS,
   CARD_REFRESH_INTERVALS,
@@ -79,11 +85,18 @@ export function useCardEconomics(queryString: string) {
 }
 
 /**
- * Record (or correct) a payout an issuer sent.
- *
- * Invalidates every card read, not just revenue: a recorded Wirex payout is
- * booked as revenue, which moves the economics view too.
+ * Card reads plus the revenue pages: a recorded payout or a fetched Rain report
+ * is booked as revenue, which moves the economics view and revenue by business
+ * line too.
  */
+function invalidateCardRevenue(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: CARD_QUERY_KEYS.all }),
+    queryClient.invalidateQueries({ queryKey: REVENUE_QUERY_KEYS.all }),
+  ]);
+}
+
+/** Record (or correct) a payout an issuer sent. */
 export function useRecordCardPayout() {
   const queryClient = useQueryClient();
   return useMutation<{ ok: true }, Error, RecordCardPayoutInput>({
@@ -91,8 +104,7 @@ export function useRecordCardPayout() {
       const response = await api.post("/admin/v1/analytics/card/payouts", input);
       return response.data;
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: CARD_QUERY_KEYS.all }),
+    onSuccess: () => invalidateCardRevenue(queryClient),
   });
 }
 
@@ -107,7 +119,6 @@ export function useRefreshRainReport() {
       );
       return response.data;
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: CARD_QUERY_KEYS.all }),
+    onSuccess: () => invalidateCardRevenue(queryClient),
   });
 }

@@ -379,7 +379,7 @@ export function CardRevenueView() {
             </table>
             <p className="mt-3 text-xs text-gray-400">
               Estimate = payout rate × settled foreign-currency spend in our
-              ledger. * the rate is the 0.5% default, not a contracted figure.
+              ledger. * the rate is an assumed default, not a contracted figure.
               Rain&apos;s report supersedes the estimate once it is in.
             </p>
           </div>

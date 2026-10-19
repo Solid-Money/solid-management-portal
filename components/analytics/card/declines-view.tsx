@@ -38,11 +38,17 @@ export function CardDeclinesView() {
   const { data, isLoading, error } = useCardSpending(queryString());
   const scope = `${filters.startDate} to ${filters.endDate}`;
 
-  const daily = useMemo(
-    () => (data ? pivotByRail(data.byDay, (row) => row.declineCount) : []),
+  // byDay has a row for every day with any activity; only days with a decline
+  // belong on this chart, or a window with spend but no declines draws empty bars.
+  const declineDays = useMemo(
+    () => (data ? data.byDay.filter((row) => row.declineCount > 0) : []),
     [data]
   );
-  const dailyRails = data ? railsIn(data.byDay) : [];
+  const daily = useMemo(
+    () => pivotByRail(declineDays, (row) => row.declineCount),
+    [declineDays]
+  );
+  const dailyRails = railsIn(declineDays);
   const totals = data?.totals;
 
   return (

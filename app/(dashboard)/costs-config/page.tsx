@@ -37,7 +37,7 @@ export default function CostsConfigPage() {
     const edited = edits[key];
     if (edited !== undefined) return edited;
     const saved = data?.config[key];
-    if (saved === undefined) return "";
+    if (saved == null) return "";
     // Rates are stored as fractions and shown as percentages; rounded so 0.5%
     // reads as 0.5 rather than 0.49999999999999994.
     return isPercent(key)
@@ -49,6 +49,9 @@ export default function CostsConfigPage() {
     const changes: Partial<CostsConfig> = {};
 
     for (const field of COST_INPUT_FIELDS) {
+      // An untouched field is never sent: re-parsing a percentage from its
+      // rounded display could differ from the stored fraction in the last digit.
+      if (edits[field.key] === undefined) continue;
       const raw = displayed(field.key).trim();
       if (!raw) continue;
 

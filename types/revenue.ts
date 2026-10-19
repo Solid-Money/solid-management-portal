@@ -208,6 +208,7 @@ export type ExportFormat = 'csv' | 'pdf' | 'xlsx';
 
 // API Query Keys
 export const REVENUE_QUERY_KEYS = {
+  all: ['revenue'],
   executiveSummary: ['revenue', 'executive-summary'],
   summary: (filters: RevenueSummaryQuery) => ['revenue', 'summary', filters],
   financeDetail: (start: string, end: string) => ['revenue', 'finance', start, end],
