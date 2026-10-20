@@ -1,18 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Headphones, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ExternalLink, Headphones, Loader2, MessageSquarePlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import NewConversationDialog from "@/components/support/new-conversation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSupportUserCases } from "@/hooks/use-support";
 import { StatusBadge, intentLabel } from "@/components/support/support-format";
 import { formatDateTime } from "@/lib/utils";
 
 /**
- * This user's support cases (imported Intercom history included) and a link
- * into the inbox.
+ * This user's support cases (imported Intercom history included), a link
+ * into the inbox, and "Message" to write to them first.
  */
-export default function UserSupportCard({ userId }: { userId: string }) {
+export default function UserSupportCard({
+  userId,
+  userLabel,
+  email,
+}: {
+  userId: string;
+  /** Username, else email, for the "Message" dialog. */
+  userLabel?: string;
+  email?: string | null;
+}) {
+  const router = useRouter();
+  const [composing, setComposing] = useState(false);
   const { data, isLoading, isError } = useSupportUserCases(userId);
   const open = data?.cases.filter((c) => c.status !== "resolved").length ?? 0;
 
@@ -23,14 +38,28 @@ export default function UserSupportCard({ userId }: { userId: string }) {
           <Headphones className="h-4 w-4 text-gray-400" />
           Support
         </CardTitle>
-        {data && data.cases.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Badge variant="muted">
-              {data.cases.length} {data.cases.length === 1 ? "case" : "cases"}
-            </Badge>
-            {open > 0 && <Badge variant="warning">{open} open</Badge>}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {data && data.cases.length > 0 && (
+            <>
+              <Badge variant="muted">
+                {data.cases.length} {data.cases.length === 1 ? "case" : "cases"}
+              </Badge>
+              {open > 0 && <Badge variant="warning">{open} open</Badge>}
+            </>
+          )}
+          <Button variant="outline" size="xs" onClick={() => setComposing(true)}>
+            <MessageSquarePlus className="h-3.5 w-3.5" />
+            Message
+          </Button>
+        </div>
+        <NewConversationDialog
+          open={composing}
+          onOpenChange={setComposing}
+          user={{ id: userId, label: userLabel || email || userId, email }}
+          onStarted={(conversationId, sent) =>
+            router.push(`/support?${sent ? "view=waiting_customer&" : ""}c=${conversationId}`)
+          }
+        />
       </CardHeader>
       <CardContent className="space-y-3">
         {isLoading ? (

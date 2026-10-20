@@ -13,6 +13,7 @@ import type {
   SupportReport,
   SupportSettings,
   SupportSettingsHistoryEntry,
+  SupportStartInput,
   SupportTranslationPreview,
 } from "@/types/support";
 
@@ -108,6 +109,19 @@ export const runSupportCaseAction = async (caseId: string, input: CaseAction) =>
   ).data;
 
 /** The user page card shows its own message when this fails. */
+/**
+ * Write to a customer first. Opens their conversation if they never wrote,
+ * or adds to the one they have; the reply is translated like any other.
+ */
+export const startSupportConversation = async (userId: string, input: SupportStartInput) =>
+  (
+    await api.post<{
+      conversationId: string;
+      message: SupportAgentMessage;
+      case: SupportAgentCase | null;
+    }>(`${base}/users/${userId}/messages`, input)
+  ).data;
+
 export const getSupportUserCases = async (userId: string) =>
   (
     await api.get<{ conversationId: string | null; cases: SupportAgentCase[] }>(
