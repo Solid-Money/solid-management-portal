@@ -672,6 +672,12 @@ export interface ChainBalance {
   soFuseThreshold?: string;
   soFuseStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   soFuseAddress?: string;
+  // EURC on Base: the float the Wirex bank deposit payout wallet pays SEPA
+  // deposits out of. Refilled from the Wirex Master Account; gas is ETH.
+  eurcBalance?: string;
+  eurcThreshold?: string;
+  eurcStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  eurcAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
@@ -711,8 +717,8 @@ export type WalletFailureSource =
 
 export type WalletForecastSource = "cashback" | "referral";
 
-/** The five assets the page tracks, as the backend names them. */
-export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE";
+/** The six assets the page tracks, as the backend names them. */
+export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE" | "EURC";
 
 export interface WalletInfo {
   name: string;
