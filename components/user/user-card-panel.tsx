@@ -23,6 +23,7 @@ import {
 import { CopyableValue } from "@/components/ui/copy-button";
 import FreezeCardDialog from "@/components/user/freeze-card-dialog";
 import IssueCardDialog from "@/components/user/issue-card-dialog";
+import RelinkCardDialog from "@/components/user/relink-card-dialog";
 import UnblockCardSpendDialog from "@/components/user/unblock-card-spend-dialog";
 import CardHoldsSection from "@/components/user/card-holds-section";
 import CardUncollectedSection from "@/components/user/card-uncollected-section";
@@ -311,6 +312,7 @@ const ACTION_LABELS: Record<
   card_unfrozen: { label: "Unfrozen", variant: "success" },
   card_issued: { label: "New card issued", variant: "info" },
   card_canceled: { label: "Card canceled", variant: "danger" },
+  card_relinked: { label: "Card re-linked", variant: "info" },
 };
 
 /** The card ids an audit row refers to, so a replacement can be traced. */
@@ -354,7 +356,8 @@ function CardAuditHistory({ userId }: { userId: string }) {
   if (entries.length === 0) {
     return (
       <p className="text-xs text-gray-500">
-        No admin has frozen, canceled or issued a card for this user.
+        No admin has frozen, canceled, issued or re-linked a card for this
+        user.
       </p>
     );
   }
@@ -421,10 +424,12 @@ export default function UserCardPanel({
           <CreditCard className="h-4 w-4 text-gray-400" />
           Card
         </CardTitle>
-        {/* Both actions sit here, next to the state they change. Issuing is
+        {/* The actions sit here, next to the state they change. Issuing is
             offered even to a cardholder with no card: the self-serve flow
             leaves a handful of approved applicants without one, and this is
-            the only way they get served. */}
+            the only way they get served. Re-linking is offered only then:
+            it restores a card link a closed-and-reopened account lost, and
+            the dialog says why when there is no card to bring back. */}
         <CardAction>
           <div className="flex flex-wrap items-center gap-2">
             {card?.hasCard && (
@@ -433,6 +438,9 @@ export default function UserCardPanel({
                 username={username}
                 card={card}
               />
+            )}
+            {!isLoading && !card?.hasCard && (
+              <RelinkCardDialog userId={userId} username={username} />
             )}
             {!isLoading && (
               <IssueCardDialog
@@ -451,7 +459,9 @@ export default function UserCardPanel({
           </div>
         ) : !card?.hasCard ? (
           <p className="text-sm text-gray-500">
-            This user has no card. Issue one above if they should have it.
+            This user has no card. If their account was closed and reopened,
+            Re-link card attaches the card they still hold at the issuer;
+            otherwise issue one above if they should have it.
           </p>
         ) : (
           <>
