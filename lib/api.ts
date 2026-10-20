@@ -20,6 +20,9 @@ import {
   KycResetResult,
   VirtualAccountOnboardingRetryResult,
   VirtualAccountOnboardingState,
+  VirtualAccountProvider,
+  VirtualAccountRemovalResult,
+  VirtualAccountRemovalState,
   RecoverAccountResult,
   RecoveryEligibility,
   ResetTwoFactorResult,
@@ -538,6 +541,31 @@ export const retryVirtualAccountOnboarding = (
   api.post<{ data: VirtualAccountOnboardingRetryResult }>(
     `/admin/v1/users/${userId}/virtual-account/onboarding/retry`,
     reason ? { reason } : {},
+  );
+
+/**
+ * Each provider's virtual-account data for this user — Rain's USD account and
+ * Wirex's EUR IBAN — and whether support can remove it. Read-only.
+ */
+export const getVirtualAccountRemoval = (userId: string) =>
+  api.get<{ data: VirtualAccountRemovalState }>(
+    `/admin/v1/users/${userId}/virtual-account/removal`,
+  );
+
+/**
+ * Remove one provider's virtual-account data, so the user can open the other
+ * provider's account (or to clear a leftover application). Deletes data at
+ * Rain that cannot be restored; refused (409) where a card shares the
+ * verification. Audited either way.
+ */
+export const removeVirtualAccountData = (
+  userId: string,
+  provider: VirtualAccountProvider,
+  reason: string,
+) =>
+  api.post<{ data: VirtualAccountRemovalResult }>(
+    `/admin/v1/users/${userId}/virtual-account/remove`,
+    { provider, reason },
   );
 
 /** Every admin action taken on this user, newest first. */

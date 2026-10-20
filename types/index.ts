@@ -2209,6 +2209,59 @@ export interface VirtualAccountOnboardingRetryResult {
   state: VirtualAccountOnboardingState;
 }
 
+/** The two virtual-account providers: Rain's USD account, Wirex's EUR IBAN. */
+export type VirtualAccountProvider = "rain" | "wirex";
+
+/** Why a provider's virtual-account data cannot be removed. */
+export type VirtualAccountRemovalBlocker =
+  | "nothing_to_remove"
+  | "rain_card_shares_kyc"
+  | "wirex_card_shares_kyc"
+  | "target_unavailable";
+
+interface VirtualAccountProviderData {
+  provider: VirtualAccountProvider;
+  /** Whether the user's virtual account comes from this provider now. */
+  isCurrent: boolean;
+  canRemove: boolean;
+  blocker?: VirtualAccountRemovalBlocker;
+  /** What removing it does, or why it cannot be removed. */
+  message: string;
+}
+
+/** Each provider's virtual-account data for a user, and whether it can go. */
+export interface VirtualAccountRemovalState {
+  userId: string;
+  currentProvider: VirtualAccountProvider;
+  /** An admin switch already on the user, if any. */
+  override?: VirtualAccountProvider;
+  country?: string;
+  rain: VirtualAccountProviderData & {
+    automationActive: boolean;
+    rainAutomationId?: string;
+    verification: boolean;
+    kycStatus?: string;
+    rainApplicationStatus?: string;
+    hasRainCard: boolean;
+  };
+  wirex: VirtualAccountProviderData & {
+    bankAccounts: number;
+    ibanLast4?: string;
+    verification: boolean;
+    hasWirexCard: boolean;
+  };
+}
+
+/** What the backend reports after removing one provider's data. */
+export interface VirtualAccountRemovalResult {
+  userId: string;
+  removedProvider: VirtualAccountProvider;
+  /** Set when the removal moved the user to the other provider. */
+  switchedTo?: VirtualAccountProvider;
+  removed: string[];
+  state: VirtualAccountRemovalState;
+}
+
 /** What the backend reports after reopening a closed account. */
 export interface RecoverAccountResult {
   userId: string;
