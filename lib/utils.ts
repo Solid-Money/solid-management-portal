@@ -17,16 +17,35 @@ export function formatNumber(
   }).format(number);
 }
 
-/** ETH in each of the forms a deposit arrives or is saved as. */
-const ETH_DENOMINATED_SYMBOLS = new Set(["ETH", "WETH", "SOETH"]);
+/**
+ * Fraction digits for the tokens worth enough a unit that two would hide a
+ * deposit: the app's minimum is about $10, which is 0.004 ETH, 0.00012 WBTC or
+ * 0.0025 PAXG. Keyed by upper-cased symbol.
+ */
+const TOKEN_FRACTION_DIGITS: Record<string, number> = {
+  // Bitcoin, wrapped: eight decimals, the token's own.
+  WBTC: 8,
+  CBBTC: 8,
+  BTC: 8,
+  // ETH in each of the forms a deposit arrives or is saved as, and the assets
+  // priced like it.
+  ETH: 6,
+  WETH: 6,
+  SOETH: 6,
+  PAXG: 6,
+  ZEC: 6,
+  AAVE: 4,
+  SOL: 4,
+  SLVX: 4,
+};
 
 /**
- * Most fraction digits a token amount is shown with: six for ETH and its
- * wrapped and vault forms, two for everything else. An ETH deposit at the app's
- * minimum is about 0.004 ETH, which two decimals render as 0.
+ * Most fraction digits a token amount is shown with: more for an asset worth
+ * hundreds or thousands a unit (see TOKEN_FRACTION_DIGITS), two for everything
+ * else.
  */
 export function tokenFractionDigits(symbol?: string | null): number {
-  return symbol && ETH_DENOMINATED_SYMBOLS.has(symbol.toUpperCase()) ? 6 : 2;
+  return (symbol && TOKEN_FRACTION_DIGITS[symbol.toUpperCase()]) || 2;
 }
 
 /**
