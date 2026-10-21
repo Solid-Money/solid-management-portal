@@ -94,7 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           if (currentPath === '/login') {
             const back = takeReturn();
-            console.log('[AuthProvider] Redirecting to', back ?? '/users');
+            // Not the URL itself: a /connect/ query carries OAuth state.
+            console.log(
+              back
+                ? '[AuthProvider] Returning to the page that needed sign-in'
+                : '[AuthProvider] Redirecting to /users',
+            );
             routerRef.current.push(back ?? '/users');
           }
         } else {

@@ -68,7 +68,8 @@ function ConnectClaude() {
   );
 
   const description = useQuery({
-    queryKey: ["support-connect", request],
+    // Per agent: the cache outlives sign-out, and the answer names the account.
+    queryKey: ["support-connect", user?.uid ?? null, request],
     queryFn: () => describeConnectRequest(request),
     enabled: !!user && !!request.client_id,
     retry: false,
