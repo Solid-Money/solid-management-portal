@@ -63,6 +63,18 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Virtual account data removed",
       variant: "danger",
     },
+    internal_team_member_added: {
+      label: "Added to internal team",
+      variant: "info",
+    },
+    internal_team_member_removed: {
+      label: "Removed from internal team",
+      variant: "warning",
+    },
+    internal_team_member_restored: {
+      label: "Restored to internal team",
+      variant: "info",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
