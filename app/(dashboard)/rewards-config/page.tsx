@@ -325,6 +325,14 @@ export default function RewardsConfigPage() {
   const saveTierMembershipConfig = async () => {
     if (!config) return;
 
+    // An emptied box would go out as Number("") = 0, which switches the bridge
+    // fee cover off. Refused here, as the other sections refuse a blank, so
+    // clearing it to retype stays possible but saving it blank does not.
+    if ((config.tierMembership.bridgeFeeCoverPct as unknown) === "") {
+      toast.error("Set a Bridge Fee Cover (0 turns it off) before saving");
+      return;
+    }
+
     if (hasChanges("fuseStaking")) await saveFuseStakingConfig();
 
     await saveSection(
