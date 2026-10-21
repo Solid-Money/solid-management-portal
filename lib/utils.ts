@@ -17,6 +17,18 @@ export function formatNumber(
   }).format(number);
 }
 
+/** ETH in each of the forms a deposit arrives or is saved as. */
+const ETH_DENOMINATED_SYMBOLS = new Set(["ETH", "WETH", "SOETH"]);
+
+/**
+ * Most fraction digits a token amount is shown with: six for ETH and its
+ * wrapped and vault forms, two for everything else. An ETH deposit at the app's
+ * minimum is about 0.004 ETH, which two decimals render as 0.
+ */
+export function tokenFractionDigits(symbol?: string | null): number {
+  return symbol && ETH_DENOMINATED_SYMBOLS.has(symbol.toUpperCase()) ? 6 : 2;
+}
+
 /**
  * A USD amount, always `$1,234.56` — the only way money should be rendered.
  *
