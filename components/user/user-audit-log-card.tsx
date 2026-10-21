@@ -101,7 +101,22 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Restored to internal team",
       variant: "info",
     },
+    internal_team_feature_assigned: {
+      label: "Internal team feature assigned",
+      variant: "info",
+    },
+    internal_team_feature_removed: {
+      label: "Internal team feature removed",
+      variant: "warning",
+    },
   };
+
+/** How the audit trail names an internal team feature. */
+const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
+  wirex_virtual_account: "Wirex EUR account",
+  spend_modes: "Credit & Smart spend modes",
+  eur_vault: "EUR vault",
+};
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
   const value = entry.metadata?.[key];
@@ -216,6 +231,14 @@ function detailFor(entry: AdminAuditEntry): string | null {
       stringField(entry, "email") ?? stringField(entry, "attemptedEmail");
     if (!next) return null;
     return `${previous ?? "none on file"} → ${next}`;
+  }
+
+  if (
+    entry.action === "internal_team_feature_assigned" ||
+    entry.action === "internal_team_feature_removed"
+  ) {
+    const feature = stringField(entry, "feature");
+    return feature ? (INTERNAL_TEAM_FEATURE_LABELS[feature] ?? feature) : null;
   }
 
   if (entry.action === "virtual_account_data_removed") {
