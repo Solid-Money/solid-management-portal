@@ -20,6 +20,7 @@ import {
   Radio,
 } from "lucide-react";
 import TemporalWorkflowLink from "@/components/temporal-workflow-link";
+import { tokenFractionDigits } from "@/lib/utils";
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString("en-US", {
@@ -192,7 +193,8 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
                       {formatDate(tx.createdAt)}
                     </td>
                     <td className="px-2 py-1.5 text-right text-gray-900 font-medium whitespace-nowrap">
-                      {parseFloat(tx.amount || "0").toFixed(2)} {tx.symbol}
+                      {parseFloat(tx.amount || "0").toFixed(tokenFractionDigits(tx.symbol))}{" "}
+                      {tx.symbol}
                     </td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-1">
