@@ -23,6 +23,7 @@ import {
   Sparkles,
   Terminal,
   TrendingUp,
+  UserCog,
   Users,
   UsersRound,
   Wallet,
@@ -229,6 +230,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Merchants excluded from cashback and referrals, and referral spend rules",
         icon: ShieldAlert,
+      },
+      {
+        href: "/internal-team",
+        label: "Internal Team",
+        description:
+          "Staff and testers: who gets team-only features and rollouts first",
+        icon: UserCog,
       },
       {
         href: "/general-config",

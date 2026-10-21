@@ -650,6 +650,12 @@ export interface ChainBalance {
   soFuseThreshold?: string;
   soFuseStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   soFuseAddress?: string;
+  // EURC on Base: the float the Wirex bank deposit payout wallet pays SEPA
+  // deposits out of. Refilled from the Wirex Master Account; gas is ETH.
+  eurcBalance?: string;
+  eurcThreshold?: string;
+  eurcStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  eurcAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
@@ -689,8 +695,8 @@ export type WalletFailureSource =
 
 export type WalletForecastSource = "cashback" | "referral";
 
-/** The five assets the page tracks, as the backend names them. */
-export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE";
+/** The six assets the page tracks, as the backend names them. */
+export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE" | "EURC";
 
 export interface WalletInfo {
   name: string;
@@ -2104,6 +2110,59 @@ export interface VirtualAccountOnboardingRetryResult {
   state: VirtualAccountOnboardingState;
 }
 
+/** The two virtual-account providers: Rain's USD account, Wirex's EUR IBAN. */
+export type VirtualAccountProvider = "rain" | "wirex";
+
+/** Why a provider's virtual-account data cannot be removed. */
+export type VirtualAccountRemovalBlocker =
+  | "nothing_to_remove"
+  | "rain_card_shares_kyc"
+  | "wirex_card_shares_kyc"
+  | "target_unavailable";
+
+interface VirtualAccountProviderData {
+  provider: VirtualAccountProvider;
+  /** Whether the user's virtual account comes from this provider now. */
+  isCurrent: boolean;
+  canRemove: boolean;
+  blocker?: VirtualAccountRemovalBlocker;
+  /** What removing it does, or why it cannot be removed. */
+  message: string;
+}
+
+/** Each provider's virtual-account data for a user, and whether it can go. */
+export interface VirtualAccountRemovalState {
+  userId: string;
+  currentProvider: VirtualAccountProvider;
+  /** An admin switch already on the user, if any. */
+  override?: VirtualAccountProvider;
+  country?: string;
+  rain: VirtualAccountProviderData & {
+    automationActive: boolean;
+    rainAutomationId?: string;
+    verification: boolean;
+    kycStatus?: string;
+    rainApplicationStatus?: string;
+    hasRainCard: boolean;
+  };
+  wirex: VirtualAccountProviderData & {
+    bankAccounts: number;
+    ibanLast4?: string;
+    verification: boolean;
+    hasWirexCard: boolean;
+  };
+}
+
+/** What the backend reports after removing one provider's data. */
+export interface VirtualAccountRemovalResult {
+  userId: string;
+  removedProvider: VirtualAccountProvider;
+  /** Set when the removal moved the user to the other provider. */
+  switchedTo?: VirtualAccountProvider;
+  removed: string[];
+  state: VirtualAccountRemovalState;
+}
+
 /** What the backend reports after reopening a closed account. */
 export interface RecoverAccountResult {
   userId: string;
@@ -3034,4 +3093,39 @@ export interface RewardExclusionMatch {
 export interface MerchantExclusionCheck {
   cashback: RewardExclusionMatch | null;
   referral: RewardExclusionMatch | null;
+}
+
+// --- Config → Internal team ------------------------------------------------
+
+/**
+ * One person on the internal team — Solid staff or a tester — joined to their
+ * account. Removal is soft: a removed member keeps their row with `enabled:
+ * false`, so who took them off, and why, stays answerable.
+ */
+export interface InternalTeamMember {
+  userId: string;
+  enabled: boolean;
+  /** Absent when the user no longer exists. */
+  username?: string;
+  email?: string;
+  country?: string;
+  userExists: boolean;
+  note?: string;
+  /** The admin's email, or `system` for the one-time import. */
+  addedBy?: string;
+  /** `imported` was carried over from the list that used to be hardcoded. */
+  source: "imported" | "admin";
+  removedBy?: string;
+  removedReason?: string;
+  /** ISO timestamps. */
+  removedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InternalTeamRoster {
+  /** Active first, then removed; newest first within each. */
+  members: InternalTeamMember[];
+  /** Whether the Wirex EUR account is staged to the team in this environment. */
+  virtualAccountTeamOnly: boolean;
 }

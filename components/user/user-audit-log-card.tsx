@@ -59,6 +59,22 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Virtual account resubmitted",
       variant: "info",
     },
+    virtual_account_data_removed: {
+      label: "Virtual account data removed",
+      variant: "danger",
+    },
+    internal_team_member_added: {
+      label: "Added to internal team",
+      variant: "info",
+    },
+    internal_team_member_removed: {
+      label: "Removed from internal team",
+      variant: "warning",
+    },
+    internal_team_member_restored: {
+      label: "Restored to internal team",
+      variant: "info",
+    },
   };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
@@ -126,6 +142,22 @@ function detailFor(entry: AdminAuditEntry): string | null {
       stringField(entry, "email") ?? stringField(entry, "attemptedEmail");
     if (!next) return null;
     return `${previous ?? "none on file"} → ${next}`;
+  }
+
+  if (entry.action === "virtual_account_data_removed") {
+    // Which provider's data went, and whether that moved the user — the two
+    // things a later "why is my bank account different?" is answered from.
+    const provider = stringField(entry, "provider");
+    const switchedTo = stringField(entry, "switchedTo");
+    if (!provider) return null;
+    return [
+      `${provider === "wirex" ? "Wirex" : "Rain"} data removed`,
+      switchedTo
+        ? `switched to ${switchedTo === "wirex" ? "Wirex" : "Rain"}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   const cardId = stringField(entry, "cardId");
