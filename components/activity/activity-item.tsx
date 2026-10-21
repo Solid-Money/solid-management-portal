@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Activity, getTransactionCategory, TRANSACTION_DETAILS, TransactionStatus, TransactionDirection, TransactionType } from "@/types";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, tokenFractionDigits } from "@/lib/utils";
 import { TokenIcon } from "./token-icon";
 import { ExternalLink, Loader2 } from "lucide-react";
 
@@ -153,7 +153,7 @@ export const ActivityItem = ({
           ) : (
             <>
               {statusSign}
-              {formatNumber(parseFloat(amount || "0"), 2)} {symbol}
+              {formatNumber(parseFloat(amount || "0"), tokenFractionDigits(symbol))} {symbol}
             </>
           )}
         </span>
