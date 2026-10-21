@@ -9,6 +9,7 @@ import type {
   ErrorGroupDetail,
   ErrorGroupRow,
   ErrorGroupStatus,
+  ErrorLabelSource,
   ErrorGroupsResponse,
   ErrorGroupUpdate,
   ErrorSource,
@@ -224,6 +225,7 @@ export const GROUP_SORT_LABELS: Record<GroupSort, string> = {
 export interface ErrorGroupsQuery extends ErrorFilters {
   status?: ErrorGroupStatus;
   labelled?: boolean;
+  labelSource?: ErrorLabelSource;
   sort?: GroupSort;
   order?: "asc" | "desc";
   page?: number;
@@ -295,6 +297,7 @@ export const getErrorGroups = (query: ErrorGroupsQuery, window: TimeWindow) =>
         ...filterParams(query, window),
         status: query.status,
         labelled: query.labelled,
+        labelSource: query.labelSource,
         sort: query.sort,
         order: query.order,
         page: query.page,
