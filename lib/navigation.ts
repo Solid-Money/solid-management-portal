@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlertTriangle,
   BarChart2,
   Headphones,
   Inbox,
@@ -118,6 +119,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Card Transactions",
         description: "Card spend with cashback and the fees charged on it",
         icon: CreditCard,
+      },
+      {
+        href: "/errors",
+        label: "Errors",
+        description: "What went wrong for users, live, with plain-English reasons",
+        icon: AlertTriangle,
       },
     ],
   },
