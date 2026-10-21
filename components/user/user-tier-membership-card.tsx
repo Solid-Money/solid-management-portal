@@ -1,12 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { KeyRound, Loader2, Lock, RefreshCw } from "lucide-react";
+import { ExternalLink, KeyRound, Loader2, Lock, RefreshCw } from "lucide-react";
 
 import { getUserTierMembership } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import {
   TierMembershipView,
+  TierSubscriptionFundingView,
   TierSubscriptionStatus,
   TierSubscriptionView,
 } from "@/types";
@@ -52,6 +53,46 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** The chains a first payment can be bridged in from — the in-app swap's. */
+const FUNDING_CHAIN_NAME: Record<number, string> = {
+  1: "Ethereum",
+  56: "BNB Chain",
+  137: "Polygon",
+  8453: "Base",
+  42161: "Arbitrum",
+};
+
+/**
+ * A first payment the user bridged in from another chain.
+ *
+ * Spelled out because it is the one case where the first charge is below the
+ * price on purpose: the bridge and any swap on the way took their cut, and the
+ * charge absorbed it. Without this, a $197.40 first charge on a $199
+ * membership reads as a billing bug. Links to LI.FI's own record of the transfer, which is what
+ * the backend checked it against.
+ */
+function FundingNote({ funding }: { funding: TierSubscriptionFundingView }) {
+  const chain =
+    FUNDING_CHAIN_NAME[funding.fromChainId] ?? `chain ${funding.fromChainId}`;
+  const token = funding.fromTokenSymbol ?? "tokens";
+  return (
+    <p className="mt-2 text-xs text-gray-600">
+      First payment bridged from {token} on {chain}: ${funding.sentUsd} sent,{" "}
+      {funding.receivedUsd} USDC arrived on Fuse, ${funding.coverUsd} of bridge
+      and swap fees covered by the first charge.{" "}
+      <a
+        href={`https://scan.li.fi/tx/${funding.transactionHash}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+      >
+        View transfer
+        <ExternalLink className="h-3 w-3" />
+      </a>
+    </p>
+  );
+}
+
 const formatFuse = (amount: number) =>
   `${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })} FUSE`;
 
@@ -74,6 +115,11 @@ function SubscriptionRow({ subscription }: { subscription: TierSubscriptionView 
         <span className="text-amber-700">
           {subscription.failedAttempts} failed charge
           {subscription.failedAttempts === 1 ? "" : "s"}
+        </span>
+      )}
+      {subscription.funding && (
+        <span className="text-gray-500">
+          bridged in · ${subscription.funding.coverUsd} fees covered
         </span>
       )}
     </li>
@@ -234,6 +280,9 @@ export default function UserTierMembershipCard({
                     }
                   />
                 </dl>
+                {subscription.funding && (
+                  <FundingNote funding={subscription.funding} />
+                )}
                 {subscription.failedAttempts > 0 && (
                   <p className="mt-2 text-xs text-amber-700">
                     {subscription.failedAttempts} renewal attempt
