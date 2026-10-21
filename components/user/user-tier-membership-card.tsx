@@ -66,9 +66,9 @@ const FUNDING_CHAIN_NAME: Record<number, string> = {
  * A first payment the user bridged in from another chain.
  *
  * Spelled out because it is the one case where the first charge is below the
- * price on purpose: the bridge took its cut on the way to Fuse and the charge
- * absorbed it. Without this, a $197.40 first charge on a $199 membership reads
- * as a billing bug. Links to LI.FI's own record of the transfer, which is what
+ * price on purpose: the bridge and any swap on the way took their cut, and the
+ * charge absorbed it. Without this, a $197.40 first charge on a $199
+ * membership reads as a billing bug. Links to LI.FI's own record of the transfer, which is what
  * the backend checked it against.
  */
 function FundingNote({ funding }: { funding: TierSubscriptionFundingView }) {
@@ -79,7 +79,7 @@ function FundingNote({ funding }: { funding: TierSubscriptionFundingView }) {
     <p className="mt-2 text-xs text-gray-600">
       First payment bridged from {token} on {chain}: ${funding.sentUsd} sent,{" "}
       {funding.receivedUsd} USDC arrived on Fuse, ${funding.coverUsd} of bridge
-      fees covered by the first charge.{" "}
+      and swap fees covered by the first charge.{" "}
       <a
         href={`https://scan.li.fi/tx/${funding.transactionHash}`}
         target="_blank"
