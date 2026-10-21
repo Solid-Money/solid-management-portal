@@ -3110,6 +3110,8 @@ export interface InternalTeamMember {
   email?: string;
   country?: string;
   userExists: boolean;
+  /** What this member gets — see {@link InternalTeamFeatureKey}. */
+  features: InternalTeamFeatureKey[];
   note?: string;
   /** The admin's email, or `system` for the one-time import. */
   addedBy?: string;
@@ -3128,4 +3130,27 @@ export interface InternalTeamRoster {
   members: InternalTeamMember[];
   /** Whether the Wirex EUR account is staged to the team in this environment. */
   virtualAccountTeamOnly: boolean;
+  /** Every feature a member can be given, in display order. */
+  features: InternalTeamFeature[];
+}
+
+/**
+ * A team-only rollout an internal team member can be given. Membership alone
+ * only makes someone internal (internal notifications, no card-waitlist
+ * emails); each of these is assigned per member.
+ */
+export type InternalTeamFeatureKey =
+  | "wirex_virtual_account"
+  | "spend_modes"
+  | "eur_vault";
+
+export interface InternalTeamFeature {
+  key: InternalTeamFeatureKey;
+  label: string;
+  description: string;
+  /**
+   * Whether the rollout is still staged to the team in this environment. When
+   * it is not, everyone has the feature and the tag changes nothing.
+   */
+  teamOnly: boolean;
 }
