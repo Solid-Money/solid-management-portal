@@ -118,16 +118,23 @@ export default function UserProfileCard({ user }: { user: User }) {
             />
           </Field>
           <Field label="Safe address" wide>
-            <CopyableValue
-              value={user.safeAddress}
-              label="Safe address"
-              truncate
-              href={
-                user.safeAddress
-                  ? `https://explorer.fuse.io/address/${user.safeAddress}`
-                  : undefined
-              }
-            />
+            {/* The app works the Safe address out on the device and saves it
+                after the account exists, so a signup that failed at that step
+                leaves an account without one until the user next logs in. */}
+            {user.safeAddress ? (
+              <CopyableValue
+                value={user.safeAddress}
+                label="Safe address"
+                truncate
+                href={`https://explorer.fuse.io/address/${user.safeAddress}`}
+              />
+            ) : (
+              <span className="text-gray-500">
+                Not saved — wallet setup did not finish at signup. The app
+                saves it the next time they log in; if it stays empty, ask
+                them to update the app.
+              </span>
+            )}
           </Field>
           <Field label="Country">{user.country || "—"}</Field>
           <Field label="Joined">
