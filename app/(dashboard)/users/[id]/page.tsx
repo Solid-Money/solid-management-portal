@@ -357,7 +357,7 @@ export default function UserDetailPage({
             <UserErrorsCard userId={id} />
           </SectionAnchor>
           <SectionAnchor id="user-support">
-            <UserSupportCard userId={id} />
+            <UserSupportCard userId={id} userLabel={user?.username || undefined} email={user?.email} />
           </SectionAnchor>
           <SectionAnchor id="user-audit-log">
             <UserAuditLogCard userId={id} />

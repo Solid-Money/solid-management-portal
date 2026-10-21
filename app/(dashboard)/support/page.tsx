@@ -52,6 +52,10 @@ function InboxScreen({ me }: { me: SupportMe }) {
         onView={(next) => update({ view: next })}
         onQuery={(next) => update({ q: next || null })}
         onSelect={(conversationId) => update({ c: conversationId })}
+        // A sent message leaves the case waiting on the customer: show it there.
+        onStarted={(conversationId, sent) =>
+          update(sent ? { view: "waiting_customer", q: null, c: conversationId } : { c: conversationId })
+        }
       />
       {open ? (
         <ThreadView key={open} conversationId={open} me={me.email} agents={agents} />

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { AlertTriangle, Bell, BellOff, Loader2, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, Bell, BellOff, Loader2, Plus, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import NewConversationDialog from "@/components/support/new-conversation-dialog";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSupportQueue } from "@/hooks/use-support";
 import {
@@ -161,6 +162,7 @@ export default function QueueList({
   onView,
   onQuery,
   onSelect,
+  onStarted,
 }: {
   view: SupportQueueView;
   query: string;
@@ -169,8 +171,11 @@ export default function QueueList({
   onView: (view: SupportQueueView) => void;
   onQuery: (query: string) => void;
   onSelect: (conversationId: string) => void;
+  /** A conversation the agent started (`sent`) or chose to open from "New conversation". */
+  onStarted: (conversationId: string, sent: boolean) => void;
 }) {
   const [text, setText] = useState(query);
+  const [composing, setComposing] = useState(false);
   const debounced = useDebounce(text, 300);
   useEffect(() => {
     if (debounced !== query) onQuery(debounced);
@@ -185,8 +190,20 @@ export default function QueueList({
       <div className="space-y-2 border-b border-gray-200 p-3">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-base font-semibold text-gray-900">Inbox</h1>
-          <NotificationToggle />
+          <div className="flex items-center gap-1.5">
+            <NotificationToggle />
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => setComposing(true)}
+              title="New conversation: write to a customer first"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New
+            </Button>
+          </div>
         </div>
+        <NewConversationDialog open={composing} onOpenChange={setComposing} onStarted={onStarted} />
         {counts && counts.overdueFollowUps > 0 && (
           <button
             type="button"
