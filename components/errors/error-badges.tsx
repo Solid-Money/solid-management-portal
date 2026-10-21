@@ -96,6 +96,14 @@ export function NewErrorBadge() {
   );
 }
 
+export function AiLabelBadge() {
+  return (
+    <Badge variant="warning" title="Label suggested by AI — approve or edit it">
+      AI
+    </Badge>
+  );
+}
+
 /**
  * "5 minutes ago", from the shared minute clock, with the exact time on hover.
  * Shows the date itself until the page has hydrated and has a clock to read.

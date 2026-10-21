@@ -3,10 +3,11 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ExternalLink, Loader2, Pencil, User } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, Loader2, Pencil, User } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  AiLabelBadge,
   ErrorSourceBadge,
   GroupStatusBadge,
   NewErrorBadge,
@@ -175,6 +176,7 @@ function DrawerBody({
         whoActs: row.whoActs,
         severity: row.severity,
         labelled: row.labelled,
+        labelSource: row.labelSource,
         status: row.status,
         mutedUntil: row.mutedUntil,
         owner: row.owner,
@@ -244,6 +246,7 @@ function DrawerBody({
           <WhoActsBadge whoActs={group.whoActs} />
           <GroupStatusBadge status={group.status} mutedUntil={group.mutedUntil} />
           {!group.labelled && <NewErrorBadge />}
+          {group.labelSource === "ai" && <AiLabelBadge />}
         </div>
         <SheetTitle>{group.title}</SheetTitle>
         <SheetDescription>
@@ -258,6 +261,43 @@ function DrawerBody({
       <div className="flex-1 space-y-6 overflow-y-auto p-4">
         {labelFirst && (
           <LabelForm group={group} saving={saving} onUpdate={update} autoFocus />
+        )}
+
+        {group.labelSource === "ai" && !labelFirst && !editingLabel && (
+          <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm text-amber-900">
+              This label was suggested by AI. Approve it as is, or edit it; either
+              way it becomes the label everyone sees.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                className="cursor-pointer"
+                disabled={saving}
+                onClick={() =>
+                  update({
+                    title: group.title,
+                    action: group.action,
+                    whoActs: group.whoActs,
+                    severity: group.severity,
+                  })
+                }
+              >
+                <Check />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer bg-white"
+                disabled={saving}
+                onClick={() => setEditingLabel(true)}
+              >
+                <Pencil />
+                Edit
+              </Button>
+            </div>
+          </section>
         )}
 
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
@@ -288,15 +328,18 @@ function DrawerBody({
               onCancel={group.labelled ? () => setEditingLabel(false) : undefined}
             />
           ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="cursor-pointer"
-              onClick={() => setEditingLabel(true)}
-            >
-              <Pencil />
-              Edit label
-            </Button>
+            // An AI suggestion has its own Approve / Edit above.
+            group.labelSource !== "ai" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer"
+                onClick={() => setEditingLabel(true)}
+              >
+                <Pencil />
+                Edit label
+              </Button>
+            )
           ))}
 
         <TopUsers group={group} />
