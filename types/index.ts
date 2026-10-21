@@ -3256,3 +3256,38 @@ export interface ClientErrorReport {
 export interface ClientErrorMatch extends ClientErrorReport {
   user?: { id: string; username?: string; email?: string };
 }
+
+// --- Config → Internal team ------------------------------------------------
+
+/**
+ * One person on the internal team — Solid staff or a tester — joined to their
+ * account. Removal is soft: a removed member keeps their row with `enabled:
+ * false`, so who took them off, and why, stays answerable.
+ */
+export interface InternalTeamMember {
+  userId: string;
+  enabled: boolean;
+  /** Absent when the user no longer exists. */
+  username?: string;
+  email?: string;
+  country?: string;
+  userExists: boolean;
+  note?: string;
+  /** The admin's email, or `system` for the one-time import. */
+  addedBy?: string;
+  /** `imported` was carried over from the list that used to be hardcoded. */
+  source: "imported" | "admin";
+  removedBy?: string;
+  removedReason?: string;
+  /** ISO timestamps. */
+  removedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InternalTeamRoster {
+  /** Active first, then removed; newest first within each. */
+  members: InternalTeamMember[];
+  /** Whether the Wirex EUR account is staged to the team in this environment. */
+  virtualAccountTeamOnly: boolean;
+}
