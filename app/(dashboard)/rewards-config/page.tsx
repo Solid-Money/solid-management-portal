@@ -332,6 +332,17 @@ export default function RewardsConfigPage() {
       toast.error("Set a Bridge Fee Cover (0 turns it off) before saving");
       return;
     }
+    // The API refuses anything past 20% as well; checked here so the admin is
+    // told which box is wrong rather than getting the section's failure toast.
+    const bridgeFeeCoverPct = Number(config.tierMembership.bridgeFeeCoverPct);
+    if (
+      !Number.isFinite(bridgeFeeCoverPct) ||
+      bridgeFeeCoverPct < 0 ||
+      bridgeFeeCoverPct > 20
+    ) {
+      toast.error("Bridge Fee Cover must be between 0 and 20%");
+      return;
+    }
 
     if (hasChanges("fuseStaking")) await saveFuseStakingConfig();
 
@@ -352,7 +363,7 @@ export default function RewardsConfigPage() {
         ultraAnnualUsd: Number(config.tierMembership.ultraAnnualUsd),
         graceDays: Number(config.tierMembership.graceDays),
         renewalNoticeDays: Number(config.tierMembership.renewalNoticeDays),
-        bridgeFeeCoverPct: Number(config.tierMembership.bridgeFeeCoverPct),
+        bridgeFeeCoverPct,
       },
       "tierMembership",
     );
@@ -2020,6 +2031,8 @@ export default function RewardsConfigPage() {
                   handleNumericUpdate("tierMembership", "bridgeFeeCoverPct", v)
                 }
                 type="number"
+                min={0}
+                max={20}
                 suffix="%"
                 tooltip="When a user pays from another chain (USDC on Base, ETH on Ethereum…), the bridge and swap take a cut on the way to Fuse. The first charge absorbs that cut, up to this share of the price, so sending $199 still buys a $199 tier. Only what the transfer actually lost is covered — never money the user did not send — and renewals always charge the full price. 0 turns it off. Capped at 20."
               />

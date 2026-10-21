@@ -98,6 +98,7 @@ export interface InputFieldProps {
   suffix?: string;
   disabled?: boolean;
   min?: number;
+  max?: number;
   step?: string;
   tooltip?: string;
 }
@@ -110,6 +111,7 @@ export function InputField({
   suffix,
   disabled = false,
   min,
+  max,
   step,
   tooltip,
 }: InputFieldProps) {
@@ -126,6 +128,7 @@ export function InputField({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           min={min}
+          max={max}
           step={step}
           className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100"
         />
