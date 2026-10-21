@@ -81,7 +81,6 @@ export function useLiveErrors(
     };
 
     socket.on("session", () => {
-      retryAttempt = 0;
       tokenRefreshed = false;
       socket
         .timeout(SUBSCRIBE_ACK_TIMEOUT_MS)
@@ -96,13 +95,21 @@ export function useLiveErrors(
           if (!ok) {
             // Connected but not in the room: nothing will arrive, so it must
             // not read as live.
-            console.warn(
-              "[errors] live subscription refused",
-              error?.message ?? (response as { error?: string } | null)?.error
-            );
+            const reason =
+              error?.message ?? (response as { error?: string } | null)?.error;
+            console.warn("[errors] live subscription refused", reason);
             markDown();
+            // An admin the server does not allow on this page will not be let
+            // in by asking again. Anything else (a timeout, a session the
+            // server had not finished admitting) gets a fresh connection and
+            // a new try, backing off.
+            if (reason !== "forbidden") {
+              socket.disconnect();
+              scheduleRetry();
+            }
             return;
           }
+          retryAttempt = 0;
           setStatus("live");
           // Anything recorded while the feed was away.
           if (hasBeenLive) onResync();
