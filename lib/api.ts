@@ -16,6 +16,7 @@ import {
   RainRtfStatus,
   IssueTierTrialRequest,
   IssueTierTrialResult,
+  InternalTeamFeatureKey,
   InternalTeamMember,
   InternalTeamRoster,
   KycResetEligibility,
@@ -664,6 +665,28 @@ export const removeInternalTeamMember = (userId: string, reason: string) =>
   api.post<{ data: InternalTeamMember }>(
     `/admin/v1/internal-team/${userId}/remove`,
     { reason },
+  );
+
+/**
+ * Give an internal team member a feature — the Wirex EUR account, the Credit &
+ * Smart spend modes, the EUR vault. Assigning one they already have is a
+ * no-op. Audited on the member's profile.
+ */
+export const assignInternalTeamFeature = (
+  userId: string,
+  feature: InternalTeamFeatureKey
+) =>
+  api.post<{ data: InternalTeamMember }>(
+    `/admin/v1/internal-team/${userId}/features/${feature}`
+  );
+
+/** Take a feature off an internal team member. They stay on the team. */
+export const removeInternalTeamFeature = (
+  userId: string,
+  feature: InternalTeamFeatureKey
+) =>
+  api.delete<{ data: InternalTeamMember }>(
+    `/admin/v1/internal-team/${userId}/features/${feature}`
   );
 
 /** Put a removed member back on the internal team. */

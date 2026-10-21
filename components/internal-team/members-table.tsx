@@ -19,14 +19,14 @@ const shortDate = (value?: string) =>
     : "—";
 
 /** How to name a member in a toast or a dialog, account or not. */
-const memberLabel = (member: InternalTeamMember) =>
+export const memberLabel = (member: InternalTeamMember) =>
   member.username ?? member.userId;
 
 /**
  * The member's account as a link to their page, or their bare id once the
  * account is gone — a link there would only lead to an error.
  */
-function MemberCell({ member }: { member: InternalTeamMember }) {
+export function MemberCell({ member }: { member: InternalTeamMember }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {member.userExists ? (
