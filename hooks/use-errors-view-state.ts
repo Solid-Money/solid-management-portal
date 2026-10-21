@@ -16,9 +16,9 @@ import {
 } from "@/lib/errors";
 import type { ErrorGroupStatus } from "@/types/errors";
 
-export type ErrorsTab = "summary" | "feed" | "label";
+export type ErrorsTab = "summary" | "feed" | "label" | "review";
 
-const TABS: ErrorsTab[] = ["summary", "feed", "label"];
+const TABS: ErrorsTab[] = ["summary", "feed", "label", "review"];
 const SORTS: GroupSort[] = ["lastSeen", "count", "users"];
 
 /** Everything the Errors page shows, as it is written in the URL. */

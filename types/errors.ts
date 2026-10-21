@@ -64,6 +64,9 @@ export interface ErrorEventRow {
   repeat?: number;            // extra identical occurrences folded into this row (burst de-dupe)
 }
 
+/** Where a group's label came from; "ai" is a suggestion awaiting an admin's review. */
+export type ErrorLabelSource = "catalog" | "admin" | "ai" | "none";
+
 export interface ErrorGroupRow {
   fingerprint: string;
   title: string;
@@ -71,6 +74,7 @@ export interface ErrorGroupRow {
   whoActs: WhoActs;
   severity: Severity;
   labelled: boolean;
+  labelSource?: ErrorLabelSource; // absent from servers older than AI labelling
   flow: ErrorFlow;
   code?: string;
   sources: ErrorSource[];

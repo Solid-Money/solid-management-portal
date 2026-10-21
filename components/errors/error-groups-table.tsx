@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2, Tag } from "lucide-react";
 
 import {
+  AiLabelBadge,
   GroupStatusBadge,
   NewErrorBadge,
   RelativeTime,
@@ -35,7 +36,8 @@ interface ErrorGroupsTableProps {
    * `summary` is the triage list; `label` is the queue of groups nobody has
    * explained yet, where the raw message is what the labeller works from.
    */
-  variant?: "summary" | "label";
+  /** "label": nobody has explained these; "review": AI suggestions to approve. */
+  variant?: "summary" | "label" | "review";
 }
 
 export function ErrorGroupsTable({
@@ -68,7 +70,9 @@ export function ErrorGroupsTable({
         <span>
           {labelQueue
             ? "Errors nobody has explained yet, most frequent first."
-            : "Each row is one cause, with what to do about it."}
+            : variant === "review"
+              ? "Labels suggested by AI, most frequent first. Open one to approve or edit it."
+              : "Each row is one cause, with what to do about it."}
         </span>
         <span className="shrink-0">
           {count(total)} {total === 1 ? "group" : "groups"}
@@ -105,7 +109,9 @@ export function ErrorGroupsTable({
                 >
                   {labelQueue
                     ? "Every error in this window has a label"
-                    : "No errors in this window"}
+                    : variant === "review"
+                      ? "No AI suggestions waiting for review"
+                      : "No errors in this window"}
                 </td>
               </tr>
             ) : (
@@ -175,6 +181,7 @@ function GroupRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-semibold">{group.title}</span>
           {!group.labelled && !labelQueue && <NewErrorBadge />}
+          {group.labelSource === "ai" && <AiLabelBadge />}
         </div>
         {labelQueue ? (
           // The labeller needs the raw text to say what it means; one line

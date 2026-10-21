@@ -165,6 +165,13 @@ export default function ErrorsPage() {
     order: "desc",
     page: state.page,
   };
+  const reviewQuery: ErrorGroupsQuery = {
+    ...filters,
+    labelSource: "ai",
+    sort: "count",
+    order: "desc",
+    page: state.page,
+  };
 
   const { live, addEvent, showPending, setBurst, markRefreshed } =
     useLiveFeedState(JSON.stringify(filters));
@@ -271,6 +278,7 @@ export default function ErrorsPage() {
             <TabsTrigger value="summary">Summary</TabsTrigger>
             <TabsTrigger value="feed">Feed</TabsTrigger>
             <TabsTrigger value="label">Needs a label</TabsTrigger>
+            <TabsTrigger value="review">AI suggestions</TabsTrigger>
           </TabsList>
           <LiveControl on={liveOn} status={liveStatus} onChange={toggleLive} />
         </div>
@@ -333,6 +341,15 @@ export default function ErrorsPage() {
             query={labelQuery}
             onPageChange={(page) => update({ page })}
             onOpen={(fingerprint, options) => openGroup(fingerprint, options)}
+          />
+        </TabsContent>
+
+        <TabsContent value="review">
+          <ErrorGroupsTable
+            variant="review"
+            query={reviewQuery}
+            onPageChange={(page) => update({ page })}
+            onOpen={(fingerprint) => openGroup(fingerprint)}
           />
         </TabsContent>
       </Tabs>
