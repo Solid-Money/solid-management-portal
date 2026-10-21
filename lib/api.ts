@@ -19,10 +19,16 @@ import {
   RainRtfStatus,
   IssueTierTrialRequest,
   IssueTierTrialResult,
+  InternalTeamFeatureKey,
+  InternalTeamMember,
+  InternalTeamRoster,
   KycResetEligibility,
   KycResetResult,
   VirtualAccountOnboardingRetryResult,
   VirtualAccountOnboardingState,
+  VirtualAccountProvider,
+  VirtualAccountRemovalResult,
+  VirtualAccountRemovalState,
   RecoverAccountResult,
   RecoveryEligibility,
   ResetTwoFactorResult,
@@ -568,6 +574,31 @@ export const retryVirtualAccountOnboarding = (
     reason ? { reason } : {},
   );
 
+/**
+ * Each provider's virtual-account data for this user — Rain's USD account and
+ * Wirex's EUR IBAN — and whether support can remove it. Read-only.
+ */
+export const getVirtualAccountRemoval = (userId: string) =>
+  api.get<{ data: VirtualAccountRemovalState }>(
+    `/admin/v1/users/${userId}/virtual-account/removal`,
+  );
+
+/**
+ * Remove one provider's virtual-account data, so the user can open the other
+ * provider's account (or to clear a leftover application). Deletes data at
+ * Rain that cannot be restored; refused (409) where a card shares the
+ * verification. Audited either way.
+ */
+export const removeVirtualAccountData = (
+  userId: string,
+  provider: VirtualAccountProvider,
+  reason: string,
+) =>
+  api.post<{ data: VirtualAccountRemovalResult }>(
+    `/admin/v1/users/${userId}/virtual-account/remove`,
+    { provider, reason },
+  );
+
 /** Every admin action taken on this user, newest first. */
 export const getUserAuditLog = (userId: string) =>
   api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
@@ -665,6 +696,68 @@ export const reevaluateReferralReward = (
   api.post<{ data: ReferralReevaluationResult }>(
     `/admin/v1/users/${referredUserId}/referral-reward/reevaluate`,
     { reason },
+  );
+
+// --- Config → Internal team ------------------------------------------------
+
+/**
+ * The internal team — Solid staff and testers — active members first, then the
+ * ones an admin removed, with whether the Wirex EUR account is staged to the
+ * team in this environment.
+ */
+export const getInternalTeam = () =>
+  api.get<{ data: InternalTeamRoster }>("/admin/v1/internal-team");
+
+/**
+ * Put a user on the internal team. `user` is whatever the admin has to hand —
+ * a username, an email or a user id — and the backend resolves it. Refused
+ * with a 404 when no account matches and a 409 when they are already an
+ * active member. The admin identity comes from the Firebase token server-side.
+ */
+export const addInternalTeamMember = (user: string, note?: string) =>
+  api.post<{ data: InternalTeamMember }>("/admin/v1/internal-team", {
+    user,
+    ...(note ? { note } : {}),
+  });
+
+/**
+ * Take a member off the internal team. Soft: the row stays, marked removed, so
+ * it can be restored and the reason is still on the page. The reason is
+ * required and lands on the user's audit trail with the admin's name.
+ */
+export const removeInternalTeamMember = (userId: string, reason: string) =>
+  api.post<{ data: InternalTeamMember }>(
+    `/admin/v1/internal-team/${userId}/remove`,
+    { reason },
+  );
+
+/**
+ * Give an internal team member a feature — the Wirex EUR account, the Credit &
+ * Smart spend modes, the EUR vault. Assigning one they already have is a
+ * no-op. Audited on the member's profile.
+ */
+export const assignInternalTeamFeature = (
+  userId: string,
+  feature: InternalTeamFeatureKey
+) =>
+  api.post<{ data: InternalTeamMember }>(
+    `/admin/v1/internal-team/${userId}/features/${feature}`
+  );
+
+/** Take a feature off an internal team member. They stay on the team. */
+export const removeInternalTeamFeature = (
+  userId: string,
+  feature: InternalTeamFeatureKey
+) =>
+  api.delete<{ data: InternalTeamMember }>(
+    `/admin/v1/internal-team/${userId}/features/${feature}`
+  );
+
+/** Put a removed member back on the internal team. */
+export const restoreInternalTeamMember = (userId: string, note?: string) =>
+  api.post<{ data: InternalTeamMember }>(
+    `/admin/v1/internal-team/${userId}/restore`,
+    note ? { note } : {},
   );
 
 // --- Rewards / cohorts -----------------------------------------------------

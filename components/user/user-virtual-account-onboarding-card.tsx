@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import RemoveVirtualAccountDialog from "@/components/user/remove-virtual-account-dialog";
 
 interface UserVirtualAccountOnboardingCardProps {
   userId: string;
@@ -148,18 +149,23 @@ export default function UserVirtualAccountOnboardingCard({
           <Landmark className="h-4 w-4 text-gray-500" />
           USD virtual account
         </CardTitle>
-        {data && (
-          <Button
-            size="sm"
-            onClick={() => setOpen(true)}
-            disabled={!data.canRetry}
-            title={data.canRetry ? undefined : data.message}
-            className="cursor-pointer"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Retry onboarding
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Both providers' data, not only Rain's: this is where support
+              moves a user between the Rain and Wirex accounts. */}
+          <RemoveVirtualAccountDialog userId={userId} username={username} />
+          {data && (
+            <Button
+              size="sm"
+              onClick={() => setOpen(true)}
+              disabled={!data.canRetry}
+              title={data.canRetry ? undefined : data.message}
+              className="cursor-pointer"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry onboarding
+            </Button>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent>
