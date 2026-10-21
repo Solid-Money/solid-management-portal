@@ -11,8 +11,11 @@ import {
   BatchIssueTierTrialResult,
   CardAuditEntry,
   CardIssuanceContext,
+  CardRelinkContext,
   IssueCardRequest,
   IssueCardResult,
+  RelinkCardRequest,
+  RelinkCardResult,
   RainRtfStatus,
   IssueTierTrialRequest,
   IssueTierTrialResult,
@@ -226,6 +229,31 @@ export const getCardIssuanceContext = (userId: string) =>
 export const issueUserCard = (userId: string, request: IssueCardRequest) =>
   api.post<{ data: IssueCardResult }>(
     `/admin/v1/users/${userId}/card/issue`,
+    request,
+  );
+
+/**
+ * What the re-link dialog opens with: every card the issuer holds for this
+ * cardholder, which can be attached back to the account, and why the rest
+ * cannot.
+ *
+ * Read when the dialog opens rather than with the card panel — it calls the
+ * issuer for the live card list.
+ */
+export const getCardRelinkContext = (userId: string) =>
+  api.get<{ data: CardRelinkContext }>(
+    `/admin/v1/users/${userId}/card/relink-context`,
+  );
+
+/**
+ * Attach a card the issuer still holds back to this user's account — for an
+ * account that was closed and reopened, which loses its card link. Nothing is
+ * issued or cancelled. The admin identity comes from the Firebase token
+ * server-side, never from here.
+ */
+export const relinkUserCard = (userId: string, request: RelinkCardRequest) =>
+  api.post<{ data: RelinkCardResult }>(
+    `/admin/v1/users/${userId}/card/relink`,
     request,
   );
 

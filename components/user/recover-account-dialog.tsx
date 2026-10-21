@@ -53,7 +53,7 @@ const RESTORED = [
 const NOT_RESTORED = [
   "Their sessions: they sign in again on each device",
   "Authenticator-app 2FA (TOTP), if they had it: they set it up again",
-  "The card link: a Rain card re-links the next time they open Card in the app",
+  "The card link: a Rain card re-links the next time they open Card in the app; a Wirex card is re-linked from the Card panel",
 ];
 
 /**
@@ -268,7 +268,8 @@ function RecoveryOutcome({
             <span>
               Their card link was removed at closure; the card itself was not
               cancelled. A Rain card re-links the next time they open Card in
-              the app. For any other issuer, ask engineering to re-link it.
+              the app. For a Wirex card, use Re-link card on the Card panel
+              once the owner has confirmed they want it back.
             </span>
           </div>
         )}

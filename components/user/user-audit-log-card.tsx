@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
     card_unfrozen: { label: "Card unfrozen", variant: "success" },
     card_issued: { label: "Card issued", variant: "info" },
     card_canceled: { label: "Card canceled", variant: "danger" },
+    card_relinked: { label: "Card re-linked", variant: "info" },
     cashback_rate_user_set: { label: "Cashback rate set", variant: "info" },
     cashback_rate_user_cleared: {
       label: "Cashback rate cleared",

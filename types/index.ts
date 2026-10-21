@@ -2063,7 +2063,11 @@ export interface CardCurrencyAmount {
 
 /** Every admin action the card panel lists against one cardholder. */
 export type CardAuditAction =
-  "card_frozen" | "card_unfrozen" | "card_issued" | "card_canceled";
+  | "card_frozen"
+  | "card_unfrozen"
+  | "card_issued"
+  | "card_canceled"
+  | "card_relinked";
 
 /** One entry in the admin audit trail for a card action. */
 export interface CardAuditEntry {
@@ -2592,6 +2596,64 @@ export interface IssueCardResult {
   previousCardCanceled: boolean;
   adminUsername: string;
   reason?: string;
+}
+
+/** One of the cardholder's cards at the issuer, as the re-link dialog lists it. */
+export interface CardRelinkCandidate {
+  cardId: string;
+  /** The issuer's own word for it: Wirex's `Active`, `Blocked`, `Closed`… */
+  issuerStatus?: string;
+  /** The status the restored card would have in the app. */
+  status: string;
+  type?: CardType;
+  last4?: string;
+  /** MM/YY. */
+  expiration?: string;
+  /** When the issuer issued it. */
+  issuedAt?: string;
+  /** The newest card operation our ledger holds for it. */
+  lastUsedAt?: string;
+  /** It has taken at least one payment. */
+  hasPayments: boolean;
+  /** Why this card cannot be re-linked. Absent when it can. */
+  blockedReason?: string;
+}
+
+/**
+ * What the re-link dialog opens with. Mirrors `AdminCardRelinkContext` in
+ * accounts-service.
+ */
+export interface CardRelinkContext {
+  /** At least one card can be re-linked. */
+  canRelink: boolean;
+  /** Why not, when `canRelink` is false. Shown verbatim. */
+  blockedReason?: string;
+  provider?: CardProvider;
+  /** The Wirex cardholder's wallet. */
+  providerCustomerId?: string;
+  wirexUserId?: string;
+  /** Every card the issuer holds for the cardholder, re-linkable or not. */
+  candidates: CardRelinkCandidate[];
+  /** The card to preselect: the re-linkable one used most recently. */
+  suggestedCardId?: string;
+}
+
+export interface RelinkCardRequest {
+  cardId: string;
+  /** Required: this attaches a live card to an account on support's word. */
+  reason: string;
+}
+
+export interface RelinkCardResult {
+  userId: string;
+  cardId: string;
+  provider: CardProvider;
+  status: string;
+  issuerStatus?: string;
+  last4?: string;
+  expiration?: string;
+  adminUsername: string;
+  reason: string;
 }
 
 export type VaultKey = "USDC" | "FUSE" | "ETH";
