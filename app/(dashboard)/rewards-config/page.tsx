@@ -344,6 +344,7 @@ export default function RewardsConfigPage() {
         ultraAnnualUsd: Number(config.tierMembership.ultraAnnualUsd),
         graceDays: Number(config.tierMembership.graceDays),
         renewalNoticeDays: Number(config.tierMembership.renewalNoticeDays),
+        bridgeFeeCoverPct: Number(config.tierMembership.bridgeFeeCoverPct),
       },
       "tierMembership",
     );
@@ -2003,6 +2004,16 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="days"
                 tooltip="How far ahead of a renewal the user is told it is coming."
+              />
+              <InputField
+                label="Bridge Fee Cover"
+                value={config.tierMembership.bridgeFeeCoverPct}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "bridgeFeeCoverPct", v)
+                }
+                type="number"
+                suffix="%"
+                tooltip="When a user pays from another chain (USDC on Base, ETH on Ethereum…), the bridge and swap take a cut on the way to Fuse. The first charge absorbs that cut, up to this share of the price, so sending $199 still buys a $199 tier. Only what the transfer actually lost is covered — never money the user did not send — and renewals always charge the full price. 0 turns it off. Capped at 20."
               />
             </div>
           </div>

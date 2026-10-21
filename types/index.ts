@@ -1676,6 +1676,12 @@ export interface TierMembershipConfig {
   graceDays: number;
   /** How far ahead of a renewal the user is told about it. */
   renewalNoticeDays: number;
+  /**
+   * The most of a first payment, as a percentage of the price, that bridge and
+   * swap costs may take when the user pays from another chain. 0 turns it off;
+   * the backend caps it at 20 whatever is saved.
+   */
+  bridgeFeeCoverPct: number;
 }
 
 /** One tier's yield boost. */
@@ -1775,6 +1781,26 @@ export interface TierSubscriptionView {
   /** When a past-due membership finally loses its tier. */
   graceEndsAt: string | null;
   subscribedAt: string;
+  /**
+   * How the first payment was funded, when the user bridged it in from
+   * another chain. Null when it was paid from USDC already on Fuse; absent
+   * from backends that predate it.
+   */
+  funding?: TierSubscriptionFundingView | null;
+}
+
+/** A first payment bridged in from another chain, through LI.FI. */
+export interface TierSubscriptionFundingView {
+  /** The source-chain transaction. */
+  transactionHash: string;
+  fromChainId: number;
+  fromTokenSymbol: string | null;
+  /** What the user sent, in USD. */
+  sentUsd: string;
+  /** USDC that reached the Safe on Fuse. */
+  receivedUsd: string;
+  /** The bridge and swap cost the first charge absorbed. */
+  coverUsd: string;
 }
 
 /** The user's locked FUSE position, read from the chain. */
