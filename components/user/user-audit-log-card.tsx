@@ -115,6 +115,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
 const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
   wirex_virtual_account: "Wirex EUR account",
   spend_modes: "Credit & Smart spend modes",
+  deposit_tokens: "New deposit tokens",
   // No longer a tag (the EUR vault is open to everyone); kept so past entries read.
   eur_vault: "EUR vault",
 };
