@@ -41,9 +41,9 @@ export default function InternalTeamPage() {
           Solid staff and testers. Being a member makes someone internal: they
           get internal-only rewards notifications and are skipped by
           card-waitlist emails. Team-only features — the Wirex EUR account, the
-          Credit &amp; Smart spend modes, the EUR vault, the new deposit tokens
-          — are assigned to each member separately below. Changes take effect
-          within a minute.
+          Credit &amp; Smart spend modes, the new deposit tokens — are assigned
+          to each member separately below. Changes take effect within a
+          minute.
         </p>
       </div>
 

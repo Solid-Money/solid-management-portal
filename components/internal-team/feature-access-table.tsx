@@ -37,8 +37,7 @@ function useRefreshAfterChange() {
 /**
  * Which team-only rollouts each active member gets. Being on the team only
  * makes someone internal; the Wirex EUR account, the Credit & Smart spend
- * modes, the EUR vault and the new deposit tokens are each assigned here, one
- * tag per member.
+ * modes and the new deposit tokens are each assigned here, one tag per member.
  */
 export default function FeatureAccessTable({
   members,
