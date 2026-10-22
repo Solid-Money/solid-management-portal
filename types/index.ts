@@ -249,6 +249,11 @@ export interface AdminActivity {
   depositTxFeeUSD?: string;
   createdAt: string;
   timestamp?: string;
+  /**
+   * Served whole by the admin list. Read for `transferContext`, which says what a
+   * send or receive was — a card refund, cashback, a deposit arriving.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 export interface AdminActivitiesResponse {

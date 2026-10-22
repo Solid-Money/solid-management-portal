@@ -24,6 +24,11 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SponsoredGasFee from "@/components/sponsored-gas-fee";
+import {
+  getTransferCategory,
+  getTransferSummary,
+  getTransferTitle,
+} from "@/lib/transfer-presentation";
 
 import { formatDateTime } from "@/lib/utils";
 export default function ActivitiesTable() {
@@ -310,15 +315,24 @@ export default function ActivitiesTable() {
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {getTypeLabel(activity.type)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {activity.shortTitle || activity.title || "-"}
+                    <td
+                      className="px-4 py-3 whitespace-nowrap text-sm text-gray-900"
+                      // What the backend found the transfer to be, on hover.
+                      title={getTransferSummary(activity)}
+                    >
+                      {(activity.type === TransactionType.SEND ||
+                      activity.type === TransactionType.RECEIVE
+                        ? getTransferTitle(activity)
+                        : undefined) ||
+                        activity.shortTitle ||
+                        activity.title ||
+                        "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                       {(() => {
-                        const category = getCategory(
-                          activity.type,
-                          activity.title
-                        );
+                        const category =
+                          getTransferCategory(activity) ??
+                          getCategory(activity.type, activity.title);
                         if (!category) return "-";
                         return (
                           <span className="text-gray-600">{category}</span>
