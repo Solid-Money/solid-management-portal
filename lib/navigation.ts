@@ -12,6 +12,7 @@ import {
   CreditCard,
   DollarSign,
   Gift,
+  Globe,
   Image,
   LayoutTemplate,
   Megaphone,
@@ -231,6 +232,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Merchants excluded from cashback and referrals, and referral spend rules",
         icon: ShieldAlert,
+      },
+      {
+        href: "/countries",
+        label: "Countries",
+        description:
+          "Where Wirex, Rain and TransFi take new sign-ups, and what is live",
+        icon: Globe,
       },
       {
         href: "/internal-team",

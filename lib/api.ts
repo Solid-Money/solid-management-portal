@@ -63,6 +63,14 @@ import {
   ReleaseCardHoldResult,
 } from "@/types/cash-holds";
 import {
+  CountryAccessList,
+  CountryAccessListKey,
+  CountryAccessOverview,
+  CreatedDiditQuestionnaire,
+  DiditLinkCheck,
+  UpdateCountryAccessListRequest,
+} from "@/types/country-access";
+import {
   CollectSettlementRequest,
   CollectSettlementResult,
   UncollectedSettlements,
@@ -758,6 +766,59 @@ export const restoreInternalTeamMember = (userId: string, note?: string) =>
   api.post<{ data: InternalTeamMember }>(
     `/admin/v1/internal-team/${userId}/restore`,
     note ? { note } : {},
+  );
+
+// --- Config → Countries ----------------------------------------------------
+
+/**
+ * Every country list (Wirex card, Rain card, Rain virtual account, TransFi),
+ * the country catalog with display names, and the read-only code lists.
+ */
+export const getCountryAccess = () =>
+  api.get<{ data: CountryAccessOverview }>("/admin/v1/country-access");
+
+/**
+ * Replace one list. Live for new sign-ups at once; added countries stay
+ * pending until the provider side is confirmed. Refused with a 409 when
+ * someone else saved the list after `expectedUpdatedAt`.
+ */
+export const updateCountryAccessList = (
+  list: CountryAccessListKey,
+  body: UpdateCountryAccessListRequest,
+) =>
+  api.put<{ data: CountryAccessList }>(
+    `/admin/v1/country-access/${list}`,
+    body,
+  );
+
+/** Generate a Didit questionnaire from a Rain list as it is stored now. */
+export const createCountryAccessDiditQuestionnaire = (
+  list: CountryAccessListKey,
+) =>
+  api.post<{ data: CreatedDiditQuestionnaire }>(
+    `/admin/v1/country-access/${list}/didit-questionnaire`,
+  );
+
+/** Ask Didit whether the workflow runs the generated questionnaire yet. */
+export const verifyCountryAccessDiditLink = (list: CountryAccessListKey) =>
+  api.post<{ data: DiditLinkCheck }>(
+    `/admin/v1/country-access/${list}/didit-link/verify`,
+  );
+
+/** Record that the provider side (Didit or Sumsub) now matches the list. */
+export const confirmCountryAccessProvider = (
+  list: CountryAccessListKey,
+  note?: string,
+) =>
+  api.post<{ data: CountryAccessList }>(
+    `/admin/v1/country-access/${list}/provider-confirmation`,
+    note ? { note } : {},
+  );
+
+/** Rewrite the card and VA lists from the code constants. */
+export const resetCountryAccessToDefaults = () =>
+  api.post<{ data: CountryAccessOverview }>(
+    "/admin/v1/country-access/reset-defaults",
   );
 
 // --- Rewards / cohorts -----------------------------------------------------
