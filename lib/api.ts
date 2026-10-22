@@ -732,9 +732,8 @@ export const removeInternalTeamMember = (userId: string, reason: string) =>
   );
 
 /**
- * Give an internal team member a feature — the Wirex EUR account, the Credit &
- * Smart spend modes, the EUR vault. Assigning one they already have is a
- * no-op. Audited on the member's profile.
+ * Give an internal team member a feature — the Wirex EUR account or the
+ * Credit & Smart spend modes. Assigning one they already have is a no-op. Audited on the member's profile.
  */
 export const assignInternalTeamFeature = (
   userId: string,
