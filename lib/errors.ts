@@ -444,7 +444,15 @@ export function matchesErrorFilters(
 
   const q = filters.q?.trim().toLowerCase();
   if (q) {
-    const text = [row.title, row.message, row.code]
+    // The server also matches a pasted Ref or request id; so must live rows.
+    const text = [
+      row.title,
+      row.message,
+      row.code,
+      row.refs?.errorRef,
+      row.refs?.errorRef?.replace("-", ""),
+      row.refs?.requestId,
+    ]
       .filter(Boolean)
       .join("\n")
       .toLowerCase();
