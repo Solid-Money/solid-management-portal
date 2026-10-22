@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ExternalLink, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -158,7 +158,11 @@ function TokenEditor({
   // The chain and address now in the form: a lookup answering for any other
   // (the admin changed one while it was out) is dropped.
   const lookingFor = useRef("");
-  lookingFor.current = `${chainId}:${trimmedAddress.toLowerCase()}`;
+  // Set after commit, not during render, which React may replay or discard;
+  // a layout effect runs before the lookup effect below reads it.
+  useLayoutEffect(() => {
+    lookingFor.current = `${chainId}:${trimmedAddress.toLowerCase()}`;
+  }, [chainId, trimmedAddress]);
 
   const lookup = useMutation({
     mutationFn: async (target: { chainId: number; address: string }) =>
