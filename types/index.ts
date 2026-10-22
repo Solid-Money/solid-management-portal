@@ -3392,7 +3392,6 @@ export interface InternalTeamRoster {
 export type InternalTeamFeatureKey =
   | "wirex_virtual_account"
   | "spend_modes"
-  | "eur_vault"
   | "deposit_tokens";
 
 export interface InternalTeamFeature {
