@@ -37,7 +37,8 @@ function useRefreshAfterChange() {
 /**
  * Which team-only rollouts each active member gets. Being on the team only
  * makes someone internal; the Wirex EUR account, the Credit & Smart spend
- * modes and the EUR vault are each assigned here, one tag per member.
+ * modes, the EUR vault and the new deposit tokens are each assigned here, one
+ * tag per member.
  */
 export default function FeatureAccessTable({
   members,
@@ -52,7 +53,7 @@ export default function FeatureAccessTable({
         <CardTitle>Feature access</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ul className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
           {features.map((feature) => (
             <li
               key={feature.key}

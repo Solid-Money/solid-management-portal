@@ -34,7 +34,7 @@ interface TokenIconProps {
   className?: string;
 }
 
-const DefaultTokenIcon = ({
+export const DefaultTokenIcon = ({
   symbol,
   size,
 }: {

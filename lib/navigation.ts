@@ -8,6 +8,7 @@ import {
   BarChart3,
   BookOpen,
   CircleAlert,
+  Coins,
   CreditCard,
   DollarSign,
   Gift,
@@ -224,6 +225,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Merchants excluded from cashback and referrals, and referral spend rules",
         icon: ShieldAlert,
+      },
+      {
+        href: "/tokens",
+        label: "Tokens",
+        description:
+          "The tokens the app lists for swaps, wallets and deposit addresses",
+        icon: Coins,
       },
       {
         href: "/internal-team",
