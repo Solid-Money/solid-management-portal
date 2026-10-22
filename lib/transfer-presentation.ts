@@ -40,16 +40,33 @@ interface TransferActivity {
 
 const KNOWN_KINDS = new Set<string>(Object.values(TransferContextKind));
 
+const textOrUndefined = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() ? value : undefined;
+
+/**
+ * What the backend found the transfer to be, rebuilt field by field rather than
+ * cast: `metadata` is free-form, and the summary is rendered as a text child,
+ * where anything but a string throws.
+ */
 export function getTransferContext(
   activity: Pick<TransferActivity, "metadata">,
 ): TransferContext | undefined {
-  const context = activity.metadata?.transferContext as
-    | Partial<TransferContext>
-    | undefined;
+  const context: unknown = activity.metadata?.transferContext;
   if (!context || typeof context !== "object") return undefined;
-  return context.kind && KNOWN_KINDS.has(context.kind)
-    ? (context as TransferContext)
-    : undefined;
+
+  const raw = context as Record<string, unknown>;
+  if (typeof raw.kind !== "string" || !KNOWN_KINDS.has(raw.kind)) {
+    return undefined;
+  }
+
+  return {
+    kind: raw.kind as TransferContextKind,
+    summary: textOrUndefined(raw.summary),
+    merchantName: textOrUndefined(raw.merchantName),
+    creditReason: textOrUndefined(raw.creditReason),
+    cardTransactionId: textOrUndefined(raw.cardTransactionId),
+    linkedClientTxId: textOrUndefined(raw.linkedClientTxId),
+  };
 }
 
 /**
@@ -89,7 +106,8 @@ export function getTransferTitle(activity: TransferActivity): string | undefined
   const title = activity.title;
   if (!isTransfer(activity.type)) return title;
   if (getTransferContext(activity)) return title;
-  if (!title || !BARE_TRANSFER_TITLE.test(title.trim())) return title;
+  // A missing title is as bare as "Send USDC" — name it by the counterparty too.
+  if (title?.trim() && !BARE_TRANSFER_TITLE.test(title.trim())) return title;
 
   const counterparty = (
     activity.type === TransactionType.SEND
@@ -125,13 +143,15 @@ export function getTransferSummary(
   activity: Pick<TransferActivity, "metadata">,
 ): string | undefined {
   const context = getTransferContext(activity);
-  if (!context?.summary) return undefined;
+  if (!context) return undefined;
 
-  if (
+  // The linked deposit is what support needs to find, so it is named even
+  // when the descriptive sentence is missing.
+  const linked =
     context.kind === TransferContextKind.DEPOSIT_DELIVERY &&
     context.linkedClientTxId
-  ) {
-    return `${context.summary} Hidden in the app; the deposit is ${context.linkedClientTxId}.`;
-  }
-  return context.summary;
+      ? `Hidden in the app; the deposit is ${context.linkedClientTxId}.`
+      : undefined;
+
+  return [context.summary, linked].filter(Boolean).join(" ") || undefined;
 }
