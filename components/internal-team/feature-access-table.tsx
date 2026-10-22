@@ -36,8 +36,8 @@ function useRefreshAfterChange() {
 
 /**
  * Which team-only rollouts each active member gets. Being on the team only
- * makes someone internal; the Wirex EUR account, the Credit & Smart spend
- * modes and the EUR vault are each assigned here, one tag per member.
+ * makes someone internal; the Wirex EUR account and the Credit & Smart spend
+ * modes are each assigned here, one tag per member.
  */
 export default function FeatureAccessTable({
   members,

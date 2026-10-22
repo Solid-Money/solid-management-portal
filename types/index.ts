@@ -3389,10 +3389,7 @@ export interface InternalTeamRoster {
  * only makes someone internal (internal notifications, no card-waitlist
  * emails); each of these is assigned per member.
  */
-export type InternalTeamFeatureKey =
-  | "wirex_virtual_account"
-  | "spend_modes"
-  | "eur_vault";
+export type InternalTeamFeatureKey = "wirex_virtual_account" | "spend_modes";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;
