@@ -13,6 +13,7 @@ import {
   CreditCard,
   DollarSign,
   Gift,
+  Globe,
   Image,
   LayoutTemplate,
   Megaphone,
@@ -239,6 +240,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "The tokens the app lists for swaps, wallets and deposit addresses",
         icon: Coins,
+      },
+      {
+        href: "/countries",
+        label: "Countries",
+        description:
+          "Where Wirex, Rain and TransFi take new sign-ups, and what is live",
+        icon: Globe,
       },
       {
         href: "/internal-team",
