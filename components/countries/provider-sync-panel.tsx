@@ -231,7 +231,9 @@ function DiditPanel({
               size="sm"
               variant={questionnaire ? "outline" : "default"}
               onClick={() => generate.mutate()}
-              disabled={generate.isPending}
+              disabled={
+                generate.isPending || !list.provider.canGenerateQuestionnaire
+              }
             >
               {generate.isPending ? <Loader2 className="animate-spin" /> : null}
               {questionnaire ? "Generate again" : "Generate questionnaire"}
