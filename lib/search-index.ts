@@ -362,6 +362,7 @@ export const USER_TABS = [
   "card",
   "rewards",
   "support",
+  "errors",
 ] as const;
 export type UserTab = (typeof USER_TABS)[number];
 
