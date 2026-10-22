@@ -22,6 +22,11 @@ import {
   InternalTeamFeatureKey,
   InternalTeamMember,
   InternalTeamRoster,
+  ListedToken,
+  ListedTokenChanges,
+  NewListedToken,
+  TokenCatalogue,
+  TokenLookup,
   KycResetEligibility,
   KycResetResult,
   VirtualAccountOnboardingRetryResult,
@@ -706,6 +711,49 @@ export const reevaluateReferralReward = (
     { reason },
   );
 
+// --- Config → Tokens --------------------------------------------------------
+
+/**
+ * The `swaptokens` list: every row, the chains a token can be added on, and
+ * the deposit tokens the list has no row for yet.
+ */
+export const getTokenCatalogue = () =>
+  api.get<{ data: TokenCatalogue }>("/admin/v1/tokens");
+
+/**
+ * The row a contract already has, or a new one read from the chain: name,
+ * symbol and decimals from the contract, with the logo, price id and
+ * cross-chain id the list already uses for that symbol. 400 when nothing
+ * answers as an ERC-20 at that address.
+ */
+export const lookupToken = (chainId: number, address: string) =>
+  api.get<{ data: TokenLookup }>("/admin/v1/tokens/lookup", {
+    params: { chainId, address },
+  });
+
+/** Add a token. 409 when it is already listed, in any address case. */
+export const createListedToken = (token: NewListedToken) =>
+  api.post<{ data: ListedToken }>("/admin/v1/tokens", token);
+
+/** Change a row. Chain, address and decimals are the token's own and stay. */
+export const updateListedToken = (id: string, changes: ListedTokenChanges) =>
+  api.patch<{ data: ListedToken }>(`/admin/v1/tokens/${id}`, changes);
+
+/** Delete a row outright. Turning it off (`isActive: false`) keeps it. */
+export const deleteListedToken = (id: string) =>
+  api.delete<{ data: { id: string } }>(`/admin/v1/tokens/${id}`);
+
+/**
+ * Add deposit tokens the list is missing, by `chainId:address`. The backend
+ * builds each row from its own deposit tables; keys no longer missing come
+ * back as skipped.
+ */
+export const addMissingDepositTokens = (keys: string[]) =>
+  api.post<{ data: { added: ListedToken[]; skipped: string[] } }>(
+    "/admin/v1/tokens/deposit-tokens",
+    { keys },
+  );
+
 // --- Config → Internal team ------------------------------------------------
 
 /**
@@ -740,8 +788,9 @@ export const removeInternalTeamMember = (userId: string, reason: string) =>
   );
 
 /**
- * Give an internal team member a feature — the Wirex EUR account or the
- * Credit & Smart spend modes. Assigning one they already have is a no-op. Audited on the member's profile.
+ * Give an internal team member a feature — the Wirex EUR account, the Credit &
+ * Smart spend modes, the new deposit tokens. Assigning one they already have is
+ * a no-op. Audited on the member's profile.
  */
 export const assignInternalTeamFeature = (
   userId: string,

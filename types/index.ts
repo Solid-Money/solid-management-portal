@@ -3389,7 +3389,10 @@ export interface InternalTeamRoster {
  * only makes someone internal (internal notifications, no card-waitlist
  * emails); each of these is assigned per member.
  */
-export type InternalTeamFeatureKey = "wirex_virtual_account" | "spend_modes";
+export type InternalTeamFeatureKey =
+  | "wirex_virtual_account"
+  | "spend_modes"
+  | "deposit_tokens";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;
@@ -3401,3 +3404,101 @@ export interface InternalTeamFeature {
    */
   teamOnly: boolean;
 }
+
+// --- Config → Tokens --------------------------------------------------------
+
+/**
+ * One row of the `swaptokens` list: a token on one chain. The list decides
+ * what the app's swap picker, wallet and activity feed show, and — unless the
+ * row is swap-only — which tokens a minted deposit address accepts.
+ */
+export interface ListedToken {
+  id: string;
+  name: string;
+  /** Lowercase, or checksummed on rows written straight to the collection. */
+  address: string;
+  symbol: string;
+  decimals: number;
+  chainId: number;
+  logoURI?: string;
+  /** Shown in the app. Off hides it without deleting the row. */
+  isActive: boolean;
+  /** Pinned to the top of the swap picker. */
+  isFeatured: boolean;
+  /** Lower comes first, after the featured tokens. */
+  displayOrder: number;
+  /** Merges this token's balances across chains in the wallet, e.g. `usdc`. */
+  commonId?: string;
+  /** The CoinGecko coin id the app prices it by when nothing else has a price. */
+  tokenId?: string;
+  /** Not accepted on a minted deposit address; listed for swapping only. */
+  swapOnly: boolean;
+  /** Whether the app's deposit screen offers it on this chain. */
+  depositOffered: boolean;
+  createdBy?: string;
+  updatedBy?: string;
+  /** ISO timestamps. */
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** What a new row would be filled in with, read on chain or from the deposit tables. */
+export interface TokenDraft {
+  chainId: number;
+  address: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  logoURI?: string;
+  commonId?: string;
+  tokenId?: string;
+  swapOnly: boolean;
+}
+
+/** A token the deposit screen offers that the list has no row for. */
+export interface MissingDepositToken extends TokenDraft {
+  /** `chainId:address`, lowercased. */
+  key: string;
+  /** `deposit_address`: a minted deposit address accepts it. `wallet`: sent straight to the Safe. */
+  route: "deposit_address" | "wallet";
+}
+
+export interface TokenChain {
+  chainId: number;
+  name: string;
+  explorerUrl?: string;
+}
+
+export interface TokenCatalogue {
+  tokens: ListedToken[];
+  chains: TokenChain[];
+  missingDepositTokens: MissingDepositToken[];
+}
+
+/** `GET /tokens/lookup`: the row a contract already has, or the draft of a new one. */
+export interface TokenLookup {
+  existing: ListedToken | null;
+  draft: TokenDraft | null;
+}
+
+export interface NewListedToken extends TokenDraft {
+  isActive?: boolean;
+  isFeatured?: boolean;
+  displayOrder?: number;
+}
+
+/** The fields an edit can change. An empty string clears an optional one. */
+export type ListedTokenChanges = Partial<
+  Pick<
+    ListedToken,
+    | "name"
+    | "symbol"
+    | "logoURI"
+    | "isActive"
+    | "isFeatured"
+    | "displayOrder"
+    | "commonId"
+    | "tokenId"
+    | "swapOnly"
+  >
+>;

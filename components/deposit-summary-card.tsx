@@ -54,6 +54,9 @@ const EXPLORER_URLS: Record<number, string> = {
   137: "https://polygonscan.com",
   8453: "https://basescan.org",
   42161: "https://arbiscan.io",
+  // Optimism takes deposits to the Safe (OP, USDC, ...), so a deposit there must
+  // not link to the Fuse explorer either.
+  10: "https://optimistic.etherscan.io",
 };
 
 function getExplorerTxUrl(hash: string, chainId: number | null): string {
