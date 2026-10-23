@@ -66,6 +66,18 @@ export interface User {
   isDeleted?: boolean;
   /** When the account was closed. Cleared when it is recovered. */
   deletedAt?: string | null;
+  /**
+   * Set when an admin closed the account for security rather than its owner —
+   * the accounts that linked a Safe they did not own. Final: the backend
+   * refuses to recover such an account. `safeAddress` is the Safe the account
+   * pointed at before it was unlinked.
+   */
+  securityHold?: {
+    reason: string;
+    adminEmail: string;
+    at: string;
+    safeAddress?: string;
+  } | null;
 }
 
 /**

@@ -3,7 +3,14 @@
 import { use, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, Ban, Eye, Loader2, Snowflake } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  Eye,
+  Loader2,
+  ShieldAlert,
+  Snowflake,
+} from "lucide-react";
 
 import api, { getUserCard } from "@/lib/api";
 import { Activity, Balance, User, UserCardOverview } from "@/types";
@@ -165,11 +172,21 @@ export default function UserDetailPage({
           "unknown". KYC is on the profile card, per Bridge customer, and the
           recover action sits next to the status there.
         */}
-        {user.isDeleted && (
-          <Badge variant="danger">
-            <Ban className="h-3 w-3" />
-            Account closed
+        {user.securityHold ? (
+          <Badge
+            variant="danger"
+            title="Closed by an admin for security — cannot be recovered"
+          >
+            <ShieldAlert className="h-3 w-3" />
+            Closed for security
           </Badge>
+        ) : (
+          user.isDeleted && (
+            <Badge variant="danger">
+              <Ban className="h-3 w-3" />
+              Account closed
+            </Badge>
+          )
         )}
         {cardOverview?.hasCard && (
           <Badge variant="info">{cardOverview.provider} card</Badge>
@@ -352,7 +369,21 @@ export default function UserDetailPage({
           {/* First on the tab: a lockout ticket is answered by whether they can
               recover on their own, before anything else is worth reading. */}
           <SectionAnchor id="user-recovery">
-            <UserRecoveryCard userId={id} username={displayName} />
+            {/* No access help for a security close: the backend refuses every
+                action on this card for it, and none of them would be right. */}
+            {user.securityHold ? (
+              <div className="flex gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Account access is not available: this account was closed for
+                  security and cannot be recovered. No recovery code, email
+                  change or two-factor reset can be sent for it. See the
+                  profile for why.
+                </span>
+              </div>
+            ) : (
+              <UserRecoveryCard userId={id} username={displayName} />
+            )}
           </SectionAnchor>
           {/* Above the chats: a Ref quoted in one resolves here without a lookup. */}
           <SectionAnchor id="user-errors">
