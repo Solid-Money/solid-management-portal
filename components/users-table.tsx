@@ -214,14 +214,24 @@ export default function UsersTable() {
                           {describeMatch(user, search)}
                         </Badge>
                       )}
-                      {user.isDeleted && (
+                      {user.securityHold ? (
                         <Badge
                           variant="danger"
                           className="ml-2"
-                          title="Closed from the app — recoverable from the profile"
+                          title="Closed by an admin for security — cannot be recovered"
                         >
-                          closed
+                          security hold
                         </Badge>
+                      ) : (
+                        user.isDeleted && (
+                          <Badge
+                            variant="danger"
+                            className="ml-2"
+                            title="Closed from the app — recoverable from the profile"
+                          >
+                            closed
+                          </Badge>
+                        )
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
