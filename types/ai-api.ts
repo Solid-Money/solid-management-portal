@@ -154,6 +154,11 @@ export interface AiApiAdminUser {
     /** What a charge draws from, in order: ["USDC"], later ["USDC", "soUSD"]. */
     billingTokens: string[];
     openChargeUsd: number;
+    /**
+     * The Wallet can't pay for what is used and not yet paid plus the next
+     * request: the proxy refuses requests until funds arrive (no pause).
+     */
+    walletShort: boolean;
   };
   account: {
     paused: boolean;
