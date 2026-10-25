@@ -321,7 +321,12 @@ export default function AiApiUserPage({
               billing.billingTokens.length ? billing.billingTokens.join(", then ") : "billing tokens"
             })`}
           >
-            {billing.walletBalanceUsd === null ? "—" : formatUsd(billing.walletBalanceUsd)}
+            {billing.walletBalanceUsd === null ? "—" : formatUsd(billing.walletBalanceUsd)}{" "}
+            {billing.walletShort ? (
+              <Badge variant="warning" title="Requests are refused until the Wallet covers unpaid usage">
+                Short
+              </Badge>
+            ) : null}
           </Fact>
           <Fact label="Mandate">
             {billing.mandate?.registered
@@ -513,7 +518,7 @@ export default function AiApiUserPage({
 
       <Card
         title="Charges"
-        description="One per day of usage, taken from the Wallet's USDC. Newest first."
+        description="Taken from the Wallet every few dollars of usage, and at each day's close. Newest first."
       >
         <div className="overflow-x-auto rounded-md border border-gray-200">
           <table className="min-w-full text-sm">

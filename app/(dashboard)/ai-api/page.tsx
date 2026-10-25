@@ -233,8 +233,8 @@ export default function AiApiPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI API</h1>
             <p className="text-sm text-gray-500">
-              API keys for AI agents, paid from the Wallet&apos;s USDC once a day,
-              with cashback into USD Yield. Days are UTC.
+              API keys for AI agents, paid from the Wallet on Base every few
+              dollars of usage, with cashback into USD Yield. Days are UTC.
             </p>
           </div>
         </div>
