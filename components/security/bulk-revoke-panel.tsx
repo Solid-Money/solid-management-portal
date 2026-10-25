@@ -128,6 +128,7 @@ export default function BulkRevokePanel() {
     previewMatchesInput &&
     withinLimit &&
     reason.trim().length > 0 &&
+    !previewMutation.isPending &&
     !revokeMutation.isPending;
 
   return (
