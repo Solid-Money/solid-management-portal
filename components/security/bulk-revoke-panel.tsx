@@ -60,6 +60,10 @@ export default function BulkRevokePanel() {
   const [raw, setRaw] = useState("");
   const [reason, setReason] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // The id set captured when the confirm dialog opened. The revoke runs against
+  // this snapshot, so a preview that resolves while the dialog is open can never
+  // swap the accounts out from under the operator who opened it.
+  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
   const [result, setResult] = useState<BulkRevokeResult | null>(null);
   // The exact id set shown by the latest successful preview. Revocation is bound
   // to this, not to whatever is in the textarea now, so an operator can never
@@ -111,8 +115,15 @@ export default function BulkRevokePanel() {
   const withinLimit = parsed.valid.length <= MAX_ACCOUNTS;
   const previewStale = !!preview && !previewMatchesInput;
 
+  // Preview is blocked while a revoke is running or the confirm dialog is open,
+  // so new rows can't replace the ones a revoke result is about to land against,
+  // and can't shift the set under an open confirmation.
   const canPreview =
-    parsed.valid.length > 0 && withinLimit && !previewMutation.isPending;
+    parsed.valid.length > 0 &&
+    withinLimit &&
+    !previewMutation.isPending &&
+    !revokeMutation.isPending &&
+    !confirmOpen;
   const canRevoke =
     previewMatchesInput &&
     withinLimit &&
@@ -187,7 +198,12 @@ export default function BulkRevokePanel() {
           <Button
             variant="destructive"
             disabled={!canRevoke}
-            onClick={() => setConfirmOpen(true)}
+            onClick={() => {
+              // Freeze the reviewed set at the moment the dialog opens.
+              if (!previewedIds) return;
+              setConfirmIds(previewedIds);
+              setConfirmOpen(true);
+            }}
             title={
               !withinLimit
                 ? `Too many accounts (max ${MAX_ACCOUNTS})`
@@ -365,19 +381,24 @@ export default function BulkRevokePanel() {
         confirmText="Revoke sessions"
         message={
           <span>
-            This signs out <strong>{previewedIds?.length ?? 0}</strong>{" "}
+            This signs out <strong>{confirmIds?.length ?? 0}</strong>{" "}
             account(s),
             including each real owner — everyone affected must sign in again with
             their passkey. Already-issued access tokens keep working until they
             expire (within the access-token lifetime). This cannot be undone.
           </span>
         }
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setConfirmIds(null);
+        }}
         onConfirm={() => {
           setConfirmOpen(false);
-          // Submit the reviewed set, never whatever is in the box now.
-          if (!previewedIds) return;
-          revokeMutation.mutate({ ids: previewedIds, reason: reason.trim() });
+          // Submit the set captured when the dialog opened, never whatever a
+          // later preview or the textarea holds now.
+          if (!confirmIds) return;
+          revokeMutation.mutate({ ids: confirmIds, reason: reason.trim() });
+          setConfirmIds(null);
         }}
       />
     </div>
