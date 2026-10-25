@@ -9,7 +9,9 @@ export type AiApiChargeFailure =
   | "wallet_empty"
   | "billing_mandate"
   | "too_early"
-  | "transient";
+  | "transient"
+  /** Solid put the Safe on hold in the billing module. */
+  | "safe_held";
 
 export type AiApiCashbackStatus = "none" | "pending" | "paid" | "failed";
 
