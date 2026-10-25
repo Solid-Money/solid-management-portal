@@ -88,6 +88,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: CircleAlert,
       },
       {
+        href: "/security/revoke-sessions",
+        label: "Session Revoke",
+        description:
+          "Sign accounts out in bulk during an incident — preview, then revoke",
+        icon: ShieldAlert,
+      },
+      {
         href: "/support/articles",
         label: "Help Center",
         description: "Articles on support.solid.xyz, in the app and behind Solid AI",

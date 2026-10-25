@@ -80,6 +80,10 @@ import {
   CollectSettlementResult,
   UncollectedSettlements,
 } from "@/types/cash-collect";
+import type {
+  BulkRevokeResult,
+  BulkSessionPreview,
+} from "@/types/bulk-session";
 
 const api = axios.create({
   baseURL:
@@ -671,6 +675,31 @@ export const resetTwoFactor = (userId: string, reason: string) =>
     `/admin/v1/users/${userId}/account/two-factor/reset`,
     { reason },
   );
+
+// --- Security: bulk session revoke -----------------------------------------
+
+/**
+ * Preview a bulk session revoke: for each account id, who it is, its balance,
+ * and how many live sessions a revoke would end. Read-only — nothing is signed
+ * out by this call.
+ */
+export const bulkSessionPreview = (userIds: string[]) =>
+  api.post<{ data: BulkSessionPreview }>("/admin/v1/security/sessions/preview", {
+    userIds,
+  });
+
+/**
+ * Revoke every login session for each listed account: their refresh tokens are
+ * invalidated, so each session ends when its access token expires and the
+ * account must sign in again. Not selective — the real owner is signed out too —
+ * so it is an incident-response action. The reason is written to every account's
+ * audit row; the admin identity comes from the Firebase token server-side.
+ */
+export const bulkRevokeSessions = (userIds: string[], reason: string) =>
+  api.post<{ data: BulkRevokeResult }>("/admin/v1/security/sessions/revoke", {
+    userIds,
+    reason,
+  });
 
 /**
  * The failures behind an error Ref a user shared (`9C1B-4F2A`), or behind a
