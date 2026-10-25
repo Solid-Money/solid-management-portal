@@ -33,6 +33,7 @@ export const CHARGE_FAILURE_LABELS: Record<AiApiChargeFailure, string> = {
   billing_mandate: "Mandate refused",
   too_early: "Too early in the period",
   transient: "Temporary error",
+  safe_held: "Safe on hold in the module",
 };
 
 export const CASHBACK_STATUS: Record<
