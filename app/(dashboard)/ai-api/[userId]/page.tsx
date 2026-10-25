@@ -26,6 +26,7 @@ import {
   KEY_STATUS,
   PAUSE_REASON_LABELS,
 } from "@/lib/ai-api";
+import { formatCashbackRate } from "@/lib/cashback-percentage";
 import { formatDateTime, formatUsd } from "@/lib/utils";
 import type {
   AiApiAccountAction,
@@ -34,7 +35,10 @@ import type {
   AiApiKeyAction,
 } from "@/types/ai-api";
 
-const EXPLORER = "https://explorer.fuse.io";
+/** Billing runs on Base: the module, the Safe it charges, and each charge. */
+const BILLING_EXPLORER = "https://basescan.org";
+/** Cashback is paid in soUSD on Fuse, the payout card cashback already uses. */
+const CASHBACK_EXPLORER = "https://explorer.fuse.io";
 
 type PendingAction =
   | { kind: "key"; key: AiApiAdminKey; action: AiApiKeyAction }
@@ -305,9 +309,19 @@ export default function AiApiUserPage({
           <Fact label="Cashback">
             {formatUsd(view.cashback.paidUsd)} paid · {formatUsd(view.cashback.pendingUsd)} pending
           </Fact>
+          <Fact label="Cashback terms">
+            {view.cashback.tier} · {formatCashbackRate(view.cashback.rate)} back,{" "}
+            {view.cashback.monthlyCapUsd > 0
+              ? `up to ${formatUsd(view.cashback.monthlyCapUsd, 0)} a month`
+              : "no monthly cap"}
+          </Fact>
           <Fact label="Waiting to be charged">{formatUsd(billing.openChargeUsd)}</Fact>
-          <Fact label="Wallet USDC (Fuse)">
-            {billing.walletUsdcUsd === null ? "—" : formatUsd(billing.walletUsdcUsd)}
+          <Fact
+            label={`Wallet on Base (${
+              billing.billingTokens.length ? billing.billingTokens.join(", then ") : "billing tokens"
+            })`}
+          >
+            {billing.walletBalanceUsd === null ? "—" : formatUsd(billing.walletBalanceUsd)}
           </Fact>
           <Fact label="Mandate">
             {billing.mandate?.registered
@@ -331,7 +345,7 @@ export default function AiApiUserPage({
           <Fact label="Billing module">
             {billing.moduleAddress ? (
               <a
-                href={`${EXPLORER}/address/${billing.moduleAddress}`}
+                href={`${BILLING_EXPLORER}/address/${billing.moduleAddress}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-indigo-600 hover:underline"
@@ -348,7 +362,7 @@ export default function AiApiUserPage({
             {view.user.safeAddress ? (
               <span className="inline-flex items-center gap-1">
                 <a
-                  href={`${EXPLORER}/address/${view.user.safeAddress}`}
+                  href={`${BILLING_EXPLORER}/address/${view.user.safeAddress}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-indigo-600 hover:underline"
@@ -588,7 +602,7 @@ export default function AiApiUserPage({
                   <td className="px-4 py-2 text-xs">
                     {charge.transactionHash ? (
                       <a
-                        href={`${EXPLORER}/tx/${charge.transactionHash}`}
+                        href={`${BILLING_EXPLORER}/tx/${charge.transactionHash}`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-indigo-600 hover:underline"
@@ -598,7 +612,7 @@ export default function AiApiUserPage({
                     ) : null}
                     {charge.cashbackTxHash ? (
                       <a
-                        href={`${EXPLORER}/tx/${charge.cashbackTxHash}`}
+                        href={`${CASHBACK_EXPLORER}/tx/${charge.cashbackTxHash}`}
                         target="_blank"
                         rel="noreferrer"
                         className="mt-1 flex items-center gap-1 text-indigo-600 hover:underline"

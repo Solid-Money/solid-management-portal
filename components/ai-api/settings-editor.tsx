@@ -10,6 +10,7 @@ import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useAiApiSettings, useSaveAiApiSettings } from "@/hooks/use-ai-api";
+import { fromPercentInput, toPercentInput } from "@/lib/cashback-percentage";
 import type {
   AiApiModelConfig,
   AiApiSettings,
@@ -28,10 +29,16 @@ interface ModelDraft {
   enabled: boolean;
 }
 
+interface TierDraft {
+  tier: number;
+  name: string;
+  percent: string;
+  capUsd: string;
+}
+
 interface Draft {
   enabled: boolean;
-  cashbackPercent: string;
-  capUsd: string;
+  tiers: TierDraft[];
   maxKeys: string;
   maxLimitUsd: string;
   models: ModelDraft[];
@@ -41,8 +48,12 @@ const priceText = (value?: number) => (value === undefined ? "" : String(value))
 
 const toDraft = (settings: AiApiSettings): Draft => ({
   enabled: settings.enabled,
-  cashbackPercent: String(Math.round(settings.cashbackRate * 1000) / 10),
-  capUsd: String(settings.cashbackMonthlyCapUsd),
+  tiers: settings.cashbackByTier.map((entry) => ({
+    tier: entry.tier,
+    name: entry.name,
+    percent: toPercentInput(entry.rate),
+    capUsd: String(entry.monthlyCapUsd),
+  })),
   maxKeys: String(settings.maxKeysPerUser),
   maxLimitUsd: String(settings.maxMonthlyLimitUsd),
   models: settings.models.map((model) => ({
@@ -78,13 +89,17 @@ const price = (text: string): number | null => {
 
 /** The draft as the API takes it, or the first thing wrong with it. */
 function parseDraft(draft: Draft): { patch: AiApiSettingsPatch } | { error: string } {
-  const percent = Number(draft.cashbackPercent);
-  if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
-    return { error: "Cashback must be 0 to 100%." };
-  }
-  const cap = Number(draft.capUsd);
-  if (!Number.isFinite(cap) || cap < 0) {
-    return { error: "The monthly cashback cap must be 0 or more (0 is no cap)." };
+  const cashbackByTier: NonNullable<AiApiSettingsPatch["cashbackByTier"]> = [];
+  for (const row of draft.tiers) {
+    const rate = fromPercentInput(row.percent);
+    if (rate === undefined) {
+      return { error: `${row.name}: cashback must be 0 to 100%.` };
+    }
+    const cap = Number(row.capUsd);
+    if (row.capUsd.trim() === "" || !Number.isFinite(cap) || cap < 0) {
+      return { error: `${row.name}: the monthly cap must be 0 or more (0 is no cap).` };
+    }
+    cashbackByTier.push({ tier: row.tier, rate, monthlyCapUsd: cap });
   }
   const maxKeys = Number(draft.maxKeys);
   if (!Number.isInteger(maxKeys) || maxKeys < 1 || maxKeys > 100) {
@@ -141,8 +156,7 @@ function parseDraft(draft: Draft): { patch: AiApiSettingsPatch } | { error: stri
   return {
     patch: {
       enabled: draft.enabled,
-      cashbackRate: Math.round(percent * 10) / 1000,
-      cashbackMonthlyCapUsd: cap,
+      cashbackByTier,
       maxKeysPerUser: maxKeys,
       maxMonthlyLimitUsd: maxLimit,
       models,
@@ -169,8 +183,8 @@ function Field({
 }
 
 /**
- * The AI API's settings: the kill switch, cashback, the limits users choose
- * within, and the models they can call with what each costs.
+ * The AI API's settings: the kill switch, each tier's cashback, the limits
+ * users choose within, and the models they can call with what each costs.
  *
  * Prices are what we charge, in dollars per million tokens; the gateway does
  * not report a cost per request, so usage is metered from these.
@@ -200,6 +214,12 @@ export default function AiApiSettingsEditor() {
   const disabled = !data?.canEdit || save.isPending;
   const error = parsed && "error" in parsed ? parsed.error : null;
   const turningOff = saved.enabled && !draft.enabled;
+
+  const updateTier = (index: number, patch: Partial<TierDraft>) =>
+    setDraft({
+      ...draft,
+      tiers: draft.tiers.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    });
 
   const updateModel = (index: number, patch: Partial<ModelDraft>) =>
     setDraft({
@@ -277,23 +297,42 @@ export default function AiApiSettingsEditor() {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Cashback (%)" hint="Of what each charge takes. 50 is half back.">
-          <Input
-            inputMode="decimal"
-            value={draft.cashbackPercent}
-            disabled={disabled}
-            onChange={(e) => setDraft({ ...draft, cashbackPercent: e.target.value })}
-          />
-        </Field>
-        <Field label="Cashback cap per month (USD)" hint="Per user. 0 is no cap.">
-          <Input
-            inputMode="decimal"
-            value={draft.capUsd}
-            disabled={disabled}
-            onChange={(e) => setDraft({ ...draft, capUsd: e.target.value })}
-          />
-        </Field>
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Cashback by tier</h3>
+          <p className="text-xs text-gray-500">
+            Of what each charge takes, at the tier the user is in when it is
+            charged. The cap is per user per calendar month; 0 is no cap.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {draft.tiers.map((row, index) => (
+            <div key={row.tier} className="grid gap-3 rounded-md border border-gray-200 p-3">
+              <div className="text-sm font-medium text-gray-900">{row.name}</div>
+              <Field label="Cashback (%)">
+                <Input
+                  aria-label={`${row.name} cashback (%)`}
+                  inputMode="decimal"
+                  value={row.percent}
+                  disabled={disabled}
+                  onChange={(e) => updateTier(index, { percent: e.target.value })}
+                />
+              </Field>
+              <Field label="Cap per month (USD)">
+                <Input
+                  aria-label={`${row.name} cashback cap per month (USD)`}
+                  inputMode="decimal"
+                  value={row.capUsd}
+                  disabled={disabled}
+                  onChange={(e) => updateTier(index, { capUsd: e.target.value })}
+                />
+              </Field>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Keys per user">
           <Input
             inputMode="numeric"
