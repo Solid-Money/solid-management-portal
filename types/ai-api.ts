@@ -149,7 +149,10 @@ export interface AiApiAdminUser {
     mandate: AiApiAdminMandate | null;
     requiredMandateUsd: number;
     needsMandate: boolean;
-    walletUsdcUsd: number | null;
+    /** The Wallet's billing tokens on Base, in USD: USDC at par, soUSD at its share price. */
+    walletBalanceUsd: number | null;
+    /** What a charge draws from, in order: ["USDC"], later ["USDC", "soUSD"]. */
+    billingTokens: string[];
     openChargeUsd: number;
   };
   account: {
@@ -160,7 +163,14 @@ export interface AiApiAdminUser {
   };
   keys: AiApiAdminKey[];
   charges: AiApiAdminCharge[];
-  cashback: { pendingUsd: number; paidUsd: number };
+  cashback: {
+    /** The user's tier now, whose rate and cap their next charge books at. */
+    tier: string;
+    rate: number;
+    monthlyCapUsd: number;
+    pendingUsd: number;
+    paidUsd: number;
+  };
 }
 
 export interface AiApiModelConfig {
@@ -177,12 +187,20 @@ export interface AiApiModelConfig {
   enabled: boolean;
 }
 
+/** One tier's AI cashback. Tier 1 is Core, 2 Prime, 3 Ultra. */
+export interface AiApiTierCashback {
+  tier: 1 | 2 | 3;
+  name: string;
+  /** 0.5 is 50%. */
+  rate: number;
+  /** Most paid back in a calendar month, USD. 0 means no cap. */
+  monthlyCapUsd: number;
+}
+
 export interface AiApiSettings {
   enabled: boolean;
-  /** 0.5 is 50%. */
-  cashbackRate: number;
-  /** 0 means no cap. */
-  cashbackMonthlyCapUsd: number;
+  /** Core, Prime and Ultra, in that order. */
+  cashbackByTier: AiApiTierCashback[];
   maxKeysPerUser: number;
   maxMonthlyLimitUsd: number;
   models: AiApiModelConfig[];
@@ -193,12 +211,13 @@ export interface AiApiSettings {
   publicBaseUrl: string | null;
 }
 
-export type AiApiSettingsPatch = Partial<
-  Omit<
-    AiApiSettings,
-    "cohortOnly" | "upstreamConfigured" | "upstreamBaseUrl" | "publicBaseUrl"
-  >
->;
+export interface AiApiSettingsPatch {
+  enabled?: boolean;
+  cashbackByTier?: { tier: number; rate: number; monthlyCapUsd: number }[];
+  maxKeysPerUser?: number;
+  maxMonthlyLimitUsd?: number;
+  models?: AiApiModelConfig[];
+}
 
 export type AiApiKeyAction = "disable" | "enable" | "revoke";
 export type AiApiAccountAction = "pause" | "resume" | "retry-charge";
