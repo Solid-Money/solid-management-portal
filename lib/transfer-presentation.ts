@@ -102,7 +102,9 @@ const shortAddress = (address: string) =>
  * recognised ("Refund from UBER"), "Sent to 0x…" / "Received from 0x…" for a
  * plain transfer, and the stored title for anything else.
  */
-export function getTransferTitle(activity: TransferActivity): string | undefined {
+export function getTransferTitle(
+  activity: TransferActivity,
+): string | undefined {
   const title = activity.title;
   if (!isTransfer(activity.type)) return title;
   if (getTransferContext(activity)) return title;
@@ -136,8 +138,10 @@ export function getTransferTitle(activity: TransferActivity): string | undefined
 }
 
 /**
- * The backend's one-line account of a transfer it recognised, with the row a
- * deposit delivery duplicates named, so an agent can find it.
+ * The backend's one-line account of a transfer it recognised, with the row the
+ * app shows instead named, so an agent can find what the user sees: the
+ * deposit a delivery duplicates, or the card purchase whose cashback section
+ * shows a cashback payout.
  */
 export function getTransferSummary(
   activity: Pick<TransferActivity, "metadata">,
@@ -145,13 +149,18 @@ export function getTransferSummary(
   const context = getTransferContext(activity);
   if (!context) return undefined;
 
-  // The linked deposit is what support needs to find, so it is named even
-  // when the descriptive sentence is missing.
-  const linked =
-    context.kind === TransferContextKind.DEPOSIT_DELIVERY &&
-    context.linkedClientTxId
+  // What support needs to find, so it is named even when the descriptive
+  // sentence is missing.
+  let shownInstead: string | undefined;
+  if (context.kind === TransferContextKind.DEPOSIT_DELIVERY) {
+    shownInstead = context.linkedClientTxId
       ? `Hidden in the app; the deposit is ${context.linkedClientTxId}.`
       : undefined;
+  } else if (context.kind === TransferContextKind.CARD_CASHBACK) {
+    shownInstead = context.cardTransactionId
+      ? `Hidden in the app; shown in the cashback section of card transaction ${context.cardTransactionId}.`
+      : "Hidden in the app.";
+  }
 
-  return [context.summary, linked].filter(Boolean).join(" ") || undefined;
+  return [context.summary, shownInstead].filter(Boolean).join(" ") || undefined;
 }
