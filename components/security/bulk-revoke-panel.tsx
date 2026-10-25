@@ -61,19 +61,29 @@ export default function BulkRevokePanel() {
   const [reason, setReason] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [result, setResult] = useState<BulkRevokeResult | null>(null);
+  // The exact id set shown by the latest successful preview. Revocation is bound
+  // to this, not to whatever is in the textarea now, so an operator can never
+  // confirm a set they did not review.
+  const [previewedIds, setPreviewedIds] = useState<string[] | null>(null);
 
   const parsed = useMemo(() => parseIds(raw), [raw]);
 
   const previewMutation = useMutation({
     mutationFn: async (ids: string[]) =>
       (await bulkSessionPreview(ids)).data.data as BulkSessionPreview,
-    onSuccess: () => setResult(null),
+    onSuccess: (_data, ids) => {
+      setPreviewedIds(ids);
+      setResult(null);
+    },
   });
 
   const revokeMutation = useMutation({
     mutationFn: async (vars: { ids: string[]; reason: string }) =>
       (await bulkRevokeSessions(vars.ids, vars.reason)).data
         .data as BulkRevokeResult,
+    // Clear any prior outcome the moment a new attempt starts, so a later
+    // failure can't leave a stale "revoked" table on screen.
+    onMutate: () => setResult(null),
     onSuccess: (data) => {
       setResult(data);
       toast.success(
@@ -90,9 +100,22 @@ export default function BulkRevokePanel() {
     return map;
   }, [result]);
 
-  const canPreview = parsed.valid.length > 0 && !previewMutation.isPending;
+  const sameSet = (a: string[], b: string[]) =>
+    a.length === b.length &&
+    [...a].sort().join(",") === [...b].sort().join(",");
+
+  // The textarea must still hold the exact set that was previewed, or the table
+  // on screen describes different accounts than a revoke would hit.
+  const previewMatchesInput =
+    !!previewedIds && sameSet(previewedIds, parsed.valid);
+  const withinLimit = parsed.valid.length <= MAX_ACCOUNTS;
+  const previewStale = !!preview && !previewMatchesInput;
+
+  const canPreview =
+    parsed.valid.length > 0 && withinLimit && !previewMutation.isPending;
   const canRevoke =
-    parsed.valid.length > 0 &&
+    previewMatchesInput &&
+    withinLimit &&
     reason.trim().length > 0 &&
     !revokeMutation.isPending;
 
@@ -166,9 +189,13 @@ export default function BulkRevokePanel() {
             disabled={!canRevoke}
             onClick={() => setConfirmOpen(true)}
             title={
-              reason.trim().length === 0
-                ? "A reason is required"
-                : undefined
+              !withinLimit
+                ? `Too many accounts (max ${MAX_ACCOUNTS})`
+                : !previewMatchesInput
+                  ? "Preview the current list before revoking"
+                  : reason.trim().length === 0
+                    ? "A reason is required"
+                    : undefined
             }
           >
             {revokeMutation.isPending ? (
@@ -183,6 +210,12 @@ export default function BulkRevokePanel() {
 
       {preview ? (
         <div className="rounded-lg border border-gray-200 bg-white">
+          {previewStale ? (
+            <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+              The account list changed since this preview. Preview again before
+              revoking — revoke is disabled until the list matches.
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
             <h2 className="text-sm font-semibold text-gray-900">
               Preview — {preview.totals.found} of {preview.totals.requested}{" "}
@@ -288,6 +321,12 @@ export default function BulkRevokePanel() {
                         {outcome?.revoked ? (
                           <span className="text-xs text-green-700">
                             revoked ({outcome.invalidatedCount})
+                            {outcome.auditFailed ? (
+                              <span className="text-amber-700">
+                                {" "}
+                                · audit log failed
+                              </span>
+                            ) : null}
                           </span>
                         ) : outcome && !outcome.found ? (
                           <span className="text-xs text-gray-400">
@@ -326,7 +365,8 @@ export default function BulkRevokePanel() {
         confirmText="Revoke sessions"
         message={
           <span>
-            This signs out <strong>{parsed.valid.length}</strong> account(s),
+            This signs out <strong>{previewedIds?.length ?? 0}</strong>{" "}
+            account(s),
             including each real owner — everyone affected must sign in again with
             their passkey. Already-issued access tokens keep working until they
             expire (within the access-token lifetime). This cannot be undone.
@@ -335,7 +375,9 @@ export default function BulkRevokePanel() {
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);
-          revokeMutation.mutate({ ids: parsed.valid, reason: reason.trim() });
+          // Submit the reviewed set, never whatever is in the box now.
+          if (!previewedIds) return;
+          revokeMutation.mutate({ ids: previewedIds, reason: reason.trim() });
         }}
       />
     </div>

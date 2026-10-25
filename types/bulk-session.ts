@@ -35,6 +35,9 @@ export interface BulkRevokeRow {
   revoked: boolean;
   invalidatedCount: number;
   error?: string;
+  /** Sessions were revoked but the audit row could not be written — the account
+   * needs a manual audit entry. */
+  auditFailed?: boolean;
 }
 
 export interface BulkRevokeResult {
