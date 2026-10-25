@@ -47,7 +47,11 @@ export function AtoActivityCleanup() {
         "/admin/v1/activities/ato-cleanup/preview",
         { quietErrors: true },
       );
-      if (!response.data || !Array.isArray(response.data.entries)) {
+      if (
+        !response.data ||
+        !Array.isArray(response.data.entries) ||
+        !Array.isArray(response.data.missingIds)
+      ) {
         throw new Error("Invalid preview response");
       }
       setPreview(response.data);
@@ -73,7 +77,11 @@ export function AtoActivityCleanup() {
         { quietErrors: true },
       );
       const updatedPreview = response.data?.preview;
-      if (!updatedPreview || !Array.isArray(updatedPreview.entries)) {
+      if (
+        !updatedPreview ||
+        !Array.isArray(updatedPreview.entries) ||
+        !Array.isArray(updatedPreview.missingIds)
+      ) {
         setPreview(null);
         setError(
           "The server did not return the cleanup state. Preview again to check whether the entries were hidden.",
