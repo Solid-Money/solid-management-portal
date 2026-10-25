@@ -47,6 +47,9 @@ export function AtoActivityCleanup() {
         "/admin/v1/activities/ato-cleanup/preview",
         { quietErrors: true },
       );
+      if (!response.data || !Array.isArray(response.data.entries)) {
+        throw new Error("Invalid preview response");
+      }
       setPreview(response.data);
     } catch (error: unknown) {
       setError(errorMessage(error));
@@ -69,8 +72,16 @@ export function AtoActivityCleanup() {
         { previewToken: preview.previewToken, confirm: true },
         { quietErrors: true },
       );
+      const updatedPreview = response.data?.preview;
+      if (!updatedPreview || !Array.isArray(updatedPreview.entries)) {
+        setPreview(null);
+        setError(
+          "The server did not return the cleanup state. Preview again to check whether the entries were hidden.",
+        );
+        return;
+      }
       setResult(response.data);
-      setPreview(response.data.preview);
+      setPreview(updatedPreview);
     } catch (error: unknown) {
       // An interrupted response can follow a successful commit. Force a new
       // read so the operator sees the actual state before any retry.
@@ -82,10 +93,11 @@ export function AtoActivityCleanup() {
     }
   }
 
-  const complete =
-    preview?.alreadyHidden === preview?.expected &&
-    preview !== null &&
-    preview.blocked === 0;
+  const complete = Boolean(
+    preview &&
+      preview.alreadyHidden === preview.expected &&
+      preview.blocked === 0,
+  );
 
   return (
     <section
