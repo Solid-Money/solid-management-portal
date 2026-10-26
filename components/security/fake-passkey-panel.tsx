@@ -214,6 +214,12 @@ export default function FakePasskeyPanel() {
               Removed from {result.accountsModified.toLocaleString()} account(s);{" "}
               {result.passkeyDetailsDeleted.toLocaleString()} passkey detail(s)
               deleted. Run by {result.adminUsername}.
+              {!result.auditRecorded ? (
+                <span className="text-amber-700">
+                  {" "}
+                  · audit log failed — record this run by hand.
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>

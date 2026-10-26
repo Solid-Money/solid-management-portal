@@ -85,6 +85,8 @@ export interface PasskeyCleanupPreview {
 export interface PasskeyCleanupResult extends PasskeyCleanupPreview {
   accountsModified: number;
   passkeyDetailsDeleted: number;
+  /** False when the best-effort audit row could not be written (cleanup still ran). */
+  auditRecorded: boolean;
   adminUsername: string;
   reason: string;
   ranAt: string;
