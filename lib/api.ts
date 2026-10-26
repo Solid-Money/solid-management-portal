@@ -83,6 +83,9 @@ import {
 import type {
   BulkRevokeResult,
   BulkSessionPreview,
+  PasskeyCleanupPreview,
+  PasskeyCleanupResult,
+  SecurityCloseResult,
 } from "@/types/bulk-session";
 
 const api = axios.create({
@@ -700,6 +703,46 @@ export const bulkRevokeSessions = (userIds: string[], reason: string) =>
     userIds,
     reason,
   });
+
+// --- Security: security-close ----------------------------------------------
+
+/**
+ * Close one account for security and unlink its Safe: sessions, TOTP and the
+ * spend config removed, the row closed. Per-account — the Revoke page closes a
+ * list one id at a time. Refused with a 409 for an account that still has a
+ * card. The reason is written to the audit trail; the admin identity comes
+ * from the Firebase token server-side.
+ */
+export const securityCloseAccount = (userId: string, reason: string) =>
+  api.post<{ data: SecurityCloseResult }>(
+    `/admin/v1/users/${userId}/account/security-close`,
+    { reason },
+  );
+
+// --- Security: fake passkey removal ----------------------------------------
+
+/**
+ * Count how far an injected passkey credential has spread before removing it:
+ * accounts carrying it, passkeydetails rows, and how many would be left with no
+ * credential (and so left untouched). Read-only.
+ */
+export const fakePasskeyPreview = (credentialId: string) =>
+  api.post<{ data: PasskeyCleanupPreview }>(
+    "/admin/v1/users/passkey-cleanup/preview",
+    { credentialId },
+  );
+
+/**
+ * Strip an injected passkey credential from every account that keeps a real
+ * one, and delete its passkeydetails rows. Accounts whose only credential is
+ * the fake are left untouched and reported. The reason is written to the audit
+ * trail; the admin identity comes from the Firebase token server-side.
+ */
+export const fakePasskeyCleanup = (credentialId: string, reason: string) =>
+  api.post<{ data: PasskeyCleanupResult }>(
+    "/admin/v1/users/passkey-cleanup/execute",
+    { credentialId, reason },
+  );
 
 /**
  * The failures behind an error Ref a user shared (`9C1B-4F2A`), or behind a
