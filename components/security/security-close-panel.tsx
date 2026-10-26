@@ -83,15 +83,24 @@ export default function SecurityClosePanel() {
   });
 
   const closeMutation = useMutation({
+    // Closed one id at a time, in order: each close is irreversible, so a
+    // 500-wide concurrent burst (and the request storm it makes) is not worth
+    // the speed. Every id gets an outcome whether it closed or was refused.
     mutationFn: async (vars: { ids: string[]; reason: string }) => {
-      const settled = await Promise.allSettled(
-        vars.ids.map((id) => securityCloseAccount(id, vars.reason)),
-      );
-      return settled.map<CloseOutcome>((s, i) =>
-        s.status === "fulfilled"
-          ? { userId: vars.ids[i], closed: true }
-          : { userId: vars.ids[i], closed: false, error: describeApiError(s.reason) },
-      );
+      const outcomes: CloseOutcome[] = [];
+      for (const id of vars.ids) {
+        try {
+          await securityCloseAccount(id, vars.reason);
+          outcomes.push({ userId: id, closed: true });
+        } catch (e) {
+          outcomes.push({
+            userId: id,
+            closed: false,
+            error: describeApiError(e),
+          });
+        }
+      }
+      return outcomes;
     },
     onMutate: () => setOutcomes(null),
     onSuccess: (results) => {
@@ -383,8 +392,18 @@ export default function SecurityClosePanel() {
         }}
         onConfirm={() => {
           setConfirmOpen(false);
-          if (!confirmIds) return;
-          closeMutation.mutate({ ids: confirmIds, reason: reason.trim() });
+          // Re-check at submit: the modal does not trap focus, so the reason
+          // input (or the list) could have changed while it was open.
+          const trimmedReason = reason.trim();
+          if (
+            !confirmIds ||
+            !previewMatchesInput ||
+            trimmedReason.length === 0
+          ) {
+            setConfirmIds(null);
+            return;
+          }
+          closeMutation.mutate({ ids: confirmIds, reason: trimmedReason });
           setConfirmIds(null);
         }}
       />

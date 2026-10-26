@@ -244,10 +244,13 @@ export default function FakePasskeyPanel() {
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);
-          if (!previewMatchesInput) return;
+          // Re-check at submit: the modal does not trap focus, so the reason
+          // input could have been cleared while it was open.
+          const trimmedReason = reason.trim();
+          if (!previewMatchesInput || trimmedReason.length === 0) return;
           executeMutation.mutate({
             credentialId: trimmedId,
-            reason: reason.trim(),
+            reason: trimmedReason,
           });
         }}
       />
