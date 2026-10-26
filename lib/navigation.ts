@@ -8,6 +8,7 @@ import {
   ArrowRightLeft,
   BarChart3,
   BookOpen,
+  Bot,
   CircleAlert,
   CreditCard,
   DollarSign,
@@ -230,6 +231,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Merchants excluded from cashback and referrals, and referral spend rules",
         icon: ShieldAlert,
+      },
+      {
+        href: "/ai-api",
+        label: "AI API",
+        description:
+          "Agent API keys: usage, daily charges, cashback and model prices",
+        icon: Bot,
       },
       {
         href: "/internal-team",

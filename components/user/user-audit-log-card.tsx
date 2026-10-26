@@ -83,6 +83,11 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Internal team feature removed",
       variant: "warning",
     },
+    ai_api_key_updated: { label: "AI API key changed", variant: "warning" },
+    ai_api_account_updated: {
+      label: "AI API account changed",
+      variant: "warning",
+    },
   };
 
 /** How the audit trail names an internal team feature. */
@@ -90,6 +95,18 @@ const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
   wirex_virtual_account: "Wirex EUR account",
   spend_modes: "Credit & Smart spend modes",
   eur_vault: "EUR vault",
+  ai_api: "AI API",
+};
+
+/** How the audit trail names an admin's change to a user's AI API. */
+const AI_API_CHANGE_LABELS: Record<string, string> = {
+  disable: "disabled",
+  enable: "enabled",
+  revoke: "deleted",
+  set_limit: "limit lowered",
+  pause: "paused",
+  resume: "resumed",
+  retry_charge: "charge retried",
 };
 
 const stringField = (entry: AdminAuditEntry, key: string): string | null => {
@@ -107,6 +124,29 @@ function detailFor(entry: AdminAuditEntry): string | null {
       stillBlocked ? `card spend still blocked: ${stillBlocked}` : null,
     ].filter(Boolean);
     return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "ai_api_key_updated") {
+    const keyName = stringField(entry, "keyName");
+    const change = stringField(entry, "change");
+    const from = entry.metadata?.from;
+    const to = entry.metadata?.to;
+    const label = change ? (AI_API_CHANGE_LABELS[change] ?? change) : null;
+    const limit =
+      typeof from === "number" && typeof to === "number"
+        ? ` $${from} → $${to}`
+        : "";
+    return keyName && label ? `${keyName}: ${label}${limit}` : label;
+  }
+
+  if (entry.action === "ai_api_account_updated") {
+    const change = stringField(entry, "change");
+    if (!change) return null;
+    const label = AI_API_CHANGE_LABELS[change] ?? change;
+    if (change === "retry_charge" && typeof entry.metadata?.charged === "boolean") {
+      return `${label}: ${entry.metadata.charged ? "charged" : "not charged"}`;
+    }
+    return label;
   }
 
   if (entry.action === "referral_reward_reevaluated") {
