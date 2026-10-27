@@ -41,6 +41,9 @@ interface Draft {
   tiers: TierDraft[];
   maxKeys: string;
   maxLimitUsd: string;
+  chargeThresholdUsd: string;
+  maxUnpaidUsd: string;
+  balanceHeadroomUsd: string;
   models: ModelDraft[];
 }
 
@@ -56,6 +59,9 @@ const toDraft = (settings: AiApiSettings): Draft => ({
   })),
   maxKeys: String(settings.maxKeysPerUser),
   maxLimitUsd: String(settings.maxMonthlyLimitUsd),
+  chargeThresholdUsd: String(settings.chargeThresholdUsd),
+  maxUnpaidUsd: String(settings.maxUnpaidUsd),
+  balanceHeadroomUsd: String(settings.balanceHeadroomUsd),
   models: settings.models.map((model) => ({
     id: model.id,
     name: model.name,
@@ -80,6 +86,9 @@ const EMPTY_MODEL: ModelDraft = {
   aliases: "",
   enabled: true,
 };
+
+/** A dollar amount typed in, or NaN when it isn't one. */
+const dollars = (text: string): number => (text.trim() === "" ? Number.NaN : Number(text));
 
 const price = (text: string): number | null => {
   if (text.trim() === "") return null;
@@ -108,6 +117,22 @@ function parseDraft(draft: Draft): { patch: AiApiSettingsPatch } | { error: stri
   const maxLimit = Number(draft.maxLimitUsd);
   if (!Number.isInteger(maxLimit) || maxLimit < 1 || maxLimit > 100_000) {
     return { error: "The highest monthly limit must be a whole number from 1 to 100,000." };
+  }
+  // The same bounds the backend holds them to.
+  const chargeThreshold = dollars(draft.chargeThresholdUsd);
+  if (Number.isNaN(chargeThreshold) || chargeThreshold < 1 || chargeThreshold > 100) {
+    return { error: "Charge at must be $1 to $100: each charge is a transaction we pay gas for." };
+  }
+  const maxUnpaid = dollars(draft.maxUnpaidUsd);
+  if (Number.isNaN(maxUnpaid) || maxUnpaid <= chargeThreshold || maxUnpaid > 1000) {
+    return {
+      error:
+        "Most a user can owe must be more than Charge at, so users aren't stopped every time a charge is due, and at most $1,000.",
+    };
+  }
+  const balanceHeadroom = dollars(draft.balanceHeadroomUsd);
+  if (Number.isNaN(balanceHeadroom) || balanceHeadroom < 0 || balanceHeadroom > 100) {
+    return { error: "Wallet headroom must be $0 to $100." };
   }
 
   const models: AiApiModelConfig[] = [];
@@ -159,6 +184,9 @@ function parseDraft(draft: Draft): { patch: AiApiSettingsPatch } | { error: stri
       cashbackByTier,
       maxKeysPerUser: maxKeys,
       maxMonthlyLimitUsd: maxLimit,
+      chargeThresholdUsd: chargeThreshold,
+      maxUnpaidUsd: maxUnpaid,
+      balanceHeadroomUsd: balanceHeadroom,
       models,
     },
   };
@@ -352,6 +380,53 @@ export default function AiApiSettingsEditor() {
             onChange={(e) => setDraft({ ...draft, maxLimitUsd: e.target.value })}
           />
         </Field>
+      </div>
+
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Pay as you go</h3>
+          <p className="text-xs text-gray-500">
+            We pay the gateway as requests run and take it from the user&apos;s
+            Wallet after, so what a user has used but not yet been charged for is
+            ours to lose if they empty their Wallet first. These set how much
+            that can be.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field
+            label="Charge at (USD)"
+            hint="A user's usage is charged once it reaches this, and whatever is left at each day's close. Each charge is a transaction we pay gas for."
+          >
+            <Input
+              inputMode="decimal"
+              value={draft.chargeThresholdUsd}
+              disabled={disabled}
+              onChange={(e) => setDraft({ ...draft, chargeThresholdUsd: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Most a user can owe (USD)"
+            hint="Requests stop until a charge clears: the most we can lose to one user when charging can't keep up."
+          >
+            <Input
+              inputMode="decimal"
+              value={draft.maxUnpaidUsd}
+              disabled={disabled}
+              onChange={(e) => setDraft({ ...draft, maxUnpaidUsd: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Wallet headroom (USD)"
+            hint="What the Wallet must hold beyond what the user owes for a request to run."
+          >
+            <Input
+              inputMode="decimal"
+              value={draft.balanceHeadroomUsd}
+              disabled={disabled}
+              onChange={(e) => setDraft({ ...draft, balanceHeadroomUsd: e.target.value })}
+            />
+          </Field>
+        </div>
       </div>
 
       <div className="space-y-2">
