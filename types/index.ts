@@ -2151,6 +2151,10 @@ export type KycResetBlocker =
   | "no_application"
   | "already_approved"
   | "verification_in_flight"
+  /** Didit approved, but the hand-off to Rain failed at Rain: retry it, don't reset. */
+  | "forward_failed"
+  /** Didit approved; the application waits on the user's deposit. */
+  | "awaiting_deposit"
   | "issuer_consumer_exists"
   | "decided_by_issuer";
 
@@ -2182,6 +2186,16 @@ export interface KycResetEligibility {
    * provider too.
    */
   providerDecisionIsFinal: boolean;
+  /**
+   * Why an approved verification could not be handed to the issuer, as the
+   * user was told. Null unless that hand-off failed. Older backends omit it.
+   */
+  forwardFailureReason?: string | null;
+  /**
+   * Approved, but on answers the issuer cannot accept (a US SSN that is not 9
+   * digits): the user has to verify again, so a reset is the right tool.
+   */
+  requiresNewVerification?: boolean;
 }
 
 /** What the backend reports after clearing a verification. */

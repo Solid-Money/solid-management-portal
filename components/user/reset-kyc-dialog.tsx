@@ -29,6 +29,7 @@ interface ResetKycDialogProps {
 const DOES = [
   "Puts their verification back to not started, so the app lets them in again",
   "Clears the stored decision and its reason codes",
+  "Clears a failed hand-off to the card issuer, and any deposit hold on it",
   "Lets them start a fresh session, with a fresh set of document attempts",
 ];
 
@@ -114,11 +115,19 @@ export default function ResetKycDialog({
           {eligibility.reasonCodes.length > 0 && (
             <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs">
               <p className="font-medium text-gray-500">
-                Declined by {eligibility.kycProvider ?? "the provider"} for
+                {/* Approved by the provider; it is the hand-off that failed. */}
+                {eligibility.requiresNewVerification
+                  ? "Approved, but could not be sent to the card issuer for"
+                  : `Declined by ${eligibility.kycProvider ?? "the provider"} for`}
               </p>
               <p className="mt-1 break-words font-mono text-gray-900">
                 {eligibility.reasonCodes.join(", ")}
               </p>
+              {eligibility.forwardFailureReason && (
+                <p className="mt-1 break-words text-gray-600">
+                  {eligibility.forwardFailureReason}
+                </p>
+              )}
             </div>
           )}
 
