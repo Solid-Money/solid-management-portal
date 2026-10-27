@@ -1186,7 +1186,7 @@ export default function RewardsConfigPage() {
         {/* Yield Boost */}
         <ConfigSection
           title="Yield Boost"
-          description="Extra APY on each user's total savings across soUSD, soETH and soFUSE, earned daily and claimed in soFUSE from the payout wallet"
+          description="Extra APY on each user's total savings across soUSD, soETH, soFUSE and soEURC (valued in USD at the EUR/USD rate), earned daily and claimed in soFUSE from the payout wallet"
           icon={<TrendingUp className="h-5 w-5 text-emerald-600" />}
         >
           <div className="flex flex-wrap items-center gap-6">
@@ -1233,7 +1233,7 @@ export default function RewardsConfigPage() {
                     }
                     type="number"
                     suffix="$"
-                    tooltip="Savings across all three vaults together that the boost applies to. Anything above earns the base yield only."
+                    tooltip="Savings in USD across all four vaults together (soEURC at the EUR/USD rate) that the boost applies to. Anything above earns the base yield only."
                   />
                   <p className="text-xs text-gray-500">
                     {Number.isFinite(yearly) && yearly > 0

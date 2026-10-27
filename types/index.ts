@@ -1662,8 +1662,9 @@ export interface TierYieldBoostConfig {
   /** Extra APY as a fraction (0.02 = +2%), accrued a day at a time. */
   apy: number;
   /**
-   * Savings, in USD across soUSD, soETH and soFUSE together, the boost applies
-   * to. Balance above it earns the base yield only; 0 grants no boost.
+   * Savings, in USD across soUSD, soETH, soFUSE and soEURC together (soEURC at
+   * the EUR/USD rate), the boost applies to. Balance above it earns the base
+   * yield only; 0 grants no boost.
    */
   maxDepositUsd: number;
 }
