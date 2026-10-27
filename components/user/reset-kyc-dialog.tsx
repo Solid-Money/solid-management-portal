@@ -103,7 +103,7 @@ export default function ResetKycDialog({
           setOpen(next);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Reset identity verification</DialogTitle>
             <DialogDescription>
