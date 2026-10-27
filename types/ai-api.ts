@@ -208,6 +208,15 @@ export interface AiApiSettings {
   cashbackByTier: AiApiTierCashback[];
   maxKeysPerUser: number;
   maxMonthlyLimitUsd: number;
+  /**
+   * Pay as you go, USD. We pay the gateway as requests run and charge the
+   * Wallet after: usage is charged once it reaches the threshold, and requests
+   * stop for a user who owes the max unpaid, or whose Wallet holds less than
+   * what they owe plus the headroom.
+   */
+  chargeThresholdUsd: number;
+  maxUnpaidUsd: number;
+  balanceHeadroomUsd: number;
   models: AiApiModelConfig[];
   /** From the environment; read-only here. */
   cohortOnly: boolean;
@@ -221,6 +230,9 @@ export interface AiApiSettingsPatch {
   cashbackByTier?: { tier: number; rate: number; monthlyCapUsd: number }[];
   maxKeysPerUser?: number;
   maxMonthlyLimitUsd?: number;
+  chargeThresholdUsd?: number;
+  maxUnpaidUsd?: number;
+  balanceHeadroomUsd?: number;
   models?: AiApiModelConfig[];
 }
 
