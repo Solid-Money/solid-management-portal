@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 
 import { getKycResetEligibility } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
 import { KycResetEligibility } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,9 @@ interface UserKycCardProps {
 }
 
 type BadgeVariant = "success" | "danger" | "warning" | "info" | "muted";
+
+/** The Wirex card onboarding sends two nudges per stall: +24h and +3 days. */
+const ONBOARDING_REMINDER_COUNT = 2;
 
 /** How each KYC status reads, and how loud it should be. */
 const STATUS_VARIANTS: Record<string, BadgeVariant> = {
@@ -136,6 +140,35 @@ export default function UserKycCard({ userId, username }: UserKycCardProps) {
                 hint={data.rejectType ? `Reject type: ${data.rejectType}` : undefined}
               />
             </dl>
+
+            {(data.sumsubReviewStatus || data.onboardingReminders) && (
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
+                <Stat
+                  label="Sumsub review"
+                  value={humanize(data.sumsubReviewStatus ?? null)}
+                  hint={
+                    data.sumsubReviewStatus === "init"
+                      ? "Opened the check, not submitted"
+                      : undefined
+                  }
+                />
+                <Stat
+                  label="Onboarding nudges"
+                  value={
+                    data.onboardingReminders
+                      ? `${data.onboardingReminders.sent} of ${ONBOARDING_REMINDER_COUNT} sent`
+                      : "—"
+                  }
+                  hint={
+                    data.onboardingReminders
+                      ? `Pushes at +24h and +3 days, counted from ${formatDateTime(
+                          data.onboardingReminders.anchoredAt,
+                        )}`
+                      : undefined
+                  }
+                />
+              </dl>
+            )}
 
             {data.reasonCodes.length > 0 && (
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
