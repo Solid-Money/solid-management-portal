@@ -2,10 +2,12 @@
  * Referral program v4 (card credit) and card credit, as admins-service serves
  * them under `/admin/v1`.
  *
- * Mirrors the cross-repo contract: friends who sign up at or after the v4
- * launch earn card credit (welcome, big spender, upgrade) and their referrer
- * earns a share of their card spend in soFUSE; friends from before launch stay
- * on the legacy $25 + $25 soFUSE program.
+ * Mirrors the cross-repo contract: friends whose referral is recorded while
+ * v4 is open to new signups (and its launch has passed) earn card credit
+ * (welcome, big spender, upgrade) and their referrer earns a share of their
+ * card spend in soFUSE. The program is stamped on the friend when the referral
+ * is recorded, so later config changes never move anyone between programs;
+ * friends from before launch stay on the legacy soFUSE cashback program.
  */
 
 export type ReferralV4Program = "v4" | "legacy";
@@ -30,7 +32,12 @@ export type ReferralV4RewardStatus =
   /** Country rule. */
   | "excluded"
   /** Refunded / fraud / rejected. */
-  | "cancelled";
+  | "cancelled"
+  /**
+   * Credited, then taken back: the qualifying spend was refunded below the bar
+   * within the clawback window, and a debt was booked for the amount.
+   */
+  | "reversed";
 
 export type ReferralV4Step = "welcome" | "big_spender" | "upgrade";
 export type ReferralV4BoostSides = "both" | "referrer" | "friend";
@@ -46,8 +53,11 @@ export interface ReferralV4Boost {
 }
 
 export interface ReferralV4Terms {
+  /** Open to new signups: referrals recorded now are on v4. */
   enabled: boolean;
   launchAt: string | null;
+  /** Payouts paused: no card credit is credited and no spend share sent. */
+  paused: boolean;
   welcome: {
     referrerUsd: number;
     friendUsd: number;
@@ -71,8 +81,12 @@ export interface ReferralV4Terms {
   spendShare: {
     rate: number;
     capPerFriendUsd: number;
-    /** 4 = Thursday. */
+    /** Weekday of the payout run: 0 = Sunday … 6 = Saturday. */
     payoutWeekday: number;
+    /** Hour (UTC) of the payout run, 0–23. */
+    payoutHourUtc: number;
+    /** Smaller weekly spend-share transfers wait for the next week. */
+    minWeeklyPayoutUsd: number;
   };
   holdDays: number;
   bonusLimit: {
@@ -80,7 +94,13 @@ export interface ReferralV4Terms {
     base: number;
     perActiveFriend: number;
     activeSpendUsd: number;
+    /** The friend's "second month", in days after signup: start… */
+    monthTwoFromDays: number;
+    /** …and end. */
+    monthTwoToDays: number;
   };
+  /** Reversal of credited spend bonuses whose spend is refunded later. */
+  clawback: { enabled: boolean; watchDays: number };
   excludedCountries: string[];
   /** The boost running right now, if any. */
   boost: ReferralV4Boost | null;
@@ -100,6 +120,10 @@ export interface ReferralV4StepView {
   earnedAt?: string;
   unlocksAt?: string;
   creditedAt?: string;
+  /** When a credited bonus was reversed. */
+  reversedAt?: string;
+  /** The part of this bonus that went to repaying a reversed one. */
+  offsetUsd?: number;
 }
 
 export interface ReferralV4UpgradeView {
@@ -113,6 +137,10 @@ export interface ReferralV4UpgradeView {
   earnedAt?: string;
   unlocksAt?: string;
   creditedAt?: string;
+  /** When a credited bonus was reversed. */
+  reversedAt?: string;
+  /** The part of this bonus that went to repaying a reversed one. */
+  offsetUsd?: number;
 }
 
 export type ReferralV4FriendStage =
@@ -172,9 +200,9 @@ export interface ReferralV4Totals {
   thisMonthUsd: number;
   /** Earned, not yet credited. */
   onHoldUsd: number;
-  /** Accrued for the current week, paid next Thursday. */
+  /** Accrued for the current week, paid in the next payout run. */
   pendingSpendShareUsd: number;
-  /** Next Thursday payout run (ISO). */
+  /** Next payout run (ISO). */
   nextPayoutAt: string;
 }
 
@@ -200,9 +228,19 @@ export interface ReferralV4Access {
 // ---------------------------------------------------------------------------
 
 export interface ReferralV4Config {
+  /**
+   * Open to new signups: a referral recorded while this is on and `launchAt`
+   * has passed is on v4, anything else legacy. Stamped on the friend when the
+   * referral is recorded, so changing it never moves existing friends.
+   */
   enabled: boolean;
-  /** Friends who sign up at or after this instant (UTC) are on v4. */
+  /** v4 opens at this instant (UTC), when `enabled`. */
   launchAt: string | null;
+  /**
+   * Incident switch: stops crediting card credit and sending spend share.
+   * Earning and tracking continue; nothing is lost.
+   */
+  paused: boolean;
   welcomeReferrerUsd: number;
   welcomeFriendUsd: number;
   welcomeSpendTargetUsd: number;
@@ -222,16 +260,44 @@ export interface ReferralV4Config {
   spendShareCapPerFriendUsd: number;
   /** Safety ceiling per referrer per week. */
   spendShareMaxWeeklyPayoutUsd: number;
+  /** Smaller weekly spend-share transfers wait for the next week. */
+  minWeeklyPayoutUsd: number;
   holdDays: number;
+  /** Weekday of the payout run: 0 = Sunday … 6 = Saturday. */
+  payoutWeekday: number;
+  /** Hour (UTC) of the payout run, 0–23. */
+  payoutHourUtc: number;
+  /** Days a step stays open after its window, for late settlements. */
+  settlementGraceDays: number;
   bonusLimitEnabled: boolean;
   bonusLimitBase: number;
   bonusLimitPerActiveFriend: number;
   bonusLimitActiveSpendUsd: number;
+  /** The friend's "second month" (days after signup), for the bonus limit. */
+  monthTwoFromDays: number;
+  /** Its end; must be after `monthTwoFromDays`. */
+  monthTwoToDays: number;
+  /** More qualified friends than this within `reviewWindowDays` go to review. */
   reviewMonthlyThreshold: number;
+  /** The window the review threshold counts friends over. */
+  reviewWindowDays: number;
+  /** The highest multiplier a boost may be created with. */
+  maxBoostMultiplier: number;
   /** ISO-2 country codes. */
   excludedCountries: string[];
   /** A code added later than this after signup earns nothing in v4. */
   linkMaxDaysAfterSignup: number;
+  /**
+   * Reverse a credited welcome / big-spender bonus whose qualifying spend is
+   * later refunded below the bar, booking a debt for the amount.
+   */
+  clawbackEnabled: boolean;
+  /** How long after crediting such a refund still reverses the bonus. */
+  clawbackWatchDays: number;
+  /** An unrecovered debt is written off this many days after it is booked. */
+  debtWriteOffDays: number;
+  /** A debt whose remainder falls below this is waived (closed). */
+  debtWaiveBelowUsd: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +375,10 @@ export interface AdminReferralV4Reward {
   reviewReason?: string;
   boostMultiplier?: number;
   cardCreditEntryId?: string;
+  /** When this credited bonus was reversed (status `reversed`). */
+  reversedAt?: string;
+  /** The part of this bonus that went to repaying a reversed one. */
+  debtOffsetUsd?: number;
 }
 
 export interface AdminReferralV4FriendRow extends ReferralV4FriendRow {
@@ -316,6 +386,50 @@ export interface AdminReferralV4FriendRow extends ReferralV4FriendRow {
   country?: string;
   idCountry?: string;
   rewards: AdminReferralV4Reward[];
+}
+
+export type ReferralV4DebtStatus =
+  /** Still being recovered from future bonuses and spend share. */
+  | "open"
+  /** Repaid in full. */
+  | "recovered"
+  /** Closed: the remainder fell below the waive threshold. */
+  | "waived"
+  /** Closed unrecovered: by age, or by an admin. */
+  | "written_off";
+
+export interface ReferralV4DebtRecovery {
+  at: string;
+  usd: number;
+  /** Taken from a later v4 bonus, or from a weekly spend-share payout. */
+  via: "bonus" | "spend_share";
+  /** The reward or payout it was taken from. */
+  ref: string;
+}
+
+/**
+ * What this user owes for a credited bonus that was reversed. Recovered from
+ * their future v4 bonuses (before the card credit is granted) and weekly spend
+ * share (before the transfer) — never from the card credit balance.
+ */
+export interface AdminReferralV4Debt {
+  id: string;
+  /** The side this user was on in the referral. */
+  side: "referrer" | "friend";
+  step: "welcome" | "big_spender";
+  /** The reversed reward. */
+  rewardId: string;
+  friend: { id: string; username: string };
+  amountUsd: number;
+  remainingUsd: number;
+  status: ReferralV4DebtStatus;
+  createdAt: string;
+  /** When it is written off automatically if still open. */
+  writeOffAt: string;
+  closedAt?: string;
+  /** Admin email, when written off by hand. */
+  closedBy?: string;
+  recoveries: ReferralV4DebtRecovery[];
 }
 
 export interface AdminUserReferralsV4 {
@@ -328,6 +442,8 @@ export interface AdminUserReferralsV4 {
     friends: AdminReferralV4FriendRow[];
   };
   asFriend: AdminReferralV4FriendRow | null;
+  /** Debts this user owes from reversed bonuses, open and closed. */
+  debts: AdminReferralV4Debt[];
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +507,7 @@ export interface ReferralBoostAdmin extends ReferralV4Boost {
 
 export interface ReferralBoostInput {
   name: string;
-  /** 1 < x ≤ 5. */
+  /** Above 1, at most the config's `maxBoostMultiplier`. */
   multiplier: number;
   startsAt: string;
   endsAt: string;
@@ -417,4 +533,13 @@ export interface ReferralV4Analytics {
     creditGrantedUsd: number;
     spendSharePaidUsd: number;
   }>;
+  /** Clawback: debts from reversed bonuses. */
+  debts: {
+    openUsd: number;
+    recoveredUsd: number;
+    writtenOffUsd: number;
+    waivedUsd: number;
+    /** Credited bonuses reversed, all time. */
+    reversedBonuses: number;
+  };
 }

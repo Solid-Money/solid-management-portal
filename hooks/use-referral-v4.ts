@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/components/auth-provider";
+import { REFERRAL_V4_DEFAULTS } from "@/hooks/use-config-editor";
 import {
   cancelReferralV4Reward,
   createReferralBoost,
@@ -11,22 +12,27 @@ import {
   getReferralBoosts,
   getReferralReviewQueue,
   getReferralV4Access,
+  getRewardsConfigQuietly,
   getUserCardCredit,
   getUserReferralsV4,
   grantUserCardCredit,
   removeUserCardCredit,
   updateReferralBoost,
+  writeOffReferralV4Debt,
 } from "@/lib/api";
 import { referralV4Retry } from "@/lib/referral-v4";
+import { ANALYTICS_QUERY_KEYS } from "@/types/analytics";
 import type {
   AdminCardCredit,
   CardCreditAdjustment,
   ReferralBoostInput,
   ReferralReviewDecisionRequest,
+  ReferralV4Config,
 } from "@/types/referral-v4";
 
 export const REFERRAL_V4_KEYS = {
   access: ["referral-v4", "access"] as const,
+  config: ["referral-v4", "config"] as const,
   review: ["referral-v4", "review"] as const,
   boosts: ["referral-boosts"] as const,
   userCardCredit: (userId: string) => ["user-card-credit", userId] as const,
@@ -42,6 +48,28 @@ export function useReferralV4Access() {
   return useQuery({
     queryKey: REFERRAL_V4_KEYS.access,
     queryFn: getReferralV4Access,
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    retry: referralV4Retry,
+  });
+}
+
+/**
+ * The referral v4 config as saved, for the screens that describe the program
+ * (payout weekday and hour, review window, boost ceiling) without editing it.
+ * Missing fields are filled from the shipped defaults; `null` when the backend
+ * sends no `referralV4` section at all. Callers fall back to wording that
+ * names no number while this loads.
+ */
+export function useReferralV4Config() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: REFERRAL_V4_KEYS.config,
+    queryFn: async (): Promise<ReferralV4Config | null> => {
+      const config = await getRewardsConfigQuietly();
+      const v4 = config?.referralV4;
+      return v4 ? { ...REFERRAL_V4_DEFAULTS, ...v4 } : null;
+    },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: referralV4Retry,
@@ -107,6 +135,25 @@ export function useCancelReferralV4Reward() {
       void queryClient.invalidateQueries({ queryKey: ["user-referrals-v4"] });
       void queryClient.invalidateQueries({ queryKey: REFERRAL_V4_KEYS.review });
       void queryClient.invalidateQueries({ queryKey: ["user-audit-log"] });
+    },
+  });
+}
+
+/**
+ * Write off one open referral debt. Refreshes the referral v4 views it shows
+ * on, the audit trails and the clawback totals on the analytics tab.
+ */
+export function useWriteOffReferralV4Debt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ debtId, note }: { debtId: string; note?: string }) =>
+      writeOffReferralV4Debt(debtId, note),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["user-referrals-v4"] });
+      void queryClient.invalidateQueries({ queryKey: ["user-audit-log"] });
+      void queryClient.invalidateQueries({
+        queryKey: ANALYTICS_QUERY_KEYS.referralsV4,
+      });
     },
   });
 }

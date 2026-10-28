@@ -4,6 +4,9 @@ import type {
   CardCreditSourceType,
   ReferralBoostAdmin,
   ReferralV4BoostSides,
+  ReferralV4Config,
+  ReferralV4DebtRecovery,
+  ReferralV4DebtStatus,
   ReferralV4FriendStage,
   ReferralV4RewardStatus,
   ReferralV4Step,
@@ -61,6 +64,7 @@ export const REFERRAL_V4_STATUS: Record<
   expired: { label: "Expired", variant: "muted" },
   excluded: { label: "Excluded (country)", variant: "muted" },
   cancelled: { label: "Cancelled", variant: "danger" },
+  reversed: { label: "Reversed", variant: "danger" },
 };
 
 export function referralV4Status(status: string | null | undefined) {
@@ -115,6 +119,125 @@ export const REFERRAL_V4_STEP_LABELS: Record<ReferralV4Step, string> = {
 export function referralV4StepLabel(step: string | undefined): string {
   if (!step) return "—";
   return REFERRAL_V4_STEP_LABELS[step as ReferralV4Step] ?? step;
+}
+
+/** How each referral debt state reads in the portal. */
+export const REFERRAL_V4_DEBT_STATUS: Record<
+  ReferralV4DebtStatus,
+  { label: string; variant: BadgeVariant }
+> = {
+  open: { label: "Open", variant: "warning" },
+  recovered: { label: "Recovered", variant: "success" },
+  waived: { label: "Waived", variant: "muted" },
+  written_off: { label: "Written off", variant: "danger" },
+};
+
+export function referralV4DebtStatus(status: string | null | undefined) {
+  if (!status) return { label: "—", variant: "muted" as const };
+  return (
+    REFERRAL_V4_DEBT_STATUS[status as ReferralV4DebtStatus] ?? {
+      label: status,
+      variant: "muted" as const,
+    }
+  );
+}
+
+export const DEBT_RECOVERY_VIA_LABELS: Record<
+  ReferralV4DebtRecovery["via"],
+  string
+> = {
+  bonus: "From a later bonus",
+  spend_share: "From spend share",
+};
+
+/** The numeric fields of the v4 config. */
+export type ReferralV4NumericField = {
+  [K in keyof ReferralV4Config]: ReferralV4Config[K] extends number ? K : never;
+}[keyof ReferralV4Config];
+
+/**
+ * What each numeric v4 field may be set to — the backend's own bounds
+ * (`REFERRAL_V4_NUMBER_FIELDS` in admins-service, and the contract for the
+ * fields added with clawback). Out of range, the backend refuses the save.
+ * `integer` marks counts, day spans, the weekday and the hour.
+ */
+export const REFERRAL_V4_NUMBER_BOUNDS: Record<
+  ReferralV4NumericField,
+  { min: number; max: number; integer?: true }
+> = {
+  welcomeReferrerUsd: { min: 0, max: 500 },
+  welcomeFriendUsd: { min: 0, max: 500 },
+  welcomeSpendTargetUsd: { min: 1, max: 100_000 },
+  welcomeMerchantTarget: { min: 1, max: 50, integer: true },
+  welcomeWindowDays: { min: 1, max: 365, integer: true },
+  bigSpenderReferrerUsd: { min: 0, max: 500 },
+  bigSpenderFriendUsd: { min: 0, max: 500 },
+  bigSpenderSpendTargetUsd: { min: 1, max: 1_000_000 },
+  bigSpenderWindowDays: { min: 1, max: 365, integer: true },
+  upgradePrimeUsd: { min: 0, max: 500 },
+  upgradeUltraUsd: { min: 0, max: 500 },
+  upgradePrimeLockFuse: { min: 1, max: 100_000_000 },
+  upgradeUltraLockFuse: { min: 1, max: 100_000_000 },
+  upgradeLockHoldDays: { min: 0, max: 730, integer: true },
+  spendShareRate: { min: 0, max: 0.05 },
+  spendShareCapPerFriendUsd: { min: 0, max: 100_000 },
+  spendShareMaxWeeklyPayoutUsd: { min: 0, max: 50_000 },
+  minWeeklyPayoutUsd: { min: 0, max: 100 },
+  holdDays: { min: 0, max: 120, integer: true },
+  payoutWeekday: { min: 0, max: 6, integer: true },
+  payoutHourUtc: { min: 0, max: 23, integer: true },
+  settlementGraceDays: { min: 0, max: 60, integer: true },
+  bonusLimitBase: { min: 0, max: 10_000, integer: true },
+  bonusLimitPerActiveFriend: { min: 0, max: 1_000, integer: true },
+  bonusLimitActiveSpendUsd: { min: 0, max: 100_000 },
+  monthTwoFromDays: { min: 1, max: 365, integer: true },
+  monthTwoToDays: { min: 2, max: 400, integer: true },
+  reviewMonthlyThreshold: { min: 0, max: 10_000, integer: true },
+  reviewWindowDays: { min: 1, max: 365, integer: true },
+  maxBoostMultiplier: { min: 1, max: 20 },
+  linkMaxDaysAfterSignup: { min: 0, max: 365, integer: true },
+  clawbackWatchDays: { min: 0, max: 730, integer: true },
+  debtWriteOffDays: { min: 1, max: 1825, integer: true },
+  debtWaiveBelowUsd: { min: 0, max: 100 },
+};
+
+/** Weekday names by `getUTCDay()` index — how the payout weekday is stored. */
+export const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+/** "Thursday" for 4, or null for anything that isn't a weekday index. */
+export function weekdayName(day: number | null | undefined): string | null {
+  if (typeof day !== "number" || !Number.isInteger(day)) return null;
+  return WEEKDAYS[day] ?? null;
+}
+
+/** "10:00 UTC" for 10, or null for anything that isn't an hour. */
+export function utcHourLabel(hour: number | null | undefined): string | null {
+  if (typeof hour !== "number" || !Number.isInteger(hour)) return null;
+  if (hour < 0 || hour > 23) return null;
+  return `${String(hour).padStart(2, "0")}:00 UTC`;
+}
+
+/**
+ * The weekly payout run as configured — "Thursdays at 10:00 UTC" — or null
+ * when the config hasn't loaded, so copy can fall back to "the weekly run"
+ * instead of naming a day it doesn't know.
+ */
+export function payoutScheduleLabel(
+  weekday: number | null | undefined,
+  hourUtc?: number | null,
+): string | null {
+  const day = weekdayName(weekday);
+  if (!day) return null;
+  const at = utcHourLabel(hourUtc);
+  return at ? `${day}s at ${at}` : `${day}s`;
 }
 
 export const BOOST_SIDES_LABELS: Record<ReferralV4BoostSides, string> = {

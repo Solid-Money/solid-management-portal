@@ -11,6 +11,7 @@ import {
   BatchIssueTierTrialResult,
   CardAuditEntry,
   CardIssuanceContext,
+  FullRewardsConfig,
   IssueCardRequest,
   IssueCardResult,
   RainRtfStatus,
@@ -63,6 +64,7 @@ import {
 } from "@/types/cash-collect";
 import type {
   AdminCardCredit,
+  AdminReferralV4Debt,
   AdminReferralV4Reward,
   AdminUserReferralsV4,
   CardCreditAdjustment,
@@ -742,6 +744,33 @@ export const cancelReferralV4Reward = async (rewardId: string, reason: string) =
       )
     ).data,
   );
+
+/**
+ * Write off an open referral debt by hand: it stops being recovered from the
+ * user's future bonuses and spend share. The note is optional; the backend
+ * records the write-off on the audit trail with the admin's name.
+ */
+export const writeOffReferralV4Debt = async (debtId: string, note?: string) =>
+  unwrapData<AdminReferralV4Debt>(
+    (
+      await api.post(
+        `/admin/v1/referral-v4/debts/${encodeURIComponent(debtId)}/write-off`,
+        note ? { note } : {},
+      )
+    ).data,
+  );
+
+/**
+ * The rewards config, read quietly — for screens that only need a few of its
+ * values (the referral v4 schedule and limits) and show their own fallback
+ * when it can't be read. The config pages load it through `useConfigEditor`.
+ */
+export const getRewardsConfigQuietly = async () =>
+  (
+    await api.get<FullRewardsConfig>("/admin/v1/rewards-config", {
+      quietErrors: true,
+    })
+  ).data;
 
 /** Rewards held for review — v4 and today's stuck legacy ones — by referrer. */
 export const getReferralReviewQueue = async () =>
