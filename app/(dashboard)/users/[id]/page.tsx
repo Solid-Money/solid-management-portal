@@ -13,6 +13,7 @@ import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
 import UserErrors from "@/components/errors/user-errors";
 import UserCardPanel from "@/components/user/user-card-panel";
+import UserCardCreditCard from "@/components/user/user-card-credit-card";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
@@ -258,6 +259,9 @@ export default function UserDetailPage({
               panel: under Real-Time Funding a decline is an allowance problem,
               and the allowance is only legible beside the card it funds. */}
           <UserRtfCard userId={id} />
+          {/* Credit is spent first at Wirex authorization, so a purchase that
+              "cost less than it should" in the table below is answered here. */}
+          <UserCardCreditCard userId={id} username={displayName} />
           {/* Next to the spending table, because a rate set on one transaction
               beats this one and is edited from a row down there. */}
           <UserCashbackRateCard
@@ -286,6 +290,8 @@ export default function UserDetailPage({
             cashbackPercentage={user.cashbackPercentage}
           />
           <UserCashbackCard userId={id} />
+          {/* Referral v4 bonuses are paid as card credit. */}
+          <UserCardCreditCard userId={id} username={displayName} />
           {/* Both sides of the referral program, with the re-evaluate action
               for rewards the engine reversed or expired. */}
           <UserReferralCard userId={id} />
