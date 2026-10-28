@@ -2,7 +2,12 @@
 
 import React from "react";
 import { Activity, getTransactionCategory, TRANSACTION_DETAILS, TransactionStatus, TransactionDirection, TransactionType } from "@/types";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, tokenFractionDigits } from "@/lib/utils";
+import {
+  getTransferCategory,
+  getTransferSummary,
+  getTransferTitle,
+} from "@/lib/transfer-presentation";
 import { TokenIcon } from "./token-icon";
 import { ExternalLink, Loader2 } from "lucide-react";
 
@@ -68,11 +73,25 @@ export const ActivityItem = ({
     ? TransactionDirection.CANCELLED
     : (details?.sign ?? "");
 
-  const displayTitle = shortTitle || title || type;
+  // A send or receive is named for what it was — "Refund from UBER", "Sent to
+  // 0x12...ab" — rather than by its short title, which for those is only ever
+  // "Send" or "Receive" and told support nothing.
+  const isTransfer =
+    transactionType === TransactionType.SEND ||
+    transactionType === TransactionType.RECEIVE;
+  const displayTitle =
+    (isTransfer ? getTransferTitle(activity) : undefined) ||
+    shortTitle ||
+    title ||
+    type;
   // Resolved from the title too: `deposit` and `bridge_deposit` each back both a
   // savings deposit and a card deposit, so the static map alone labelled every
   // card deposit "Savings account".
-  const description = getTransactionCategory(transactionType, title) || "Unknown";
+  const description =
+    getTransferCategory(activity) ||
+    getTransactionCategory(transactionType, title) ||
+    "Unknown";
+  const summary = getTransferSummary(activity);
 
   const formatActivityTimestamp = (ts?: string, createdAtDate?: string) => {
     const date = ts ? new Date(parseInt(ts) * 1000) : new Date(createdAtDate || "");
@@ -131,6 +150,9 @@ export const ActivityItem = ({
             <span className="text-xs text-gray-400">•</span>
             <span className="text-xs text-gray-500">{formattedTimestamp}</span>
           </div>
+          {summary && (
+            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{summary}</p>
+          )}
         </div>
         {(isFailed || isExpired || isRefunded) && statusBadge && (
           <div
@@ -153,7 +175,7 @@ export const ActivityItem = ({
           ) : (
             <>
               {statusSign}
-              {formatNumber(parseFloat(amount || "0"), 2)} {symbol}
+              {formatNumber(parseFloat(amount || "0"), tokenFractionDigits(symbol))} {symbol}
             </>
           )}
         </span>

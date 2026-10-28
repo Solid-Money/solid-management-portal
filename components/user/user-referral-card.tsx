@@ -8,6 +8,7 @@ import { getUserReferrals } from "@/lib/api";
 import {
   referralStatus,
   reversalReasonLabel,
+  reviewReasonLabel,
   spendAgainstBar,
   spendBreakdown,
 } from "@/lib/referral";
@@ -36,12 +37,17 @@ function statusDetail(row: AdminReferralRewardRow): string | null {
       return row.paidAt ? `Paid ${shortDate(row.paidAt)}` : "Paid";
     case "reversed":
       return `${reversalReasonLabel(row.reversalReason)}${
-        row.reversedAt ? ` · ${shortDate(row.reversedAt)}` : ""
+        row.reversedBy ? ` · by ${row.reversedBy}` : ""
+      }${row.reversedAt ? ` · ${shortDate(row.reversedAt)}` : ""}${
+        row.reversalNote ? ` — "${row.reversalNote}"` : ""
       }`;
-    case "under_review":
-      return row.reviewReason === "velocity_over_monthly_threshold"
-        ? "Held: referrer over the monthly auto-review threshold"
-        : "Held for review";
+    case "under_review": {
+      const reasons =
+        row.reviewReasons ?? (row.reviewReason ? [row.reviewReason] : []);
+      return reasons.length > 0
+        ? `Held: ${reasons.map(reviewReasonLabel).join(", ")} · decide in Referral Review`
+        : "Held for review · decide in Referral Review";
+    }
     case "expired":
       return "Window closed without clearing the bar";
     default:
@@ -57,6 +63,19 @@ function StatusCell({ row }: { row: AdminReferralRewardRow }) {
     <div className="space-y-0.5">
       <Badge variant={status.variant}>{status.label}</Badge>
       {detail && <p className="text-[11px] text-gray-500">{detail}</p>}
+      {row.referrerLegWithheld && (
+        <p className="text-[11px] text-amber-700">
+          {row.status === "paid"
+            ? "Referrer's share withheld — only the friend was paid"
+            : "Referrer's share withheld — only the friend's share will pay"}
+        </p>
+      )}
+      {row.reviewApprovedAt && row.status !== "reversed" && (
+        <p className="text-[11px] text-emerald-700">
+          Approved by {row.reviewApprovedBy ?? "an admin"} ·{" "}
+          {shortDate(row.reviewApprovedAt)}
+        </p>
+      )}
       {row.reinstatedAt && (
         <p className="text-[11px] text-emerald-700">
           Reinstated by {row.reinstatedBy ?? "an admin"} ·{" "}

@@ -56,12 +56,46 @@ export interface User {
     frozen: boolean;
   } | null;
   /**
+   * Why a search for a card or issuer id found this user — that id is nowhere
+   * else on the row. Only present on search results, and null when the user
+   * matched on something else.
+   */
+  cardMatch?: CardSearchMatch | null;
+  /**
    * The owner closed the account with the in-app "Delete account". The row is
    * kept rather than removed, so the account can be recovered from its profile.
    */
   isDeleted?: boolean;
   /** When the account was closed. Cleared when it is recovered. */
   deletedAt?: string | null;
+  /**
+   * Set when an admin closed the account for security rather than its owner —
+   * the accounts that linked a Safe they did not own. Final: the backend
+   * refuses to recover such an account. `safeAddress` is the Safe the account
+   * pointed at before it was unlinked.
+   */
+  securityHold?: {
+    reason: string;
+    adminEmail: string;
+    at: string;
+    safeAddress?: string;
+  } | null;
+}
+
+/**
+ * Which card or issuer id a user search matched. Mirrors `CardReferenceMatch`
+ * in accounts-service.
+ */
+export interface CardSearchMatch {
+  /**
+   * `card_id` is the card they hold today; `previous_card_id` one a
+   * replacement retired; `wirex_user_id` and `provider_user_id` (Rain's
+   * consumer id) are the issuer's ids for the cardholder.
+   */
+  field: "card_id" | "previous_card_id" | "wirex_user_id" | "provider_user_id";
+  provider: CardProvider;
+  /** The whole id, so a search by its first characters shows what it found. */
+  value: string;
 }
 
 /**
@@ -229,6 +263,11 @@ export interface AdminActivity {
   depositTxFeeUSD?: string;
   createdAt: string;
   timestamp?: string;
+  /**
+   * Served whole by the admin list. Read for `transferContext`, which says what a
+   * send or receive was — a card refund, cashback, a deposit arriving.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 export interface AdminActivitiesResponse {
@@ -1132,6 +1171,13 @@ export interface CardTransactionCashback {
    */
   cashbackPercentage?: number;
   cashbackPercentageSource?: CashbackPercentageSource;
+  /**
+   * The monthly cap frozen on the row with that rate, in USD. The payout holds
+   * the purchase to the larger of this and the cap of the tier held on payout
+   * day, so a trial that ended in between keeps its cap. Absent on rows from
+   * before the cap was stored.
+   */
+  monthlyCapUsd?: number;
 }
 
 /**
@@ -1662,6 +1708,12 @@ export interface TierMembershipConfig {
   graceDays: number;
   /** How far ahead of a renewal the user is told about it. */
   renewalNoticeDays: number;
+  /**
+   * The most of a first payment, as a percentage of the price, that bridge and
+   * swap costs may take when the user pays from another chain. 0 turns it off;
+   * the backend caps it at 20 whatever is saved.
+   */
+  bridgeFeeCoverPct: number;
 }
 
 /** One tier's yield boost. */
@@ -1767,6 +1819,26 @@ export interface TierSubscriptionView {
   /** When a past-due membership finally loses its tier. */
   graceEndsAt: string | null;
   subscribedAt: string;
+  /**
+   * How the first payment was funded, when the user bridged it in from
+   * another chain. Null when it was paid from USDC already on Fuse; absent
+   * from backends that predate it.
+   */
+  funding?: TierSubscriptionFundingView | null;
+}
+
+/** A first payment bridged in from another chain, through LI.FI. */
+export interface TierSubscriptionFundingView {
+  /** The source-chain transaction. */
+  transactionHash: string;
+  fromChainId: number;
+  fromTokenSymbol: string | null;
+  /** What the user sent, in USD. */
+  sentUsd: string;
+  /** USDC that reached the Safe on Fuse. */
+  receivedUsd: string;
+  /** The bridge and swap cost the first charge absorbed. */
+  coverUsd: string;
 }
 
 /** The user's locked FUSE position, read from the chain. */
@@ -1798,6 +1870,28 @@ export interface TierLockTrancheReport {
   unlocksAt: string | null;
 }
 
+/** The FUSE a lock costs per tier — what a locked position is graded against. */
+export interface TierLockThresholds {
+  /** FUSE for Prime. */
+  tier2Amount: number;
+  /** FUSE for Ultra. */
+  tier3Amount: number;
+}
+
+/**
+ * Where the prices a lock is graded against came from.
+ *
+ * `existing`: already on the lock's record. `lock-time`: the price in force
+ * the day it was opened, from the config history. `admin`: entered by support
+ * because that day's price is not on record. `live`: today's price, used only
+ * when nothing better was known.
+ */
+export type TierLockThresholdsSource =
+  | "existing"
+  | "lock-time"
+  | "admin"
+  | "live";
+
 /** What re-evaluating a user's lock found and changed. */
 export interface TierLockReevaluationResult {
   safeAddress: string;
@@ -1806,7 +1900,42 @@ export interface TierLockReevaluationResult {
   lockTierAfter: string;
   /** The user's tier by every route, afterwards. */
   currentTier: string;
+  /**
+   * When the position was opened: the day its prices are pinned from.
+   * Optional only because a backend from before it existed omits it.
+   */
+  lockedSince?: string | null;
+  /** The prices the lock is graded against now; null when unpinned. */
+  pinnedThresholds?: TierLockThresholds | null;
+  thresholdsSource?: TierLockThresholdsSource | null;
   tranches: TierLockTrancheReport[];
+}
+
+/**
+ * What re-evaluating a lock would do, read before support presses it.
+ *
+ * Above all, whether the price the lock was bought at is on record. A lock
+ * with no record gets one, pinned for the rest of its term at the price on the
+ * day it was opened; when that day falls before the price history began,
+ * `needsThresholds` is true and support has to enter it.
+ */
+export interface TierLockReevaluationPreview {
+  /** Null when the user has no Safe. */
+  safeAddress: string | null;
+  /** Whether anything is locked on chain. */
+  locked: boolean;
+  /** When the oldest open lock was taken. */
+  lockedSince: string | null;
+  /** Whether the lock already has its record, and so its prices. */
+  recorded: boolean;
+  /** The prices on the existing record. */
+  pinnedThresholds: TierLockThresholds | null;
+  /** The price in force the day the lock was opened; null when not on record. */
+  lockTimeThresholds: TierLockThresholds | null;
+  /** Today's price, for reference only. */
+  liveThresholds: TierLockThresholds;
+  /** Re-evaluating needs support to enter the prices to pin. */
+  needsThresholds: boolean;
 }
 
 /** What one tier costs by each route, and whether the user already holds it. */
@@ -1969,11 +2098,34 @@ export interface WirexSpendContext {
   /** Guardian pauses. `safePaused` is usually arrears or a fraud hold. */
   modulePaused: boolean;
   safePaused: boolean;
+  /**
+   * `spendableUsd` in the currency the cardholder's purchases are billed in —
+   * the figure the app shows them, so the number a declined cardholder quotes
+   * back ("the app said €12.73") can be checked against it. Absent for a USD
+   * card, before any purchase, or when Wirex's latest quote is over a day old.
+   */
+  availableInCardCurrency?: CardCurrencyAmount;
+}
+
+/** An amount converted at Wirex's own quote. */
+export interface CardCurrencyAmount {
+  /** Decimal string, floored to the cent, e.g. `"12.73"`. */
+  amount: string;
+  /** ISO 4217, e.g. `"EUR"`. */
+  currency: string;
+  /** USD per one unit of `currency`, Wirex's quote with its spread. */
+  rate: number;
+  /** When Wirex quoted `rate` — the latest authorization in that currency. */
+  rateAt: string;
 }
 
 /** Every admin action the card panel lists against one cardholder. */
 export type CardAuditAction =
-  "card_frozen" | "card_unfrozen" | "card_issued" | "card_canceled";
+  | "card_frozen"
+  | "card_unfrozen"
+  | "card_issued"
+  | "card_canceled"
+  | "card_relinked";
 
 /** One entry in the admin audit trail for a card action. */
 export interface CardAuditEntry {
@@ -2014,6 +2166,10 @@ export type KycResetBlocker =
   | "no_application"
   | "already_approved"
   | "verification_in_flight"
+  /** Didit approved, but the hand-off to Rain failed at Rain: retry it, don't reset. */
+  | "forward_failed"
+  /** Didit approved; the application waits on the user's deposit. */
+  | "awaiting_deposit"
   | "issuer_consumer_exists"
   | "decided_by_issuer";
 
@@ -2040,11 +2196,34 @@ export interface KycResetEligibility {
   /** Sumsub's RETRY/FINAL, when Sumsub decided. */
   rejectType: string | null;
   /**
+   * Sumsub's review status (`init`, `pending`, `completed`, …). `init` is an
+   * applicant who opened the identity check and has not submitted it. Absent
+   * from backends older than the Wirex onboarding redesign.
+   */
+  sumsubReviewStatus?: string | null;
+  /**
+   * The Wirex card onboarding nudges: a push 24 hours and 3 days after the
+   * applicant last opened the identity check or was asked for more documents.
+   * `sent` is how many of the two went out since `anchoredAt`. Null for an
+   * applicant they have never covered.
+   */
+  onboardingReminders?: { anchoredAt: string; sent: number } | null;
+  /**
    * The provider holds a FINAL decision, so a reset only reopens our side: a new
    * session reaches the same answer unless the applicant is reset with the
    * provider too.
    */
   providerDecisionIsFinal: boolean;
+  /**
+   * Why an approved verification could not be handed to the issuer, as the
+   * user was told. Null unless that hand-off failed. Older backends omit it.
+   */
+  forwardFailureReason?: string | null;
+  /**
+   * Approved, but on answers the issuer cannot accept (a US SSN that is not 9
+   * digits): the user has to verify again, so a reset is the right tool.
+   */
+  requiresNewVerification?: boolean;
 }
 
 /** What the backend reports after clearing a verification. */
@@ -2329,9 +2508,13 @@ export interface AdminReferralRewardRow {
   reversedAt?: string;
   /**
    * account_closed | chargeback | ineligible_spend |
-   * no_activity_after_qualifying | self_referral_suspected
+   * no_activity_after_qualifying | self_referral_suspected |
+   * rejected_in_review | referrer_blocked
    */
   reversalReason?: string;
+  /** The admin who rejected or blocked it, and the note they gave. */
+  reversedBy?: string;
+  reversalNote?: string;
   /** Spend the referral rules left out (excluded merchants, tiny purchases). */
   excludedSpendUsd?: number;
   /** Merchants spent at that have not reached the per-merchant minimum. */
@@ -2339,6 +2522,13 @@ export interface AdminReferralRewardRow {
   /** Qualified, but the friend has not yet made the purchase the payout needs. */
   awaitingActivity?: boolean;
   reviewReason?: string;
+  /** Every reason it is held for review. */
+  reviewReasons?: string[];
+  /** An admin approved it out of (or ahead of) review. */
+  reviewApprovedAt?: string;
+  reviewApprovedBy?: string;
+  /** The referrer's share is withheld: the friend is paid, the referrer is not. */
+  referrerLegWithheld?: boolean;
   /** An admin re-evaluated it and put it back on track. */
   reinstatedAt?: string;
   reinstatedBy?: string;
@@ -2428,8 +2618,14 @@ export interface IssuanceCurrentCard {
   type?: CardType;
   /** Our status for it. */
   status?: string;
-  /** The issuer's own word — the one that says `canceled`. */
+  /** The issuer's own word: Rain's `canceled`, Wirex's `Blocked` or `Closed`. */
   issuerStatus?: string;
+  /**
+   * Whether the issuer already holds the card permanently closed, so the
+   * dialog need not know each issuer's vocabulary. Absent when the issuer
+   * could not be read.
+   */
+  closedAtIssuer?: boolean;
   last4?: string;
   /** MM/YY. */
   expiration?: string;
@@ -2448,7 +2644,10 @@ export interface CardIssuanceContext {
   /** Why not, when `canIssue` is false. Shown verbatim. */
   blockedReason?: string;
   provider?: CardProvider;
-  /** Issuer customer id the new card would be issued against. */
+  /**
+   * Issuer customer id the new card would be issued against: the Rain consumer
+   * id, or the Wirex cardholder's wallet.
+   */
   providerCustomerId?: string;
   currentCard?: IssuanceCurrentCard;
   defaults: {
@@ -2482,6 +2681,64 @@ export interface IssueCardResult {
   previousCardCanceled: boolean;
   adminUsername: string;
   reason?: string;
+}
+
+/** One of the cardholder's cards at the issuer, as the re-link dialog lists it. */
+export interface CardRelinkCandidate {
+  cardId: string;
+  /** The issuer's own word for it: Wirex's `Active`, `Blocked`, `Closed`… */
+  issuerStatus?: string;
+  /** The status the restored card would have in the app. */
+  status: string;
+  type?: CardType;
+  last4?: string;
+  /** MM/YY. */
+  expiration?: string;
+  /** When the issuer issued it. */
+  issuedAt?: string;
+  /** The newest card operation our ledger holds for it. */
+  lastUsedAt?: string;
+  /** It has taken at least one payment. */
+  hasPayments: boolean;
+  /** Why this card cannot be re-linked. Absent when it can. */
+  blockedReason?: string;
+}
+
+/**
+ * What the re-link dialog opens with. Mirrors `AdminCardRelinkContext` in
+ * accounts-service.
+ */
+export interface CardRelinkContext {
+  /** At least one card can be re-linked. */
+  canRelink: boolean;
+  /** Why not, when `canRelink` is false. Shown verbatim. */
+  blockedReason?: string;
+  provider?: CardProvider;
+  /** The Wirex cardholder's wallet. */
+  providerCustomerId?: string;
+  wirexUserId?: string;
+  /** Every card the issuer holds for the cardholder, re-linkable or not. */
+  candidates: CardRelinkCandidate[];
+  /** The card to preselect: the re-linkable one used most recently. */
+  suggestedCardId?: string;
+}
+
+export interface RelinkCardRequest {
+  cardId: string;
+  /** Required: this attaches a live card to an account on support's word. */
+  reason: string;
+}
+
+export interface RelinkCardResult {
+  userId: string;
+  cardId: string;
+  provider: CardProvider;
+  status: string;
+  issuerStatus?: string;
+  last4?: string;
+  expiration?: string;
+  adminUsername: string;
+  reason: string;
 }
 
 export type VaultKey = "USDC" | "FUSE" | "ETH";
@@ -2539,7 +2796,18 @@ export interface UserRewardsData {
   hasCustomCashbackRate?: boolean;
   nextTierCashbackRate: number;
   cashbackThisMonth: number;
+  /** This month's cashback still in escrow, already held to the cap. */
+  cashbackPendingThisMonth?: number;
+  /** The monthly cap of the tier held now. */
   maxCashbackMonthly: number;
+  /**
+   * The ceiling this month's purchases are actually paid up to. Above
+   * `maxCashbackMonthly` when they were made on a bigger tier — a trial that
+   * has since ended keeps its cap on what was bought during it.
+   */
+  cashbackCapThisMonth?: number;
+  /** What a purchase made now can still earn this month. */
+  cashbackHeadroomThisMonth?: number;
   referralPoints: number;
   hasCard: boolean;
   hasOptedIn: boolean;
@@ -2718,6 +2986,8 @@ export interface CashbackEntry {
   /** The rate the row was created at, and which of the three levels set it. */
   cashbackPercentage?: number;
   cashbackPercentageSource?: CashbackPercentageSource;
+  /** The monthly cap frozen on the row with that rate, in USD. */
+  monthlyCapUsd?: number;
 }
 
 /** Cashback rows plus the totals support is usually actually after. */
@@ -2749,6 +3019,101 @@ export interface ReevaluateFailedCashbackResult {
   blockedReason?: string;
   /** The latest the retry cron will pick the rows up. */
   expectedBy?: string;
+}
+
+/** Why a stuck cashback row gave up, read off its last error. */
+export type StuckCashbackCause =
+  | "rpc_unavailable"
+  | "wallet_underfunded"
+  | "transfer_reverted"
+  | "no_payout_address"
+  | "other";
+
+/** One PermanentlyFailed cashback row, as Config → Bulk lists it. */
+export interface StuckCashbackRow {
+  id: string;
+  userId: string;
+  /** Absent when the row's account no longer resolves. */
+  username?: string;
+  email?: string;
+  /** Rows whose user has no Safe are skipped by a re-send. */
+  hasPayoutAddress: boolean;
+  transactionId: string;
+  merchantName?: string;
+  type: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  /** The rate frozen on the row, as a fraction. Absent on older rows. */
+  cashbackPercentage?: number;
+  /**
+   * USD owed before the monthly cap: the row's own figure, else spend times its
+   * frozen rate. Null for a row older than the stored rate — the payout prices
+   * it at the cardholder's rate on the day.
+   */
+  owedUsd: number | null;
+  cause: StuckCashbackCause;
+  lastError?: string;
+  retryCount: number;
+  /** When the purchase was made. */
+  purchasedAt: string;
+  /** When the last payout attempt gave up. */
+  failedAt: string;
+}
+
+export interface StuckCashbackList {
+  rows: StuckCashbackRow[];
+  /** Every PermanentlyFailed row, including any past the cap on `rows`. */
+  total: number;
+  truncated: boolean;
+  summary: {
+    users: number;
+    owedUsd: number;
+    /** Rows with no `owedUsd`, priced only at payout. */
+    unpricedRows: number;
+    /** Rows a re-send would skip because their user has no Safe. */
+    noPayoutAddressRows: number;
+  };
+  generatedAt: string;
+}
+
+export type BulkReevaluateSkipReason =
+  | "not_permanently_failed"
+  | "user_not_found"
+  | "no_payout_address";
+
+/** What a bulk re-send of stuck cashback did. */
+export interface BulkReevaluateFailedCashbackResult {
+  batchId: string;
+  requested: number;
+  /** Rows reset to Failed with a fresh retry budget. */
+  rearmed: (ReevaluatedCashbackRow & { userId: string; username?: string })[];
+  skipped: {
+    id: string;
+    userId?: string;
+    username?: string;
+    reason: BulkReevaluateSkipReason;
+  }[];
+  /** Cardholders with at least one row re-armed. */
+  users: number;
+  /** The latest the retry cron will have picked every row up. */
+  expectedBy?: string;
+}
+
+/** One cashback row withheld by an admin. */
+export interface WithheldCashbackRow {
+  id: string;
+  transactionId: string;
+  merchantName?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  /** The status it was withheld from: Escrowed, Pending or Failed. */
+  previousStatus: string;
+}
+
+export interface WithholdCashbackResult {
+  userId: string;
+  /** Rows now Ineligible, so no cron will pay them. */
+  withheld: WithheldCashbackRow[];
 }
 
 export interface IntercomConversationSummary {
@@ -3069,9 +3434,15 @@ export interface ReferralSpendRuleSettings {
 export interface AntiAbuseConfig {
   merchantExclusions: MerchantExclusionConfig;
   referralRules: ReferralSpendRuleSettings;
+  /**
+   * Email domains new accounts may not sign up with, lower-cased. A listed
+   * domain also covers its subdomains. Absent from a backend that predates it.
+   */
+  blockedEmailDomains?: string[];
   defaults: {
     merchantExclusions: MerchantExclusionConfig;
     referralRules: ReferralSpendRuleSettings;
+    blockedEmailDomains?: string[];
   };
   lastUpdate: { at: string; by: string | null } | null;
 }
@@ -3083,6 +3454,7 @@ export interface UpdateAntiAbuseConfig {
   categories?: MerchantCategoryExclusion[];
   merchants?: MerchantNameExclusion[];
   referralRules?: Partial<ReferralSpendRuleSettings>;
+  blockedEmailDomains?: string[];
 }
 
 export interface MerchantExclusionPreview {
@@ -3158,7 +3530,8 @@ export type InternalTeamFeatureKey =
   | "wirex_virtual_account"
   | "spend_modes"
   | "eur_vault"
-  | "ai_api";
+  | "ai_api"
+  | "deposit_tokens";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;
@@ -3170,3 +3543,101 @@ export interface InternalTeamFeature {
    */
   teamOnly: boolean;
 }
+
+// --- Config → Tokens --------------------------------------------------------
+
+/**
+ * One row of the `swaptokens` list: a token on one chain. The list decides
+ * what the app's swap picker, wallet and activity feed show, and — unless the
+ * row is swap-only — which tokens a minted deposit address accepts.
+ */
+export interface ListedToken {
+  id: string;
+  name: string;
+  /** Lowercase, or checksummed on rows written straight to the collection. */
+  address: string;
+  symbol: string;
+  decimals: number;
+  chainId: number;
+  logoURI?: string;
+  /** Shown in the app. Off hides it without deleting the row. */
+  isActive: boolean;
+  /** Pinned to the top of the swap picker. */
+  isFeatured: boolean;
+  /** Lower comes first, after the featured tokens. */
+  displayOrder: number;
+  /** Merges this token's balances across chains in the wallet, e.g. `usdc`. */
+  commonId?: string;
+  /** The CoinGecko coin id the app prices it by when nothing else has a price. */
+  tokenId?: string;
+  /** Not accepted on a minted deposit address; listed for swapping only. */
+  swapOnly: boolean;
+  /** Whether the app's deposit screen offers it on this chain. */
+  depositOffered: boolean;
+  createdBy?: string;
+  updatedBy?: string;
+  /** ISO timestamps. */
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** What a new row would be filled in with, read on chain or from the deposit tables. */
+export interface TokenDraft {
+  chainId: number;
+  address: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  logoURI?: string;
+  commonId?: string;
+  tokenId?: string;
+  swapOnly: boolean;
+}
+
+/** A token the deposit screen offers that the list has no row for. */
+export interface MissingDepositToken extends TokenDraft {
+  /** `chainId:address`, lowercased. */
+  key: string;
+  /** `deposit_address`: a minted deposit address accepts it. `wallet`: sent straight to the Safe. */
+  route: "deposit_address" | "wallet";
+}
+
+export interface TokenChain {
+  chainId: number;
+  name: string;
+  explorerUrl?: string;
+}
+
+export interface TokenCatalogue {
+  tokens: ListedToken[];
+  chains: TokenChain[];
+  missingDepositTokens: MissingDepositToken[];
+}
+
+/** `GET /tokens/lookup`: the row a contract already has, or the draft of a new one. */
+export interface TokenLookup {
+  existing: ListedToken | null;
+  draft: TokenDraft | null;
+}
+
+export interface NewListedToken extends TokenDraft {
+  isActive?: boolean;
+  isFeatured?: boolean;
+  displayOrder?: number;
+}
+
+/** The fields an edit can change. An empty string clears an optional one. */
+export type ListedTokenChanges = Partial<
+  Pick<
+    ListedToken,
+    | "name"
+    | "symbol"
+    | "logoURI"
+    | "isActive"
+    | "isFeatured"
+    | "displayOrder"
+    | "commonId"
+    | "tokenId"
+    | "swapOnly"
+  >
+>;

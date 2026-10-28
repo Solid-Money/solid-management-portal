@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 
 import { getKycResetEligibility } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
 import { KycResetEligibility } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,9 @@ interface UserKycCardProps {
 }
 
 type BadgeVariant = "success" | "danger" | "warning" | "info" | "muted";
+
+/** The Wirex card onboarding sends two nudges per stall: +24h and +3 days. */
+const ONBOARDING_REMINDER_COUNT = 2;
 
 /** How each KYC status reads, and how loud it should be. */
 const STATUS_VARIANTS: Record<string, BadgeVariant> = {
@@ -42,7 +46,7 @@ function Stat({
     <div>
       <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm font-semibold text-gray-900">{value}</dd>
-      {hint && <p className="mt-0.5 hidden text-xs text-gray-500 @lg:block">{hint}</p>}
+      {hint && <p className="mt-0.5 break-words text-xs text-gray-500">{hint}</p>}
     </div>
   );
 }
@@ -137,6 +141,35 @@ export default function UserKycCard({ userId, username }: UserKycCardProps) {
               />
             </dl>
 
+            {(data.sumsubReviewStatus || data.onboardingReminders) && (
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
+                <Stat
+                  label="Sumsub review"
+                  value={humanize(data.sumsubReviewStatus ?? null)}
+                  hint={
+                    data.sumsubReviewStatus === "init"
+                      ? "Opened the check, not submitted"
+                      : undefined
+                  }
+                />
+                <Stat
+                  label="Onboarding nudges"
+                  value={
+                    data.onboardingReminders
+                      ? `${data.onboardingReminders.sent} of ${ONBOARDING_REMINDER_COUNT} sent`
+                      : "—"
+                  }
+                  hint={
+                    data.onboardingReminders
+                      ? `Pushes at +24h and +3 days, counted from ${formatDateTime(
+                          data.onboardingReminders.anchoredAt,
+                        )}`
+                      : undefined
+                  }
+                />
+              </dl>
+            )}
+
             {data.reasonCodes.length > 0 && (
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
                 <p className="text-xs font-medium uppercase text-gray-500">
@@ -152,6 +185,22 @@ export default function UserKycCard({ userId, username }: UserKycCardProps) {
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* An approved verification carries no provider codes, so this is
+                the only thing that says why the user is stuck. */}
+            {data.forwardFailureReason && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <p className="font-medium">Could not be sent to the card issuer</p>
+                <p className="mt-1 break-words">{data.forwardFailureReason}</p>
+                {data.requiresNewVerification && (
+                  <p className="mt-1">
+                    Retrying the hand-off sends the same answers and fails the
+                    same way. The user has to verify again: they can start it
+                    from the app, or reset their verification here.
+                  </p>
+                )}
               </div>
             )}
 

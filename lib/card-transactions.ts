@@ -49,6 +49,7 @@ export function cashbackStatusVariant(
     case "PartiallyRefunded":
     case "FullyRefunded":
     case "Canceled":
+    case "Ineligible":
       return "muted";
     default:
       return "muted";

@@ -19,16 +19,22 @@ export default function ErrorLookup() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const initial = searchParams.get("ref") ?? "";
-  const [input, setInput] = useState(initial);
-  const [query, setQuery] = useState(initial.trim());
+  // The URL is the source of truth: the nav's quick search can open another
+  // Ref while this page is already mounted.
+  const ref = searchParams.get("ref") ?? "";
+  const query = ref.trim();
+  const [input, setInput] = useState(ref);
+  const [inputRef, setInputRef] = useState(ref);
+  if (ref !== inputRef) {
+    setInputRef(ref);
+    setInput(ref);
+  }
 
   const { data, isFetching, isError } = useClientErrorLookup(query);
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const trimmed = input.trim();
-    setQuery(trimmed);
     router.replace(trimmed ? `${pathname}?ref=${encodeURIComponent(trimmed)}` : pathname);
   };
 

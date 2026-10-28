@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, Search, User as UserIcon } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { LogOut, Menu, User as UserIcon } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NavSearchTrigger } from "@/components/command-palette/search-trigger";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +32,6 @@ import {
   isActivePath,
   type NavGroup,
 } from "@/lib/navigation";
-import { isErrorLookupQuery } from "@/lib/error-ref";
 import { cn } from "@/lib/utils";
 import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
 
@@ -56,37 +55,6 @@ function CountBadge({ count }: { count: number }) {
     >
       {count > 99 ? "99+" : count}
     </span>
-  );
-}
-
-/** Jump straight to a user from anywhere — the most common support entry point. */
-function UserQuickSearch() {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    // A Ref pasted from a support chat goes to the error lookup instead.
-    router.push(
-      isErrorLookupQuery(trimmed)
-        ? `/error-lookup?ref=${encodeURIComponent(trimmed)}`
-        : `/users?search=${encodeURIComponent(trimmed)}`,
-    );
-  };
-
-  return (
-    <form onSubmit={submit} className="relative hidden lg:block">
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400" />
-      <Input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Find a user or Ref…"
-        aria-label="Find a user by name, email, address or referral code, or an error Ref"
-        className="h-9 w-56 pl-8"
-      />
-    </form>
   );
 }
 
@@ -154,12 +122,28 @@ function GroupSubmenu({
 }
 
 /** Every link in one dropdown, for viewports too narrow for the menu bar. */
-function MobileNav({ pathname, groups }: { pathname: string; groups: NavGroup[] }) {
+function MobileNav({
+  pathname,
+  groups,
+  supportBadge,
+}: {
+  pathname: string;
+  groups: NavGroup[];
+  supportBadge: number;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="md:hidden" aria-label="Open navigation">
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative md:hidden"
+          aria-label={supportBadge ? `Open navigation, ${supportBadge} support cases waiting` : "Open navigation"}
+        >
           <Menu className="h-4 w-4" />
+          {supportBadge > 0 && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
@@ -182,8 +166,9 @@ function MobileNav({ pathname, groups }: { pathname: string; groups: NavGroup[] 
               </DropdownMenuItem>
             ) : (
               <>
-                <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
+                <DropdownMenuLabel className="text-muted-foreground flex items-center text-xs uppercase">
                   {group.label}
+                  {group.supportBadge && <CountBadge count={supportBadge} />}
                 </DropdownMenuLabel>
                 {group.items?.map((item) => (
                   <DropdownMenuItem key={item.href} asChild>
@@ -285,7 +270,7 @@ export default function DashboardNav() {
     <>
       <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <MobileNav pathname={pathname} groups={groups} />
+          <MobileNav pathname={pathname} groups={groups} supportBadge={supportBadge} />
 
           <Link href="/users" className="shrink-0 text-xl font-bold text-indigo-600">
             Solid Admin
@@ -324,7 +309,9 @@ export default function DashboardNav() {
           </NavigationMenu>
 
           <div className="ml-auto flex items-center gap-3">
-            <UserQuickSearch />
+            {/* Users, card ids, Refs, pages and settings — the most common
+                support entry point, so it is on every page. */}
+            <NavSearchTrigger />
             <ProfileMenu
               email={user?.email}
               onSignOut={() => setIsSignOutModalOpen(true)}

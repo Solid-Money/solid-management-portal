@@ -152,6 +152,9 @@ export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
   ultraAnnualUsd: TIER_PRICE_NOT_PURCHASABLE,
   graceDays: 7,
   renewalNoticeDays: 7,
+  // The backend's default: live Base -> Fuse quotes cost well under 1%, and a
+  // volatile source token adds its own swap on top.
+  bridgeFeeCoverPct: 5,
 };
 
 /**

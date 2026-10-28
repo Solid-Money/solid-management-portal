@@ -196,7 +196,8 @@ function ArticlesScreen() {
       link.href = url;
       link.download = "help-center-redirects.csv";
       link.click();
-      URL.revokeObjectURL(url);
+      // Some browsers start the download after click() returns.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
       toast.error("Could not load the redirect map");
     }
@@ -220,13 +221,13 @@ function ArticlesScreen() {
           <Button variant="outline" onClick={downloadRedirects} title="Old Intercom and renamed URLs, and where they go">
             <Download /> Redirect map
           </Button>
-          <Button variant="outline" onClick={() => setShowImport(true)} title="Copy Intercom's help center here">
+          <Button id="import-intercom" data-search-open variant="outline" onClick={() => setShowImport(true)} title="Copy Intercom's help center here">
             <CloudDownload /> Import from Intercom
           </Button>
-          <Button variant="outline" onClick={() => setShowCollections(true)}>
+          <Button id="help-collections" data-search-open variant="outline" onClick={() => setShowCollections(true)}>
             <FolderTree /> Collections
           </Button>
-          <Button onClick={() => setShowNew(true)}>
+          <Button id="new-article" data-search-open onClick={() => setShowNew(true)}>
             <Plus /> New article
           </Button>
         </div>

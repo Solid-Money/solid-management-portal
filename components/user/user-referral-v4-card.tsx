@@ -455,7 +455,7 @@ function ReferrerSection({
           detail={
             overThreshold ? (
               <Link
-                href="/referral-review"
+                href="/referral-v4-review"
                 className="text-amber-700 underline"
               >
                 Over the review threshold

@@ -34,6 +34,31 @@ function Stat({
 }
 
 /**
+ * What is still pending this month, and the cap the month is paid up to.
+ *
+ * The month's cap sits above the tier's when purchases were made on a bigger
+ * tier — a trial that has since ended keeps its cap on what was bought during
+ * it — which is exactly what a cardholder asks support about, so both are
+ * shown then.
+ */
+function monthCashbackHint(rewards: UserRewardsData): string {
+  const parts: string[] = [];
+
+  const pending = rewards.cashbackPendingThisMonth ?? 0;
+  if (pending > 0) parts.push(`+$${pending.toFixed(2)} pending`);
+
+  const tierCap = rewards.maxCashbackMonthly;
+  const monthCap = rewards.cashbackCapThisMonth ?? tierCap;
+  parts.push(
+    monthCap > tierCap
+      ? `Cap $${monthCap.toFixed(2)} (tier $${tierCap.toFixed(2)})`
+      : `Cap $${monthCap.toFixed(2)}`
+  );
+
+  return parts.join(" · ");
+}
+
+/**
  * Tier, points and cashback allowance, read from the same rewards service the
  * app's rewards screen uses — so "why am I not getting 2% cashback?" can be
  * answered from the same numbers the customer is seeing.
@@ -90,7 +115,7 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
               <Stat
                 label="Cashback this month"
                 value={`$${rewards.cashbackThisMonth.toFixed(2)}`}
-                hint={`Cap $${rewards.maxCashbackMonthly.toFixed(2)}`}
+                hint={monthCashbackHint(rewards)}
               />
               <Stat
                 label="Referral points"

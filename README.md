@@ -6,7 +6,29 @@ Admin dashboard for managing Solid users and viewing account balances.
 
 - User list with search, sorting, and pagination
 - User detail view with balances and activity
-- Public access (no authentication required for v1)
+- Dashboard-wide search (⌘K / Ctrl+K, or `/`) — see below
+
+## Search
+
+The search box in the top bar (and on the Users page) opens a command palette
+built on the shadcn `Command` component (`cmdk`):
+
+- **Users** by username, email, wallet, Safe, referral code, user ID — and by
+  card: a Rain or Wirex card ID (whole, or its first characters), a replaced
+  card's old ID, a Wirex user ID or a Rain consumer ID. Results say which ID
+  matched.
+- **Recent users**: every profile you open is kept (per admin, in this
+  browser) and listed when the search opens empty.
+- **Pages, sections and actions** from `lib/search-index.ts`. A section links
+  to an `id` on its page (`/rewards-config#referral-system`); the user profile,
+  wallets and referral review keep their tab in `?tab=`. `SectionScroller`
+  waits for the section to render, scrolls to it and flashes it; a collapsed
+  config section opens itself, and a button marked `data-search-open` (e.g.
+  "New campaign") is pressed. When you rename or move a section, update its
+  entry in `lib/search-index.ts`.
+- **Wallets** from the treasury registry, by name, purpose or address.
+- **Error Refs** go to the error lookup; a 24-character user ID opens the
+  profile directly.
 
 ## Tech Stack
 
@@ -91,14 +113,14 @@ Make sure to set these in your Vercel project settings:
 │   ├── layout.tsx          # Root layout with providers
 │   └── page.tsx            # Root page (redirects to /users)
 ├── components/
-│   ├── auth-provider.tsx   # Auth context (mocked for v1)
+│   ├── auth-provider.tsx   # Firebase sign-in, limited to the admin domain
 │   ├── providers.tsx       # Global providers
 │   ├── users-table.tsx     # Users list table
 │   ├── balances-card.tsx   # User balances display
 │   └── activity-list.tsx   # User activity list
 ├── lib/
 │   ├── api.ts              # Axios instance
-│   └── firebase.ts         # Firebase config (unused in v1)
+│   └── firebase.ts         # Firebase config
 ├── hooks/
 │   └── use-debounce.ts     # Debounce hook
 └── types/

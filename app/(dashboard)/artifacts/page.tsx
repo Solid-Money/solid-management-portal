@@ -151,7 +151,7 @@ export default function ArtifactsPage() {
         </p>
       </div>
 
-      <Card>
+      <Card id="add-artifact">
         <CardHeader>
           <CardTitle>Add an artifact</CardTitle>
         </CardHeader>
