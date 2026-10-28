@@ -2994,6 +2994,84 @@ export interface ReevaluateFailedCashbackResult {
   expectedBy?: string;
 }
 
+/** Why a stuck cashback row gave up, read off its last error. */
+export type StuckCashbackCause =
+  | "rpc_unavailable"
+  | "wallet_underfunded"
+  | "transfer_reverted"
+  | "no_payout_address"
+  | "other";
+
+/** One PermanentlyFailed cashback row, as Config → Bulk lists it. */
+export interface StuckCashbackRow {
+  id: string;
+  userId: string;
+  /** Absent when the row's account no longer resolves. */
+  username?: string;
+  email?: string;
+  /** Rows whose user has no Safe are skipped by a re-send. */
+  hasPayoutAddress: boolean;
+  transactionId: string;
+  merchantName?: string;
+  type: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  /** The rate frozen on the row, as a fraction. Absent on older rows. */
+  cashbackPercentage?: number;
+  /**
+   * USD owed before the monthly cap: the row's own figure, else spend times its
+   * frozen rate. Null for a row older than the stored rate — the payout prices
+   * it at the cardholder's rate on the day.
+   */
+  owedUsd: number | null;
+  cause: StuckCashbackCause;
+  lastError?: string;
+  retryCount: number;
+  /** When the purchase was made. */
+  purchasedAt: string;
+  /** When the last payout attempt gave up. */
+  failedAt: string;
+}
+
+export interface StuckCashbackList {
+  rows: StuckCashbackRow[];
+  /** Every PermanentlyFailed row, including any past the cap on `rows`. */
+  total: number;
+  truncated: boolean;
+  summary: {
+    users: number;
+    owedUsd: number;
+    /** Rows with no `owedUsd`, priced only at payout. */
+    unpricedRows: number;
+    /** Rows a re-send would skip because their user has no Safe. */
+    noPayoutAddressRows: number;
+  };
+  generatedAt: string;
+}
+
+export type BulkReevaluateSkipReason =
+  | "not_permanently_failed"
+  | "user_not_found"
+  | "no_payout_address";
+
+/** What a bulk re-send of stuck cashback did. */
+export interface BulkReevaluateFailedCashbackResult {
+  batchId: string;
+  requested: number;
+  /** Rows reset to Failed with a fresh retry budget. */
+  rearmed: (ReevaluatedCashbackRow & { userId: string; username?: string })[];
+  skipped: {
+    id: string;
+    userId?: string;
+    username?: string;
+    reason: BulkReevaluateSkipReason;
+  }[];
+  /** Cardholders with at least one row re-armed. */
+  users: number;
+  /** The latest the retry cron will have picked every row up. */
+  expectedBy?: string;
+}
+
 /** One cashback row withheld by an admin. */
 export interface WithheldCashbackRow {
   id: string;

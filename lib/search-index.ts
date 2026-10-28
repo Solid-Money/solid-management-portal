@@ -298,7 +298,14 @@ const CONFIG_ENTRIES: SearchEntry[] = [
   section("/general-config#rain-rtf", "Rain Real-Time Funding", "Config › General", Zap, {
     keywords: ["rtf", "rain", "authorization", "card funding"],
   }),
-  action("/tier-trials#gift-trials", "Gift tier trials", "Config › Tier Trials", Sparkles, {
+  section("/bulk#stuck-cashback", "Stuck cashback", "Config › Bulk", BadgeDollarSign, {
+    description: "Re-send cashback that gave up after five payout attempts",
+    keywords: ["permanently failed", "failed cashback", "re-send", "retry", "payout", "bulk"],
+  }),
+  section("/bulk#tier-trials", "Tier trials", "Config › Bulk", Sparkles, {
+    keywords: ["prime", "ultra", "batch", "trial", "gift", "bulk"],
+  }),
+  action("/bulk#gift-trials", "Gift tier trials", "Config › Bulk", Sparkles, {
     description: "Prime or Ultra for a list of usernames at once",
     keywords: ["prime", "ultra", "batch", "trial", "gift"],
   }),

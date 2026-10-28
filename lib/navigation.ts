@@ -15,6 +15,7 @@ import {
   Gift,
   Globe,
   Image,
+  Layers,
   LayoutTemplate,
   Megaphone,
   Percent,
@@ -210,10 +211,11 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Gift,
       },
       {
-        href: "/tier-trials",
-        label: "Tier Trials",
-        description: "Gift Prime or Ultra to a list of users at once",
-        icon: Sparkles,
+        href: "/bulk",
+        label: "Bulk",
+        description:
+          "Act on many users at once: re-send stuck cashback, gift tier trials",
+        icon: Layers,
       },
       {
         href: "/fees-config",

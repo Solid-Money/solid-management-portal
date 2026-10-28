@@ -100,6 +100,16 @@ export function scrollToHashTarget(): () => void {
     window.clearInterval(timer);
     if (element.closest("[data-anchor-self]")) return;
 
+    // A section folded into a closed <details> (Config → Bulk) is opened on
+    // the way in, whether the link names the section or something inside it.
+    for (
+      let details = element.closest("details");
+      details;
+      details = details.parentElement?.closest("details") ?? null
+    ) {
+      details.open = true;
+    }
+
     // A button that only opens a form ("New campaign") is pressed for the
     // reader: they searched for the action, not for where it lives. The hash
     // is dropped afterwards so a reload or a later re-render cannot open it
