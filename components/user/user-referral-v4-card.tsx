@@ -26,6 +26,7 @@ import type {
   ReferralV4UpgradeView,
 } from "@/types/referral-v4";
 import CancelReferralV4RewardDialog from "@/components/user/cancel-referral-v4-reward-dialog";
+import { CardErrorBoundary } from "@/components/referral-v4/card-error-boundary";
 import { NotAvailableYet } from "@/components/referral-v4/not-available";
 import UserLink from "@/components/user-link";
 import { Badge } from "@/components/ui/badge";
@@ -91,7 +92,8 @@ function stepWhen(step: {
   }
 }
 
-function StepChip({ step }: { step: ReferralV4StepView }) {
+function StepChip({ step }: { step?: ReferralV4StepView }) {
+  if (!step) return <span className="text-gray-400">—</span>;
   const status = referralV4Status(step.status);
   const when = stepWhen(step);
   const showProgress =
@@ -118,7 +120,8 @@ function StepChip({ step }: { step: ReferralV4StepView }) {
   );
 }
 
-function UpgradeChip({ upgrade }: { upgrade: ReferralV4UpgradeView }) {
+function UpgradeChip({ upgrade }: { upgrade?: ReferralV4UpgradeView }) {
+  if (!upgrade) return <span className="text-gray-400">—</span>;
   const status = referralV4Status(upgrade.status);
   const when = stepWhen(upgrade);
 
@@ -345,7 +348,14 @@ function ReferrerSection({
 }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const { asReferrer } = data;
-  const { totals, bonusLimit } = asReferrer;
+  const { bonusLimit } = asReferrer;
+  const totals = asReferrer.totals ?? {
+    earnedUsd: 0,
+    thisMonthUsd: 0,
+    onHoldUsd: 0,
+    pendingSpendShareUsd: 0,
+    nextPayoutAt: "",
+  };
   const friends = asReferrer.friends ?? [];
   const overThreshold =
     asReferrer.monthQualifiedCount > asReferrer.reviewThreshold;
@@ -622,6 +632,14 @@ function FriendSection({
  * the Referral cashback card.
  */
 export default function UserReferralV4Card({ userId }: { userId: string }) {
+  return (
+    <CardErrorBoundary title="Referral v4 — card credit">
+      <ReferralV4CardBody userId={userId} />
+    </CardErrorBoundary>
+  );
+}
+
+function ReferralV4CardBody({ userId }: { userId: string }) {
   const { data, isLoading, error } = useUserReferralsV4(userId);
   const access = useReferralV4Access();
   const canCancel = access.data?.canReview === true;
@@ -665,11 +683,13 @@ export default function UserReferralV4Card({ userId }: { userId: string }) {
           <p className="text-sm text-red-600">Failed to load referral v4.</p>
         ) : (
           <div className="space-y-5">
-            {terms && (
+            {terms?.welcome && terms.bigSpender && terms.upgrade && terms.spendShare && (
               <p className="text-xs text-gray-500">{termsLine(terms)}</p>
             )}
-            <ReferrerSection data={data} canCancel={canCancel} />
-            <FriendSection row={data.asFriend} canCancel={canCancel} />
+            {data.asReferrer && (
+              <ReferrerSection data={data} canCancel={canCancel} />
+            )}
+            <FriendSection row={data.asFriend ?? null} canCancel={canCancel} />
           </div>
         )}
       </CardContent>

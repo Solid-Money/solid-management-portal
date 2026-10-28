@@ -173,7 +173,7 @@ export default function ReferralBoostsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
-                        {boost.steps.map((step) => (
+                        {(boost.steps ?? []).map((step) => (
                           <Badge key={step} variant="muted">
                             {referralV4StepLabel(step)}
                           </Badge>

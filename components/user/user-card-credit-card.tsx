@@ -17,6 +17,7 @@ import {
 import { formatUsd } from "@/lib/utils";
 import type { AdminCardCreditEntry } from "@/types/referral-v4";
 import CardCreditAdjustDialog from "@/components/user/card-credit-adjust-dialog";
+import { CardErrorBoundary } from "@/components/referral-v4/card-error-boundary";
 import { NotAvailableYet } from "@/components/referral-v4/not-available";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,18 @@ function Stat({
  * asked about "my credit isn't being used". Grant and Remove are shown only
  * to admins the backend allows (`canManageCredit`).
  */
-export default function UserCardCreditCard({
+export default function UserCardCreditCard(props: {
+  userId: string;
+  username: string;
+}) {
+  return (
+    <CardErrorBoundary title="Card credit">
+      <CardCreditCardBody {...props} />
+    </CardErrorBoundary>
+  );
+}
+
+function CardCreditCardBody({
   userId,
   username,
 }: {

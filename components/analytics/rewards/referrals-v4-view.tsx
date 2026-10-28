@@ -83,9 +83,11 @@ export function RewardsReferralsV4View() {
         <AnalyticsKpiCard
           className="md:col-span-2"
           title="Next payout"
-          value={data ? formatUsd(data.nextPayout.estimateUsd) : undefined}
+          value={
+            data?.nextPayout ? formatUsd(data.nextPayout.estimateUsd) : undefined
+          }
           scope={
-            data
+            data?.nextPayout
               ? `Estimate for ${formatUtc(data.nextPayout.at)} · ${formatNumber(
                   data.nextPayout.referrers,
                   0,
