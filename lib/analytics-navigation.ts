@@ -219,6 +219,12 @@ export const ANALYTICS_TABS: AnalyticsTab[] = [
         label: "Referral program",
         question: "Who refers, who qualifies, and what does a referral cost us?",
       },
+      {
+        id: "referrals-v4",
+        label: "Referral v4",
+        question:
+          "What does referral v4 cost in card credit and spend share, and what is due at the next payout?",
+      },
     ],
   },
   {

@@ -6,6 +6,7 @@ import { PendingSubTab } from "@/components/analytics/panel";
 import { RewardsOwedView } from "@/components/analytics/rewards/owed-view";
 import { RewardsPaidView } from "@/components/analytics/rewards/paid-view";
 import { RewardsReferralsView } from "@/components/analytics/rewards/referrals-view";
+import { RewardsReferralsV4View } from "@/components/analytics/rewards/referrals-v4-view";
 import { RewardsWalletsView } from "@/components/analytics/rewards/wallets-view";
 import { analyticsTab, resolveSubTab } from "@/lib/analytics-navigation";
 
@@ -30,6 +31,8 @@ export default function RewardsAnalyticsPage() {
         <RewardsWalletsView />
       ) : subTab?.id === "referrals" ? (
         <RewardsReferralsView />
+      ) : subTab?.id === "referrals-v4" ? (
+        <RewardsReferralsV4View />
       ) : null}
     </div>
   );

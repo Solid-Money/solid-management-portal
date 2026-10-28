@@ -21,6 +21,7 @@ import {
   formatCashbackRate,
   formatMonthlyCap,
 } from "@/lib/cashback-percentage";
+import { formatUsd } from "@/lib/utils";
 import CashbackRateDialog from "@/components/cashback/cashback-rate-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -333,7 +334,7 @@ export default function CardTransactionsTable({
     );
   }
 
-  const columnCount = compact ? 8 : 9;
+  const columnCount = compact ? 9 : 10;
 
   return (
     <div className="bg-white shadow rounded-lg">
@@ -417,6 +418,12 @@ export default function CardTransactionsTable({
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Card Fees
+              </th>
+              <th
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                title="Referral v4 card credit used on this purchase (Wirex). Cashback is earned on the rest."
+              >
+                Card credit
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Cashback
@@ -510,6 +517,12 @@ export default function CardTransactionsTable({
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm">{renderFees(tx)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-emerald-700">
+                    {typeof tx.cardCreditUsedUsd === "number" &&
+                    tx.cardCreditUsedUsd > 0
+                      ? formatUsd(tx.cardCreditUsedUsd)
+                      : null}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {tx.cashback ? (
                       <div className="space-y-1">
