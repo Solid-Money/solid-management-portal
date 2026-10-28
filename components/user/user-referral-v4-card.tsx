@@ -2,16 +2,25 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Gift, Loader2, Zap } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Gift,
+  Loader2,
+  PauseCircle,
+  Zap,
+} from "lucide-react";
 
 import {
   useReferralV4Access,
+  useReferralV4Config,
   useUserReferralsV4,
 } from "@/hooks/use-referral-v4";
 import {
   CANCELLABLE_V4_STATUSES,
   formatUtcDay,
   isNotAvailable,
+  payoutScheduleLabel,
   referralV4Stage,
   referralV4Status,
   referralV4StepLabel,
@@ -26,6 +35,7 @@ import type {
   ReferralV4UpgradeView,
 } from "@/types/referral-v4";
 import CancelReferralV4RewardDialog from "@/components/user/cancel-referral-v4-reward-dialog";
+import ReferralV4DebtsSection from "@/components/user/referral-v4-debts-section";
 import { CardErrorBoundary } from "@/components/referral-v4/card-error-boundary";
 import { NotAvailableYet } from "@/components/referral-v4/not-available";
 import UserLink from "@/components/user-link";
@@ -44,6 +54,10 @@ function percent(rate: number): string {
 
 /** The program's terms in one line, read live from config. */
 function termsLine(terms: ReferralV4Terms): string {
+  const schedule = payoutScheduleLabel(
+    terms.spendShare.payoutWeekday,
+    terms.spendShare.payoutHourUtc,
+  );
   return [
     `Welcome ${money(terms.welcome.referrerUsd)} + ${money(
       terms.welcome.friendUsd,
@@ -62,7 +76,14 @@ function termsLine(terms: ReferralV4Terms): string {
       terms.spendShare.capPerFriendUsd,
     )} per friend`,
     `${terms.holdDays}-day hold`,
-  ].join(" · ");
+    schedule && `paid ${schedule}`,
+    terms.clawback &&
+      (terms.clawback.enabled
+        ? `clawback within ${terms.clawback.watchDays} days of crediting`
+        : "clawback off"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** When the step's next thing happens, or happened. */
@@ -72,6 +93,7 @@ function stepWhen(step: {
   unlocksAt?: string;
   creditedAt?: string;
   earnedAt?: string;
+  reversedAt?: string;
 }): string | null {
   switch (step.status) {
     case "in_progress":
@@ -87,6 +109,10 @@ function stepWhen(step: {
     case "limit_reached":
     case "under_review":
       return step.earnedAt ? `earned ${formatUtcDay(step.earnedAt)}` : null;
+    case "reversed":
+      return step.reversedAt
+        ? `reversed ${formatUtcDay(step.reversedAt)}`
+        : null;
     default:
       return null;
   }
@@ -116,7 +142,18 @@ function StepChip({ step }: { step?: ReferralV4StepView }) {
       {when && (
         <p className="text-[11px] whitespace-nowrap text-gray-500">{when}</p>
       )}
+      <OffsetNote usd={step.offsetUsd} />
     </div>
+  );
+}
+
+/** The part of a bonus that went to repaying a reversed one, if any. */
+function OffsetNote({ usd }: { usd?: number }) {
+  if (!usd || usd <= 0) return null;
+  return (
+    <p className="text-[11px] text-amber-700">
+      {money(usd)} repaid a reversed bonus
+    </p>
   );
 }
 
@@ -146,6 +183,7 @@ function UpgradeChip({ upgrade }: { upgrade?: ReferralV4UpgradeView }) {
       {when && (
         <p className="text-[11px] whitespace-nowrap text-gray-500">{when}</p>
       )}
+      <OffsetNote usd={upgrade.offsetUsd} />
     </div>
   );
 }
@@ -268,7 +306,11 @@ function RewardsTable({
               `credited ${formatUtcDay(reward.creditedAt)}`,
             reward.cancelledAt &&
               `cancelled ${formatUtcDay(reward.cancelledAt)}`,
+            reward.reversedAt &&
+              `reversed ${formatUtcDay(reward.reversedAt)}`,
           ].filter(Boolean);
+          const offset = reward.debtOffsetUsd ?? 0;
+          const reversed = reward.status === "reversed";
 
           return (
             <tr key={reward.id} className="align-top">
@@ -295,7 +337,21 @@ function RewardsTable({
                 {reward.cancelReason && (
                   <p className="text-red-700">“{reward.cancelReason}”</p>
                 )}
-                {!reward.reviewReason && !reward.cancelReason && "—"}
+                {reversed && (
+                  <p className="text-red-700">
+                    Refunded below the bar after crediting — debt booked
+                  </p>
+                )}
+                {offset > 0 && (
+                  <p className="text-amber-700">
+                    {money(offset)} repaid a reversed bonus
+                  </p>
+                )}
+                {!reward.reviewReason &&
+                  !reward.cancelReason &&
+                  !reversed &&
+                  offset <= 0 &&
+                  "—"}
               </td>
               <td className="px-2 py-1.5 text-right">
                 {canCancel && CANCELLABLE_V4_STATUSES.has(reward.status) && (
@@ -342,9 +398,12 @@ function Stat({
 function ReferrerSection({
   data,
   canCancel,
+  reviewWindowDays,
 }: {
   data: AdminUserReferralsV4;
   canCancel: boolean;
+  /** From the config; undefined while it loads. */
+  reviewWindowDays?: number;
 }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const { asReferrer } = data;
@@ -387,7 +446,11 @@ function ReferrerSection({
           warn={!!bonusLimit && bonusLimit.waiting > 0}
         />
         <Stat
-          label="Qualified this month"
+          label={
+            reviewWindowDays
+              ? `Qualified, last ${reviewWindowDays} days`
+              : "Qualified, review window"
+          }
           value={`${asReferrer.monthQualifiedCount} / ${asReferrer.reviewThreshold}`}
           detail={
             overThreshold ? (
@@ -629,7 +692,8 @@ function FriendSection({
  * not yet credited (on hold, over the bonus limit, under review) for admins
  * who can review. Legacy friends (signed up before launch) are listed too,
  * with their legacy status; their full detail and re-evaluate action stay on
- * the Referral cashback card.
+ * the Referral cashback card. Debts from reversed bonuses close the card, with
+ * Write off on the open ones for the same admins.
  */
 export default function UserReferralV4Card({ userId }: { userId: string }) {
   return (
@@ -645,6 +709,10 @@ function ReferralV4CardBody({ userId }: { userId: string }) {
   const canCancel = access.data?.canReview === true;
   const notAvailable = !!error && isNotAvailable(error);
   const terms = data?.terms;
+  const reviewWindowDays = useReferralV4Config().data?.reviewWindowDays;
+  const openDebtUsd = (Array.isArray(data?.debts) ? data.debts : [])
+    .filter((debt) => debt.status === "open")
+    .reduce((sum, debt) => sum + (Number(debt.remainingUsd) || 0), 0);
 
   return (
     <Card className="@container">
@@ -661,13 +729,22 @@ function ReferralV4CardBody({ userId }: { userId: string }) {
                 {terms.boost.name} ×{terms.boost.multiplier}
               </Badge>
             )}
+            {openDebtUsd > 0 && (
+              <Badge variant="warning">Owes {formatUsd(openDebtUsd)}</Badge>
+            )}
+            {terms.paused && (
+              <Badge variant="danger">
+                <PauseCircle />
+                Payouts paused
+              </Badge>
+            )}
             {terms.enabled ? (
               <Badge variant="success">
-                On
-                {terms.launchAt ? ` since ${formatUtcDay(terms.launchAt)}` : ""}
+                Open to new signups
+                {terms.launchAt ? ` from ${formatUtcDay(terms.launchAt)}` : ""}
               </Badge>
             ) : (
-              <Badge variant="muted">v4 off</Badge>
+              <Badge variant="muted">Closed to new signups</Badge>
             )}
           </div>
         )}
@@ -687,9 +764,19 @@ function ReferralV4CardBody({ userId }: { userId: string }) {
               <p className="text-xs text-gray-500">{termsLine(terms)}</p>
             )}
             {data.asReferrer && (
-              <ReferrerSection data={data} canCancel={canCancel} />
+              <ReferrerSection
+                data={data}
+                canCancel={canCancel}
+                reviewWindowDays={reviewWindowDays}
+              />
             )}
             <FriendSection row={data.asFriend ?? null} canCancel={canCancel} />
+            {Array.isArray(data.debts) && (
+              <ReferralV4DebtsSection
+                debts={data.debts}
+                canWriteOff={canCancel}
+              />
+            )}
           </div>
         )}
       </CardContent>
