@@ -44,6 +44,8 @@ import {
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   ReevaluateFailedCashbackResult,
+  BulkReevaluateFailedCashbackResult,
+  StuckCashbackList,
   WithholdCashbackResult,
   TierTrial,
   TierLockReevaluationPreview,
@@ -475,6 +477,28 @@ export const reevaluateFailedCashback = (userId: string, reason?: string) =>
   api.post<{ data: ReevaluateFailedCashbackResult }>(
     `/admin/v1/users/${userId}/cashback/reevaluate`,
     { reason: reason || undefined },
+  );
+
+/**
+ * Every PermanentlyFailed cashback row across all cardholders, with who it
+ * belongs to, what it is owed and why it gave up. Backs Config → Bulk.
+ */
+export const getStuckCashback = () =>
+  api.get<{ data: StuckCashbackList }>("/admin/v1/cashback/permanently-failed");
+
+/**
+ * Put the chosen PermanentlyFailed rows back in the retry queue, across any
+ * number of users. The retry cron pays them through the normal payout path;
+ * rows already re-sent or paid, and rows whose user has no Safe, come back as
+ * skipped. Each user's audit trail records it under the admin's name.
+ */
+export const bulkReevaluateFailedCashback = (
+  cashbackIds: string[],
+  reason?: string,
+) =>
+  api.post<{ data: BulkReevaluateFailedCashbackResult }>(
+    "/admin/v1/cashback/permanently-failed/reevaluate",
+    { cashbackIds, reason: reason || undefined },
   );
 
 /**
