@@ -313,6 +313,7 @@ export const ANALYTICS_QUERY_KEYS = {
   depositRails: (query: string) =>
     ["analytics", "funnel", "rails", query] as const,
   costsConfig: ["analytics", "costs-config"] as const,
+  referralsV4: ["analytics", "rewards", "referrals-v4"] as const,
 };
 
 /**
@@ -327,4 +328,5 @@ export const ANALYTICS_REFRESH_INTERVALS = {
   referralProgram: 10 * 60 * 1000,
   depositRails: 5 * 60 * 1000,
   costsConfig: 30 * 60 * 1000,
+  referralsV4: 5 * 60 * 1000,
 };

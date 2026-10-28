@@ -1,7 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api";
+import api, { getReferralV4Analytics } from "@/lib/api";
+import { referralV4Retry } from "@/lib/referral-v4";
+import type { ReferralV4Analytics } from "@/types/referral-v4";
 import {
   ANALYTICS_QUERY_KEYS,
   ANALYTICS_REFRESH_INTERVALS,
@@ -58,6 +60,21 @@ export function useReferralProgram(topReferrerLimit = 25) {
     },
     refetchInterval: ANALYTICS_REFRESH_INTERVALS.referralProgram,
     staleTime: ANALYTICS_REFRESH_INTERVALS.referralProgram / 2,
+  });
+}
+
+/**
+ * Referral v4: card credit granted, spent and outstanding, spend share paid,
+ * the next Thursday payout and a weekly series. Not retried on a 404/503 —
+ * a backend without v4 yet shows a muted state instead.
+ */
+export function useReferralV4Analytics() {
+  return useQuery<ReferralV4Analytics>({
+    queryKey: ANALYTICS_QUERY_KEYS.referralsV4,
+    queryFn: getReferralV4Analytics,
+    refetchInterval: ANALYTICS_REFRESH_INTERVALS.referralsV4,
+    staleTime: ANALYTICS_REFRESH_INTERVALS.referralsV4 / 2,
+    retry: referralV4Retry,
   });
 }
 
