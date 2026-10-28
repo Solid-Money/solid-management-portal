@@ -111,7 +111,7 @@ export default function UserReferralCard({ userId }: { userId: string }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-4 w-4 text-gray-400" />
-          Referral cashback
+          Referral cashback — legacy
         </CardTitle>
         {referrals && !referrals.program.enabled && (
           <Badge variant="warning">Payouts paused</Badge>

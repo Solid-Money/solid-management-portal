@@ -25,6 +25,7 @@ import UserVirtualAccountOnboardingCard from "@/components/user/user-virtual-acc
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserReferralCard from "@/components/user/user-referral-card";
+import UserReferralV4Card from "@/components/user/user-referral-v4-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
 import UserTierMembershipCard from "@/components/user/user-tier-membership-card";
@@ -292,8 +293,11 @@ export default function UserDetailPage({
           <UserCashbackCard userId={id} />
           {/* Referral v4 bonuses are paid as card credit. */}
           <UserCardCreditCard userId={id} username={displayName} />
-          {/* Both sides of the referral program, with the re-evaluate action
-              for rewards the engine reversed or expired. */}
+          {/* Referral v4 from both sides: friends from launch on, with their
+              rewards and the cancel action; legacy friends are listed too. */}
+          <UserReferralV4Card userId={id} />
+          {/* Both sides of the legacy referral program, with the re-evaluate
+              action for rewards the engine reversed or expired. */}
           <UserReferralCard userId={id} />
         </TabsContent>
 
