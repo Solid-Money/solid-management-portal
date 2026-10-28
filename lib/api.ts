@@ -558,9 +558,10 @@ export const getKycResetEligibility = (userId: string) =>
 /**
  * Clear a declined identity verification so the user can start a new one.
  *
- * Narrow by design: it clears our record of the decision and nothing else — no
- * issuer consumer is deleted, no card is touched, and the provider's own
- * decision is not overturned. The reason is required; it is written to the
+ * Narrow by design: it clears our record of the decision — including a failed
+ * hand-off to the card issuer and any deposit hold on it — and nothing else: no
+ * issuer consumer is deleted, no card is touched, nothing is sent to the
+ * issuer, and the provider's own decision is not overturned. The reason is required; it is written to the
  * audit trail with the admin's name, and refusals are recorded too.
  */
 export const resetKycVerification = (userId: string, reason: string) =>

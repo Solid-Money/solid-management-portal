@@ -155,6 +155,22 @@ export default function UserKycCard({ userId, username }: UserKycCardProps) {
               </div>
             )}
 
+            {/* An approved verification carries no provider codes, so this is
+                the only thing that says why the user is stuck. */}
+            {data.forwardFailureReason && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <p className="font-medium">Could not be sent to the card issuer</p>
+                <p className="mt-1 break-words">{data.forwardFailureReason}</p>
+                {data.requiresNewVerification && (
+                  <p className="mt-1">
+                    Retrying the hand-off sends the same answers and fails the
+                    same way. The user has to verify again: they can start it
+                    from the app, or reset their verification here.
+                  </p>
+                )}
+              </div>
+            )}
+
             {!data.eligible && data.blockerMessage && (
               <p className="text-xs text-gray-500">{data.blockerMessage}</p>
             )}

@@ -29,6 +29,7 @@ interface ResetKycDialogProps {
 const DOES = [
   "Puts their verification back to not started, so the app lets them in again",
   "Clears the stored decision and its reason codes",
+  "Clears our record of a failed hand-off to the card issuer, and any deposit hold on it",
   "Lets them start a fresh session, with a fresh set of document attempts",
 ];
 
@@ -58,6 +59,7 @@ export default function ResetKycDialog({
   const queryClient = useQueryClient();
 
   const trimmedReason = reason.trim();
+  const hasReasonCodes = eligibility.reasonCodes.length > 0;
 
   const mutation = useMutation({
     mutationFn: async () =>
@@ -101,7 +103,7 @@ export default function ResetKycDialog({
           setOpen(next);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Reset identity verification</DialogTitle>
             <DialogDescription>
@@ -111,14 +113,26 @@ export default function ResetKycDialog({
             </DialogDescription>
           </DialogHeader>
 
-          {eligibility.reasonCodes.length > 0 && (
+          {(hasReasonCodes || eligibility.forwardFailureReason) && (
             <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs">
               <p className="font-medium text-gray-500">
-                Declined by {eligibility.kycProvider ?? "the provider"} for
+                {/* Approved by the provider; it is the hand-off that failed. */}
+                {eligibility.requiresNewVerification
+                  ? "Approved, but could not be sent to the card issuer for"
+                  : hasReasonCodes
+                    ? `Declined by ${eligibility.kycProvider ?? "the provider"} for`
+                    : "Could not be sent to the card issuer"}
               </p>
-              <p className="mt-1 break-words font-mono text-gray-900">
-                {eligibility.reasonCodes.join(", ")}
-              </p>
+              {hasReasonCodes && (
+                <p className="mt-1 break-words font-mono text-gray-900">
+                  {eligibility.reasonCodes.join(", ")}
+                </p>
+              )}
+              {eligibility.forwardFailureReason && (
+                <p className="mt-1 break-words text-gray-600">
+                  {eligibility.forwardFailureReason}
+                </p>
+              )}
             </div>
           )}
 
