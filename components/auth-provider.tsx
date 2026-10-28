@@ -21,6 +21,34 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+/**
+ * Pages opened from outside the portal (Claude's connector consent page)
+ * come back after sign-in, with their query. Only `/connect/` paths, so the
+ * login can't be turned into a redirect anywhere else.
+ */
+const RETURN_KEY = 'auth:returnTo';
+
+function rememberReturn(path: string, search: string) {
+  if (!path.startsWith('/connect/')) return;
+  try {
+    sessionStorage.setItem(RETURN_KEY, path + search);
+  } catch {
+    // Private mode: the agent lands on the portal and starts again from Claude.
+  }
+}
+
+function takeReturn(): string | null {
+  try {
+    const target = sessionStorage.getItem(RETURN_KEY);
+    sessionStorage.removeItem(RETURN_KEY);
+    return target && target.startsWith('/connect/') && !target.startsWith('//')
+      ? target
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,8 +93,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[AuthProvider] Current path:', currentPath);
           
           if (currentPath === '/login') {
-            console.log('[AuthProvider] Redirecting to /users');
-            routerRef.current.push('/users');
+            const back = takeReturn();
+            // Not the URL itself: a /connect/ query carries OAuth state.
+            console.log(
+              back
+                ? '[AuthProvider] Returning to the page that needed sign-in'
+                : '[AuthProvider] Redirecting to /users',
+            );
+            routerRef.current.push(back ?? '/users');
           }
         } else {
           // User is not from allowed domain, sign them out
@@ -89,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[AuthProvider] Current path:', currentPath);
         
         if (currentPath !== '/login' && !currentPath.startsWith('/_next')) {
+          rememberReturn(currentPath, window.location.search);
           console.log('[AuthProvider] Redirecting to /login');
           routerRef.current.push('/login');
         }

@@ -37,18 +37,21 @@ import {
 } from "@/types/support";
 
 function Section({
+  id,
   title,
   description,
   children,
   action,
 }: {
+  /** Anchor the admin search links to. */
+  id?: string;
   title: string;
   description?: string;
   children: React.ReactNode;
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg bg-white p-6 shadow-sm">
+    <section id={id} className="rounded-lg bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
@@ -186,18 +189,31 @@ function MacroDialog({
 }
 
 function SettingsScreen({ me }: { me: SupportMe }) {
-  const { data, isLoading } = useSupportSettings();
+  const { data, isLoading, isError, refetch } = useSupportSettings();
   const history = useSupportSettingsHistory();
   const macros = useSupportMacros();
   const deleteMacro = useDeleteSupportMacro();
   const update = useUpdateSupportSettings();
-  // Local edits on top of what is saved; null means "nothing changed yet".
-  const [edits, setEdits] = useState<Draft | null>(null);
+  // Only the fields this admin changed, laid over the latest saved settings.
+  // A refresh (another admin saving, or the tab regaining focus) updates every
+  // other field, so a save never sends back values nobody here edited.
+  const [edits, setEdits] = useState<Partial<Draft>>({});
   const [macroOpen, setMacroOpen] = useState(false);
   const [editing, setEditing] = useState<SupportMacro | null>(null);
 
   const saved = useMemo(() => (data ? fromSettings(data.settings) : null), [data]);
-  const draft = edits ?? saved;
+  const draft = saved ? { ...saved, ...edits } : null;
+
+  if (isError && !data) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-16 text-sm text-gray-600">
+        <p>Could not load the support settings.</p>
+        <Button variant="outline" size="sm" onClick={() => void refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
 
   if (isLoading || !draft || !saved || !data) {
     return (
@@ -210,7 +226,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
   const patch = changedFields(saved, draft);
   const dirty = Object.keys(patch).length > 0;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
-    setEdits((current) => ({ ...(current ?? saved), [key]: value }));
+    setEdits((current) => ({ ...current, [key]: value }));
   // Everyone on the roster, plus anyone who already has a profile.
   const agents = [...new Set([...me.agents, ...draft.agentProfiles.map((profile) => profile.email)])].sort();
   const profileFor = (email: string): SupportAgentProfile =>
@@ -221,7 +237,8 @@ function SettingsScreen({ me }: { me: SupportMe }) {
     set("agentProfiles", next.name.trim() ? [...others, { ...next, ...(next.slackUserId ? {} : { slackUserId: undefined }) }] : others);
   };
 
-  const saveAll = () =>
+  const saveAll = () => {
+    const sent = patch;
     update.mutate(
       {
         ...patch,
@@ -235,11 +252,19 @@ function SettingsScreen({ me }: { me: SupportMe }) {
       },
       {
         onSuccess: () => {
-          setEdits(null);
+          // Keep anything edited while the save was in flight.
+          setEdits((current) => {
+            const next: Partial<Draft> = { ...current };
+            for (const key of Object.keys(sent) as Array<keyof Draft>) {
+              if (JSON.stringify(current[key]) === JSON.stringify(sent[key])) delete next[key];
+            }
+            return next;
+          });
           toast.success("Support settings saved");
         },
       },
     );
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-24">
@@ -254,7 +279,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
         </div>
       </div>
 
-      <Section title="Solid AI" description="Changes apply to the next turn on every server (within 15 seconds). Off is the kill switch.">
+      <Section id="solid-ai" title="Solid AI" description="Changes apply to the next turn on every server (within 15 seconds). Off is the kill switch.">
         <div className="grid gap-2 sm:grid-cols-3">
           {MODES.map((mode) => (
             <button
@@ -310,6 +335,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
       </Section>
 
       <Section
+        id="ai-knowledge"
         title="What Solid AI knows"
         description="Solid AI quotes numbers only from here, its account tools and the help center. Changes apply to the next turn."
       >
@@ -375,7 +401,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
         </div>
       </Section>
 
-      <Section title="Team" description="Who is on call for urgent cases, and how the inbox names each agent.">
+      <Section id="support-team" title="Team" description="Who is on call for urgent cases, and how the inbox names each agent.">
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-1.5 sm:col-span-3">
             <Label htmlFor="hours">Business hours</Label>
@@ -422,6 +448,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
       </Section>
 
       <Section
+        id="known-incidents"
         title="Known incidents"
         description="Active incidents are shown in the app's chat and given to Solid AI, in the wording you approve here."
         action={
@@ -466,6 +493,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
       </Section>
 
       <Section
+        id="saved-replies"
         title="Saved replies"
         description="Inserted from the composer. Written in English; the customer receives their language."
         action={
@@ -508,7 +536,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
         )}
       </Section>
 
-      <Section title="History" description="Every saved version, newest first.">
+      <Section id="settings-history" title="History" description="Every saved version, newest first.">
         {history.data?.length ? (
           <table className="w-full text-sm">
             <thead>
@@ -542,7 +570,7 @@ function SettingsScreen({ me }: { me: SupportMe }) {
               Unsaved: {Object.keys(patch).map(fieldLabel).join(", ")}
             </span>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setEdits(null)}>Discard</Button>
+              <Button variant="outline" onClick={() => setEdits({})}>Discard</Button>
               <Button onClick={saveAll} disabled={update.isPending}>
                 {update.isPending && <Loader2 className="animate-spin" />}
                 Save changes

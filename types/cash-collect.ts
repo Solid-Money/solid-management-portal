@@ -11,7 +11,7 @@ export interface UncollectedSettlement {
   chainId: number;
   amountMicroUsd: string;
   amountUsd: number;
-  cause: "ARREARS" | "REFUSED_MANDATORY";
+  cause: "ARREARS" | "REFUSED_MANDATORY" | "WIREX_SETTLED_UNCAPTURED";
   explanation: string;
   status?: string;
   transactionReason?: string;

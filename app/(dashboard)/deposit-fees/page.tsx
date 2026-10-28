@@ -22,16 +22,19 @@ import {
 import { formatRate } from "@/lib/fee-rate";
 
 function Section({
+  id,
   title,
   description,
   children,
 }: {
+  /** Anchor the admin search links to. */
+  id?: string;
   title: string;
   description?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-lg shadow-sm p-6">
+    <section id={id} className="bg-white rounded-lg shadow-sm p-6">
       <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
       {description ? (
         <p className="mt-1 text-sm text-gray-500">{description}</p>
@@ -193,6 +196,7 @@ export default function DepositFeesPage() {
       ) : null}
 
       <Section
+        id="deposit-fee-status"
         title="Status"
         description="The fee is charged only while the program and the line are on, and only on deposits detected after the launch time."
       >
@@ -236,6 +240,7 @@ export default function DepositFeesPage() {
       </Section>
 
       <Section
+        id="deposit-fee-rates"
         title="Rates"
         description="A rate is a percent of the deposit, taken on the source chain before bridging. Locked cells are never bridged, so they are always free."
       >
@@ -254,7 +259,7 @@ export default function DepositFeesPage() {
         />
       </Section>
 
-      <Section title="History" description="Every saved change, newest first.">
+      <Section id="deposit-fee-history" title="History" description="Every saved change, newest first.">
         <HistoryTable matrix={matrix} />
       </Section>
 

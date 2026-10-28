@@ -1,9 +1,16 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, Ban, Eye, Loader2, Snowflake } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  Eye,
+  Loader2,
+  ShieldAlert,
+  Snowflake,
+} from "lucide-react";
 
 import api, { getUserCard } from "@/lib/api";
 import { Activity, Balance, User, UserCardOverview } from "@/types";
@@ -31,6 +38,10 @@ import UserTierTrialCard from "@/components/user/user-tier-trial-card";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SectionAnchor } from "@/components/section-anchor";
+import { useUrlTab } from "@/hooks/use-url-tab";
+import { USER_TABS, type UserTab } from "@/lib/search-index";
+import { useRecentUsers } from "@/lib/recent-users";
 
 /** One headline figure in the strip under the user's name. */
 function SummaryStat({
@@ -62,6 +73,9 @@ export default function UserDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  // In the URL so a search result can open the tab a section lives in.
+  const [tab, setTab] = useUrlTab<UserTab>(USER_TABS, "overview");
+  const { remember } = useRecentUsers();
 
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["user", id],
@@ -93,6 +107,20 @@ export default function UserDetailPage({
         })
       ).data,
   });
+
+  // Every profile opened goes on the admin's recent list, however it was
+  // reached — search, a referral link, the activity feed, a pasted URL.
+  const cardProvider = card?.data?.hasCard ? card.data.provider : undefined;
+  useEffect(() => {
+    if (!user) return;
+    remember({
+      id,
+      username: user.username,
+      email: user.email,
+      isDeleted: user.isDeleted,
+      cardProvider,
+    });
+  }, [id, user, cardProvider, remember]);
 
   // The page frame renders as soon as the user record lands; the panels each
   // carry their own loading state, so one slow on-chain read no longer holds
@@ -144,11 +172,21 @@ export default function UserDetailPage({
           "unknown". KYC is on the profile card, per Bridge customer, and the
           recover action sits next to the status there.
         */}
-        {user.isDeleted && (
-          <Badge variant="danger">
-            <Ban className="h-3 w-3" />
-            Account closed
+        {user.securityHold ? (
+          <Badge
+            variant="danger"
+            title="Closed by an admin for security — cannot be recovered"
+          >
+            <ShieldAlert className="h-3 w-3" />
+            Closed for security
           </Badge>
+        ) : (
+          user.isDeleted && (
+            <Badge variant="danger">
+              <Ban className="h-3 w-3" />
+              Account closed
+            </Badge>
+          )
         )}
         {cardOverview?.hasCard && (
           <Badge variant="info">{cardOverview.provider} card</Badge>
@@ -182,7 +220,7 @@ export default function UserDetailPage({
         <SummaryStat label="Wallet" value={`$${walletUsd.toFixed(2)}`} />
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -196,23 +234,33 @@ export default function UserDetailPage({
         <TabsContent value="overview">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="space-y-4">
-              <UserProfileCard user={user} />
-              {balancesLoading ? (
-                <div className="flex justify-center rounded-xl border bg-white py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-                </div>
-              ) : (
-                <BalancesCard balances={balanceRows} />
-              )}
+              <SectionAnchor id="user-profile">
+                <UserProfileCard user={user} />
+              </SectionAnchor>
+              <SectionAnchor id="user-balances">
+                {balancesLoading ? (
+                  <div className="flex justify-center rounded-xl border bg-white py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+                  </div>
+                ) : (
+                  <BalancesCard balances={balanceRows} />
+                )}
+              </SectionAnchor>
             </div>
             <div className="space-y-4">
-              <UserSavingsCard userId={id} />
-              <UserCardPanel
-                userId={id}
-                username={displayName}
-                card={cardOverview}
-                isLoading={cardLoading}
-              />
+              <SectionAnchor id="user-savings">
+                <UserSavingsCard userId={id} />
+              </SectionAnchor>
+              {/* The card tab holds the linked `user-card`; ids stay unique
+                  page-wide even though inactive tabs are unmounted. */}
+              <SectionAnchor id="user-overview-card">
+                <UserCardPanel
+                  userId={id}
+                  username={displayName}
+                  card={cardOverview}
+                  isLoading={cardLoading}
+                />
+              </SectionAnchor>
             </div>
           </div>
         </TabsContent>
@@ -223,49 +271,63 @@ export default function UserDetailPage({
               <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
             </div>
           ) : (
-            <div className="h-[calc(100vh-22rem)] min-h-96">
+            <div id="user-activity" className="h-[calc(100vh-22rem)] min-h-96">
               <ActivityList activities={activity?.docs ?? []} />
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="deposits">
-          <DepositSummaryCard userId={id} />
+          <SectionAnchor id="user-deposits">
+            <DepositSummaryCard userId={id} />
+          </SectionAnchor>
         </TabsContent>
 
         <TabsContent value="card" className="space-y-4">
           {/* Above the card itself, because verification is the gate the card
               is behind: a declined KYC is why most "where is my card?" tickets
               exist, and the reason codes here are what answer them. */}
-          <UserKycCard userId={id} username={displayName} />
+          <SectionAnchor id="user-kyc">
+            <UserKycCard userId={id} username={displayName} />
+          </SectionAnchor>
           {/* The USD virtual account has its own verification and its own Rain
               review, so it gets stuck in places the card's KYC card does not
               show — and "I paid but got no account" lands on this tab. */}
-          <UserVirtualAccountOnboardingCard
-            userId={id}
-            username={displayName}
-          />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <UserCardPanel
+          <SectionAnchor id="user-virtual-account">
+            <UserVirtualAccountOnboardingCard
               userId={id}
               username={displayName}
-              card={cardOverview}
-              isLoading={cardLoading}
             />
-            <UserCashbackCard userId={id} />
+          </SectionAnchor>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <SectionAnchor id="user-card">
+              <UserCardPanel
+                userId={id}
+                username={displayName}
+                card={cardOverview}
+                isLoading={cardLoading}
+              />
+            </SectionAnchor>
+            <SectionAnchor id="user-cashback">
+              <UserCashbackCard userId={id} />
+            </SectionAnchor>
           </div>
           {/* On the card tab rather than the overview, and next to the card
               panel: under Real-Time Funding a decline is an allowance problem,
               and the allowance is only legible beside the card it funds. */}
-          <UserRtfCard userId={id} />
+          <SectionAnchor id="user-rtf">
+            <UserRtfCard userId={id} />
+          </SectionAnchor>
           {/* Next to the spending table, because a rate set on one transaction
               beats this one and is edited from a row down there. */}
-          <UserCashbackRateCard
-            userId={id}
-            username={displayName}
-            cashbackPercentage={user.cashbackPercentage}
-          />
-          <div>
+          <SectionAnchor id="user-card-cashback-rate">
+            <UserCashbackRateCard
+              userId={id}
+              username={displayName}
+              cashbackPercentage={user.cashbackPercentage}
+            />
+          </SectionAnchor>
+          <div id="user-card-spending">
             <h2 className="mb-2 text-sm font-semibold text-gray-900">
               Card spending
             </h2>
@@ -274,31 +336,65 @@ export default function UserDetailPage({
         </TabsContent>
 
         <TabsContent value="rewards" className="space-y-4">
-          <UserRewardsCard userId={id} />
+          <SectionAnchor id="user-rewards">
+            <UserRewardsCard userId={id} />
+          </SectionAnchor>
           {/* Directly under the tier it can override: a running trial is why
               the tier above may not match the points next to it. */}
-          <UserTierMembershipCard userId={id} />
+          <SectionAnchor id="user-tier">
+            <UserTierMembershipCard userId={id} />
+          </SectionAnchor>
 
-          <UserTierTrialCard userId={id} username={displayName} />
-          <UserCashbackRateCard
-            userId={id}
-            username={displayName}
-            cashbackPercentage={user.cashbackPercentage}
-          />
-          <UserCashbackCard userId={id} />
+          <SectionAnchor id="user-tier-trial">
+            <UserTierTrialCard userId={id} username={displayName} />
+          </SectionAnchor>
+          <SectionAnchor id="user-cashback-rate">
+            <UserCashbackRateCard
+              userId={id}
+              username={displayName}
+              cashbackPercentage={user.cashbackPercentage}
+            />
+          </SectionAnchor>
+          <SectionAnchor id="user-rewards-cashback">
+            <UserCashbackCard userId={id} />
+          </SectionAnchor>
           {/* Both sides of the referral program, with the re-evaluate action
               for rewards the engine reversed or expired. */}
-          <UserReferralCard userId={id} />
+          <SectionAnchor id="user-referrals">
+            <UserReferralCard userId={id} />
+          </SectionAnchor>
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
           {/* First on the tab: a lockout ticket is answered by whether they can
               recover on their own, before anything else is worth reading. */}
-          <UserRecoveryCard userId={id} username={displayName} />
+          <SectionAnchor id="user-recovery">
+            {/* No access help for a security close: the backend refuses every
+                action on this card for it, and none of them would be right. */}
+            {user.securityHold ? (
+              <div className="flex gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Account access is not available: this account was closed for
+                  security and cannot be recovered. No recovery code, email
+                  change or two-factor reset can be sent for it. See the
+                  profile for why.
+                </span>
+              </div>
+            ) : (
+              <UserRecoveryCard userId={id} username={displayName} />
+            )}
+          </SectionAnchor>
           {/* Above the chats: a Ref quoted in one resolves here without a lookup. */}
-          <UserErrorsCard userId={id} />
-          <UserSupportCard userId={id} />
-          <UserAuditLogCard userId={id} />
+          <SectionAnchor id="user-errors">
+            <UserErrorsCard userId={id} />
+          </SectionAnchor>
+          <SectionAnchor id="user-support">
+            <UserSupportCard userId={id} userLabel={user?.username || undefined} email={user?.email} />
+          </SectionAnchor>
+          <SectionAnchor id="user-audit-log">
+            <UserAuditLogCard userId={id} />
+          </SectionAnchor>
         </TabsContent>
 
         <TabsContent value="errors">

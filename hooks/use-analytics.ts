@@ -12,6 +12,7 @@ import {
   type RewardsOwedResponse,
   type RewardsPaidResponse,
 } from "@/types/analytics";
+import { CARD_QUERY_KEYS } from "@/types/card-analytics";
 
 /**
  * What we owe users and have not paid.
@@ -113,6 +114,8 @@ export function useUpdateCostsConfig() {
       void queryClient.invalidateQueries({
         queryKey: ANALYTICS_QUERY_KEYS.rewardsOwed,
       });
+      // The FX payout rates feed the card revenue estimate and economics.
+      void queryClient.invalidateQueries({ queryKey: CARD_QUERY_KEYS.all });
     },
   });
 }

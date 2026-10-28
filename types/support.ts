@@ -179,6 +179,13 @@ export interface SupportReplyInput {
   draftRunId?: string;
 }
 
+/** The first message of a conversation an agent starts (see startSupportConversation). */
+export interface SupportStartInput {
+  clientMessageId: string;
+  body: string;
+  sendUntranslated?: boolean;
+}
+
 export interface SupportIncident {
   id: string;
   title: string;

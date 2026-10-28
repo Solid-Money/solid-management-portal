@@ -43,6 +43,13 @@ export interface FeeProductDefinition {
 }
 
 /**
+ * The fees page's anchor for one product's section (or one onboarding
+ * charge's), as the admin search links to it: `bankDeposit` → `fee-bank-deposit`.
+ */
+export const feeSectionId = (key: string): string =>
+  `fee-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
+
+/**
  * The fee products, in the order the app's own fee table shows them.
  *
  * Each carries the copy explaining how its fee is collected, because that is

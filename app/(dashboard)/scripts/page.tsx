@@ -4,6 +4,7 @@ import { useState } from "react";
 import api from "@/lib/api";
 import { Play, Calendar, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { AtoActivityCleanup } from "@/components/scripts/ato-activity-cleanup";
 
 export default function ScriptsPage() {
   const [loading, setLoading] = useState(false);
@@ -39,7 +40,12 @@ export default function ScriptsPage() {
         </div>
       </div>
 
-      <div className="bg-white shadow sm:rounded-lg p-6 max-w-2xl">
+      <AtoActivityCleanup />
+
+      <div
+        id="cohort-snapshot-script"
+        className="bg-white shadow sm:rounded-lg p-6 max-w-2xl"
+      >
         <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
           Cohort Snapshots
         </h3>

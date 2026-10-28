@@ -4,6 +4,7 @@ import { Balance } from "@/types";
 import { Coins, CreditCard, PiggyBank, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { tokenFractionDigits } from "@/lib/utils";
 
 /**
  * Every account a user holds money in, in the order the app presents them.
@@ -43,10 +44,9 @@ function iconFor(accountType?: string) {
 
 function formatAmount(value: number, currency: string): string {
   // Non-USD assets keep more precision: 0.0042 ETH must not round to 0.00.
-  const decimals = currency === "soETH" || currency === "ETH" ? 6 : 2;
   return value.toLocaleString("en-US", {
     minimumFractionDigits: 2,
-    maximumFractionDigits: decimals,
+    maximumFractionDigits: tokenFractionDigits(currency),
   });
 }
 

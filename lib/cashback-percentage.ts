@@ -59,3 +59,15 @@ export function describeCashbackRate(
 
   return `${rate} (${CASHBACK_PERCENTAGE_SOURCE_LABELS[source] ?? source})`;
 }
+
+/**
+ * The monthly cap frozen on a cashback row — "$100/mo cap" — or `undefined`
+ * for a row from before the cap was stored, which is capped by whatever tier
+ * the user holds on payout day.
+ */
+export function formatMonthlyCap(usd?: number | null): string | undefined {
+  if (usd === null || usd === undefined || !Number.isFinite(usd) || usd < 0)
+    return undefined;
+
+  return `$${Number(usd.toFixed(2))}/mo cap`;
+}

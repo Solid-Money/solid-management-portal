@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, UserCircle } from "lucide-react";
+import { ExternalLink, ShieldAlert, UserCircle } from "lucide-react";
 
 import { formatDateTime } from "@/lib/utils";
 import { User } from "@/types";
@@ -24,6 +24,43 @@ function Field({
     <div className={wide ? "sm:col-span-2" : undefined}>
       <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm text-gray-900">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * An account an admin closed for security — one that linked a Safe it did not
+ * own. Said in full rather than as a badge, because the first thing support
+ * will try is "Recover account", and it is deliberately not there.
+ */
+function SecurityClosedNotice({
+  hold,
+}: {
+  hold: NonNullable<User["securityHold"]>;
+}) {
+  return (
+    <div className="w-full space-y-2">
+      <Badge variant="danger">Closed for security</Badge>
+      <div className="flex gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="space-y-1">
+          <p>
+            Closed by {hold.adminEmail} on {formatDateTime(hold.at)}:{" "}
+            <span className="font-medium">{hold.reason}</span>
+          </p>
+          {hold.safeAddress && (
+            <p className="flex flex-wrap items-center gap-1">
+              It was linked to a Safe it does not own:
+              <CopyableValue value={hold.safeAddress} label="Safe" />
+            </p>
+          )}
+          <p>
+            This account cannot be recovered or reopened, here or on request.
+            Its sessions, two-factor and card spending were removed, and the
+            Safe it pointed at belongs to another user, who is unaffected.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -52,6 +89,7 @@ const CARD_PROVIDER_LABEL: Record<string, string> = {
  */
 export default function UserProfileCard({ user }: { user: User }) {
   const closed = Boolean(user.isDeleted);
+  const securityHold = user.securityHold ?? null;
 
   return (
     <Card>
@@ -65,7 +103,9 @@ export default function UserProfileCard({ user }: { user: User }) {
         <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
           <Field label="Account status" wide>
             <div className="flex flex-wrap items-center gap-2">
-              {closed ? (
+              {securityHold ? (
+                <SecurityClosedNotice hold={securityHold} />
+              ) : closed ? (
                 <>
                   <Badge variant="danger">Closed</Badge>
                   <span className="text-gray-600">
@@ -82,17 +122,24 @@ export default function UserProfileCard({ user }: { user: User }) {
                 <RecoverAccountDialog
                   userId={user._id}
                   username={user.username || user.email || user._id}
-                  closed={closed}
+                  // Never offered for a security close: the backend refuses it.
+                  closed={closed && !securityHold}
                   closedAt={user.deletedAt}
                 />
               </span>
             </div>
           </Field>
           <Field label="Two-factor (authenticator app)" wide>
-            <UserTwoFactorField
-              userId={user._id}
-              username={user.username || user.email || user._id}
-            />
+            {securityHold ? (
+              <span className="text-gray-600">
+                Removed when the account was closed for security.
+              </span>
+            ) : (
+              <UserTwoFactorField
+                userId={user._id}
+                username={user.username || user.email || user._id}
+              />
+            )}
           </Field>
           <Field label="User ID" wide>
             <CopyableValue value={user._id} label="User ID" />

@@ -291,3 +291,35 @@
     scrollbar-color: var(--color-gray-300) transparent;
   }
 }
+
+/*
+ * Landing on a section from the admin search (see lib/section-navigation.ts).
+ * Clear of the sticky top bar, then a brief ring so the eye finds it — two
+ * pulses and gone, rather than a highlight the reader has to dismiss.
+ */
+main [id] {
+  scroll-margin-top: 5rem;
+}
+
+/* Focused by the search on landing (tabindex -1); the flash marks it instead. */
+main [id][tabindex="-1"]:focus {
+  outline: none;
+}
+
+@keyframes section-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(99 102 241 / 0);
+  }
+  20%,
+  60% {
+    box-shadow: 0 0 0 4px rgb(99 102 241 / 0.45);
+  }
+  40% {
+    box-shadow: 0 0 0 2px rgb(99 102 241 / 0.2);
+  }
+}
+
+.section-flash {
+  animation: section-flash 2s ease-in-out;
+}

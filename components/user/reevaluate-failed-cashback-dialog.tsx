@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -126,6 +127,17 @@ export default function ReevaluateFailedCashbackDialog({
                 </li>
                 <li>
                   Nothing is sent from here, so a second press cannot pay twice.
+                </li>
+                <li>
+                  Many users stuck after the same outage? Re-send them together
+                  from{" "}
+                  <Link
+                    href="/bulk#stuck-cashback"
+                    className="font-medium text-indigo-600 hover:underline"
+                  >
+                    Config → Bulk
+                  </Link>
+                  .
                 </li>
               </ul>
 

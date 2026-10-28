@@ -20,6 +20,7 @@ import {
   Radio,
 } from "lucide-react";
 import TemporalWorkflowLink from "@/components/temporal-workflow-link";
+import { formatNumber, tokenFractionDigits } from "@/lib/utils";
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString("en-US", {
@@ -53,6 +54,9 @@ const EXPLORER_URLS: Record<number, string> = {
   137: "https://polygonscan.com",
   8453: "https://basescan.org",
   42161: "https://arbiscan.io",
+  // Optimism takes deposits to the Safe (OP, USDC, ...), so a deposit there must
+  // not link to the Fuse explorer either.
+  10: "https://optimistic.etherscan.io",
 };
 
 function getExplorerTxUrl(hash: string, chainId: number | null): string {
@@ -192,7 +196,8 @@ function TitleRow({ item }: { item: DepositTitleGroup }) {
                       {formatDate(tx.createdAt)}
                     </td>
                     <td className="px-2 py-1.5 text-right text-gray-900 font-medium whitespace-nowrap">
-                      {parseFloat(tx.amount || "0").toFixed(2)} {tx.symbol}
+                      {formatNumber(parseFloat(tx.amount || "0"), tokenFractionDigits(tx.symbol))}{" "}
+                      {tx.symbol}
                     </td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-1">

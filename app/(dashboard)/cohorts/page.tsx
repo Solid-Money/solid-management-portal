@@ -288,6 +288,7 @@ export default function CohortsPage() {
 
         <div className="flex gap-2">
           <Button
+            id="recalculate-cohorts"
             onClick={handleTrigger}
             disabled={triggering || loading}
             className="cursor-pointer bg-amber-600 hover:bg-amber-700"

@@ -42,7 +42,7 @@ function Stat({
     <div>
       <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm font-semibold text-gray-900">{value}</dd>
-      {hint && <p className="mt-0.5 hidden text-xs text-gray-500 @lg:block">{hint}</p>}
+      {hint && <p className="mt-0.5 break-words text-xs text-gray-500">{hint}</p>}
     </div>
   );
 }
@@ -152,6 +152,22 @@ export default function UserKycCard({ userId, username }: UserKycCardProps) {
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* An approved verification carries no provider codes, so this is
+                the only thing that says why the user is stuck. */}
+            {data.forwardFailureReason && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <p className="font-medium">Could not be sent to the card issuer</p>
+                <p className="mt-1 break-words">{data.forwardFailureReason}</p>
+                {data.requiresNewVerification && (
+                  <p className="mt-1">
+                    Retrying the hand-off sends the same answers and fails the
+                    same way. The user has to verify again: they can start it
+                    from the app, or reset their verification here.
+                  </p>
+                )}
               </div>
             )}
 
