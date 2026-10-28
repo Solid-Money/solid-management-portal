@@ -14,10 +14,12 @@ import {
   useDecideReferralReview,
   useReferralReviewQueue,
   useReferralV4Access,
+  useReferralV4Config,
 } from "@/hooks/use-referral-v4";
 import {
   formatUtc,
   isNotAvailable,
+  payoutScheduleLabel,
   referralV4StepLabel,
 } from "@/lib/referral-v4";
 import { formatUsd } from "@/lib/utils";
@@ -97,8 +99,8 @@ function ItemStep({ item }: { item: ReferralReviewItem }) {
 
 /**
  * The referral review queue: rewards held because their referrer qualified
- * more friends in a month than the review threshold allows — v4 rewards and
- * today's legacy rewards stuck under review alike.
+ * more friends within the review window than the review threshold allows — v4
+ * rewards and today's legacy rewards stuck under review alike.
  *
  * Grouped by referrer, because the decision is about the referrer ("is this a
  * real community or a farm?"), and items are selected individually or a
@@ -111,6 +113,19 @@ export default function ReferralReviewPage() {
   const canReview = access.data?.canReview === true;
   const queue = useReferralReviewQueue();
   const decide = useDecideReferralReview();
+  const { data: config } = useReferralV4Config();
+
+  // The window and payout run as configured; generic wording until it loads.
+  const reviewWindow = config?.reviewWindowDays
+    ? `in ${config.reviewWindowDays} days`
+    : "within the review window";
+  const schedule = payoutScheduleLabel(
+    config?.payoutWeekday,
+    config?.payoutHourUtc,
+  );
+  const v4ApproveCopy = `Approved v4 rewards continue their hold and are credited as card credit in the first weekly payout run after they unlock${
+    schedule ? ` (${schedule})` : ""
+  }.`;
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [decision, setDecision] = useState<ReferralReviewDecision | null>(null);
@@ -221,12 +236,11 @@ export default function ReferralReviewPage() {
             Referral review
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-gray-500">
-            Referral rewards held because their referrer qualified more friends
-            in a month than the review threshold. Approved v4 rewards continue
-            their hold and are credited in the first Thursday run after they
-            unlock; approved legacy rewards are paid by the next 02:00 UTC
-            sweep. Rejected rewards are cancelled (legacy: reversed as
-            &ldquo;rejected in review&rdquo;).
+            Referral rewards held because their referrer qualified more friends{" "}
+            {reviewWindow} than the review threshold. {v4ApproveCopy} Approved
+            legacy rewards are paid by the next 02:00 UTC sweep. Rejected
+            rewards are cancelled (legacy: reversed as &ldquo;rejected in
+            review&rdquo;).
           </p>
         </div>
         {!canReview && !access.isLoading && (
@@ -415,7 +429,7 @@ export default function ReferralReviewPage() {
                         className="text-sm"
                       />
                       <Badge variant="warning">
-                        {group.monthQualifiedCount} qualified this month
+                        {group.monthQualifiedCount} qualified {reviewWindow}
                       </Badge>
                     </div>
                     <span className="text-xs text-gray-500">
@@ -527,7 +541,7 @@ export default function ReferralReviewPage() {
             </DialogTitle>
             <DialogDescription>
               {decision === "approve"
-                ? "Approved v4 rewards continue their hold and are credited as card credit in the first Thursday run after they unlock. Approved legacy rewards are paid by the next 02:00 UTC sweep."
+                ? `${v4ApproveCopy} Approved legacy rewards are paid by the next 02:00 UTC sweep.`
                 : "Rejected v4 rewards are cancelled and never credited. Rejected legacy rewards are reversed (rejected in review) for both sides."}{" "}
               {formatUsd(selectedAmount)} in total.
             </DialogDescription>

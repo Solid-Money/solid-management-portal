@@ -16,26 +16,54 @@ import { AnalyticsKpiCard } from "@/components/analytics/kpi-card";
 import { Panel } from "@/components/analytics/panel";
 import { NotAvailableYet } from "@/components/referral-v4/not-available";
 import { useReferralV4Analytics } from "@/hooks/use-analytics";
-import { formatUtc, isNotAvailable } from "@/lib/referral-v4";
+import { useReferralV4Config } from "@/hooks/use-referral-v4";
+import {
+  formatUtc,
+  isNotAvailable,
+  payoutScheduleLabel,
+} from "@/lib/referral-v4";
 import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 
 /**
  * Referral v4 in money: card credit granted, spent and still outstanding,
- * what is held, the soFUSE spend share paid, and what Thursday's run is
- * expected to pay.
+ * what is held, the soFUSE spend share paid, what the next payout run is
+ * expected to pay, and the clawback debts from reversed bonuses.
  *
- * Unscoped by the header's dates, like the liability view: outstanding credit
- * and bonuses on hold are positions, and the weekly series carries its own
- * dates.
+ * Unscoped by the header's dates, like the liability view: outstanding credit,
+ * bonuses on hold and open debts are positions, and the weekly series carries
+ * its own dates.
  */
 export function RewardsReferralsV4View() {
   const { data, isLoading, error } = useReferralV4Analytics();
+  const { data: config } = useReferralV4Config();
 
   if (error && isNotAvailable(error)) {
     return <NotAvailableYet what="Referral v4 analytics" className="p-4" />;
   }
 
   const weekly = data?.weekly ?? [];
+  const schedule = payoutScheduleLabel(
+    config?.payoutWeekday,
+    config?.payoutHourUtc,
+  );
+  const nextPayoutScope = [
+    data?.nextPayout
+      ? `Estimate for ${formatUtc(data.nextPayout.at)} · ${formatNumber(
+          data.nextPayout.referrers,
+          0,
+          0,
+        )} referrer${data.nextPayout.referrers === 1 ? "" : "s"} — unlocked card credit plus last week's spend share`
+      : "Unlocked card credit plus last week's spend share",
+    // While paused the run credits and sends nothing, whatever it estimates.
+    config?.paused &&"payouts are paused in the program settings",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  // Undefined while loading; null from a backend without clawback yet, which
+  // the tiles show as not instrumented rather than as $0.
+  const debts = data ? (data.debts ?? null) : undefined;
+  const debtUsd = (pick: (block: NonNullable<typeof debts>) => number) =>
+    debts === undefined ? undefined : debts ? formatUsd(pick(debts)) : null;
 
   return (
     <div className="space-y-6">
@@ -76,7 +104,9 @@ export function RewardsReferralsV4View() {
         <AnalyticsKpiCard
           title="Spend share paid"
           value={data ? formatUsd(data.spendSharePaidUsd) : undefined}
-          scope="All time, in soFUSE to referrers every Thursday"
+          scope={`All time, in soFUSE to referrers ${
+            schedule ? `on ${schedule}` : "weekly"
+          }`}
           source="database"
           invertTrendColor
         />
@@ -86,16 +116,51 @@ export function RewardsReferralsV4View() {
           value={
             data?.nextPayout ? formatUsd(data.nextPayout.estimateUsd) : undefined
           }
-          scope={
-            data?.nextPayout
-              ? `Estimate for ${formatUtc(data.nextPayout.at)} · ${formatNumber(
-                  data.nextPayout.referrers,
-                  0,
-                  0,
-                )} referrer${data.nextPayout.referrers === 1 ? "" : "s"} — unlocked card credit plus last week's spend share`
-              : "Unlocked card credit plus last week's spend share"
-          }
+          scope={nextPayoutScope}
           source="derived"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <AnalyticsKpiCard
+          title="Open debt"
+          value={debtUsd((block) => block.openUsd)}
+          scope="Still owed from reversed bonuses — recovered from future bonuses and spend share"
+          source="database"
+          invertTrendColor
+        />
+        <AnalyticsKpiCard
+          title="Debt recovered"
+          value={debtUsd((block) => block.recoveredUsd)}
+          scope="All time, kept back from later bonuses and spend share"
+          source="database"
+        />
+        <AnalyticsKpiCard
+          title="Debt written off"
+          value={debtUsd((block) => block.writtenOffUsd)}
+          scope="All time — unrecovered by the write-off age, or by an admin"
+          source="database"
+          invertTrendColor
+        />
+        <AnalyticsKpiCard
+          title="Debt waived"
+          value={debtUsd((block) => block.waivedUsd)}
+          scope="All time — remainders below the waive threshold"
+          source="database"
+          invertTrendColor
+        />
+        <AnalyticsKpiCard
+          title="Bonuses reversed"
+          value={
+            debts === undefined
+              ? undefined
+              : debts
+                ? formatNumber(debts.reversedBonuses, 0, 0)
+                : null
+          }
+          scope="All time — credited spend bonuses refunded below the bar"
+          source="database"
+          invertTrendColor
         />
       </div>
 

@@ -225,7 +225,7 @@ export const ANALYTICS_TABS: AnalyticsTab[] = [
         id: "referrals-v4",
         label: "Referral v4",
         question:
-          "What does referral v4 cost in card credit and spend share, and what is due on Thursday?",
+          "What does referral v4 cost in card credit and spend share, and what is due at the next payout?",
       },
     ],
   },

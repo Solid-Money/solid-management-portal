@@ -65,8 +65,8 @@ export function useReferralProgram(topReferrerLimit = 25) {
 
 /**
  * Referral v4: card credit granted, spent and outstanding, spend share paid,
- * the next Thursday payout and a weekly series. Not retried on a 404/503 —
- * a backend without v4 yet shows a muted state instead.
+ * the next payout run, clawback debts and a weekly series. Not retried on a
+ * 404/503 — a backend without v4 yet shows a muted state instead.
  */
 export function useReferralV4Analytics() {
   return useQuery<ReferralV4Analytics>({

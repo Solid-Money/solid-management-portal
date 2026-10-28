@@ -4,7 +4,11 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useSaveReferralBoost } from "@/hooks/use-referral-v4";
+import { REFERRAL_V4_DEFAULTS } from "@/hooks/use-config-editor";
+import {
+  useReferralV4Config,
+  useSaveReferralBoost,
+} from "@/hooks/use-referral-v4";
 import {
   BOOST_SIDES_LABELS,
   REFERRAL_V4_STEP_LABELS,
@@ -32,7 +36,8 @@ import { Switch } from "@/components/ui/switch";
 
 const STEPS: ReferralV4Step[] = ["welcome", "big_spender", "upgrade"];
 const SIDES: ReferralV4BoostSides[] = ["both", "referrer", "friend"];
-const MAX_MULTIPLIER = 5;
+/** What a new boost starts at, when the ceiling allows it: double. */
+const SUGGESTED_MULTIPLIER = 2;
 
 interface ReferralBoostModalProps {
   /** The boost to edit, or null to create one. */
@@ -44,18 +49,26 @@ interface ReferralBoostModalProps {
  * Create or edit a referral boost: a multiplier on the v4 card credit bonuses
  * earned inside a UTC window, for chosen steps and sides.
  *
- * Checked here with the backend's bounds (multiplier above 1 and at most 5,
- * end after start, at least one step) so a typo is caught before saving.
- * Boosted credit doesn't count toward the per-friend cap.
+ * Checked here with the backend's bounds (multiplier above 1 and at most the
+ * config's `maxBoostMultiplier`, end after start, at least one step) so a
+ * typo is caught before saving. Boosted credit doesn't count toward the
+ * per-friend cap.
  */
 export default function ReferralBoostModal({
   boost,
   onClose,
 }: ReferralBoostModalProps) {
   const save = useSaveReferralBoost();
+  // The shipped default stands in until the config loads; the backend holds
+  // the line either way.
+  const maxMultiplier =
+    useReferralV4Config().data?.maxBoostMultiplier ??
+    REFERRAL_V4_DEFAULTS.maxBoostMultiplier;
   const [name, setName] = useState(boost?.name ?? "");
   const [multiplier, setMultiplier] = useState(
-    boost ? String(boost.multiplier) : "2",
+    boost
+      ? String(boost.multiplier)
+      : String(Math.min(SUGGESTED_MULTIPLIER, maxMultiplier)),
   );
   const [startsAt, setStartsAt] = useState(isoToUtcInput(boost?.startsAt));
   const [endsAt, setEndsAt] = useState(isoToUtcInput(boost?.endsAt));
@@ -78,9 +91,9 @@ export default function ReferralBoostModal({
       multiplier.trim() === "" ||
       !Number.isFinite(parsedMultiplier) ||
       parsedMultiplier <= 1 ||
-      parsedMultiplier > MAX_MULTIPLIER
+      parsedMultiplier > maxMultiplier
     ) {
-      return `The multiplier must be above 1 and at most ${MAX_MULTIPLIER}.`;
+      return `The multiplier must be above 1 and at most ${maxMultiplier}.`;
     }
     if (!startIso || !endIso) return "Set both the start and the end.";
     if (new Date(endIso) <= new Date(startIso)) {
@@ -163,7 +176,7 @@ export default function ReferralBoostModal({
                 id="boost-multiplier"
                 type="number"
                 min={1.1}
-                max={MAX_MULTIPLIER}
+                max={maxMultiplier}
                 step="0.1"
                 value={multiplier}
                 onChange={(event) => setMultiplier(event.target.value)}
@@ -171,7 +184,8 @@ export default function ReferralBoostModal({
               />
             </div>
             <p className="text-muted-foreground text-xs">
-              Above 1, at most {MAX_MULTIPLIER}. ×2 doubles the credit.
+              Above 1, at most {maxMultiplier} (set on Rewards config →
+              Referral v4). ×2 doubles the credit.
             </p>
           </div>
 
