@@ -77,6 +77,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Unpaid cashback withheld",
       variant: "danger",
     },
+    cashback_trial_terms_applied: {
+      label: "Trial cashback terms applied",
+      variant: "info",
+    },
     kyc_verification_reset: {
       label: "KYC verification reset",
       variant: "warning",
@@ -187,6 +191,20 @@ function detailFor(entry: AdminAuditEntry): string | null {
     return typeof count === "number"
       ? `${count} row${count === 1 ? "" : "s"} back in the retry queue`
       : null;
+  }
+
+  if (entry.action === "cashback_trial_terms_applied") {
+    const rows = entry.metadata?.rows;
+    const usd = entry.metadata?.additionalUsd;
+    if (!Array.isArray(rows)) return null;
+    return [
+      `${rows.length} row${rows.length === 1 ? "" : "s"} corrected`,
+      typeof usd === "number" && usd > 0
+        ? `up to ${formatUsd(usd)} more`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   if (entry.action === "cashback_withheld") {

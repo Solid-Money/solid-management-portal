@@ -3,8 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Loader2, Percent } from "lucide-react";
 
-import { getUserCashback } from "@/lib/api";
-import { CashbackEntry, CashbackHistory } from "@/types";
+import { getUserCashback, getUserTierTrials } from "@/lib/api";
+import { CashbackEntry, CashbackHistory, TierTrialView } from "@/types";
 import { cashbackStatusVariant } from "@/lib/card-transactions";
 import {
   formatCashbackRate,
@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReevaluateFailedCashbackDialog from "@/components/user/reevaluate-failed-cashback-dialog";
+import TrialCashbackTermsDialog from "@/components/user/trial-cashback-terms-dialog";
 import WithholdCashbackDialog from "@/components/user/withhold-cashback-dialog";
 
 /** Rows a cron will still pay — what "Withhold unpaid" cancels. */
@@ -42,6 +43,15 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
     queryFn: async () => (await getUserCashback(userId)).data,
   });
 
+  // Shared with the tier trial card on the same page, so this is one request.
+  const { data: trials } = useQuery<{ data: TierTrialView }>({
+    queryKey: ["user-tier-trial", userId],
+    queryFn: async () => (await getUserTierTrials(userId)).data,
+  });
+  const hadTrial = (trials?.data.history ?? []).some(
+    (trial) => trial.activatedAt !== null,
+  );
+
   const history = data?.data;
   const entries = history?.entries ?? [];
   // Only these have stopped retrying; a plain Failed row is still in the queue.
@@ -67,6 +77,7 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                 permanentlyFailedCount={permanentlyFailedCount}
               />
             )}
+            {hadTrial && <TrialCashbackTermsDialog userId={userId} />}
             <WithholdCashbackDialog userId={userId} unpaidCount={unpaidCount} />
             <span className="text-sm font-semibold text-gray-900">
               ${history.totalPaidUsd.toFixed(2)}
