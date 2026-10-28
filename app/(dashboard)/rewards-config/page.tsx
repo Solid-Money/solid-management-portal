@@ -254,6 +254,21 @@ export default function RewardsConfigPage() {
   const saveSubscriptionDiscountConfig = async () => {
     if (!config) return;
 
+    const caps = [
+      config.subscriptionDiscount.eligibleAmountCap,
+      config.subscriptionDiscount.tier1.monthlyCap,
+      config.subscriptionDiscount.tier2.monthlyCap,
+      config.subscriptionDiscount.tier3.monthlyCap,
+    ];
+
+    // A cleared box would go out as 0 and quietly switch a tier's subscription
+    // cashback — or the grandfathered rate — off, so it is refused instead. A
+    // negative cap is refused for the same reason.
+    if (caps.some((cap) => (cap as unknown) === "" || Number(cap) < 0)) {
+      toast.error("Every subscription cap needs a value of $0 or more");
+      return;
+    }
+
     await saveSection(
       "Subscription Discount",
       "subscription-discount",
@@ -310,6 +325,25 @@ export default function RewardsConfigPage() {
   const saveTierMembershipConfig = async () => {
     if (!config) return;
 
+    // An emptied box would go out as Number("") = 0, which switches the bridge
+    // fee cover off. Refused here, as the other sections refuse a blank, so
+    // clearing it to retype stays possible but saving it blank does not.
+    if ((config.tierMembership.bridgeFeeCoverPct as unknown) === "") {
+      toast.error("Set a Bridge Fee Cover (0 turns it off) before saving");
+      return;
+    }
+    // The API refuses anything past 20% as well; checked here so the admin is
+    // told which box is wrong rather than getting the section's failure toast.
+    const bridgeFeeCoverPct = Number(config.tierMembership.bridgeFeeCoverPct);
+    if (
+      !Number.isFinite(bridgeFeeCoverPct) ||
+      bridgeFeeCoverPct < 0 ||
+      bridgeFeeCoverPct > 20
+    ) {
+      toast.error("Bridge Fee Cover must be between 0 and 20%");
+      return;
+    }
+
     if (hasChanges("fuseStaking")) await saveFuseStakingConfig();
 
     await saveSection(
@@ -329,6 +363,7 @@ export default function RewardsConfigPage() {
         ultraAnnualUsd: Number(config.tierMembership.ultraAnnualUsd),
         graceDays: Number(config.tierMembership.graceDays),
         renewalNoticeDays: Number(config.tierMembership.renewalNoticeDays),
+        bridgeFeeCoverPct,
       },
       "tierMembership",
     );
@@ -573,6 +608,7 @@ export default function RewardsConfigPage() {
       <div className="space-y-4">
         {/* Tier Thresholds */}
         <ConfigSection
+          id="tier-thresholds"
           title="Tier Thresholds"
           description="Define points required to reach each loyalty tier"
           icon={<Settings className="h-5 w-5 text-indigo-600" />}
@@ -681,6 +717,7 @@ export default function RewardsConfigPage() {
 
         {/* Points Earning */}
         <ConfigSection
+          id="points-earning"
           title="Points Earning"
           description="Configure how users earn loyalty points through various activities"
           icon={<Coins className="h-5 w-5 text-yellow-600" />}
@@ -803,6 +840,7 @@ export default function RewardsConfigPage() {
 
         {/* Referral System */}
         <ConfigSection
+          id="referral-system"
           title="Referral System"
           description="Rewards for users who refer new members to the platform"
           icon={<Users className="h-5 w-5 text-teal-600" />}
@@ -885,6 +923,7 @@ export default function RewardsConfigPage() {
 
         {/* Referral Cashback Program */}
         <ConfigSection
+          id="referral-cashback"
           title="Referral Cashback Program"
           description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield and counts towards the FUSE skip-the-line unlock, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Separate from the points-based referral rewards above."
           icon={<Gift className="h-5 w-5 text-pink-600" />}
@@ -1068,6 +1107,7 @@ export default function RewardsConfigPage() {
 
         {/* Cashback */}
         <ConfigSection
+          id="card-cashback"
           title="Cashback on Card Transactions"
           description="Users earn FUSE tokens back on card purchases based on their tier"
           icon={<Percent className="h-5 w-5 text-green-600" />}
@@ -1185,6 +1225,7 @@ export default function RewardsConfigPage() {
 
         {/* Yield Boost */}
         <ConfigSection
+          id="yield-boost"
           title="Yield Boost"
           description="Extra APY on each user's total savings across soUSD, soETH, soFUSE and soEURC (valued in USD at the EUR/USD rate), earned daily and claimed in soFUSE from the payout wallet"
           icon={<TrendingUp className="h-5 w-5 text-emerald-600" />}
@@ -1326,6 +1367,7 @@ export default function RewardsConfigPage() {
 
         {/* Card Welcome Bonus */}
         <ConfigSection
+          id="card-welcome-bonus"
           title="Card Welcome Bonus"
           description="Bonus for users who make their first deposit via card (borrow deposits)"
           icon={<CreditCard className="h-5 w-5 text-blue-600" />}
@@ -1380,6 +1422,7 @@ export default function RewardsConfigPage() {
 
         {/* Subscription Discount */}
         <ConfigSection
+          id="subscription-discounts"
           title="Category-based Subscription Discounts"
           description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins). Each tier has its own monthly cap on subscription cashback across all categories together (Core $50, Prime $100, Ultra $200) — there is no per-service cap, except on grandfathered subscriptions still paid at the old flat rate. Paid as soUSD and also drawn from the card cashback monthly cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
@@ -1738,6 +1781,7 @@ export default function RewardsConfigPage() {
 
         {/* FUSE Staking */}
         <ConfigSection
+          id="fuse-staking"
           title="FUSE Staking for Tier Unlock"
           description={`"Skip the line": HOLDING FUSE in the soFUSE savings vault unlocks a tier outright, bypassing the points ladder — the tier lasts only while the balance stays above the threshold. The toggle here gates that route alone. The two amounts are shared with the v3 FUSE lock below and apply to it whether this toggle is on or off, which is why they are editable in both places.`}
           icon={<Wallet className="h-5 w-5 text-orange-600" />}
@@ -1784,6 +1828,7 @@ export default function RewardsConfigPage() {
 
         {/* Tier Membership (rewards v3) */}
         <ConfigSection
+          id="tier-membership"
           title="Tier Membership (v3)"
           description="How a tier is bought. Each route has its own switch and its own numbers; a tier costs the same whichever way it is reached."
           icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
@@ -1978,6 +2023,18 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="days"
                 tooltip="How far ahead of a renewal the user is told it is coming."
+              />
+              <InputField
+                label="Bridge Fee Cover"
+                value={config.tierMembership.bridgeFeeCoverPct}
+                onChange={(v) =>
+                  handleNumericUpdate("tierMembership", "bridgeFeeCoverPct", v)
+                }
+                type="number"
+                min={0}
+                max={20}
+                suffix="%"
+                tooltip="When a user pays from another chain (USDC on Base, ETH on Ethereum…), the bridge and swap take a cut on the way to Fuse. The first charge absorbs that cut, up to this share of the price, so sending $199 still buys a $199 tier. Only what the transfer actually lost is covered — never money the user did not send — and renewals always charge the full price. 0 turns it off. Capped at 20."
               />
             </div>
           </div>

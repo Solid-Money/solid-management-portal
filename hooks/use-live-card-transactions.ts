@@ -19,6 +19,8 @@ const REFRESH_DEBOUNCE_MS = 1_500;
 
 /** The inbox re-reads quickly: an agent is often looking at the thread that changed. */
 const SUPPORT_REFRESH_DEBOUNCE_MS = 300;
+/** A busy queue still refreshes at least this often while events keep coming. */
+const SUPPORT_REFRESH_MAX_WAIT_MS = 2_000;
 
 /**
  * Backoff for a handshake the server refused, which Socket.IO never retries on
@@ -50,6 +52,7 @@ export function useLiveCardTransactions(enabled: boolean): void {
 
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
     let supportTimer: ReturnType<typeof setTimeout> | undefined;
+    let supportWaitingSince: number | undefined;
     const changedConversations = new Set<string>();
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryAttempt = 0;
@@ -77,6 +80,7 @@ export function useLiveCardTransactions(enabled: boolean): void {
     // The support inbox: the queue, the badge and any open thread that changed.
     const refreshSupport = () => {
       supportTimer = undefined;
+      supportWaitingSince = undefined;
       void queryClient.invalidateQueries({ queryKey: ["support", "counts"] });
       void queryClient.invalidateQueries({ queryKey: ["support", "me"] });
       void queryClient.invalidateQueries({ queryKey: ["support", "queue"] });
@@ -87,9 +91,17 @@ export function useLiveCardTransactions(enabled: boolean): void {
       void queryClient.invalidateQueries({ queryKey: ["support", "user-cases"] });
     };
 
+    // Debounced, but never past the max wait: a steady stream of events less
+    // than 300 ms apart would otherwise hold the refresh back indefinitely.
     const scheduleSupportRefresh = () => {
+      const now = Date.now();
+      supportWaitingSince ??= now;
       if (supportTimer) clearTimeout(supportTimer);
-      supportTimer = setTimeout(refreshSupport, SUPPORT_REFRESH_DEBOUNCE_MS);
+      const wait = Math.min(
+        SUPPORT_REFRESH_DEBOUNCE_MS,
+        Math.max(0, supportWaitingSince + SUPPORT_REFRESH_MAX_WAIT_MS - now),
+      );
+      supportTimer = setTimeout(refreshSupport, wait);
     };
 
     const scheduleRetry = () => {

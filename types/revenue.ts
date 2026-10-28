@@ -9,6 +9,9 @@ export type RevenueType =
   | 'yield_share'
   | 'borrowing_fee'
   | 'treasury_interest'
+  // The FX fee share Rain and Wirex pay us — not a fee of ours, so not a
+  // FeeRevenueType. See the Card tab's Revenue & payouts view.
+  | 'card_fx_payout'
   | FeeRevenueType;
 
 /**
@@ -30,7 +33,11 @@ export type FeeRevenueType =
   | 'bank_withdrawal_fee'
   | 'bank_deposit_fee'
   | 'stocks_fee'
-  | 'transfi_fee';
+  | 'transfi_fee'
+  | 'card_deposit_bridge_fee'
+  | 'savings_deposit_bridge_fee'
+  | 'rain_card_onboarding_fee'
+  | 'rain_va_onboarding_fee';
 
 export type ReconciliationStatusType = 'pending' | 'verified' | 'discrepancy' | 'resolved';
 
@@ -128,18 +135,44 @@ export interface PaginatedUserRevenueResponse {
   };
 }
 
+/** The business lines the by-product rows are grouped under. */
+export type RevenueBusinessLine =
+  | 'savings'
+  | 'swaps'
+  | 'card'
+  | 'banking'
+  | 'stocks'
+  | 'buy_crypto';
+
 // Product Revenue Response
 export interface ProductRevenue {
   name: string;
   revenue: number;
+  /** Distinct users the revenue came from; 0 where `usersAttributable` is false. */
   users: number;
+  /**
+   * False where revenue is not attributable to users (vault yield, issuer
+   * payouts). Optional: a backend that predates it sends only `users`.
+   */
+  usersAttributable?: boolean;
+  /** Formatted change, or "new" when the previous window earned nothing. */
   trend: string;
+  changePercent: number | null;
+  previousRevenue: number;
   revenueType: RevenueType;
+  businessLine: RevenueBusinessLine;
 }
 
 export interface ProductRevenueResponse {
   products: ProductRevenue[];
   totalRevenue: number;
+  previousTotalRevenue: number;
+  period: {
+    startDate: string;
+    endDate: string;
+    previousStartDate: string;
+    previousEndDate: string;
+  };
 }
 
 // Investor Report Response
@@ -180,6 +213,7 @@ export type ExportFormat = 'csv' | 'pdf' | 'xlsx';
 
 // API Query Keys
 export const REVENUE_QUERY_KEYS = {
+  all: ['revenue'],
   executiveSummary: ['revenue', 'executive-summary'],
   summary: (filters: RevenueSummaryQuery) => ['revenue', 'summary', filters],
   financeDetail: (start: string, end: string) => ['revenue', 'finance', start, end],
@@ -361,6 +395,10 @@ export const FEE_REVENUE_COLORS: Record<FeeRevenueType, string> = {
   bank_deposit_fee: '#0d9488', // teal-600
   transfi_fee: '#7c3aed', // violet-600
   stocks_fee: '#0284c7', // sky-600
+  card_deposit_bridge_fee: '#65a30d', // lime-600
+  savings_deposit_bridge_fee: '#db2777', // pink-600
+  rain_card_onboarding_fee: '#ea580c', // orange-600
+  rain_va_onboarding_fee: '#475569', // slate-600
 };
 
 /**
@@ -379,6 +417,10 @@ export const FEE_REVENUE_TYPES: FeeRevenueType[] = [
   'bank_withdrawal_fee',
   'transfi_fee',
   'stocks_fee',
+  'card_deposit_bridge_fee',
+  'savings_deposit_bridge_fee',
+  'rain_card_onboarding_fee',
+  'rain_va_onboarding_fee',
 ];
 
 export const FEE_REVENUE_QUERY_KEYS = {

@@ -10,16 +10,20 @@ import {
   BookOpen,
   Bot,
   CircleAlert,
+  Coins,
   CreditCard,
   DollarSign,
   Gift,
+  Globe,
   Image,
+  Layers,
   LayoutTemplate,
   Megaphone,
   Percent,
   Receipt,
   Share2,
   ShieldAlert,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Terminal,
@@ -84,6 +88,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Error Lookup",
         description: "Trace the Ref on a user's failure screen to what happened",
         icon: CircleAlert,
+      },
+      {
+        href: "/security/revoke-sessions",
+        label: "Session Revoke",
+        description:
+          "Sign accounts out in bulk during an incident — preview, then revoke",
+        icon: ShieldAlert,
       },
       {
         href: "/support/articles",
@@ -201,10 +212,11 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Gift,
       },
       {
-        href: "/tier-trials",
-        label: "Tier Trials",
-        description: "Gift Prime or Ultra to a list of users at once",
-        icon: Sparkles,
+        href: "/bulk",
+        label: "Bulk",
+        description:
+          "Act on many users at once: re-send stuck cashback, gift tier trials",
+        icon: Layers,
       },
       {
         href: "/fees-config",
@@ -238,6 +250,20 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Agent API keys: usage, daily charges, cashback and model prices",
         icon: Bot,
+      },
+      {
+        href: "/tokens",
+        label: "Tokens",
+        description:
+          "The tokens the app lists for swaps, wallets and deposit addresses",
+        icon: Coins,
+      },
+      {
+        href: "/countries",
+        label: "Countries",
+        description:
+          "Where Wirex, Rain and TransFi take new sign-ups, and what is live",
+        icon: Globe,
       },
       {
         href: "/internal-team",
@@ -275,6 +301,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Referral Lookup",
         description: "Who a referral code belongs to and who used it",
         icon: Share2,
+      },
+      {
+        href: "/referral-review",
+        label: "Referral Review",
+        description:
+          "Approve or reject held referral rewards, block referrers, re-check unpaid",
+        icon: ShieldCheck,
       },
     ],
   },

@@ -1,5 +1,6 @@
 import { formatDistanceToNowStrict } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/utils";
 import type {
   SupportAgentCase,
   SupportCaseStatus,
@@ -84,14 +85,10 @@ export function ago(iso: string | null | undefined): string {
   }
 }
 
+/** Day, month and time in the portal's shared format (`formatDateTime`). */
 export function dateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(iso, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 /** "es" → "Spanish", via the browser's own names; falls back to the tag. */

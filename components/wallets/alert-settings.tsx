@@ -32,7 +32,10 @@ export default function AlertSettings({
   save: Save;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-end gap-3 text-xs text-gray-600">
+    <div
+      id="wallet-alert-settings"
+      className="flex flex-wrap items-end justify-end gap-3 text-xs text-gray-600"
+    >
       <NumberSetting
         label="Critical at"
         suffix="days"

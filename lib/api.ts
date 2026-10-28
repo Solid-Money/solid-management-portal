@@ -11,14 +11,22 @@ import {
   BatchIssueTierTrialResult,
   CardAuditEntry,
   CardIssuanceContext,
+  CardRelinkContext,
   IssueCardRequest,
   IssueCardResult,
+  RelinkCardRequest,
+  RelinkCardResult,
   RainRtfStatus,
   IssueTierTrialRequest,
   IssueTierTrialResult,
   InternalTeamFeatureKey,
   InternalTeamMember,
   InternalTeamRoster,
+  ListedToken,
+  ListedTokenChanges,
+  NewListedToken,
+  TokenCatalogue,
+  TokenLookup,
   KycResetEligibility,
   KycResetResult,
   VirtualAccountOnboardingRetryResult,
@@ -36,8 +44,13 @@ import {
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   ReevaluateFailedCashbackResult,
+  BulkReevaluateFailedCashbackResult,
+  StuckCashbackList,
+  WithholdCashbackResult,
   TierTrial,
+  TierLockReevaluationPreview,
   TierLockReevaluationResult,
+  TierLockThresholds,
   TierMembershipView,
   TierTrialView,
 } from "@/types";
@@ -57,10 +70,22 @@ import {
   ReleaseCardHoldResult,
 } from "@/types/cash-holds";
 import {
+  CountryAccessList,
+  CountryAccessListKey,
+  CountryAccessOverview,
+  CreatedDiditQuestionnaire,
+  DiditLinkCheck,
+  UpdateCountryAccessListRequest,
+} from "@/types/country-access";
+import {
   CollectSettlementRequest,
   CollectSettlementResult,
   UncollectedSettlements,
 } from "@/types/cash-collect";
+import type {
+  BulkRevokeResult,
+  BulkSessionPreview,
+} from "@/types/bulk-session";
 
 const api = axios.create({
   baseURL:
@@ -228,6 +253,31 @@ export const issueUserCard = (userId: string, request: IssueCardRequest) =>
   );
 
 /**
+ * What the re-link dialog opens with: every card the issuer holds for this
+ * cardholder, which can be attached back to the account, and why the rest
+ * cannot.
+ *
+ * Read when the dialog opens rather than with the card panel — it calls the
+ * issuer for the live card list.
+ */
+export const getCardRelinkContext = (userId: string) =>
+  api.get<{ data: CardRelinkContext }>(
+    `/admin/v1/users/${userId}/card/relink-context`,
+  );
+
+/**
+ * Attach a card the issuer still holds back to this user's account — for an
+ * account that was closed and reopened, which loses its card link. Nothing is
+ * issued or cancelled. The admin identity comes from the Firebase token
+ * server-side, never from here.
+ */
+export const relinkUserCard = (userId: string, request: RelinkCardRequest) =>
+  api.post<{ data: RelinkCardResult }>(
+    `/admin/v1/users/${userId}/card/relink`,
+    request,
+  );
+
+/**
  * Freeze or unfreeze a user's card. The admin identity is taken from the
  * Firebase token server-side — never sent from here — so the audit row and the
  * Slack message name whoever is actually signed in.
@@ -335,10 +385,31 @@ export const getUserTierMembership = (userId: string) =>
  * Only ever holds a tier up; safe to repeat. The admin's name on the audit row
  * comes from the Firebase token, never from here.
  */
-export const reevaluateTierLock = (userId: string, reason?: string) =>
+export const reevaluateTierLock = (
+  userId: string,
+  reason?: string,
+  /**
+   * The prices to pin, only when the preview says `needsThresholds`: the lock
+   * has no record and the price on the day it was opened is not on record.
+   */
+  thresholds?: TierLockThresholds,
+) =>
   api.post<{ data: TierLockReevaluationResult }>(
     `/admin/v1/users/${userId}/tier-lock/reevaluate`,
-    { reason: reason || undefined },
+    { reason: reason || undefined, ...(thresholds ?? {}) },
+  );
+
+/**
+ * What re-evaluating this user's lock would do, without doing it — chiefly
+ * whether the price it was bought at is on record or has to be entered.
+ *
+ * Quiet: the dialog still works without it (a backend from before it existed
+ * has no such route), so a failure here should not toast.
+ */
+export const getTierLockReevaluationPreview = (userId: string) =>
+  api.get<{ data: TierLockReevaluationPreview }>(
+    `/admin/v1/users/${userId}/tier-lock/reevaluate`,
+    { quietErrors: true },
   );
 
 /**
@@ -406,6 +477,40 @@ export const reevaluateFailedCashback = (userId: string, reason?: string) =>
   api.post<{ data: ReevaluateFailedCashbackResult }>(
     `/admin/v1/users/${userId}/cashback/reevaluate`,
     { reason: reason || undefined },
+  );
+
+/**
+ * Every PermanentlyFailed cashback row across all cardholders, with who it
+ * belongs to, what it is owed and why it gave up. Backs Config → Bulk.
+ */
+export const getStuckCashback = () =>
+  api.get<{ data: StuckCashbackList }>("/admin/v1/cashback/permanently-failed");
+
+/**
+ * Put the chosen PermanentlyFailed rows back in the retry queue, across any
+ * number of users. The retry cron pays them through the normal payout path;
+ * rows already re-sent or paid, and rows whose user has no Safe, come back as
+ * skipped. Each user's audit trail records it under the admin's name.
+ */
+export const bulkReevaluateFailedCashback = (
+  cashbackIds: string[],
+  reason?: string,
+) =>
+  api.post<{ data: BulkReevaluateFailedCashbackResult }>(
+    "/admin/v1/cashback/permanently-failed/reevaluate",
+    { cashbackIds, reason: reason || undefined },
+  );
+
+/**
+ * Withhold this user's unpaid cashback: every Escrowed, Pending or Failed row
+ * is marked Ineligible so no cron pays it. For accounts found abusing rewards;
+ * rows already paid are left alone. The reason is required and goes on the
+ * audit trail with the admin's name from the Firebase token.
+ */
+export const withholdUserCashback = (userId: string, reason: string) =>
+  api.post<{ data: WithholdCashbackResult }>(
+    `/admin/v1/users/${encodeURIComponent(userId)}/cashback/withhold`,
+    { reason },
   );
 
 /**
@@ -477,9 +582,10 @@ export const getKycResetEligibility = (userId: string) =>
 /**
  * Clear a declined identity verification so the user can start a new one.
  *
- * Narrow by design: it clears our record of the decision and nothing else — no
- * issuer consumer is deleted, no card is touched, and the provider's own
- * decision is not overturned. The reason is required; it is written to the
+ * Narrow by design: it clears our record of the decision — including a failed
+ * hand-off to the card issuer and any deposit hold on it — and nothing else: no
+ * issuer consumer is deleted, no card is touched, nothing is sent to the
+ * issuer, and the provider's own decision is not overturned. The reason is required; it is written to the
  * audit trail with the admin's name, and refusals are recorded too.
  */
 export const resetKycVerification = (userId: string, reason: string) =>
@@ -540,22 +646,6 @@ export const getUserAuditLog = (userId: string) =>
   api.get<{ data: AdminAuditEntry[] }>(`/admin/v1/users/${userId}/audit-log`);
 
 /**
- * The failures behind an error Ref a user shared (`9C1B-4F2A`), or behind a
- * full GlitchTip event ID or request ID. An 8-character Ref can repeat over
- * months, so each match carries its user.
- */
-export const lookupClientErrors = (query: string) =>
-  api.get<{ data: ClientErrorMatch[] }>("/admin/v1/errors", {
-    params: { query },
-  });
-
-/** The failures the app showed this user, newest first. */
-export const getUserClientErrors = (userId: string, limit = 20) =>
-  api.get<{ data: ClientErrorReport[] }>(`/admin/v1/errors/users/${userId}`, {
-    params: { limit },
-  });
-
-/**
  * Whether this user can get back in on their own, and what is stopping them.
  * Read-only — the first thing to check on a lockout ticket.
  */
@@ -611,6 +701,47 @@ export const resetTwoFactor = (userId: string, reason: string) =>
     { reason },
   );
 
+// --- Security: bulk session revoke -----------------------------------------
+
+/**
+ * Preview a bulk session revoke: for each account id, who it is, its balance,
+ * and how many live sessions a revoke would end. Read-only — nothing is signed
+ * out by this call.
+ */
+export const bulkSessionPreview = (userIds: string[]) =>
+  api.post<{ data: BulkSessionPreview }>("/admin/v1/security/sessions/preview", {
+    userIds,
+  });
+
+/**
+ * Revoke every login session for each listed account: their refresh tokens are
+ * invalidated, so each session ends when its access token expires and the
+ * account must sign in again. Not selective — the real owner is signed out too —
+ * so it is an incident-response action. The reason is written to every account's
+ * audit row; the admin identity comes from the Firebase token server-side.
+ */
+export const bulkRevokeSessions = (userIds: string[], reason: string) =>
+  api.post<{ data: BulkRevokeResult }>("/admin/v1/security/sessions/revoke", {
+    userIds,
+    reason,
+  });
+
+/**
+ * The failures behind an error Ref a user shared (`9C1B-4F2A`), or behind a
+ * full GlitchTip event ID or request ID. An 8-character Ref can repeat over
+ * months, so each match carries its user.
+ */
+export const lookupClientErrors = (query: string) =>
+  api.get<{ data: ClientErrorMatch[] }>("/admin/v1/errors", {
+    params: { query },
+  });
+
+/** The failures the app showed this user, newest first. */
+export const getUserClientErrors = (userId: string, limit = 20) =>
+  api.get<{ data: ClientErrorReport[] }>(`/admin/v1/errors/users/${userId}`, {
+    params: { limit },
+  });
+
 /**
  * This user's referral cashback from both sides: the reward they earn as
  * someone's referred friend, and one row per friend they invited.
@@ -632,6 +763,49 @@ export const reevaluateReferralReward = (
   api.post<{ data: ReferralReevaluationResult }>(
     `/admin/v1/users/${referredUserId}/referral-reward/reevaluate`,
     { reason },
+  );
+
+// --- Config → Tokens --------------------------------------------------------
+
+/**
+ * The `swaptokens` list: every row, the chains a token can be added on, and
+ * the deposit tokens the list has no row for yet.
+ */
+export const getTokenCatalogue = () =>
+  api.get<{ data: TokenCatalogue }>("/admin/v1/tokens");
+
+/**
+ * The row a contract already has, or a new one read from the chain: name,
+ * symbol and decimals from the contract, with the logo, price id and
+ * cross-chain id the list already uses for that symbol. 400 when nothing
+ * answers as an ERC-20 at that address.
+ */
+export const lookupToken = (chainId: number, address: string) =>
+  api.get<{ data: TokenLookup }>("/admin/v1/tokens/lookup", {
+    params: { chainId, address },
+  });
+
+/** Add a token. 409 when it is already listed, in any address case. */
+export const createListedToken = (token: NewListedToken) =>
+  api.post<{ data: ListedToken }>("/admin/v1/tokens", token);
+
+/** Change a row. Chain, address and decimals are the token's own and stay. */
+export const updateListedToken = (id: string, changes: ListedTokenChanges) =>
+  api.patch<{ data: ListedToken }>(`/admin/v1/tokens/${id}`, changes);
+
+/** Delete a row outright. Turning it off (`isActive: false`) keeps it. */
+export const deleteListedToken = (id: string) =>
+  api.delete<{ data: { id: string } }>(`/admin/v1/tokens/${id}`);
+
+/**
+ * Add deposit tokens the list is missing, by `chainId:address`. The backend
+ * builds each row from its own deposit tables; keys no longer missing come
+ * back as skipped.
+ */
+export const addMissingDepositTokens = (keys: string[]) =>
+  api.post<{ data: { added: ListedToken[]; skipped: string[] } }>(
+    "/admin/v1/tokens/deposit-tokens",
+    { keys },
   );
 
 // --- Config → Internal team ------------------------------------------------
@@ -669,8 +843,8 @@ export const removeInternalTeamMember = (userId: string, reason: string) =>
 
 /**
  * Give an internal team member a feature — the Wirex EUR account, the Credit &
- * Smart spend modes, the EUR vault. Assigning one they already have is a
- * no-op. Audited on the member's profile.
+ * Smart spend modes, the EUR vault, the new deposit tokens, the AI API.
+ * Assigning one they already have is a no-op. Audited on the member's profile.
  */
 export const assignInternalTeamFeature = (
   userId: string,
@@ -694,6 +868,59 @@ export const restoreInternalTeamMember = (userId: string, note?: string) =>
   api.post<{ data: InternalTeamMember }>(
     `/admin/v1/internal-team/${userId}/restore`,
     note ? { note } : {},
+  );
+
+// --- Config → Countries ----------------------------------------------------
+
+/**
+ * Every country list (Wirex card, Rain card, Rain virtual account, TransFi),
+ * the country catalog with display names, and the read-only code lists.
+ */
+export const getCountryAccess = () =>
+  api.get<{ data: CountryAccessOverview }>("/admin/v1/country-access");
+
+/**
+ * Replace one list. Live for new sign-ups at once; added countries stay
+ * pending until the provider side is confirmed. Refused with a 409 when
+ * someone else saved the list after `expectedUpdatedAt`.
+ */
+export const updateCountryAccessList = (
+  list: CountryAccessListKey,
+  body: UpdateCountryAccessListRequest,
+) =>
+  api.put<{ data: CountryAccessList }>(
+    `/admin/v1/country-access/${list}`,
+    body,
+  );
+
+/** Generate a Didit questionnaire from a Rain list as it is stored now. */
+export const createCountryAccessDiditQuestionnaire = (
+  list: CountryAccessListKey,
+) =>
+  api.post<{ data: CreatedDiditQuestionnaire }>(
+    `/admin/v1/country-access/${list}/didit-questionnaire`,
+  );
+
+/** Ask Didit whether the workflow runs the generated questionnaire yet. */
+export const verifyCountryAccessDiditLink = (list: CountryAccessListKey) =>
+  api.post<{ data: DiditLinkCheck }>(
+    `/admin/v1/country-access/${list}/didit-link/verify`,
+  );
+
+/** Record that the provider side (Didit or Sumsub) now matches the list. */
+export const confirmCountryAccessProvider = (
+  list: CountryAccessListKey,
+  note?: string,
+) =>
+  api.post<{ data: CountryAccessList }>(
+    `/admin/v1/country-access/${list}/provider-confirmation`,
+    note ? { note } : {},
+  );
+
+/** Rewrite the card and VA lists from the code constants. */
+export const resetCountryAccessToDefaults = () =>
+  api.post<{ data: CountryAccessOverview }>(
+    "/admin/v1/country-access/reset-defaults",
   );
 
 // --- Rewards / cohorts -----------------------------------------------------

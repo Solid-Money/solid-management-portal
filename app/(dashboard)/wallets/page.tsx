@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import RefillModal from "@/components/wallets/refill-modal";
 import TreasuryAudit from "@/components/wallets/treasury-audit";
 import AlertSettings from "@/components/wallets/alert-settings";
 import { Button } from "@/components/ui/button";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import {
   getTreasurySettings,
   updateTreasurySettings,
@@ -23,6 +24,8 @@ import {
 } from "@/types";
 
 type Tab = "wallets" | "funding" | "history";
+
+const TAB_VALUES = ["wallets", "funding", "history"] as const;
 
 const TABS: Array<{ value: Tab; label: string; blurb: string }> = [
   {
@@ -69,8 +72,18 @@ function describeSettingChange(
 }
 
 export default function WalletsPage() {
+  return (
+    <Suspense fallback={null}>
+      <WalletsScreen />
+    </Suspense>
+  );
+}
+
+function WalletsScreen() {
   const [filter, setFilter] = useState<WalletFilter>("active");
-  const [tab, setTab] = useState<Tab>("wallets");
+  // In the URL so the admin search can open the funding ledger or the history
+  // directly, and a pasted link keeps the tab it was copied from.
+  const [tab, setTab] = useUrlTab<Tab>(TAB_VALUES, "wallets");
   const [refillable, setRefillable] = useState<WalletAssetPlan[]>([]);
   const [refilling, setRefilling] = useState(false);
   const queryClient = useQueryClient();
@@ -123,6 +136,8 @@ export default function WalletsPage() {
                 }
               >
                 <Button
+                  id="refill-wallets"
+                  data-search-open
                   variant="destructive"
                   size="sm"
                   disabled={nothingToFund}

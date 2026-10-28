@@ -17,7 +17,10 @@ import {
   CARD_FEE_STATUS_LABELS,
   CASHBACK_PERCENTAGE_SOURCE_LABELS,
 } from "@/types";
-import { formatCashbackRate } from "@/lib/cashback-percentage";
+import {
+  formatCashbackRate,
+  formatMonthlyCap,
+} from "@/lib/cashback-percentage";
 import CashbackRateDialog from "@/components/cashback/cashback-rate-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -281,6 +284,9 @@ export default function CardTransactionsTable({
     const accrued = tx.cashback?.cashbackPercentage;
     const pinned = tx.cashbackPercentage;
     const source = tx.cashback?.cashbackPercentageSource;
+    // The cap frozen with the rate — what explains a trial member's purchase
+    // paying past their current tier's cap after the trial ended.
+    const cap = formatMonthlyCap(tx.cashback?.monthlyCapUsd);
 
     return (
       <div className="space-y-1">
@@ -294,6 +300,7 @@ export default function CardTransactionsTable({
                 {CASHBACK_PERCENTAGE_SOURCE_LABELS[source] ?? source}
               </div>
             )}
+            {cap && <div className="text-[10px] text-gray-500">{cap}</div>}
           </div>
         ) : (
           <span className="text-gray-400">—</span>

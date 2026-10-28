@@ -141,34 +141,32 @@ export const ANALYTICS_TABS: AnalyticsTab[] = [
     id: "card",
     label: "Card",
     question:
-      "Is the card being used, by whom, on which rail, and what does each rail cost us?",
+      "Is the card being used, on which rail, what does it earn us, and what does each rail cost?",
     subTabs: [
       {
         id: "spending",
         label: "Spending",
-        question: "How much is being spent, and on which rail?",
-        pending: { phase: 2 },
+        question: "How much is being spent, on which rail, and how much converts currency?",
+      },
+      {
+        id: "revenue",
+        label: "Revenue & payouts",
+        question: "What FX revenue do Rain and Wirex owe us, and did they pay it?",
       },
       {
         id: "issuance",
         label: "Issuance & activation",
-        question: "Do the cards we issue get activated and used?",
-        pending: { phase: 2 },
+        question: "Do the cards we issue get used?",
       },
       {
         id: "declines",
         label: "Declines & risk",
         question: "What is being declined, and is it abuse?",
-        pending: { phase: 2 },
       },
       {
         id: "costs",
-        label: "Rail costs",
-        question: "What does each card rail cost us per active card and per dollar spent?",
-        pending: {
-          phase: 2,
-          blockedOn: "Needs the Rain and Wirex contract costs entered under costs config.",
-        },
+        label: "Rail economics",
+        question: "What does each card rail earn and cost us per active card and per dollar spent?",
       },
     ],
   },

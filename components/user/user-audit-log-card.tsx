@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { History, Loader2 } from "lucide-react";
 
 import { getUserAuditLog } from "@/lib/api";
-import { formatDateTime, formatUsd } from "@/lib/utils";
+import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 import { AdminAuditEntry } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
     card_unfrozen: { label: "Card unfrozen", variant: "success" },
     card_issued: { label: "Card issued", variant: "info" },
     card_canceled: { label: "Card canceled", variant: "danger" },
+    card_relinked: { label: "Card re-linked", variant: "info" },
     cashback_rate_user_set: { label: "Cashback rate set", variant: "info" },
     cashback_rate_user_cleared: {
       label: "Cashback rate cleared",
@@ -46,10 +47,35 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Referral reward re-evaluated",
       variant: "info",
     },
+    referral_reward_held: { label: "Referral reward held", variant: "warning" },
+    referral_reward_approved: {
+      label: "Referral reward approved",
+      variant: "success",
+    },
+    referral_reward_rejected: {
+      label: "Referral reward rejected",
+      variant: "danger",
+    },
+    referral_reward_rechecked: {
+      label: "Referral reward re-checked",
+      variant: "warning",
+    },
+    referral_referrer_blocked: {
+      label: "Blocked from referral rewards",
+      variant: "danger",
+    },
+    referral_referrer_unblocked: {
+      label: "Referral block lifted",
+      variant: "success",
+    },
     tier_lock_reevaluated: { label: "Tier lock re-evaluated", variant: "info" },
     cashback_failed_reevaluated: {
       label: "Failed cashback re-sent",
       variant: "info",
+    },
+    cashback_withheld: {
+      label: "Unpaid cashback withheld",
+      variant: "danger",
     },
     kyc_verification_reset: {
       label: "KYC verification reset",
@@ -94,6 +120,8 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
 const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
   wirex_virtual_account: "Wirex EUR account",
   spend_modes: "Credit & Smart spend modes",
+  deposit_tokens: "New deposit tokens",
+  // No longer a tag (the EUR vault is open to everyone); kept so past entries read.
   eur_vault: "EUR vault",
   ai_api: "AI API",
 };
@@ -153,10 +181,58 @@ function detailFor(entry: AdminAuditEntry): string | null {
     return referralReevaluationDetail(entry);
   }
 
+  if (
+    entry.action === "referral_reward_held" ||
+    entry.action === "referral_reward_approved" ||
+    entry.action === "referral_reward_rejected"
+  ) {
+    const from = stringField(entry, "previousStatus");
+    const to = stringField(entry, "status");
+    const parts = [
+      from && to ? `${from} → ${to}` : null,
+      entry.metadata?.friendOnly === true ? "friend paid only" : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "referral_reward_rechecked") {
+    const outcome = stringField(entry, "outcome");
+    const reasons = entry.metadata?.reasons;
+    return outcome
+      ? `${outcome}${
+          Array.isArray(reasons) && reasons.length
+            ? `: ${reasons.join(", ")}`
+            : ""
+        }`
+      : null;
+  }
+
+  if (entry.action === "referral_referrer_blocked") {
+    const mode = stringField(entry, "mode");
+    const counts = ["held", "voided", "withheld"]
+      .map((key) => {
+        const value = entry.metadata?.[key];
+        return typeof value === "number" && value > 0
+          ? `${formatNumber(value, 0, 0)} ${key}`
+          : null;
+      })
+      .filter(Boolean);
+    return [mode ? `mode: ${mode}` : null, ...counts]
+      .filter(Boolean)
+      .join(" · ") || null;
+  }
+
   if (entry.action === "cashback_failed_reevaluated") {
     const count = entry.metadata?.rearmed;
     return typeof count === "number"
       ? `${count} row${count === 1 ? "" : "s"} back in the retry queue`
+      : null;
+  }
+
+  if (entry.action === "cashback_withheld") {
+    const count = entry.metadata?.withheld;
+    return typeof count === "number"
+      ? `${formatNumber(count, 0, 0)} unpaid row${count === 1 ? "" : "s"} withheld`
       : null;
   }
 

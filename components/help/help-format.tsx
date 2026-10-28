@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/utils";
 import type { HelpArticleSummary } from "@/types/help";
 
 /**
@@ -15,7 +16,7 @@ export const HELP_SITE_URL = (
 
 export function shortDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return formatDateTime(iso, { year: "numeric", month: "short", day: "numeric" });
 }
 
 export function personName(email: string | null | undefined): string {

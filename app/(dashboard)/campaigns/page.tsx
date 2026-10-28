@@ -118,6 +118,8 @@ export default function CampaignsPage() {
         </div>
         {campaigns.length > 0 && (
           <button
+            id="new-campaign"
+            data-search-open
             onClick={handleCreate}
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer"
           >
@@ -251,6 +253,8 @@ export default function CampaignsPage() {
             Create a campaign to offer location-specific cashback promotions.
           </p>
           <button
+            id="new-campaign"
+            data-search-open
             onClick={handleCreate}
             className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm font-medium"
           >
