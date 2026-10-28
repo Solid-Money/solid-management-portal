@@ -707,6 +707,9 @@ function ReferralV4CardBody({ userId }: { userId: string }) {
   const { data, isLoading, error } = useUserReferralsV4(userId);
   const access = useReferralV4Access();
   const canCancel = access.data?.canReview === true;
+  // Writing off a debt forgoes money owed, so it takes the card-credit
+  // permission the backend checks, not the review one.
+  const canWriteOff = access.data?.canManageCredit === true;
   const notAvailable = !!error && isNotAvailable(error);
   const terms = data?.terms;
   const reviewWindowDays = useReferralV4Config().data?.reviewWindowDays;
@@ -774,7 +777,7 @@ function ReferralV4CardBody({ userId }: { userId: string }) {
             {Array.isArray(data.debts) && (
               <ReferralV4DebtsSection
                 debts={data.debts}
-                canWriteOff={canCancel}
+                canWriteOff={canWriteOff}
               />
             )}
           </div>
