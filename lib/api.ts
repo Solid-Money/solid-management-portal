@@ -12,6 +12,7 @@ import {
   CardAuditEntry,
   CardIssuanceContext,
   CardRelinkContext,
+  FullRewardsConfig,
   IssueCardRequest,
   IssueCardResult,
   RelinkCardRequest,
@@ -82,6 +83,20 @@ import {
   CollectSettlementResult,
   UncollectedSettlements,
 } from "@/types/cash-collect";
+import type {
+  AdminCardCredit,
+  AdminReferralV4Debt,
+  AdminReferralV4Reward,
+  AdminUserReferralsV4,
+  CardCreditAdjustment,
+  ReferralBoostAdmin,
+  ReferralBoostInput,
+  ReferralReviewDecisionRequest,
+  ReferralReviewDecisionResult,
+  ReferralReviewQueue,
+  ReferralV4Access,
+  ReferralV4Analytics,
+} from "@/types/referral-v4";
 import type {
   BulkRevokeResult,
   BulkSessionPreview,
@@ -763,6 +778,188 @@ export const reevaluateReferralReward = (
   api.post<{ data: ReferralReevaluationResult }>(
     `/admin/v1/users/${referredUserId}/referral-reward/reevaluate`,
     { reason },
+  );
+
+// --- Referral v4 + card credit ---------------------------------------------
+
+/**
+ * The payload of a response, whether or not the endpoint wraps it in
+ * `{ data }`. The user endpoints here do and the analytics ones don't, and the
+ * v4 endpoints were specified bare; reading both keeps the screens working
+ * whichever way they ship. Only a body that is *exactly* `{ data: … }` is
+ * unwrapped, so a payload with its own `data` field is left alone.
+ */
+export function unwrapData<T>(body: unknown): T {
+  if (
+    body !== null &&
+    typeof body === "object" &&
+    !Array.isArray(body) &&
+    "data" in body &&
+    Object.keys(body).length === 1
+  ) {
+    return (body as { data: T }).data;
+  }
+  return body as T;
+}
+
+/**
+ * What the signed-in admin may do with referral v4: edit its config, grant
+ * and remove card credit, and decide the review queue. Read quietly — every
+ * screen that asks shows its own state when it fails.
+ */
+export const getReferralV4Access = async () =>
+  unwrapData<ReferralV4Access>(
+    (
+      await api.get("/admin/v1/referral-v4/access", {
+        quietErrors: true,
+      })
+    ).data,
+  );
+
+/** This user's card credit: balance, lifetime totals and the full ledger. */
+export const getUserCardCredit = async (userId: string) =>
+  unwrapData<AdminCardCredit>(
+    (
+      await api.get(`/admin/v1/users/${userId}/card-credit`, {
+        quietErrors: true,
+      })
+    ).data,
+  );
+
+/**
+ * Give this user card credit (0 < amount ≤ 500). The reason is required and
+ * lands on the ledger entry and the audit trail with the admin's name, which
+ * the backend takes from the Firebase token.
+ */
+export const grantUserCardCredit = async (
+  userId: string,
+  body: CardCreditAdjustment,
+) =>
+  unwrapData<AdminCardCredit>(
+    (await api.post(`/admin/v1/users/${userId}/card-credit/grant`, body)).data,
+  );
+
+/** Take card credit back, up to what is available (409 otherwise). */
+export const removeUserCardCredit = async (
+  userId: string,
+  body: CardCreditAdjustment,
+) =>
+  unwrapData<AdminCardCredit>(
+    (await api.post(`/admin/v1/users/${userId}/card-credit/remove`, body))
+      .data,
+  );
+
+/**
+ * Referral v4 from both sides: this user as a referrer (bonus limit, totals,
+ * every friend with their rewards) and their own invite as a friend.
+ */
+export const getUserReferralsV4 = async (userId: string) =>
+  unwrapData<AdminUserReferralsV4>(
+    (
+      await api.get(`/admin/v1/users/${userId}/referrals-v4`, {
+        quietErrors: true,
+      })
+    ).data,
+  );
+
+/**
+ * Cancel a v4 reward that has not been credited yet (on hold, over the bonus
+ * limit, or under review). The reason is required.
+ */
+export const cancelReferralV4Reward = async (rewardId: string, reason: string) =>
+  unwrapData<AdminReferralV4Reward>(
+    (
+      await api.post(
+        `/admin/v1/referral-v4/rewards/${encodeURIComponent(rewardId)}/cancel`,
+        { reason },
+      )
+    ).data,
+  );
+
+/**
+ * Write off an open referral debt by hand: it stops being recovered from the
+ * user's future bonuses and spend share. The note is optional; the backend
+ * records the write-off on the audit trail with the admin's name.
+ */
+export const writeOffReferralV4Debt = async (debtId: string, note?: string) =>
+  unwrapData<AdminReferralV4Debt>(
+    (
+      await api.post(
+        `/admin/v1/referral-v4/debts/${encodeURIComponent(debtId)}/write-off`,
+        note ? { note } : {},
+      )
+    ).data,
+  );
+
+/**
+ * The rewards config, read quietly — for screens that only need a few of its
+ * values (the referral v4 schedule and limits) and show their own fallback
+ * when it can't be read. The config pages load it through `useConfigEditor`.
+ */
+export const getRewardsConfigQuietly = async () =>
+  (
+    await api.get<FullRewardsConfig>("/admin/v1/rewards-config", {
+      quietErrors: true,
+    })
+  ).data;
+
+/** Rewards held for review — v4 and today's stuck legacy ones — by referrer. */
+export const getReferralReviewQueue = async () =>
+  unwrapData<ReferralReviewQueue>(
+    (
+      await api.get("/admin/v1/referral-v4/review", {
+        quietErrors: true,
+      })
+    ).data,
+  );
+
+/** Approve or reject a set of review items; reports each one's outcome. */
+export const decideReferralReview = async (
+  body: ReferralReviewDecisionRequest,
+) =>
+  unwrapData<ReferralReviewDecisionResult>(
+    (await api.post("/admin/v1/referral-v4/review", body)).data,
+  );
+
+/** Every referral boost, past, live and scheduled. */
+export const getReferralBoosts = async () =>
+  unwrapData<ReferralBoostAdmin[]>(
+    (
+      await api.get("/admin/v1/referral-boosts", {
+        quietErrors: true,
+      })
+    ).data,
+  );
+
+export const createReferralBoost = async (body: ReferralBoostInput) =>
+  unwrapData<ReferralBoostAdmin>(
+    (await api.post("/admin/v1/referral-boosts", body)).data,
+  );
+
+export const updateReferralBoost = async (
+  id: string,
+  body: Partial<ReferralBoostInput>,
+) =>
+  unwrapData<ReferralBoostAdmin>(
+    (
+      await api.patch(
+        `/admin/v1/referral-boosts/${encodeURIComponent(id)}`,
+        body,
+      )
+    ).data,
+  );
+
+export const deleteReferralBoost = (id: string) =>
+  api.delete(`/admin/v1/referral-boosts/${encodeURIComponent(id)}`);
+
+/** Card credit and spend-share totals, the next payout and a weekly series. */
+export const getReferralV4Analytics = async () =>
+  unwrapData<ReferralV4Analytics>(
+    (
+      await api.get("/admin/v1/analytics/rewards/referrals-v4", {
+        quietErrors: true,
+      })
+    ).data,
   );
 
 // --- Config → Tokens --------------------------------------------------------

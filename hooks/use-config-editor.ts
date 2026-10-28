@@ -12,6 +12,7 @@ import {
   TierMembershipConfig,
   YieldBoostConfig,
 } from "@/types";
+import type { ReferralV4Config } from "@/types/referral-v4";
 
 /** Shipped defaults for the referral cashback program (mirrors the backend). */
 export const REFERRAL_CASHBACK_DEFAULTS: ReferralCashbackConfig = {
@@ -24,6 +25,56 @@ export const REFERRAL_CASHBACK_DEFAULTS: ReferralCashbackConfig = {
   payoutDelayDays: 30,
   reversalWindowDays: 60,
   autoReviewMonthlyThreshold: 20,
+};
+
+/**
+ * Shipped defaults for referral v4 (mirrors the contract). Off until launch.
+ *
+ * Only ever fills fields missing from a `referralV4` the backend did send — a
+ * backend that sends none has no v4 endpoint to save to, and the section says
+ * so instead of offering a form.
+ */
+export const REFERRAL_V4_DEFAULTS: ReferralV4Config = {
+  enabled: false,
+  launchAt: null,
+  paused: false,
+  welcomeReferrerUsd: 10,
+  welcomeFriendUsd: 10,
+  welcomeSpendTargetUsd: 150,
+  welcomeMerchantTarget: 3,
+  welcomeWindowDays: 30,
+  bigSpenderReferrerUsd: 50,
+  bigSpenderFriendUsd: 50,
+  bigSpenderSpendTargetUsd: 5000,
+  bigSpenderWindowDays: 90,
+  upgradePrimeUsd: 20,
+  upgradeUltraUsd: 100,
+  upgradePrimeLockFuse: 50000,
+  upgradeUltraLockFuse: 400000,
+  upgradeLockHoldDays: 90,
+  spendShareRate: 0.01,
+  spendShareCapPerFriendUsd: 2000,
+  spendShareMaxWeeklyPayoutUsd: 1000,
+  minWeeklyPayoutUsd: 1,
+  holdDays: 14,
+  payoutWeekday: 4,
+  payoutHourUtc: 10,
+  settlementGraceDays: 7,
+  bonusLimitEnabled: true,
+  bonusLimitBase: 10,
+  bonusLimitPerActiveFriend: 3,
+  bonusLimitActiveSpendUsd: 250,
+  monthTwoFromDays: 30,
+  monthTwoToDays: 60,
+  reviewMonthlyThreshold: 20,
+  reviewWindowDays: 30,
+  maxBoostMultiplier: 5,
+  excludedCountries: ["BD", "PH", "KE", "NG"],
+  linkMaxDaysAfterSignup: 7,
+  clawbackEnabled: true,
+  clawbackWatchDays: 120,
+  debtWriteOffDays: 180,
+  debtWaiveBelowUsd: 1,
 };
 
 /**
@@ -145,6 +196,17 @@ export function withConfigDefaults(
       ...REFERRAL_CASHBACK_DEFAULTS,
       ...config.referralCashback,
     },
+    ...(config.referralV4
+      ? {
+          referralV4: {
+            ...REFERRAL_V4_DEFAULTS,
+            ...config.referralV4,
+            excludedCountries:
+              config.referralV4.excludedCountries ??
+              REFERRAL_V4_DEFAULTS.excludedCountries,
+          },
+        }
+      : {}),
     productFees: {
       ...PRODUCT_FEES_DEFAULTS,
       ...fees,

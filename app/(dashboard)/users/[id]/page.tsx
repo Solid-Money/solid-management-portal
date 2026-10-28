@@ -20,6 +20,7 @@ import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
 import UserErrors from "@/components/errors/user-errors";
 import UserCardPanel from "@/components/user/user-card-panel";
+import UserCardCreditCard from "@/components/user/user-card-credit-card";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
@@ -31,6 +32,7 @@ import UserVirtualAccountOnboardingCard from "@/components/user/user-virtual-acc
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserReferralCard from "@/components/user/user-referral-card";
+import UserReferralV4Card from "@/components/user/user-referral-v4-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
 import UserTierMembershipCard from "@/components/user/user-tier-membership-card";
@@ -318,6 +320,11 @@ export default function UserDetailPage({
           <SectionAnchor id="user-rtf">
             <UserRtfCard userId={id} />
           </SectionAnchor>
+          {/* Credit is spent first at Wirex authorization, so a purchase that
+              "cost less than it should" in the table below is answered here. */}
+          <SectionAnchor id="user-card-credit">
+            <UserCardCreditCard userId={id} username={displayName} />
+          </SectionAnchor>
           {/* Next to the spending table, because a rate set on one transaction
               beats this one and is edited from a row down there. */}
           <SectionAnchor id="user-card-cashback-rate">
@@ -358,8 +365,17 @@ export default function UserDetailPage({
           <SectionAnchor id="user-rewards-cashback">
             <UserCashbackCard userId={id} />
           </SectionAnchor>
-          {/* Both sides of the referral program, with the re-evaluate action
-              for rewards the engine reversed or expired. */}
+          {/* Referral v4 bonuses are paid as card credit. */}
+          <SectionAnchor id="user-rewards-card-credit">
+            <UserCardCreditCard userId={id} username={displayName} />
+          </SectionAnchor>
+          {/* Referral v4 from both sides: friends from launch on, with their
+              rewards, debts and the cancel action; legacy friends are listed too. */}
+          <SectionAnchor id="user-referrals-v4">
+            <UserReferralV4Card userId={id} />
+          </SectionAnchor>
+          {/* Both sides of the legacy referral program, with the re-evaluate
+              action for rewards the engine reversed or expired. */}
           <SectionAnchor id="user-referrals">
             <UserReferralCard userId={id} />
           </SectionAnchor>

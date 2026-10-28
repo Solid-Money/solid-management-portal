@@ -1,3 +1,5 @@
+import type { ReferralV4Config } from "@/types/referral-v4";
+
 export interface User {
   _id: string;
   email: string;
@@ -1238,6 +1240,11 @@ export interface CardTransaction {
   fees?: CardTransactionFee[];
   /** Sum of the fees Rain actually accepted, in USD. */
   totalFeeUsd?: number;
+  /**
+   * Card credit (Wirex only) applied to this purchase, in USD. Absent when
+   * none was used; cashback is computed on the rest.
+   */
+  cardCreditUsedUsd?: number;
   user?: {
     _id: string;
     username: string;
@@ -1778,6 +1785,11 @@ export interface FullRewardsConfig {
   fuseStaking: FuseStakingConfig;
   referral: ReferralConfig;
   referralCashback: ReferralCashbackConfig;
+  /**
+   * Referral program v4 (card credit). Absent from a backend that predates it,
+   * in which case its section shows as not available yet.
+   */
+  referralV4?: ReferralV4Config;
   cardWelcomeBonus: CardWelcomeBonusConfig;
   productFees: ProductFeesConfig;
   tierMembership: TierMembershipConfig;

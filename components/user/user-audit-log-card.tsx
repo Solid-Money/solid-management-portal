@@ -109,12 +109,29 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Internal team feature removed",
       variant: "warning",
     },
+    card_credit_granted: { label: "Card credit granted", variant: "success" },
+    card_credit_removed: { label: "Card credit removed", variant: "warning" },
+    referral_v4_reward_cancelled: {
+      label: "Referral v4 reward cancelled",
+      variant: "warning",
+    },
+    referral_review_decided: {
+      label: "Referral review decided",
+      variant: "info",
+    },
     ai_api_key_updated: { label: "AI API key changed", variant: "warning" },
     ai_api_account_updated: {
       label: "AI API account changed",
       variant: "warning",
     },
   };
+
+/** How the audit trail names a referral v4 reward step. */
+const REFERRAL_V4_STEP_LABELS: Record<string, string> = {
+  welcome: "Welcome bonus",
+  big_spender: "Big spender bonus",
+  upgrade: "Upgrade bonus",
+};
 
 /** How the audit trail names an internal team feature. */
 const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
@@ -182,6 +199,25 @@ function detailFor(entry: AdminAuditEntry): string | null {
   }
 
   if (
+    entry.action === "card_credit_granted" ||
+    entry.action === "card_credit_removed"
+  ) {
+    const amount = entry.metadata?.amountUsd;
+    const balance = entry.metadata?.balanceAfterUsd;
+    const parts = [
+      typeof amount === "number"
+        ? `${entry.action === "card_credit_granted" ? "+" : "−"}${formatUsd(
+            Math.abs(amount),
+          )}`
+        : null,
+      typeof balance === "number"
+        ? `${formatUsd(balance)} available after`
+        : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (
     entry.action === "referral_reward_held" ||
     entry.action === "referral_reward_approved" ||
     entry.action === "referral_reward_rejected"
@@ -193,6 +229,36 @@ function detailFor(entry: AdminAuditEntry): string | null {
       entry.metadata?.friendOnly === true ? "friend paid only" : null,
     ].filter(Boolean);
     return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "referral_v4_reward_cancelled") {
+    const step = stringField(entry, "step");
+    const side = stringField(entry, "side");
+    const amount = entry.metadata?.amountUsd;
+    const parts = [
+      step ? REFERRAL_V4_STEP_LABELS[step] ?? step : null,
+      side,
+      typeof amount === "number" ? formatUsd(amount) : null,
+      stringField(entry, "previousStatus")
+        ? `was ${stringField(entry, "previousStatus")}`
+        : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "referral_review_decided") {
+    const decision = stringField(entry, "decision");
+    const kind = stringField(entry, "kind");
+    const parts = [
+      decision === "approve"
+        ? "approved"
+        : decision === "reject"
+          ? "rejected"
+          : decision,
+      kind === "legacy" ? "legacy reward" : kind ? `${kind} reward` : null,
+      stringField(entry, "status") ? `→ ${stringField(entry, "status")}` : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" ") : null;
   }
 
   if (entry.action === "referral_reward_rechecked") {
