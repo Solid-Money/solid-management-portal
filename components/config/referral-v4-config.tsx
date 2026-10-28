@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CreditCard, Eye, Loader2, Save, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { CreditCard, Eye, Loader2, PauseCircle, Save, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -23,52 +24,119 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ConfigEditor } from "@/hooks/use-config-editor";
-import { useReferralV4Access } from "@/hooks/use-referral-v4";
+import { REFERRAL_V4_KEYS, useReferralV4Access } from "@/hooks/use-referral-v4";
 import {
+  REFERRAL_V4_NUMBER_BOUNDS,
+  WEEKDAYS,
   formatUtc,
   isNotAvailable,
   isoToUtcInput,
+  payoutScheduleLabel,
+  utcHourLabel,
   utcInputToIso,
+  weekdayName,
+  type ReferralV4NumericField,
 } from "@/lib/referral-v4";
-import { formatUsd } from "@/lib/utils";
+import { formatNumber, formatUsd } from "@/lib/utils";
 import type { ReferralV4Config } from "@/types/referral-v4";
 
-type NumericField = {
-  [K in keyof ReferralV4Config]: ReferralV4Config[K] extends number ? K : never;
-}[keyof ReferralV4Config];
+/** Every numeric field, for the blank and bounds checks before saving. */
+const NUMERIC_FIELDS = Object.keys(
+  REFERRAL_V4_NUMBER_BOUNDS,
+) as ReferralV4NumericField[];
 
-/** Every numeric field, for the "nothing left blank" check before saving. */
-const NUMERIC_FIELDS: NumericField[] = [
-  "welcomeReferrerUsd",
-  "welcomeFriendUsd",
-  "welcomeSpendTargetUsd",
-  "welcomeMerchantTarget",
-  "welcomeWindowDays",
-  "bigSpenderReferrerUsd",
-  "bigSpenderFriendUsd",
-  "bigSpenderSpendTargetUsd",
-  "bigSpenderWindowDays",
-  "upgradePrimeUsd",
-  "upgradeUltraUsd",
-  "upgradePrimeLockFuse",
-  "upgradeUltraLockFuse",
-  "upgradeLockHoldDays",
-  "spendShareRate",
-  "spendShareCapPerFriendUsd",
-  "spendShareMaxWeeklyPayoutUsd",
-  "holdDays",
-  "bonusLimitBase",
-  "bonusLimitPerActiveFriend",
-  "bonusLimitActiveSpendUsd",
-  "reviewMonthlyThreshold",
-  "linkMaxDaysAfterSignup",
-];
+/** What each number is called when a save is refused over it. */
+const FIELD_LABELS: Record<ReferralV4NumericField, string> = {
+  welcomeReferrerUsd: "Welcome bonus — referrer",
+  welcomeFriendUsd: "Welcome bonus — friend",
+  welcomeSpendTargetUsd: "Welcome bonus — spend target",
+  welcomeMerchantTarget: "Welcome bonus — distinct shops",
+  welcomeWindowDays: "Welcome bonus — window",
+  bigSpenderReferrerUsd: "Big spender — referrer",
+  bigSpenderFriendUsd: "Big spender — friend",
+  bigSpenderSpendTargetUsd: "Big spender — spend target",
+  bigSpenderWindowDays: "Big spender — window",
+  upgradePrimeUsd: "Upgrade bonus — Prime",
+  upgradeUltraUsd: "Upgrade bonus — Ultra",
+  upgradePrimeLockFuse: "Upgrade bonus — Prime lock",
+  upgradeUltraLockFuse: "Upgrade bonus — Ultra lock",
+  upgradeLockHoldDays: "Upgrade bonus — lock hold",
+  spendShareRate: "Spend share rate",
+  spendShareCapPerFriendUsd: "Cap per friend",
+  spendShareMaxWeeklyPayoutUsd: "Max weekly payout",
+  minWeeklyPayoutUsd: "Min weekly payout",
+  holdDays: "Hold",
+  payoutWeekday: "Payout day",
+  payoutHourUtc: "Payout hour",
+  settlementGraceDays: "Settlement grace",
+  bonusLimitBase: "Bonus limit — starting limit",
+  bonusLimitPerActiveFriend: "Bonus limit — per active friend",
+  bonusLimitActiveSpendUsd: "Bonus limit — active friend spend",
+  monthTwoFromDays: "Month two starts",
+  monthTwoToDays: "Month two ends",
+  reviewMonthlyThreshold: "Review threshold",
+  reviewWindowDays: "Review window",
+  maxBoostMultiplier: "Max boost multiplier",
+  linkMaxDaysAfterSignup: "Code added within",
+  clawbackWatchDays: "Clawback watch window",
+  debtWriteOffDays: "Write off after",
+  debtWaiveBelowUsd: "Waive below",
+};
 
 const ISO2 = /^[A-Z]{2}$/;
 
 /** A stored fraction as the percent its box shows, or blank mid-edit. */
 function fractionAsPercent(value: number): number | string {
   return (value as unknown) === "" ? "" : Math.round(value * 1e6) / 1e4;
+}
+
+/** Whole dollars without cents, anything else with them. */
+function money(value: unknown): string {
+  const amount = Number(value) || 0;
+  return formatUsd(amount, Number.isInteger(amount) ? 0 : 2);
+}
+
+/**
+ * A field's allowed range as the operator types it: "0–60", "0%–5%", or with
+ * `joiner` " and " for a sentence.
+ */
+function rangeText(key: ReferralV4NumericField, joiner = "–"): string {
+  const { min, max } = REFERRAL_V4_NUMBER_BOUNDS[key];
+  if (key === "spendShareRate") {
+    return `${fractionAsPercent(min)}%${joiner}${fractionAsPercent(max)}%`;
+  }
+  return `${formatNumber(min, 2, 0)}${joiner}${formatNumber(max, 2, 0)}`;
+}
+
+/**
+ * Why this config can't be saved, or null when it can. Mirrors what the
+ * backend refuses — a blank box, a number out of its range, a fraction where
+ * a whole number belongs, month two ending before it starts — so the operator
+ * hears it here instead of from a 400.
+ */
+function saveRefusal(v4: ReferralV4Config): string | null {
+  // These size real payouts. A cleared box would go out as 0 and quietly
+  // switch a reward off, so it is refused instead.
+  if (NUMERIC_FIELDS.some((key) => (v4[key] as unknown) === "")) {
+    return "Fill in every Referral v4 field before saving";
+  }
+  for (const key of NUMERIC_FIELDS) {
+    const value = Number(v4[key]);
+    const { min, max, integer } = REFERRAL_V4_NUMBER_BOUNDS[key];
+    if (!Number.isFinite(value) || value < min || value > max) {
+      return `${FIELD_LABELS[key]} must be between ${rangeText(key, " and ")}`;
+    }
+    if (integer && !Number.isInteger(value)) {
+      return `${FIELD_LABELS[key]} must be a whole number`;
+    }
+  }
+  if (Number(v4.monthTwoToDays) <= Number(v4.monthTwoFromDays)) {
+    return "Month two has to end after it starts";
+  }
+  if (v4.enabled && !v4.launchAt) {
+    return "Set a launch time before opening referral v4 to new signups";
+  }
+  return null;
 }
 
 function Group({
@@ -90,6 +158,68 @@ function Group({
     </div>
   );
 }
+
+/** The one-line explanation under a field. */
+function Help({
+  children,
+  error = false,
+}: {
+  children: React.ReactNode;
+  error?: boolean;
+}) {
+  return (
+    <p className={`mt-1 text-xs ${error ? "text-red-600" : "text-gray-500"}`}>
+      {children}
+    </p>
+  );
+}
+
+/** A numeric field picked from a fixed list (weekday, hour). */
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  help,
+}: {
+  label: string;
+  value: number;
+  options: Array<{ value: number; label: string }>;
+  onChange: (value: number) => void;
+  disabled: boolean;
+  help: string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <label className="mb-1 text-sm font-medium text-gray-700">{label}</label>
+      <select
+        aria-label={label}
+        value={String(value)}
+        onChange={(event) => onChange(Number(event.target.value))}
+        disabled={disabled}
+        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <Help>{help}</Help>
+    </div>
+  );
+}
+
+const WEEKDAY_OPTIONS = WEEKDAYS.map((name, index) => ({
+  value: index,
+  label: name,
+}));
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => ({
+  value: hour,
+  label: utcHourLabel(hour) ?? String(hour),
+}));
 
 /** ISO-2 country codes as removable chips; type and press Enter or comma. */
 function CountryChips({
@@ -186,12 +316,15 @@ type Props = Pick<
 >;
 
 /**
- * Referral program v4: card credit for friends who sign up at or after the
- * launch time, a share of their card spend for the referrer.
+ * Referral program v4: card credit for friends whose referral is recorded
+ * while it is open to new signups, a share of their card spend for the
+ * referrer.
  *
  * Saved through its own endpoint (`referral-v4`), so it never touches the
- * legacy cashback section above it — friends from before launch keep being
- * paid by those settings. Editable only by the admins the backend allows
+ * legacy cashback section below it — friends recorded before launch keep being
+ * paid by those settings. Each friend is stamped with the program open when
+ * their referral is recorded, so nothing here moves an existing friend between
+ * programs. Editable only by the admins the backend allows
  * (`GET /referral-v4/access`); everyone else sees it read-only.
  */
 export default function ReferralV4ConfigSection({
@@ -204,6 +337,7 @@ export default function ReferralV4ConfigSection({
   saveSection,
 }: Props) {
   const access = useReferralV4Access();
+  const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const v4 = config?.referralV4;
@@ -212,26 +346,41 @@ export default function ReferralV4ConfigSection({
   const disabled = !canEdit;
 
   const field = (
-    key: NumericField,
+    key: ReferralV4NumericField,
     label: string,
     options: {
       suffix?: string;
       step?: string;
-      min?: number;
       tooltip?: string;
+      /** A one-line explanation under the box, followed by its range. */
+      help?: string;
+      /** Shown in red in place of the help line. */
+      error?: string | null;
     } = {},
   ) => (
-    <InputField
-      label={label}
-      value={v4?.[key] ?? ""}
-      onChange={(value) => handleNumericUpdate("referralV4", key, value)}
-      type="number"
-      suffix={options.suffix}
-      step={options.step ?? "1"}
-      min={options.min ?? 0}
-      disabled={disabled}
-      tooltip={options.tooltip}
-    />
+    <div>
+      <InputField
+        label={label}
+        value={v4?.[key] ?? ""}
+        onChange={(value) => handleNumericUpdate("referralV4", key, value)}
+        type="number"
+        suffix={options.suffix}
+        step={options.step ?? "1"}
+        min={REFERRAL_V4_NUMBER_BOUNDS[key].min}
+        disabled={disabled}
+        tooltip={options.tooltip}
+      />
+      {options.error ? (
+        <Help error>{options.error}</Help>
+      ) : (
+        options.help && (
+          <Help>
+            {options.help}{" "}
+            <span className="text-gray-400">({rangeText(key)})</span>
+          </Help>
+        )
+      )}
+    </div>
   );
 
   if (!config) return null;
@@ -243,6 +392,16 @@ export default function ReferralV4ConfigSection({
     (v4.launchAt || null) !== (saved.launchAt || null);
 
   const legacy = config.referralCashback;
+  const legacyAmounts = `${money(legacy.referrerRewardUsd)} + ${money(
+    legacy.newUserRewardUsd,
+  )}`;
+  const payoutDay = weekdayName(v4?.payoutWeekday);
+  const schedule = payoutScheduleLabel(v4?.payoutWeekday, v4?.payoutHourUtc);
+  const monthTwoInverted =
+    !!v4 &&
+    (v4.monthTwoFromDays as unknown) !== "" &&
+    (v4.monthTwoToDays as unknown) !== "" &&
+    Number(v4.monthTwoToDays) <= Number(v4.monthTwoFromDays);
 
   const save = async () => {
     if (!v4) return;
@@ -253,36 +412,27 @@ export default function ReferralV4ConfigSection({
       "referral-v4",
       {
         enabled: v4.enabled,
+        paused: v4.paused,
         launchAt: v4.launchAt || null,
         ...Object.fromEntries(
           NUMERIC_FIELDS.map((key) => [key, Number(v4[key])]),
         ),
         bonusLimitEnabled: v4.bonusLimitEnabled,
+        clawbackEnabled: v4.clawbackEnabled,
         excludedCountries: v4.excludedCountries,
       },
       "referralV4",
     );
+    // Boosts, review and analytics read the saved schedule and limits.
+    void queryClient.invalidateQueries({ queryKey: REFERRAL_V4_KEYS.config });
   };
 
   const requestSave = () => {
     if (!v4) return;
 
-    // These size real payouts. A cleared box would go out as 0 and quietly
-    // switch a reward off, so it is refused instead.
-    if (NUMERIC_FIELDS.some((key) => (v4[key] as unknown) === "")) {
-      toast.error("Fill in every Referral v4 field before saving");
-      return;
-    }
-    if (NUMERIC_FIELDS.some((key) => Number(v4[key]) < 0)) {
-      toast.error("Referral v4 amounts can't be negative");
-      return;
-    }
-    if (Number(v4.spendShareRate) > 1) {
-      toast.error("Spend share can't be more than 100%");
-      return;
-    }
-    if (v4.enabled && !v4.launchAt) {
-      toast.error("Set a launch time before turning referral v4 on");
+    const refusal = saveRefusal(v4);
+    if (refusal) {
+      toast.error(refusal);
       return;
     }
     if (turningOn || launchMoved) {
@@ -301,7 +451,9 @@ export default function ReferralV4ConfigSection({
   return (
     <ConfigSection
       title="Referral v4 — card credit"
-      description="Friends who sign up at or after the launch time earn card credit (welcome, big spender, upgrade) instead of soFUSE, and their referrer earns a share of their card spend, paid in soFUSE every Thursday, up to a cap per friend. Friends from before launch stay on the legacy cashback program below."
+      description={`Friends whose referral is recorded while v4 is open to new signups earn card credit (welcome, big spender, upgrade) instead of soFUSE, and their referrer earns a share of their card spend, paid in soFUSE ${
+        payoutDay ? `every ${payoutDay}` : "weekly"
+      }, up to a cap per friend. Every friend keeps the program they were recorded under; friends from before launch stay on the legacy cashback program below.`}
       icon={<CreditCard className="h-5 w-5 text-emerald-600" />}
     >
       {!v4 ? (
@@ -310,11 +462,17 @@ export default function ReferralV4ConfigSection({
         <>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={saved?.enabled ? "success" : "muted"}>
-              {saved?.enabled ? "On" : "Off"}
+              {saved?.enabled ? "Open to new signups" : "Closed to new signups"}
             </Badge>
+            {saved?.paused && (
+              <Badge variant="danger">
+                <PauseCircle className="h-3 w-3" />
+                Payouts paused
+              </Badge>
+            )}
             {saved?.enabled && saved.launchAt && (
               <span className="text-xs text-gray-500">
-                v4 for friends who signed up from {formatUtc(saved.launchAt)}
+                New referrals go on v4 from {formatUtc(saved.launchAt)}
               </span>
             )}
             {!canEdit && !access.isLoading && (
@@ -327,6 +485,13 @@ export default function ReferralV4ConfigSection({
               <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" />
             )}
           </div>
+          {saved?.paused && (
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              Payouts are paused: no card credit is being credited and no spend
+              share is being sent. Friends keep earning, and nothing is lost —
+              it is paid once payouts resume.
+            </p>
+          )}
           {!canEdit && !access.isLoading && (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {access.error
@@ -338,20 +503,39 @@ export default function ReferralV4ConfigSection({
           )}
 
           <Group
-            title="Launch"
-            tooltip="v4 applies by signup time: a friend who signs up at or after the launch time is on v4, everyone before stays on the legacy program."
+            title="Program"
+            tooltip="Which program a friend is on is decided once, when their referral is recorded, and stamped on them: v4 if it is open to new signups and the launch time has passed, legacy otherwise."
           >
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="flex items-end pb-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
                 <ToggleField
-                  label="Referral v4 enabled"
+                  label="Open to new signups"
                   value={v4.enabled}
                   onChange={(value) =>
                     updateConfig("referralV4", "enabled", value)
                   }
                   disabled={disabled}
-                  tooltip="While off, everyone stays on the legacy program and the app keeps today's referral screens."
                 />
+                <Help>
+                  Friends are stamped with the program open at the moment their
+                  referral is recorded, so changing this never moves existing
+                  friends between programs. Existing (pre-launch) friends keep
+                  the cashback program&apos;s {legacyAmounts}.
+                </Help>
+              </div>
+              <div>
+                <ToggleField
+                  label="Pause payouts"
+                  value={v4.paused}
+                  onChange={(value) =>
+                    updateConfig("referralV4", "paused", value)
+                  }
+                  disabled={disabled}
+                />
+                <Help>
+                  Stops crediting card credit and sending spend share. Earning
+                  continues and nothing is lost.
+                </Help>
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 text-sm font-medium text-gray-700">
@@ -371,13 +555,13 @@ export default function ReferralV4ConfigSection({
                   disabled={disabled}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <Help>
                   {v4.launchAt
-                    ? `Friends signing up at or after ${formatUtc(
+                    ? `Referrals recorded at or after ${formatUtc(
                         v4.launchAt,
-                      )} are on v4; earlier friends keep the legacy reward.`
-                    : "Not set. Friends signing up at or after this time will be on v4."}
-                </p>
+                      )}, while open to new signups, are on v4.`
+                    : "Not set. v4 opens to new signups at this time."}
+                </Help>
               </div>
             </div>
           </Group>
@@ -393,12 +577,9 @@ export default function ReferralV4ConfigSection({
                 suffix: "$",
                 step: "5",
               })}
-              {field("welcomeMerchantTarget", "Distinct shops", {
-                min: 1,
-              })}
+              {field("welcomeMerchantTarget", "Distinct shops")}
               {field("welcomeWindowDays", "Window", {
                 suffix: "days",
-                min: 1,
                 tooltip: "Days from signup.",
               })}
             </div>
@@ -417,7 +598,6 @@ export default function ReferralV4ConfigSection({
               })}
               {field("bigSpenderWindowDays", "Window", {
                 suffix: "days",
-                min: 1,
                 tooltip: "Days from signup.",
               })}
             </div>
@@ -448,7 +628,7 @@ export default function ReferralV4ConfigSection({
 
           <Group
             title="Spend share"
-            tooltip="The referrer's share of each v4 friend's eligible settled card spend, net of refunds, per Monday-to-Monday UTC week, paid in soFUSE the following Thursday."
+            tooltip="The referrer's share of each v4 friend's eligible settled card spend, net of refunds, per Monday-to-Monday UTC week, paid in soFUSE in the weekly payout run (see Payout schedule)."
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <InputField
@@ -479,29 +659,79 @@ export default function ReferralV4ConfigSection({
                 suffix: "$ / referrer",
                 step: "100",
                 tooltip:
-                  "Safety ceiling on one referrer's Thursday spend-share transfer.",
+                  "Safety ceiling on one referrer's weekly spend-share transfer.",
               })}
             </div>
           </Group>
 
-          <Group title="Hold & limits">
+          <Group
+            title="Payout schedule"
+            tooltip="One weekly run credits the bonuses that have unlocked as card credit and sends each referrer last week's spend share in one soFUSE transfer."
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-5">
+              <SelectField
+                label="Payout day"
+                value={v4.payoutWeekday}
+                options={WEEKDAY_OPTIONS}
+                onChange={(value) =>
+                  updateConfig("referralV4", "payoutWeekday", value)
+                }
+                disabled={disabled}
+                help="Weekday of the payout run."
+              />
+              <SelectField
+                label="Payout hour"
+                value={v4.payoutHourUtc}
+                options={HOUR_OPTIONS}
+                onChange={(value) =>
+                  updateConfig("referralV4", "payoutHourUtc", value)
+                }
+                disabled={disabled}
+                help="Hour of the payout run, in UTC."
+              />
+              {field("holdDays", "Hold", {
+                suffix: "days",
+                tooltip:
+                  "Every bonus unlocks this many days after it is earned, then is credited in the next payout run.",
+              })}
+              {field("settlementGraceDays", "Settlement grace", {
+                suffix: "days",
+                help: "Days a step stays open after its window, for purchases that settle late.",
+              })}
+              {field("minWeeklyPayoutUsd", "Min weekly payout", {
+                suffix: "$",
+                step: "0.5",
+                help: "Smaller weekly spend-share transfers wait for next week.",
+              })}
+            </div>
+            {schedule && (
+              <p className="mt-3 text-xs text-gray-500">
+                Runs {schedule}.
+              </p>
+            )}
+          </Group>
+
+          <Group title="Limits & review">
             <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {field("holdDays", "Hold", {
-                  suffix: "days",
-                  tooltip:
-                    "Every bonus unlocks this many days after it is earned, then is credited in the next Thursday run.",
-                })}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {field("reviewMonthlyThreshold", "Review threshold", {
-                  suffix: "/ month",
-                  min: 1,
+                  suffix: "friends",
                   tooltip:
-                    "Referrers with more qualified friends than this in a calendar month go to the review queue.",
+                    "Referrers with more qualified friends than this within the review window go to the review queue.",
+                })}
+                {field("reviewWindowDays", "Review window", {
+                  suffix: "days",
+                  help: "Window the review threshold counts qualified friends over.",
                 })}
                 {field("linkMaxDaysAfterSignup", "Code added within", {
                   suffix: "days of signup",
                   tooltip:
                     "A referral code added later than this after signup earns nothing in v4.",
+                })}
+                {field("maxBoostMultiplier", "Max boost multiplier", {
+                  suffix: "×",
+                  step: "0.5",
+                  help: "Highest multiplier a referral boost may be created with.",
                 })}
               </div>
               <div
@@ -518,9 +748,9 @@ export default function ReferralV4ConfigSection({
                     updateConfig("referralV4", "bonusLimitEnabled", value)
                   }
                   disabled={disabled}
-                  tooltip="Caps the referrer's welcome bonuses. Bonuses over the limit are kept and paid when it grows."
+                  tooltip="Caps the referrer's welcome bonuses: the starting limit, plus more for every friend who spends enough in their second month. Bonuses over the limit are kept and paid when it grows."
                 />
-                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-5">
                   {field("bonusLimitBase", "Starting limit", {
                     suffix: "bonuses",
                   })}
@@ -528,10 +758,64 @@ export default function ReferralV4ConfigSection({
                     suffix: "more",
                   })}
                   {field("bonusLimitActiveSpendUsd", "Active friend spends", {
-                    suffix: "$ in month 2",
+                    suffix: "$ in month two",
                     step: "10",
                   })}
+                  {field("monthTwoFromDays", "Month two starts", {
+                    suffix: "days after signup",
+                    help: "Start of a friend's second month, for the bonus limit.",
+                  })}
+                  {field("monthTwoToDays", "Month two ends", {
+                    suffix: "days after signup",
+                    help: "Its end. Must be after the start.",
+                    error: monthTwoInverted
+                      ? `Must be after the start (${v4.monthTwoFromDays} days).`
+                      : null,
+                  })}
                 </div>
+              </div>
+            </div>
+          </Group>
+
+          <Group
+            title="Clawback"
+            tooltip="Only v4 welcome and big-spender bonuses, on either side, once credited. A refund during the hold still just cancels the bonus, spend share corrects itself, and the legacy program is untouched."
+          >
+            <div
+              className={`rounded-lg border p-3 ${
+                v4.clawbackEnabled
+                  ? "border-indigo-100"
+                  : "border-gray-200 bg-gray-50"
+              }`}
+            >
+              <ToggleField
+                label="Clawback"
+                value={v4.clawbackEnabled}
+                onChange={(value) =>
+                  updateConfig("referralV4", "clawbackEnabled", value)
+                }
+                disabled={disabled}
+              />
+              <Help>
+                Reverses a credited spend bonus whose qualifying spend is later
+                refunded below the bar, and books a debt that is recovered from
+                the user&apos;s future v4 bonuses and spend share — never from
+                their card credit.
+              </Help>
+              <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
+                {field("clawbackWatchDays", "Watch window", {
+                  suffix: "days after crediting",
+                  help: "How long after crediting a refund still reverses the bonus.",
+                })}
+                {field("debtWriteOffDays", "Write off after", {
+                  suffix: "days",
+                  help: "An unrecovered debt is written off this many days after it is booked.",
+                })}
+                {field("debtWaiveBelowUsd", "Waive below", {
+                  suffix: "$",
+                  step: "0.5",
+                  help: "A debt whose remainder falls below this is waived (closed).",
+                })}
               </div>
             </div>
           </Group>
@@ -554,8 +838,8 @@ export default function ReferralV4ConfigSection({
             clear the welcome bar (both sides),{" "}
             {formatUsd(welcomeBothSides + bigSpenderBothSides, 0)} if they also
             hit big spender — plus the referrer&apos;s upgrade bonus and{" "}
-            {fractionAsPercent(v4.spendShareRate)}% of their spend. Boosts are
-            set on{" "}
+            {fractionAsPercent(v4.spendShareRate)}% of their spend. Boosts (up
+            to ×{v4.maxBoostMultiplier}) are set on{" "}
             <Link
               href="/referral-boosts"
               className="font-medium text-indigo-600 hover:underline"
@@ -579,25 +863,24 @@ export default function ReferralV4ConfigSection({
               <DialogHeader>
                 <DialogTitle>
                   {turningOn
-                    ? "Turn on referral v4?"
+                    ? "Open referral v4 to new signups?"
                     : "Move the referral v4 launch time?"}
                 </DialogTitle>
                 <DialogDescription>
-                  Friends who sign up at or after{" "}
+                  Referrals recorded at or after{" "}
                   <span className="font-medium text-gray-900">
                     {formatUtc(v4.launchAt)}
                   </span>{" "}
-                  will earn <strong>card credit</strong> instead of soFUSE, and
-                  their referrer earns{" "}
+                  will be on v4: the friend earns <strong>card credit</strong>{" "}
+                  instead of soFUSE, and their referrer earns{" "}
                   {fractionAsPercent(v4.spendShareRate)}% of their card spend.
                 </DialogDescription>
               </DialogHeader>
               <ul className="space-y-1.5 text-xs text-gray-600">
                 <li>
-                  Friends who signed up before then keep the legacy reward (
-                  {formatUsd(Number(legacy.referrerRewardUsd) || 0, 0)} +{" "}
-                  {formatUsd(Number(legacy.newUserRewardUsd) || 0, 0)} in
-                  soFUSE).
+                  Friends already recorded keep the program they were stamped
+                  with — existing friends stay on the cashback program&apos;s{" "}
+                  {legacyAmounts} in soFUSE.
                 </li>
                 <li>
                   The app switches to the v4 referral screens once the change
@@ -605,8 +888,9 @@ export default function ReferralV4ConfigSection({
                 </li>
                 {launchMoved && (
                   <li>
-                    Was {formatUtc(saved?.launchAt)}. Friends between the two
-                    times change program.
+                    Was {formatUtc(saved?.launchAt)}. Only referrals recorded
+                    from now on follow the new time; nobody already recorded
+                    changes program.
                   </li>
                 )}
               </ul>
@@ -624,7 +908,7 @@ export default function ReferralV4ConfigSection({
                   className="cursor-pointer"
                 >
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {turningOn ? "Turn on v4" : "Save launch time"}
+                  {turningOn ? "Open to new signups" : "Save launch time"}
                 </Button>
               </DialogFooter>
             </DialogContent>
