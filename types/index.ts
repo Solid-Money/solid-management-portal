@@ -3501,6 +3501,13 @@ export interface MerchantNameExclusion {
   referral: boolean;
 }
 
+/**
+ * A merchant, by name, that earns under a category code that otherwise does
+ * not — per programme. The same shape as an exclusion, read the other way: it
+ * lifts a category exclusion only, never a name exclusion.
+ */
+export type MerchantNameAllowance = MerchantNameExclusion;
+
 export interface MerchantExclusionConfig {
   /** Master switch: off pays cashback on every category. */
   cashbackEnabled: boolean;
@@ -3508,6 +3515,8 @@ export interface MerchantExclusionConfig {
   referralEnabled: boolean;
   categories: MerchantCategoryExclusion[];
   merchants: MerchantNameExclusion[];
+  /** Always-eligible merchants. Absent from a backend that predates them. */
+  allowedMerchants?: MerchantNameAllowance[];
 }
 
 /** What a purchase must be to count toward the referral target. */
@@ -3540,6 +3549,7 @@ export interface UpdateAntiAbuseConfig {
   referralEnabled?: boolean;
   categories?: MerchantCategoryExclusion[];
   merchants?: MerchantNameExclusion[];
+  allowedMerchants?: MerchantNameAllowance[];
   referralRules?: Partial<ReferralSpendRuleSettings>;
   blockedEmailDomains?: string[];
 }
@@ -3567,6 +3577,11 @@ export interface RewardExclusionMatch {
 export interface MerchantExclusionCheck {
   cashback: RewardExclusionMatch | null;
   referral: RewardExclusionMatch | null;
+  /**
+   * The always-eligible pattern the merchant matches per programme, or null.
+   * Absent from a backend that predates the list.
+   */
+  allowedBy?: { cashback: string | null; referral: string | null };
 }
 
 /**
