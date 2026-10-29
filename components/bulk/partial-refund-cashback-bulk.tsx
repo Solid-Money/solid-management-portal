@@ -82,7 +82,7 @@ const SKIP_REASONS: Record<PartialRefundRestoreSkipReason, string> = {
  * Until Oct 29 2026 a refund that landed before a purchase's cashback paid
  * cancelled all of it, however little came back. A fuel station that holds
  * €150 and charges €52.34 returns the unused €98, and the cashback on the €52.34
- * the user actually spent went with it (robertofd31, Plenergy, Oct 27). New
+ * the user actually spent went with it (a fuel purchase reported Oct 27). New
  * refunds now shrink the cashback instead; this puts back the ones that were
  * cancelled before.
  *
@@ -664,7 +664,7 @@ function RestoreResult({
           <span className="font-medium text-gray-900">
             {rows.length} skipped
           </span>{" "}
-          — {SKIP_REASONS[reason]}
+          — {SKIP_REASONS[reason] ?? reason}
           {rows.some((row) => row.username) &&
             `: ${unique(
               rows.map((row) => row.username).filter(Boolean) as string[],

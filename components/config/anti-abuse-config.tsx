@@ -1528,7 +1528,9 @@ function Verdict({
           text={
             match
               ? "Matched by the rule named below."
-              : "No rule matches, so this purchase earns and counts as usual."
+              : allowedBy
+                ? "On the always-eligible list, so an excluded category code doesn't block it."
+                : "No rule matches, so this purchase earns and counts as usual."
           }
         />
       </div>
