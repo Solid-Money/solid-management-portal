@@ -478,18 +478,19 @@ function ApplyOutcome({
   onDone: () => void;
 }) {
   const blocked = Boolean(result.blockedReason);
+  const nothingApplied = blocked || result.applied.length === 0;
   const queued = result.applied.filter((row) => row.action !== "update_terms");
 
   return (
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          {blocked || result.applied.length === 0 ? (
+          {nothingApplied ? (
             <AlertTriangle className="h-5 w-5 text-amber-600" />
           ) : (
             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           )}
-          {blocked
+          {nothingApplied
             ? "Nothing applied"
             : `Trial terms applied to ${result.applied.length} row${
                 result.applied.length === 1 ? "" : "s"
@@ -498,13 +499,15 @@ function ApplyOutcome({
         <DialogDescription>
           {blocked
             ? result.blockedReason
-            : queued.length > 0
-              ? `Up to ${formatUsd(result.additionalUsd)} more pays on the next hourly payout run${
-                  result.expectedBy
-                    ? `, by ${formatDateTime(result.expectedBy)}`
-                    : ""
-                }, as far as the trial's monthly cap allows.`
-              : "The rows pay on their own payout dates at the trial's terms."}
+            : result.applied.length === 0
+              ? "Every selected row was paid, re-queued or corrected since the preview. Open the dialog again to see what is left."
+              : queued.length > 0
+                ? `Up to ${formatUsd(result.additionalUsd)} more pays on the next hourly payout run${
+                    result.expectedBy
+                      ? `, by ${formatDateTime(result.expectedBy)}`
+                      : ""
+                  }, as far as the trial's monthly cap allows.`
+                : "The rows pay on their own payout dates at the trial's terms."}
         </DialogDescription>
       </DialogHeader>
 
