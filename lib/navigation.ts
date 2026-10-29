@@ -8,6 +8,7 @@ import {
   ArrowRightLeft,
   BarChart3,
   BookOpen,
+  Bot,
   CircleAlert,
   Coins,
   CreditCard,
@@ -256,6 +257,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Where Wirex, Rain and TransFi take new sign-ups, and what is live",
         icon: Globe,
+      },
+      {
+        href: "/ai-api",
+        label: "AI API",
+        description:
+          "Agent API keys: usage, daily charges, cashback and model prices",
+        icon: Bot,
       },
       {
         href: "/internal-team",

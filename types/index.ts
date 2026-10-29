@@ -711,6 +711,7 @@ export type WalletRole =
   | "Gas sponsorship"
   | "Card operations"
   | "Protocol operations"
+  | "AI API"
   | "Unclassified";
 
 /**
@@ -726,6 +727,7 @@ export const WALLET_ROLE_ORDER: WalletRole[] = [
   "Reward payouts",
   "Card operations",
   "Protocol operations",
+  "AI API",
   "Unclassified",
 ];
 
@@ -3502,7 +3504,8 @@ export interface InternalTeamRoster {
 export type InternalTeamFeatureKey =
   | "wirex_virtual_account"
   | "spend_modes"
-  | "deposit_tokens";
+  | "deposit_tokens"
+  | "ai_api";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;
