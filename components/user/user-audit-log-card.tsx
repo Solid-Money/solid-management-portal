@@ -81,6 +81,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Trial cashback terms applied",
       variant: "info",
     },
+    cashback_partial_refund_restored: {
+      label: "Cashback restored after partial refund",
+      variant: "info",
+    },
     kyc_verification_reset: {
       label: "KYC verification reset",
       variant: "warning",
@@ -191,6 +195,18 @@ function detailFor(entry: AdminAuditEntry): string | null {
     return typeof count === "number"
       ? `${count} row${count === 1 ? "" : "s"} back in the retry queue`
       : null;
+  }
+
+  if (entry.action === "cashback_partial_refund_restored") {
+    const count = entry.metadata?.restored;
+    const usd = entry.metadata?.owedUsd;
+    if (typeof count !== "number") return null;
+    return [
+      `${count} row${count === 1 ? "" : "s"} back in the payout queue`,
+      typeof usd === "number" && usd > 0 ? `about ${formatUsd(usd)}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   if (entry.action === "cashback_trial_terms_applied") {

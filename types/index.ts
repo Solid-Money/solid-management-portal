@@ -3085,6 +3085,67 @@ export interface BulkReevaluateFailedCashbackResult {
   expectedBy?: string;
 }
 
+/**
+ * One purchase whose cashback a refund voided when only part of it came back —
+ * a fuel or car-rental hold that settled below what was held.
+ */
+export interface PartialRefundVoidedRow {
+  id: string;
+  userId: string;
+  username?: string;
+  email?: string;
+  transactionId: string;
+  merchantName?: string;
+  merchantCategoryCode?: string;
+  purchasedAt: string;
+  voidedAt: string;
+  /** What the purchase was recorded at, in USD — for a hold, what was held. */
+  purchaseUsd: number;
+  /** What every refund credit on the purchase returned, in USD. */
+  refundedUsd: number;
+  /** What the user kept, which still earns. */
+  keptUsd: number;
+  /** Wirex's reasons on those credits: Clearing, Refund, Reversal. */
+  refundReasons: string[];
+  /** The rate a restore writes: the user's rate today. Null when unreadable. */
+  percentage: number | null;
+  /** What the kept spend earns before the monthly cap. Null when unpriced. */
+  owedUsd: number | null;
+}
+
+export interface PartialRefundVoidedList {
+  rows: PartialRefundVoidedRow[];
+  total: number;
+  truncated: boolean;
+  summary: {
+    users: number;
+    keptUsd: number;
+    owedUsd: number;
+    unpricedRows: number;
+  };
+  generatedAt: string;
+}
+
+export type PartialRefundRestoreSkipReason =
+  | "not_refund_voided"
+  | "refund_not_partial"
+  | "uncollected_debit"
+  | "user_not_found";
+
+/** What a restore of partial-refund cashback did. */
+export interface PartialRefundRestoreResult {
+  batchId: string;
+  requested: number;
+  restored: (PartialRefundVoidedRow & { percentage: number; payoutAt: string })[];
+  skipped: {
+    id: string;
+    userId?: string;
+    username?: string;
+    reason: PartialRefundRestoreSkipReason;
+  }[];
+  users: number;
+}
+
 /** One activated tier trial and the cashback terms its tier grants today. */
 export interface TrialCashbackWindow {
   trialId: string;
