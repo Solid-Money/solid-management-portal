@@ -2182,6 +2182,19 @@ export interface KycResetEligibility {
   /** Sumsub's RETRY/FINAL, when Sumsub decided. */
   rejectType: string | null;
   /**
+   * Sumsub's review status (`init`, `pending`, `completed`, …). `init` is an
+   * applicant who opened the identity check and has not submitted it. Absent
+   * from backends older than the Wirex onboarding redesign.
+   */
+  sumsubReviewStatus?: string | null;
+  /**
+   * The Wirex card onboarding nudges: a push 24 hours and 3 days after the
+   * applicant last opened the identity check or was asked for more documents.
+   * `sent` is how many of the two went out since `anchoredAt`. Null for an
+   * applicant they have never covered.
+   */
+  onboardingReminders?: { anchoredAt: string; sent: number } | null;
+  /**
    * The provider holds a FINAL decision, so a reset only reopens our side: a new
    * session reaches the same answer unless the applicant is reset with the
    * provider too.
