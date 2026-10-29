@@ -47,6 +47,8 @@ import {
   BulkReevaluateFailedCashbackResult,
   StuckCashbackList,
   WithholdCashbackResult,
+  TrialCashbackCorrectionPlan,
+  ApplyTrialCashbackTermsResult,
   TierTrial,
   TierLockReevaluationPreview,
   TierLockReevaluationResult,
@@ -498,6 +500,30 @@ export const bulkReevaluateFailedCashback = (
 ) =>
   api.post<{ data: BulkReevaluateFailedCashbackResult }>(
     "/admin/v1/cashback/permanently-failed/reevaluate",
+    { cashbackIds, reason: reason || undefined },
+  );
+
+/**
+ * What putting this user's tier-trial cashback terms back on the purchases made
+ * during their trials would change. Read-only.
+ */
+export const getTrialCashbackTerms = (userId: string) =>
+  api.get<{ data: TrialCashbackCorrectionPlan }>(
+    `/admin/v1/users/${encodeURIComponent(userId)}/cashback/trial-terms`,
+  );
+
+/**
+ * Apply the trial-terms corrections the admin approved. Nothing is sent from
+ * here: the hourly escrow run pays re-queued rows and top-ups through the
+ * normal payout path. Rows changed since the preview come back as skipped.
+ */
+export const applyTrialCashbackTerms = (
+  userId: string,
+  cashbackIds: string[],
+  reason?: string,
+) =>
+  api.post<{ data: ApplyTrialCashbackTermsResult }>(
+    `/admin/v1/users/${encodeURIComponent(userId)}/cashback/trial-terms`,
     { cashbackIds, reason: reason || undefined },
   );
 

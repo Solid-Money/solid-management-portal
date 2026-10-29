@@ -3072,6 +3072,88 @@ export interface BulkReevaluateFailedCashbackResult {
   expectedBy?: string;
 }
 
+/** One activated tier trial and the cashback terms its tier grants today. */
+export interface TrialCashbackWindow {
+  trialId: string;
+  tier: "prime" | "ultra";
+  status: string;
+  activatedAt: string;
+  /** When it stopped applying: expiry, revocation, or now for a running one. */
+  endedAt: string;
+  /** The tier's rate, as a fraction. */
+  percentage: number;
+  monthlyCapUsd: number;
+}
+
+/**
+ * - `update_terms`: still unpaid; the payout will use the trial's terms.
+ * - `rearm`: canceled by the Core cap, or given up on; queued for the next
+ *   hourly escrow run on the trial's terms.
+ * - `top_up`: paid short; a new row pays the difference on the next run.
+ */
+export type TrialCorrectionAction = "update_terms" | "rearm" | "top_up";
+
+/** One trial purchase whose cashback a correction would change. */
+export interface TrialCorrectionRow {
+  cashbackId: string;
+  transactionId: string;
+  merchantName?: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  purchasedAt: string;
+  status: string;
+  trialId: string;
+  action: TrialCorrectionAction;
+  from: { percentage?: number; monthlyCapUsd?: number };
+  to: { percentage?: number; monthlyCapUsd: number };
+  /** What the purchase earns on the trial's terms, before the monthly cap. */
+  owedUsd: number;
+  /** What it has paid so far, corrections included. Paid rows only. */
+  paidUsd?: number;
+  /** What the correction can add, before the monthly cap. */
+  additionalUsd: number;
+}
+
+export type TrialCorrectionSkipReason =
+  | "already_topped_up"
+  | "refunded"
+  | "canceled_other"
+  | "ineligible"
+  | "claimed_correction";
+
+/** What "Apply trial terms" would change for one user. */
+export interface TrialCashbackCorrectionPlan {
+  userId: string;
+  username?: string;
+  trials: TrialCashbackWindow[];
+  rows: TrialCorrectionRow[];
+  /** Trial purchases the correction leaves alone, and why. */
+  skipped: {
+    cashbackId: string;
+    transactionId: string;
+    merchantName?: string;
+    status: string;
+    reason: TrialCorrectionSkipReason;
+  }[];
+  /** Trial purchases that already carry the trial's terms in full. */
+  alreadyCorrect: number;
+  additionalUsd: number;
+  /** Set when nothing can be applied: the user has no Safe. */
+  blockedReason?: string;
+  generatedAt: string;
+}
+
+export interface ApplyTrialCashbackTermsResult {
+  userId: string;
+  applied: (TrialCorrectionRow & { topUpTransactionId?: string })[];
+  /** `changed`: paid, re-queued or corrected since the preview. */
+  skipped: { cashbackId: string; reason: "changed" | "already_topped_up" }[];
+  additionalUsd: number;
+  blockedReason?: string;
+  /** When the escrow run will have paid the re-queued rows and top-ups. */
+  expectedBy?: string;
+}
+
 /** One cashback row withheld by an admin. */
 export interface WithheldCashbackRow {
   id: string;
