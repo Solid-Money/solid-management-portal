@@ -68,6 +68,8 @@ const SKIP_REASONS: Record<PartialRefundRestoreSkipReason, string> = {
   refund_not_partial: "The refunds now add up to the whole purchase",
   uncollected_debit:
     "The refund settled a charge we never collected, so nothing kept was paid for",
+  terms_unavailable:
+    "Their cashback rate couldn't be read right now — nothing was changed, try again shortly",
   user_not_found: "The account no longer exists",
 };
 

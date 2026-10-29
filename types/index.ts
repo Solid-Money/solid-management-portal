@@ -3130,6 +3130,8 @@ export type PartialRefundRestoreSkipReason =
   | "not_refund_voided"
   | "refund_not_partial"
   | "uncollected_debit"
+  /** The cardholder's rate could not be read; nothing was written. */
+  | "terms_unavailable"
   | "user_not_found";
 
 /** What a restore of partial-refund cashback did. */
