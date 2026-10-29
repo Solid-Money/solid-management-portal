@@ -99,7 +99,7 @@ export const ANALYTICS_TABS: AnalyticsTab[] = [
         pending: {
           phase: 2,
           blockedOn:
-            "Brevo and Firebase attribution is unverified, and push opens are not tracked — only sends are.",
+            "Push opens reach Amplitude by notification type and Firebase reports sends and opens per type, but neither feeds the portal yet, and Brevo and Firebase attribution is unverified.",
         },
       },
     ],
