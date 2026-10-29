@@ -3085,6 +3085,69 @@ export interface BulkReevaluateFailedCashbackResult {
   expectedBy?: string;
 }
 
+/**
+ * One purchase whose cashback a refund voided when only part of it came back —
+ * a fuel or car-rental hold that settled below what was held.
+ */
+export interface PartialRefundVoidedRow {
+  id: string;
+  userId: string;
+  username?: string;
+  email?: string;
+  transactionId: string;
+  merchantName?: string;
+  merchantCategoryCode?: string;
+  purchasedAt: string;
+  voidedAt: string;
+  /** What the purchase was recorded at, in USD — for a hold, what was held. */
+  purchaseUsd: number;
+  /** What every refund credit on the purchase returned, in USD. */
+  refundedUsd: number;
+  /** What the user kept, which still earns. */
+  keptUsd: number;
+  /** Wirex's reasons on those credits: Clearing, Refund, Reversal. */
+  refundReasons: string[];
+  /** The rate a restore writes: the user's rate today. Null when unreadable. */
+  percentage: number | null;
+  /** What the kept spend earns before the monthly cap. Null when unpriced. */
+  owedUsd: number | null;
+}
+
+export interface PartialRefundVoidedList {
+  rows: PartialRefundVoidedRow[];
+  total: number;
+  truncated: boolean;
+  summary: {
+    users: number;
+    keptUsd: number;
+    owedUsd: number;
+    unpricedRows: number;
+  };
+  generatedAt: string;
+}
+
+export type PartialRefundRestoreSkipReason =
+  | "not_refund_voided"
+  | "refund_not_partial"
+  | "uncollected_debit"
+  /** The cardholder's rate could not be read; nothing was written. */
+  | "terms_unavailable"
+  | "user_not_found";
+
+/** What a restore of partial-refund cashback did. */
+export interface PartialRefundRestoreResult {
+  batchId: string;
+  requested: number;
+  restored: (PartialRefundVoidedRow & { percentage: number; payoutAt: string })[];
+  skipped: {
+    id: string;
+    userId?: string;
+    username?: string;
+    reason: PartialRefundRestoreSkipReason;
+  }[];
+  users: number;
+}
+
 /** One activated tier trial and the cashback terms its tier grants today. */
 export interface TrialCashbackWindow {
   trialId: string;
@@ -3440,6 +3503,13 @@ export interface MerchantNameExclusion {
   referral: boolean;
 }
 
+/**
+ * A merchant, by name, that earns under a category code that otherwise does
+ * not — per programme. The same shape as an exclusion, read the other way: it
+ * lifts a category exclusion only, never a name exclusion.
+ */
+export type MerchantNameAllowance = MerchantNameExclusion;
+
 export interface MerchantExclusionConfig {
   /** Master switch: off pays cashback on every category. */
   cashbackEnabled: boolean;
@@ -3447,6 +3517,8 @@ export interface MerchantExclusionConfig {
   referralEnabled: boolean;
   categories: MerchantCategoryExclusion[];
   merchants: MerchantNameExclusion[];
+  /** Always-eligible merchants. Absent from a backend that predates them. */
+  allowedMerchants?: MerchantNameAllowance[];
 }
 
 /** What a purchase must be to count toward the referral target. */
@@ -3479,6 +3551,7 @@ export interface UpdateAntiAbuseConfig {
   referralEnabled?: boolean;
   categories?: MerchantCategoryExclusion[];
   merchants?: MerchantNameExclusion[];
+  allowedMerchants?: MerchantNameAllowance[];
   referralRules?: Partial<ReferralSpendRuleSettings>;
   blockedEmailDomains?: string[];
 }
@@ -3506,6 +3579,11 @@ export interface RewardExclusionMatch {
 export interface MerchantExclusionCheck {
   cashback: RewardExclusionMatch | null;
   referral: RewardExclusionMatch | null;
+  /**
+   * The always-eligible pattern the merchant matches per programme, or null.
+   * Absent from a backend that predates the list.
+   */
+  allowedBy?: { cashback: string | null; referral: string | null };
 }
 
 /**
