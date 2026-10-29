@@ -29,6 +29,7 @@ import {
   TierGrid,
   ToggleField,
 } from "@/components/config/config-fields";
+import ReferralV4ConfigSection from "@/components/config/referral-v4-config";
 import TierEmailModal from "@/components/tier-email-modal";
 import TierUsersModal from "@/components/tier-users-modal";
 import {
@@ -109,6 +110,7 @@ function describeAccrualRun(result: YieldBoostRunResult): string {
 export default function RewardsConfigPage() {
   const {
     config,
+    savedConfig,
     loading,
     saving,
     hasChanges,
@@ -841,8 +843,8 @@ export default function RewardsConfigPage() {
         {/* Referral System */}
         <ConfigSection
           id="referral-system"
-          title="Referral System"
-          description="Rewards for users who refer new members to the platform"
+          title="Referral System — points"
+          description="Points rewards for users who refer new members to the platform. Separate from referral cashback and referral v4 below."
           icon={<Users className="h-5 w-5 text-teal-600" />}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -893,7 +895,7 @@ export default function RewardsConfigPage() {
               />
               <div className="mt-3">
                 <InputField
-                  label="Boost %"
+                  label="Points Boost %"
                   value={
                     (config.referral.boostPercentage as any) === ""
                       ? ""
@@ -906,7 +908,7 @@ export default function RewardsConfigPage() {
                   suffix="%"
                   step="0.1"
                   disabled={!config.referral.boostEnabled}
-                  tooltip="Bonus percentage awarded to the referred user"
+                  tooltip="Bonus points percentage awarded to the referred user. Unrelated to the referral v4 boosts on Growth → Referral boosts."
                 />
               </div>
             </div>
@@ -921,11 +923,22 @@ export default function RewardsConfigPage() {
           </button>
         </ConfigSection>
 
-        {/* Referral Cashback Program */}
+        {/* Referral v4 — card credit, for friends who sign up from launch */}
+        <ReferralV4ConfigSection
+          config={config}
+          savedConfig={savedConfig}
+          saving={saving}
+          hasChanges={hasChanges}
+          updateConfig={updateConfig}
+          handleNumericUpdate={handleNumericUpdate}
+          saveSection={saveSection}
+        />
+
+        {/* Referral Cashback Program — legacy since v4 */}
         <ConfigSection
           id="referral-cashback"
-          title="Referral Cashback Program"
-          description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield and counts towards the FUSE skip-the-line unlock, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Separate from the points-based referral rewards above."
+          title="Referral cashback — legacy (friends before v4 launch)"
+          description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield and counts towards the FUSE skip-the-line unlock, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Once referral v4 is on, these settings apply only to friends who signed up before its launch time. Separate from the points-based referral rewards above."
           icon={<Gift className="h-5 w-5 text-pink-600" />}
         >
           <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">

@@ -1,3 +1,5 @@
+import type { ReferralV4Config } from "@/types/referral-v4";
+
 export interface User {
   _id: string;
   email: string;
@@ -711,6 +713,7 @@ export type WalletRole =
   | "Gas sponsorship"
   | "Card operations"
   | "Protocol operations"
+  | "AI API"
   | "Unclassified";
 
 /**
@@ -726,6 +729,7 @@ export const WALLET_ROLE_ORDER: WalletRole[] = [
   "Reward payouts",
   "Card operations",
   "Protocol operations",
+  "AI API",
   "Unclassified",
 ];
 
@@ -1236,6 +1240,11 @@ export interface CardTransaction {
   fees?: CardTransactionFee[];
   /** Sum of the fees Rain actually accepted, in USD. */
   totalFeeUsd?: number;
+  /**
+   * Card credit (Wirex only) applied to this purchase, in USD. Absent when
+   * none was used; cashback is computed on the rest.
+   */
+  cardCreditUsedUsd?: number;
   user?: {
     _id: string;
     username: string;
@@ -1776,6 +1785,11 @@ export interface FullRewardsConfig {
   fuseStaking: FuseStakingConfig;
   referral: ReferralConfig;
   referralCashback: ReferralCashbackConfig;
+  /**
+   * Referral program v4 (card credit). Absent from a backend that predates it,
+   * in which case its section shows as not available yet.
+   */
+  referralV4?: ReferralV4Config;
   cardWelcomeBonus: CardWelcomeBonusConfig;
   productFees: ProductFeesConfig;
   tierMembership: TierMembershipConfig;
@@ -2181,6 +2195,19 @@ export interface KycResetEligibility {
   reasonCodes: string[];
   /** Sumsub's RETRY/FINAL, when Sumsub decided. */
   rejectType: string | null;
+  /**
+   * Sumsub's review status (`init`, `pending`, `completed`, …). `init` is an
+   * applicant who opened the identity check and has not submitted it. Absent
+   * from backends older than the Wirex onboarding redesign.
+   */
+  sumsubReviewStatus?: string | null;
+  /**
+   * The Wirex card onboarding nudges: a push 24 hours and 3 days after the
+   * applicant last opened the identity check or was asked for more documents.
+   * `sent` is how many of the two went out since `anchoredAt`. Null for an
+   * applicant they have never covered.
+   */
+  onboardingReminders?: { anchoredAt: string; sent: number } | null;
   /**
    * The provider holds a FINAL decision, so a reset only reopens our side: a new
    * session reaches the same answer unless the applicant is reset with the
@@ -3398,6 +3425,48 @@ export interface UpdateRainRtfConfig {
   tokenOverrides?: RainRtfTokenOverride[];
 }
 
+/**
+ * A failure the app showed a user, as accounts-service recorded it
+ * (`clientErrors`), keyed by the Ref on their screen.
+ */
+export interface ClientErrorReport {
+  id: string;
+  /** 8 uppercase hex characters, no hyphen (`9C1B4F2A`). */
+  ref: string;
+  /** Full GlitchTip event ID. */
+  eventId: string;
+  /** The failing API call's request ID, when one of ours failed. */
+  requestId?: string;
+  userId?: string;
+  /** What the user was doing, e.g. `move_to_card`. */
+  action: string;
+  /** Stable cause, e.g. `PAYMASTER_REJECTED`, `HTTP_502`. */
+  code: string;
+  /** Cause family, e.g. `blockchain`, `server`, `offline`. */
+  kind: string;
+  /** Where it was shown: `sheet`, `toast`, `inline` or `screen`. */
+  surface: string;
+  /** What the user read. */
+  title: string;
+  body?: string;
+  /** Sanitized technical cause. */
+  message?: string;
+  httpStatus?: number;
+  /** True when the app knew no transaction left the device. */
+  nothingSent?: boolean;
+  platform?: string;
+  appVersion?: string;
+  route?: string;
+  details?: { amount?: string; token?: string; network?: string };
+  occurredAt: string;
+  createdAt: string;
+}
+
+/** A lookup match, with just enough of its user to tell matches apart. */
+export interface ClientErrorMatch extends ClientErrorReport {
+  user?: { id: string; username?: string; email?: string };
+}
+
 // --- Config → Anti-abuse ---------------------------------------------------
 
 /**
@@ -3495,48 +3564,6 @@ export interface MerchantExclusionCheck {
   referral: RewardExclusionMatch | null;
 }
 
-/**
- * A failure the app showed a user, as accounts-service recorded it
- * (`clientErrors`), keyed by the Ref on their screen.
- */
-export interface ClientErrorReport {
-  id: string;
-  /** 8 uppercase hex characters, no hyphen (`9C1B4F2A`). */
-  ref: string;
-  /** Full GlitchTip event ID. */
-  eventId: string;
-  /** The failing API call's request ID, when one of ours failed. */
-  requestId?: string;
-  userId?: string;
-  /** What the user was doing, e.g. `move_to_card`. */
-  action: string;
-  /** Stable cause, e.g. `PAYMASTER_REJECTED`, `HTTP_502`. */
-  code: string;
-  /** Cause family, e.g. `blockchain`, `server`, `offline`. */
-  kind: string;
-  /** Where it was shown: `sheet`, `toast`, `inline` or `screen`. */
-  surface: string;
-  /** What the user read. */
-  title: string;
-  body?: string;
-  /** Sanitized technical cause. */
-  message?: string;
-  httpStatus?: number;
-  /** True when the app knew no transaction left the device. */
-  nothingSent?: boolean;
-  platform?: string;
-  appVersion?: string;
-  route?: string;
-  details?: { amount?: string; token?: string; network?: string };
-  occurredAt: string;
-  createdAt: string;
-}
-
-/** A lookup match, with just enough of its user to tell matches apart. */
-export interface ClientErrorMatch extends ClientErrorReport {
-  user?: { id: string; username?: string; email?: string };
-}
-
 // --- Config → Internal team ------------------------------------------------
 
 /**
@@ -3584,6 +3611,8 @@ export interface InternalTeamRoster {
 export type InternalTeamFeatureKey =
   | "wirex_virtual_account"
   | "spend_modes"
+  | "eur_vault"
+  | "ai_api"
   | "deposit_tokens";
 
 export interface InternalTeamFeature {

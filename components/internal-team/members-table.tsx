@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +8,7 @@ import { restoreInternalTeamMember } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import { InternalTeamMember } from "@/types";
 import RemoveMemberDialog from "@/components/internal-team/remove-member-dialog";
+import UserLink from "@/components/user-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,15 +30,11 @@ export function MemberCell({ member }: { member: InternalTeamMember }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {member.userExists ? (
-        <Link
-          href={`/users/${member.userId}`}
-          className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
-          title={member.username ? undefined : member.userId}
-        >
-          {member.username ?? member.userId}
-        </Link>
+        <UserLink userId={member.userId} username={member.username} />
       ) : (
-        <span className="font-mono text-xs text-gray-500">{member.userId}</span>
+        <span className="font-mono text-xs text-gray-500">
+          {member.userId}
+        </span>
       )}
       {!member.userExists && <Badge variant="warning">User not found</Badge>}
       {member.source === "imported" && <Badge variant="muted">Imported</Badge>}
