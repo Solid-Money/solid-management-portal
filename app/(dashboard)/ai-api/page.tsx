@@ -89,7 +89,10 @@ function UsersTable() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useAiApiUsers({ search, page });
+  const { data, isLoading, isFetching, isError, refetch } = useAiApiUsers({
+    search,
+    page,
+  });
 
   // Search as the admin stops typing, not on every key.
   useEffect(() => {
@@ -132,6 +135,19 @@ function UsersTable() {
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin text-gray-400" />
+                </td>
+              </tr>
+            ) : isError && !data ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                  Could not load the users with keys.{" "}
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="cursor-pointer font-medium text-indigo-600 hover:underline"
+                  >
+                    Try again
+                  </button>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
@@ -216,7 +232,8 @@ function UsersTable() {
 export default function AiApiPage() {
   const [range, setRange] = useState<RangeKey>("month");
   const params = useMemo(() => rangeParams(range), [range]);
-  const { data, isLoading, isFetching } = useAiApiOverview(params);
+  const { data, isLoading, isFetching, isError, refetch } =
+    useAiApiOverview(params);
   const overview = data?.data;
 
   // Upstream cost against what users are billed: the gap is usage beyond
@@ -256,7 +273,14 @@ export default function AiApiPage() {
         </div>
       </div>
 
-      {isLoading || !overview ? (
+      {isError && !overview ? (
+        <div className="flex flex-col items-center gap-3 py-24 text-sm text-gray-600">
+          <p>Could not load the AI API overview.</p>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : isLoading || !overview ? (
         <div className="flex justify-center py-24">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>

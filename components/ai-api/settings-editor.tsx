@@ -96,8 +96,19 @@ const price = (text: string): number | null => {
   return Number.isFinite(value) && value >= 0 ? value : Number.NaN;
 };
 
-/** The draft as the API takes it, or the first thing wrong with it. */
-function parseDraft(draft: Draft): { patch: AiApiSettingsPatch } | { error: string } {
+/**
+ * The draft as the API takes it, or the first thing wrong with it.
+ *
+ * Every field is checked, but only what changed from `base` — the settings as
+ * they stood when editing began — is sent, so a save never writes back older
+ * values over what another admin saved since for fields this one left alone.
+ */
+function parseDraft(
+  draft: Draft,
+  base: Draft,
+): { patch: AiApiSettingsPatch } | { error: string } {
+  const changed = <K extends keyof Draft>(key: K) =>
+    JSON.stringify(draft[key]) !== JSON.stringify(base[key]);
   const cashbackByTier: NonNullable<AiApiSettingsPatch["cashbackByTier"]> = [];
   for (const row of draft.tiers) {
     const rate = fromPercentInput(row.percent);
@@ -108,7 +119,10 @@ function parseDraft(draft: Draft): { patch: AiApiSettingsPatch } | { error: stri
     if (row.capUsd.trim() === "" || !Number.isFinite(cap) || cap < 0) {
       return { error: `${row.name}: the monthly cap must be 0 or more (0 is no cap).` };
     }
-    cashbackByTier.push({ tier: row.tier, rate, monthlyCapUsd: cap });
+    const before = base.tiers.find((entry) => entry.tier === row.tier);
+    if (JSON.stringify(row) !== JSON.stringify(before)) {
+      cashbackByTier.push({ tier: row.tier, rate, monthlyCapUsd: cap });
+    }
   }
   const maxKeys = Number(draft.maxKeys);
   if (!Number.isInteger(maxKeys) || maxKeys < 1 || maxKeys > 100) {
@@ -180,17 +194,29 @@ function parseDraft(draft: Draft): { patch: AiApiSettingsPatch } | { error: stri
 
   return {
     patch: {
-      enabled: draft.enabled,
-      cashbackByTier,
-      maxKeysPerUser: maxKeys,
-      maxMonthlyLimitUsd: maxLimit,
-      chargeThresholdUsd: chargeThreshold,
-      maxUnpaidUsd: maxUnpaid,
-      balanceHeadroomUsd: balanceHeadroom,
-      models,
+      ...(changed("enabled") ? { enabled: draft.enabled } : {}),
+      ...(cashbackByTier.length ? { cashbackByTier } : {}),
+      ...(changed("maxKeys") ? { maxKeysPerUser: maxKeys } : {}),
+      ...(changed("maxLimitUsd") ? { maxMonthlyLimitUsd: maxLimit } : {}),
+      ...(changed("chargeThresholdUsd") ? { chargeThresholdUsd: chargeThreshold } : {}),
+      ...(changed("maxUnpaidUsd") ? { maxUnpaidUsd: maxUnpaid } : {}),
+      ...(changed("balanceHeadroomUsd") ? { balanceHeadroomUsd: balanceHeadroom } : {}),
+      // The table is saved whole: two admins editing it at once is still last
+      // save wins, but an edit elsewhere no longer replaces it.
+      ...(changed("models") ? { models } : {}),
     },
   };
 }
+
+/** The models on in `base` that the draft removes or switches off. */
+const modelsTurnedOff = (draft: Draft, base: Draft): string[] => {
+  const stillOn = new Set(
+    draft.models.filter((model) => model.enabled).map((model) => model.id.trim()),
+  );
+  return base.models
+    .filter((model) => model.enabled && !stillOn.has(model.id.trim()))
+    .map((model) => model.id.trim());
+};
 
 function Field({
   label,
@@ -218,20 +244,39 @@ function Field({
  * not report a cost per request, so usage is metered from these.
  */
 export default function AiApiSettingsEditor() {
-  const { data, isLoading } = useAiApiSettings();
+  const { data, isLoading, isError, refetch } = useAiApiSettings();
   const save = useSaveAiApiSettings();
   // Null until the admin changes something, so the form shows what is saved —
   // including a save someone else made — until there are edits to keep.
-  const [edits, setDraft] = useState<Draft | null>(null);
+  const [edits, setEdits] = useState<Draft | null>(null);
+  // What was saved when editing began: a save sends only what differs from it.
+  const [editBase, setEditBase] = useState<Draft | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const saved = data?.data;
   const draft = edits ?? (saved ? toDraft(saved) : null);
-  const parsed = draft ? parseDraft(draft) : null;
-  const isDirty =
-    !!edits && !!saved && JSON.stringify(edits) !== JSON.stringify(toDraft(saved));
+  const base = editBase ?? (saved ? toDraft(saved) : null);
+  const parsed = draft && base ? parseDraft(draft, base) : null;
+  const isDirty = !!edits && !!base && JSON.stringify(edits) !== JSON.stringify(base);
 
-  if (isLoading || !draft || !saved) {
+  const setDraft = (next: Draft | null) => {
+    if (next && !edits && saved) setEditBase(toDraft(saved));
+    if (!next) setEditBase(null);
+    setEdits(next);
+  };
+
+  if (isError && !data) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-12 text-sm text-gray-600">
+        <p>Could not load the AI API settings.</p>
+        <Button variant="outline" size="sm" onClick={() => void refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  if (isLoading || !draft || !base || !saved) {
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
@@ -242,6 +287,7 @@ export default function AiApiSettingsEditor() {
   const disabled = !data?.canEdit || save.isPending;
   const error = parsed && "error" in parsed ? parsed.error : null;
   const turningOff = saved.enabled && !draft.enabled;
+  const modelsOff = modelsTurnedOff(draft, base);
 
   const updateTier = (index: number, patch: Partial<TierDraft>) =>
     setDraft({
@@ -570,10 +616,14 @@ export default function AiApiSettingsEditor() {
         message={
           turningOff
             ? "Every user's keys stop working within 5 minutes and no new keys can be made. Usage already made is still charged and its cashback still paid."
-            : "New prices apply to requests made after the change. What has already been used keeps the price it was metered at."
+            : `${
+                modelsOff.length
+                  ? `Requests for ${modelsOff.join(", ")} are refused within 5 minutes. `
+                  : ""
+              }New prices apply to requests made after the change. What has already been used keeps the price it was metered at.`
         }
         confirmText={turningOff ? "Turn off" : "Save"}
-        isDestructive={turningOff}
+        isDestructive={turningOff || modelsOff.length > 0}
         onConfirm={handleSave}
         onCancel={() => setConfirming(false)}
       />
