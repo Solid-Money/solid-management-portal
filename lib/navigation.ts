@@ -90,9 +90,9 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: "/security/revoke-sessions",
-        label: "Session Revoke",
+        label: "Revoke",
         description:
-          "Sign accounts out in bulk during an incident — preview, then revoke",
+          "Incident response: revoke sessions, security-close accounts, remove fake passkeys",
         icon: ShieldAlert,
       },
       {
