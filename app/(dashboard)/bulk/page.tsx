@@ -1,8 +1,9 @@
 "use client";
 
-import { CircleDollarSign, Layers, Sparkles } from "lucide-react";
+import { CircleDollarSign, Layers, RotateCcw, Sparkles } from "lucide-react";
 
 import BulkSection from "@/components/bulk/bulk-section";
+import PartialRefundCashbackBulk from "@/components/bulk/partial-refund-cashback-bulk";
 import StuckCashbackBulk from "@/components/bulk/stuck-cashback-bulk";
 import TierTrialsBulk from "@/components/bulk/tier-trials-bulk";
 
@@ -38,6 +39,15 @@ export default function BulkPage() {
           icon={CircleDollarSign}
         >
           {(open) => <StuckCashbackBulk open={open} />}
+        </BulkSection>
+
+        <BulkSection
+          id="partial-refund-cashback"
+          title="Cashback cancelled by a partial refund"
+          description="Purchases whose cashback was cancelled in full when only part came back — a fuel or car-rental hold that settled lower — restored on the part the user kept"
+          icon={RotateCcw}
+        >
+          {(open) => <PartialRefundCashbackBulk open={open} />}
         </BulkSection>
 
         <BulkSection

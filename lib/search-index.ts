@@ -287,6 +287,7 @@ const CONFIG_ENTRIES: SearchEntry[] = [
       ["programme-switches", "Anti-abuse switches", ["toggle", "enable"]],
       ["excluded-merchants", "Excluded merchants", ["blocklist", "merchant", "no cashback"]],
       ["excluded-mccs", "Excluded merchant categories", ["mcc", "category", "gambling"]],
+      ["always-eligible-merchants", "Always-eligible merchants", ["allowlist", "whitelist", "chatgpt", "5816"]],
       ["referral-qualification-rules", "Referral qualification rules", ["referral", "minimum spend"]],
       ["test-a-merchant", "Test a merchant", ["check merchant", "would it earn"]],
     ] as const

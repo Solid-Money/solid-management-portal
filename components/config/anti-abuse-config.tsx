@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Ban,
+  BadgeCheck,
   Loader2,
   MailX,
   Plus,
@@ -38,6 +39,7 @@ import type {
   MerchantCategoryExclusion,
   MerchantExclusionCheck,
   MerchantExclusionPreview,
+  MerchantNameAllowance,
   MerchantNameExclusion,
   ReferralSpendRuleSettings,
   UpdateAntiAbuseConfig,
@@ -62,6 +64,8 @@ interface Draft {
   referralEnabled: boolean;
   categories: MerchantCategoryExclusion[];
   merchants: MerchantNameExclusion[];
+  /** Undefined against a backend that predates the list: nothing to edit. */
+  allowedMerchants?: MerchantNameAllowance[];
   referralRules: ReferralSpendRuleSettings;
   blockedEmailDomains: string[];
 }
@@ -75,6 +79,9 @@ const toDraft = (config: AntiAbuseConfig): Draft => ({
   merchants: config.merchantExclusions.merchants.map((entry) => ({
     ...entry,
   })),
+  allowedMerchants: config.merchantExclusions.allowedMerchants?.map(
+    (entry) => ({ ...entry }),
+  ),
   referralRules: { ...config.referralRules },
   blockedEmailDomains: [...(config.blockedEmailDomains ?? [])],
 });
@@ -207,6 +214,7 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
         defaultOpen
       >
         <MerchantList
+          kind="excluded"
           entries={draft.merchants}
           defaults={config.defaults.merchantExclusions.merchants}
           onChange={(merchants) => edit((d) => ({ ...d, merchants }))}
@@ -226,6 +234,25 @@ export function AntiAbuseConfigEditor({ config }: { config: AntiAbuseConfig }) {
           onChange={(categories) => edit((d) => ({ ...d, categories }))}
         />
       </ConfigSection>
+
+      {draft.allowedMerchants && (
+        <ConfigSection
+          id="always-eligible-merchants"
+          title="Always-eligible merchants"
+          description="Earn even when their category code is excluded above"
+          icon={<BadgeCheck className="h-5 w-5 text-emerald-600" />}
+          defaultOpen
+        >
+          <MerchantList
+            kind="allowed"
+            entries={draft.allowedMerchants}
+            defaults={config.defaults.merchantExclusions.allowedMerchants ?? []}
+            onChange={(allowedMerchants) =>
+              edit((d) => ({ ...d, allowedMerchants }))
+            }
+          />
+        </ConfigSection>
+      )}
 
       <ConfigSection
         id="referral-qualification-rules"
@@ -380,6 +407,8 @@ function diff(
     noun: string,
     /** What removing an entry allows, when it is not a purchase earning. */
     removedEffect?: string,
+    /** False for a list whose entries let purchases through, not block them. */
+    removalLoosens = true,
   ) => {
     if (same(before, after)) return false;
     const beforeKeys = new Set(before.map(key));
@@ -392,7 +421,7 @@ function diff(
       !added && !removed.length && "edited",
     ].filter(Boolean);
     summary.push(`${noun} ${parts.join(", ")}`);
-    if (removed.length > 0) {
+    if (removalLoosens && removed.length > 0) {
       risky.push(
         `${removed.length} ${noun} removed: ${removed.map(key).slice(0, 8).join(", ")}${
           removed.length > 8 ? "…" : ""
@@ -439,6 +468,38 @@ function diff(
         `Categories no longer excluded from a programme: ${loosened
           .map((c) => c.code)
           .join(", ")}`,
+      );
+    }
+  }
+
+  // Read the other way round: here an added entry, or a programme ticked on
+  // one, is what lets purchases through, and removing one only tightens.
+  const savedAllowed = saved.allowedMerchants ?? [];
+  const draftAllowed = draft.allowedMerchants ?? [];
+  if (
+    listChange(
+      savedAllowed,
+      draftAllowed,
+      (m) => m.pattern,
+      "always-eligible merchants",
+      undefined,
+      false,
+    )
+  ) {
+    payload.allowedMerchants = draftAllowed;
+    const widened = draftAllowed.filter((entry) => {
+      const before = savedAllowed.find((m) => m.pattern === entry.pattern);
+      return (
+        (entry.cashback && !before?.cashback) ||
+        (entry.referral && !before?.referral)
+      );
+    });
+    if (widened.length > 0) {
+      risky.push(
+        `Merchants that now earn through an excluded category: ${widened
+          .map((m) => m.pattern)
+          .slice(0, 8)
+          .join(", ")}${widened.length > 8 ? "…" : ""}`,
       );
     }
   }
@@ -534,12 +595,16 @@ function ProgrammeChecks({
   referral,
   onChange,
   label,
+  action = "Exclude",
 }: {
   cashback: boolean;
   referral: boolean;
   onChange: (next: { cashback: boolean; referral: boolean }) => void;
   label: string;
+  /** What ticking a box does to the entry: "Exclude X from…" or "Allow X for…". */
+  action?: "Exclude" | "Allow";
 }) {
+  const preposition = action === "Exclude" ? "from" : "for";
   return (
     <>
       <td className="px-3 py-2 text-center">
@@ -549,7 +614,7 @@ function ProgrammeChecks({
           onChange={(event) =>
             onChange({ cashback: event.target.checked, referral })
           }
-          aria-label={`Exclude ${label} from cashback`}
+          aria-label={`${action} ${label} ${preposition} cashback`}
           className="h-4 w-4 cursor-pointer accent-indigo-600"
         />
       </td>
@@ -560,7 +625,7 @@ function ProgrammeChecks({
           onChange={(event) =>
             onChange({ cashback, referral: event.target.checked })
           }
-          aria-label={`Exclude ${label} from referrals`}
+          aria-label={`${action} ${label} ${preposition} referrals`}
           className="h-4 w-4 cursor-pointer accent-indigo-600"
         />
       </td>
@@ -617,15 +682,44 @@ function ListToolbar({
   );
 }
 
+/** Where the excluded and the always-eligible merchant lists differ. */
+const MERCHANT_LIST_COPY = {
+  excluded: {
+    action: "Exclude",
+    intro: null,
+    placeholder: "e.g. moogold or weixin*scan",
+    notePlaceholder: "Why (optional), e.g. game credit resold for cash",
+    empty: "No merchants are excluded by name.",
+    previewAsk: "should be blocked",
+    // A new exclusion blocks both programmes until unticked.
+    newEntry: { cashback: true, referral: true },
+  },
+  allowed: {
+    action: "Allow",
+    intro:
+      "A merchant here earns even when its category code is excluded above — ChatGPT, Claude and Google One bill as 5816 digital goods, and H&M paid through Curve arrives as 8999. It never lifts a name exclusion: an excluded merchant stays excluded. Tick Referrals only for a merchant you are sure is not used to farm the referral target — gift cards at the big stores clear it as well as a game top-up does.",
+    placeholder: "e.g. openai or google one",
+    notePlaceholder: "Why (optional), e.g. AI subscription billed as 5816",
+    empty: "No merchant earns through an excluded category.",
+    previewAsk: "should earn",
+    // Cashback only to start, as the shipped entries: the catch-all codes are
+    // what the referral target was farmed through.
+    newEntry: { cashback: true, referral: false },
+  },
+} as const;
+
 function MerchantList({
+  kind,
   entries,
   defaults,
   onChange,
 }: {
+  kind: keyof typeof MERCHANT_LIST_COPY;
   entries: MerchantNameExclusion[];
   defaults: MerchantNameExclusion[];
   onChange: (entries: MerchantNameExclusion[]) => void;
 }) {
+  const copy = MERCHANT_LIST_COPY[kind];
   const [search, setSearch] = useState("");
   const [pattern, setPattern] = useState("");
   const [note, setNote] = useState("");
@@ -656,8 +750,7 @@ function MerchantList({
       {
         pattern: normalized,
         ...(note.trim() && { label: note.trim() }),
-        cashback: true,
-        referral: true,
+        ...copy.newEntry,
       },
       ...entries,
     ]);
@@ -668,6 +761,7 @@ function MerchantList({
 
   return (
     <div className="space-y-4">
+      {copy.intro && <p className="text-sm text-gray-600">{copy.intro}</p>}
       <p className="text-sm text-gray-600">
         Matched against the merchant name on the card transaction, ignoring
         case. A pattern matches anywhere in the name, and{" "}
@@ -684,7 +778,7 @@ function MerchantList({
             value={pattern}
             onChange={(event) => setPattern(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && add()}
-            placeholder="e.g. moogold or weixin*scan"
+            placeholder={copy.placeholder}
             spellCheck={false}
             aria-label="Merchant name pattern"
             className="rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -693,7 +787,7 @@ function MerchantList({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && add()}
-            placeholder="Why (optional), e.g. game credit resold for cash"
+            placeholder={copy.notePlaceholder}
             aria-label="Note"
             className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
@@ -737,7 +831,9 @@ function MerchantList({
             &ldquo;{normalized}&rdquo; is already on the list.
           </p>
         ) : null}
-        {preview.data && <PreviewResult preview={preview.data} />}
+        {preview.data && (
+          <PreviewResult preview={preview.data} ask={copy.previewAsk} />
+        )}
       </div>
 
       <ListToolbar
@@ -767,7 +863,7 @@ function MerchantList({
               <tr>
                 <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
                   {entries.length === 0
-                    ? "No merchants are excluded by name."
+                    ? copy.empty
                     : "No merchant matches the filter."}
                 </td>
               </tr>
@@ -808,6 +904,7 @@ function MerchantList({
                     cashback={entry.cashback}
                     referral={entry.referral}
                     label={entry.pattern}
+                    action={copy.action}
                     onChange={(next) =>
                       onChange(
                         entries.map((e) =>
@@ -1171,7 +1268,14 @@ function CategoryList({
   );
 }
 
-function PreviewResult({ preview }: { preview: MerchantExclusionPreview }) {
+function PreviewResult({
+  preview,
+  ask = "should be blocked",
+}: {
+  preview: MerchantExclusionPreview;
+  /** What the operator should confirm of each merchant listed. */
+  ask?: string;
+}) {
   if (preview.transactions === 0) {
     return (
       <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-600">
@@ -1186,7 +1290,7 @@ function PreviewResult({ preview }: { preview: MerchantExclusionPreview }) {
         Would have matched <strong>{preview.transactions}</strong> purchases
         worth <strong>{formatUsd(preview.usd)}</strong> by{" "}
         <strong>{preview.customers}</strong> cardholders in the last{" "}
-        {preview.days} days. Check that every merchant below should be blocked:
+        {preview.days} days. Check that every merchant below {ask}:
       </p>
       <ul className="max-h-48 space-y-0.5 overflow-auto">
         {preview.merchants.map((merchant) => (
@@ -1332,6 +1436,7 @@ function MerchantTester({ draft }: { draft: Draft }) {
           referralEnabled: draft.referralEnabled,
           categories: draft.categories,
           merchants: draft.merchants,
+          allowedMerchants: draft.allowedMerchants,
         },
       },
       {
@@ -1380,8 +1485,16 @@ function MerchantTester({ draft }: { draft: Draft }) {
 
       {checked && (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Verdict programme="Card cashback" match={checked.cashback} />
-          <Verdict programme="Referral target" match={checked.referral} />
+          <Verdict
+            programme="Card cashback"
+            match={checked.cashback}
+            allowedBy={checked.allowedBy?.cashback}
+          />
+          <Verdict
+            programme="Referral target"
+            match={checked.referral}
+            allowedBy={checked.allowedBy?.referral}
+          />
         </div>
       )}
     </div>
@@ -1391,9 +1504,12 @@ function MerchantTester({ draft }: { draft: Draft }) {
 function Verdict({
   programme,
   match,
+  allowedBy,
 }: {
   programme: string;
   match: MerchantExclusionCheck["cashback"];
+  /** The always-eligible pattern the merchant matches, if any. */
+  allowedBy?: string | null;
 }) {
   return (
     <div
@@ -1412,11 +1528,20 @@ function Verdict({
           text={
             match
               ? "Matched by the rule named below."
-              : "No rule matches, so this purchase earns and counts as usual."
+              : allowedBy
+                ? "On the always-eligible list, so an excluded category code doesn't block it."
+                : "No rule matches, so this purchase earns and counts as usual."
           }
         />
       </div>
       {match && <p className="mt-1 text-gray-700">{match.description}</p>}
+      {allowedBy && (
+        <p className="mt-1 text-gray-700">
+          {match
+            ? `Always eligible as “${allowedBy}”, but that never lifts a merchant exclusion.`
+            : `Always eligible as “${allowedBy}”: an excluded category code doesn't block it.`}
+        </p>
+      )}
     </div>
   );
 }

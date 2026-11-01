@@ -45,6 +45,8 @@ import {
   SetUserCashbackPercentageResult,
   ReevaluateFailedCashbackResult,
   BulkReevaluateFailedCashbackResult,
+  PartialRefundRestoreResult,
+  PartialRefundVoidedList,
   StuckCashbackList,
   WithholdCashbackResult,
   TrialCashbackCorrectionPlan,
@@ -500,6 +502,30 @@ export const bulkReevaluateFailedCashback = (
 ) =>
   api.post<{ data: BulkReevaluateFailedCashbackResult }>(
     "/admin/v1/cashback/permanently-failed/reevaluate",
+    { cashbackIds, reason: reason || undefined },
+  );
+
+/**
+ * Cashback a refund voided when only part of the purchase came back, across
+ * every user, with what each kept and what it earns. Read-only.
+ */
+export const getPartialRefundVoidedCashback = () =>
+  api.get<{ data: PartialRefundVoidedList }>(
+    "/admin/v1/cashback/partial-refund-voided",
+  );
+
+/**
+ * Put the chosen rows back in the escrow queue, owed on the part of each
+ * purchase the user kept. The hourly escrow run pays them through the normal
+ * payout path; rows already restored, or whose refund turns out not to be
+ * partial, come back as skipped.
+ */
+export const restorePartialRefundVoidedCashback = (
+  cashbackIds: string[],
+  reason?: string,
+) =>
+  api.post<{ data: PartialRefundRestoreResult }>(
+    "/admin/v1/cashback/partial-refund-voided/restore",
     { cashbackIds, reason: reason || undefined },
   );
 
