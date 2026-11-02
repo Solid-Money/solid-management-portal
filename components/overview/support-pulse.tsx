@@ -2,8 +2,20 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { change, formatCount, formatDuration, formatRatio, intentLabel } from "@/lib/overview-format";
-import type { OverviewResponse, OverviewSupportQueue } from "@/types/overview";
+import {
+  change,
+  formatCount,
+  formatDuration,
+  formatRatio,
+  intentLabel,
+} from "@/lib/overview-format";
+import {
+  OVERVIEW_MOODS,
+  type OverviewMood,
+  type OverviewResponse,
+  type OverviewSupportMood,
+  type OverviewSupportQueue,
+} from "@/types/overview";
 import {
   ArrowLink,
   OVERVIEW_ACCENT,
@@ -56,10 +68,17 @@ export function SupportPulse({
                   href={supportHref(queue.id)}
                   className={cn(
                     "rounded-lg border px-3 py-2.5 hover:shadow-sm",
-                    alarm ? "border-[#f5c2c2] bg-[#fdf3f3]" : "border-[#eef0f4] bg-[#fafbfd]",
+                    alarm
+                      ? "border-[#f5c2c2] bg-[#fdf3f3]"
+                      : "border-[#eef0f4] bg-[#fafbfd]",
                   )}
                 >
-                  <div className={cn("text-[20px] font-semibold", alarm ? "text-[#b91c1c]" : "text-gray-900")}>
+                  <div
+                    className={cn(
+                      "text-[20px] font-semibold",
+                      alarm ? "text-[#b91c1c]" : "text-gray-900",
+                    )}
+                  >
                     {formatCount(count)}
                   </div>
                   <div className="text-[12px] text-gray-500">{queue.label}</div>
@@ -69,11 +88,22 @@ export function SupportPulse({
           </div>
         </Column>
 
-        <Column title="Mood" className="xl:pl-6">
-          <p className="text-[12.5px] leading-[18px] text-gray-500">
-            Not measured yet. Mood comes from a sentiment label the AI adds to each chat, which ships with the
-            support-service change after this page.
-          </p>
+        <Column
+          title={
+            support.mood
+              ? `Mood · ${formatCount(total(support.mood.current))} chats`
+              : "Mood"
+          }
+          className="xl:pl-6"
+        >
+          {support.mood ? (
+            <MoodBar mood={support.mood} compare={compare} />
+          ) : (
+            <p className="text-[12.5px] leading-[18px] text-gray-500">
+              Not measured yet: mood comes from the sentiment Solid AI adds to
+              each chat.
+            </p>
+          )}
         </Column>
 
         <Column title="Solid AI" className="xl:pl-6">
@@ -90,36 +120,53 @@ export function SupportPulse({
           <Row
             label="Median first reply"
             value={formatDuration(support.firstReplyMedianSeconds.current)}
-            was={compare ? formatDuration(support.firstReplyMedianSeconds.previous) : null}
+            was={
+              compare
+                ? formatDuration(support.firstReplyMedianSeconds.previous)
+                : null
+            }
             worse={
               support.firstReplyMedianSeconds.current !== null &&
               support.firstReplyMedianSeconds.previous !== null &&
-              support.firstReplyMedianSeconds.current > support.firstReplyMedianSeconds.previous
+              support.firstReplyMedianSeconds.current >
+                support.firstReplyMedianSeconds.previous
             }
           />
           <p className="mt-2 text-[11.5px] text-gray-400">
-            {formatCount(support.solvedAlone.current)} of {formatCount(support.newCases.current)} new cases resolved
-            without a person.
+            {formatCount(support.solvedAlone.current)} of{" "}
+            {formatCount(support.newCases.current)} new cases resolved without a
+            person.
           </p>
         </Column>
 
         <Column title="What people write about" className="xl:pl-6">
           <div className="flex flex-col gap-1.5">
             {support.topIntents.map((intent) => (
-              <div key={intent.intent} className="grid grid-cols-[96px_1fr_32px] items-center gap-2 text-[12.5px]">
-                <span className="truncate text-gray-700">{intentLabel(intent.intent)}</span>
+              <div
+                key={intent.intent}
+                className="grid grid-cols-[96px_1fr_32px] items-center gap-2 text-[12.5px]"
+              >
+                <span className="truncate text-gray-700">
+                  {intentLabel(intent.intent)}
+                </span>
                 <span className="h-1.5 rounded-full bg-[#f1f2f6]">
                   <span
                     className="block h-full rounded-full"
-                    style={{ width: `${(intent.count / maxIntent) * 100}%`, background: OVERVIEW_ACCENT }}
+                    style={{
+                      width: `${(intent.count / maxIntent) * 100}%`,
+                      background: OVERVIEW_ACCENT,
+                    }}
                   />
                 </span>
-                <span className="text-right text-gray-500">{formatCount(intent.count)}</span>
+                <span className="text-right text-gray-500">
+                  {formatCount(intent.count)}
+                </span>
               </div>
             ))}
             {support.withoutIntent.current > 0 ? (
               <p className="mt-1 text-[11.5px] text-gray-400">
-                {formatCount(support.withoutIntent.current)} new cases had no topic.
+                {formatCount(support.withoutIntent.current)} new cases had no
+                topic.
               </p>
             ) : null}
           </div>
@@ -140,7 +187,9 @@ function Column({
 }) {
   return (
     <div className={className}>
-      <p className="mb-2.5 text-[11px] font-semibold tracking-wide text-gray-400 uppercase">{title}</p>
+      <p className="mb-2.5 text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+        {title}
+      </p>
       {children}
     </div>
   );
@@ -163,9 +212,72 @@ function Row({
       <span>
         <span className="font-semibold text-gray-900">{value}</span>
         {was ? (
-          <span className={cn("ml-2 text-[12px]", worse ? "text-[#b91c1c]" : "text-gray-400")}>was {was}</span>
+          <span
+            className={cn(
+              "ml-2 text-[12px]",
+              worse ? "text-[#b91c1c]" : "text-gray-400",
+            )}
+          >
+            was {was}
+          </span>
         ) : null}
       </span>
+    </div>
+  );
+}
+
+const MOOD_COLORS: Record<OverviewMood, string> = {
+  happy: "#16a34a",
+  neutral: "#d1d5db",
+  frustrated: "#f59e0b",
+  angry: "#dc2626",
+};
+
+function total(counts: Record<OverviewMood, number>): number {
+  return OVERVIEW_MOODS.reduce((sum, mood) => sum + (counts[mood] ?? 0), 0);
+}
+
+/** The latest mood of each chat in the range, and what made people angry. */
+function MoodBar({
+  mood,
+  compare,
+}: {
+  mood: OverviewSupportMood;
+  compare: boolean;
+}) {
+  const all = total(mood.current);
+  const reasons = mood.angryReasons.map((r) => r.reason);
+  return (
+    <div>
+      <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full bg-[#f1f2f6]">
+        {all > 0
+          ? OVERVIEW_MOODS.map((m) => (
+              <span
+                key={m}
+                style={{
+                  width: `${(mood.current[m] / all) * 100}%`,
+                  background: MOOD_COLORS[m],
+                }}
+              />
+            ))
+          : null}
+      </div>
+      <div className="mt-2 grid grid-cols-4 text-[12px] text-gray-500">
+        {OVERVIEW_MOODS.map((m) => (
+          <span key={m}>
+            <span className="font-semibold text-gray-900">
+              {formatCount(mood.current[m])}
+            </span>{" "}
+            {m}
+          </span>
+        ))}
+      </div>
+      <p className="mt-2 text-[12px] leading-[17px] text-gray-500">
+        {compare
+          ? `Previous period: ${formatCount(mood.previous.happy)} happy · ${formatCount(mood.previous.angry)} angry. `
+          : ""}
+        {reasons.length ? `Angry about ${reasons.join(" and ")}.` : ""}
+      </p>
     </div>
   );
 }

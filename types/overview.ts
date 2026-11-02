@@ -45,6 +45,25 @@ export const OVERVIEW_SUPPORT_QUEUES = [
 ] as const;
 export type OverviewSupportQueue = (typeof OVERVIEW_SUPPORT_QUEUES)[number];
 
+export const OVERVIEW_MOODS = [
+  "happy",
+  "neutral",
+  "frustrated",
+  "angry",
+] as const;
+export type OverviewMood = (typeof OVERVIEW_MOODS)[number];
+
+/**
+ * How customers felt: the latest sentiment label of each case a customer
+ * wrote in during the period. Null until cases carry a sentiment.
+ */
+export interface OverviewSupportMood {
+  current: Record<OverviewMood, number>;
+  previous: Record<OverviewMood, number>;
+  /** The most common reasons behind "angry" in the range. */
+  angryReasons: Array<{ reason: string; count: number }>;
+}
+
 export interface OverviewRange {
   /** First day of the picked range, `YYYY-MM-DD`. */
   from: string;
@@ -192,6 +211,8 @@ export interface OverviewSupport {
   firstReplyMedianSeconds: ComparedNullable;
   topIntents: Array<{ intent: string; count: number }>;
   withoutIntent: Compared;
+  /** Absent from older responses; null until cases carry a sentiment. */
+  mood?: OverviewSupportMood | null;
 }
 
 export interface OverviewResponse {
