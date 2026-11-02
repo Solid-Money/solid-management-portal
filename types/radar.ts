@@ -75,6 +75,32 @@ export const RADAR_FLOWS = [
 ] as const;
 export type RadarFlow = (typeof RADAR_FLOWS)[number];
 
+/** Which app notice a draft is for: the first post, an update, or "fixed". */
+export const RADAR_NOTICE_KINDS = ["post", "update", "resolve"] as const;
+export type RadarNoticeKind = (typeof RADAR_NOTICE_KINDS)[number];
+
+/** Text Solid AI (or the template) wrote for the app, waiting for a person. */
+export interface RadarNoticeDraft {
+  kind: RadarNoticeKind;
+  title: string;
+  message: string;
+  source: "ai" | "template";
+  model: string | null;
+  createdAt: string;
+  status: "pending" | "published" | "discarded";
+}
+
+/** The app notice that is live (or was), in support's Known incidents. */
+export interface RadarNotice {
+  incidentId: string;
+  title: string;
+  message: string;
+  publishedAt: string;
+  publishedBy: string;
+  lastUpdateAt: string | null;
+  resolvedAt: string | null;
+}
+
 export interface RadarTimelineEntry {
   at: string;
   kind:
@@ -157,6 +183,9 @@ export interface AttentionItemView {
   sampleError: string | null;
   /** From the error text by fixed rules, when one matches. */
   likelyCause: { cause: string; fix: string } | null;
+  slackChannel: string | null;
+  noticeDraft: RadarNoticeDraft | null;
+  notice: RadarNotice | null;
 }
 
 export interface AttentionListResponse {
