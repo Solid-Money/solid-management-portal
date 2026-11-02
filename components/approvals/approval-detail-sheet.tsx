@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   CircleAlert,
+  Fingerprint,
   KeyRound,
   Loader2,
   Play,
@@ -41,6 +42,7 @@ import {
 import { describeRequirement } from "@/lib/admin-access";
 import { formatDateTime } from "@/lib/utils";
 import { APPROVAL_SUMMARY_KEY } from "@/hooks/use-admin-access";
+import { useApprovalSigner } from "@/hooks/use-approval-signer";
 import type { AdminApproval } from "@/types/admin-access";
 
 const EVENT_LABEL: Record<AdminApproval["events"][number]["type"], string> = {
@@ -94,6 +96,7 @@ export default function ApprovalDetailSheet({
   const { access } = useAuth();
   const queryClient = useQueryClient();
   const [decision, setDecision] = useState<"approve" | "reject" | null>(null);
+  const signer = useApprovalSigner();
 
   const { data: approval, isLoading } = useQuery<AdminApproval>({
     queryKey: ["approval", id],
@@ -116,7 +119,7 @@ export default function ApprovalDetailSheet({
       comment: string;
     }) =>
       (kind === "approve"
-        ? await approveApproval(id!, comment)
+        ? await approveApproval(id!, comment, await signer.sign([id!]))
         : await rejectApproval(id!, comment)
       ).data.data,
     onSuccess: (updated) => {
@@ -127,6 +130,13 @@ export default function ApprovalDetailSheet({
         toast.error(`Approved, but it failed: ${updated.execution?.error ?? "unknown error"}`);
       else if (updated.status === "rejected") toast.success("Request rejected");
       else toast.success("Approval recorded; it needs more before it runs");
+    },
+    onError: (error) => {
+      // The API layer toasts server refusals; a passkey prompt cancelled or
+      // refused in the browser never reached it.
+      if (!(error as { response?: unknown }).response) {
+        toast.error(error instanceof Error ? error.message : "Could not sign");
+      }
     },
   });
 
@@ -265,6 +275,15 @@ export default function ApprovalDetailSheet({
                     <span key={entry.email} className="inline-flex items-center gap-1">
                       {entry.email}
                       <RankBadge rank={entry.rank} />
+                      {entry.signature && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-emerald-700"
+                          title={`Signed with their passkey · Turnkey activity ${entry.signature.activityId}`}
+                        >
+                          <Fingerprint className="h-3 w-3" aria-hidden />
+                          signed
+                        </span>
+                      )}
                     </span>
                   ))}
                 </div>
@@ -341,6 +360,8 @@ export default function ApprovalDetailSheet({
             pending={decide.isPending}
             onOpenChange={(open) => !open && setDecision(null)}
             onConfirm={(comment) => decide.mutate({ kind: decision, comment })}
+            signs={signer.signs}
+            blocked={signer.blocked}
           />
         )}
       </SheetContent>

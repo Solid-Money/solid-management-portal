@@ -4,15 +4,18 @@ import {
   getActionPolicies,
   getAdminTeam,
   getApprovalSummary,
+  getSigningOverview,
 } from "@/lib/api";
 import type {
   AdminActionPolicyRow,
   AdminTeamMember,
+  SigningOverview,
 } from "@/types/admin-access";
 
 export const ACTION_POLICIES_KEY = ["admin-action-policies"] as const;
 export const ADMIN_TEAM_KEY = ["admin-team"] as const;
 export const APPROVAL_SUMMARY_KEY = ["approval-summary"] as const;
+export const SIGNING_KEY = ["approval-signing"] as const;
 
 /**
  * Every portal action and the approval rule it runs under. Read once and
@@ -51,5 +54,18 @@ export function useApprovalSummary(enabled = true) {
     queryFn: async () => (await getApprovalSummary()).data.data,
     enabled,
     refetchInterval: 30_000,
+  });
+}
+
+/**
+ * Approval signing: the mode, the admin sub-org, and where the signed-in admin
+ * stands in it. Shared by the approve buttons and the setup section.
+ */
+export function useSigningOverview(enabled = true) {
+  return useQuery<SigningOverview>({
+    queryKey: SIGNING_KEY,
+    queryFn: async () => (await getSigningOverview()).data.data,
+    enabled,
+    staleTime: 30_000,
   });
 }

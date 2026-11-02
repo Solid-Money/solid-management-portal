@@ -14,15 +14,17 @@ import {
 } from "@/components/internal-team/members-table";
 import AdminTeamSection from "@/components/admin-access/admin-team-section";
 import ApprovalRulesSection from "@/components/admin-access/approval-rules-section";
+import ApprovalSigningSection from "@/components/admin-access/approval-signing-section";
 
 /**
- * Config → Internal team, in four parts, each closed until opened:
+ * Config → Internal team, in five parts, each closed until opened:
  *
  * 1–2. The app side: who counts as Solid staff or a tester (members, by app
  *      username), and which team-only rollouts each of them gets.
- * 3–4. The portal side, a separate system: who may sign in to this portal at
- *      what rank (admin access), and which portal actions need another admin's
- *      approval (approval rules).
+ * 3–5. The portal side, a separate system: who may sign in to this portal at
+ *      what rank (admin access), which portal actions need another admin's
+ *      approval (approval rules), and the Turnkey passkeys approvals are
+ *      signed with (approval signing).
  *
  * The member list used to be hardcoded in the backend, so adding a tester took
  * a deploy and taking off someone who had left took remembering to. It lives in
@@ -61,9 +63,10 @@ export default function InternalTeamPage() {
         <p className="mt-1 text-sm text-gray-500">
           The first two sections are about app accounts: Solid staff and
           testers, by app username, and the team-only features each gets. The
-          last two are a separate system about this portal: who can sign in to
-          it at what rank, and which actions here need another admin&apos;s
-          approval. Open a section to see and change it.
+          rest are a separate system about this portal: who can sign in to it
+          at what rank, which actions here need another admin&apos;s approval,
+          and the passkeys approvals are signed with. Open a section to see and
+          change it.
         </p>
       </div>
 
@@ -120,6 +123,14 @@ export default function InternalTeamPage() {
         summary="Which portal actions wait for another admin's approval before they run, how many approvals, from which ranks, and which ranks may start them. Requests wait under Activity → Approvals."
       >
         <ApprovalRulesSection />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        id="approval-signing"
+        title="5. Approval signing"
+        summary="Approve with your own passkey through Turnkey, so an approval can't be forged from our side. Admins and their ranks live in a Turnkey sub-org that only the root admins can change, two at a time."
+      >
+        <ApprovalSigningSection />
       </CollapsibleSection>
     </div>
   );

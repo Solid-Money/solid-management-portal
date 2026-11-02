@@ -33,6 +33,7 @@ import { describeRequirement } from "@/lib/admin-access";
 import { formatDateTime } from "@/lib/utils";
 import { useUrlTab } from "@/hooks/use-url-tab";
 import { APPROVAL_SUMMARY_KEY } from "@/hooks/use-admin-access";
+import { useApprovalSigner } from "@/hooks/use-approval-signer";
 import type {
   AdminApproval,
   AdminApprovalGroup,
@@ -94,6 +95,7 @@ export default function ApprovalsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState<"approve" | "reject" | null>(null);
   const openId = searchParams.get("id");
+  const signer = useApprovalSigner();
 
   const { data, isLoading, error } = useQuery<AdminApprovalList>({
     queryKey: ["approvals", group],
@@ -125,12 +127,19 @@ export default function ApprovalsPage() {
     }: {
       decision: "approve" | "reject";
       comment: string;
-    }) =>
-      (await decideApprovals(
-        chosen.map((item) => item.id),
-        decision,
-        comment
-      )).data.data,
+    }) => {
+      const ids = chosen.map((item) => item.id);
+      // One passkey prompt covers every selected request.
+      const signature =
+        decision === "approve" ? await signer.sign(ids) : undefined;
+      return (await decideApprovals(ids, decision, comment, signature)).data
+        .data;
+    },
+    onError: (error) => {
+      if (!(error as { response?: unknown }).response) {
+        toast.error(error instanceof Error ? error.message : "Could not sign");
+      }
+    },
     onSuccess: (results, { decision }) => {
       setBulk(null);
       setSelected(new Set());
@@ -372,6 +381,8 @@ export default function ApprovalsPage() {
           pending={decideMany.isPending}
           onOpenChange={(open) => !open && setBulk(null)}
           onConfirm={(comment) => decideMany.mutate({ decision: bulk, comment })}
+          signs={signer.signs}
+          blocked={signer.blocked}
         />
       )}
 

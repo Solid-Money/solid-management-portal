@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Fingerprint, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,8 @@ export function DecisionDialog({
   pending,
   onOpenChange,
   onConfirm,
+  signs = false,
+  blocked = null,
 }: {
   decision: "approve" | "reject";
   count: number;
@@ -104,7 +106,13 @@ export function DecisionDialog({
   pending: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (comment: string) => void;
+  /** Approving asks for the admin's passkey. */
+  signs?: boolean;
+  /** Signing is required and this admin can't sign yet. */
+  blocked?: string | null;
 }) {
+  const signing = decision === "approve" && signs;
+  const stopped = decision === "approve" ? blocked : null;
   const [comment, setComment] = useState("");
   const approving = decision === "approve";
   const noun = count === 1 ? "this request" : `${count} requests`;
@@ -149,6 +157,20 @@ export function DecisionDialog({
             disabled={pending}
           />
         </div>
+        {signing && (
+          <p className="flex items-start gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+            <Fingerprint className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            You&apos;ll confirm with your admin passkey. The signature goes to
+            Turnkey from this browser and covers{" "}
+            {count === 1 ? "this request" : `all ${count} requests`} exactly as
+            filed.
+          </p>
+        )}
+        {stopped && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {stopped}
+          </p>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
@@ -161,11 +183,15 @@ export function DecisionDialog({
           <Button
             variant={approving ? "default" : "destructive"}
             onClick={() => onConfirm(comment.trim())}
-            disabled={pending}
+            disabled={pending || !!stopped}
             className="cursor-pointer"
           >
-            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {approving ? "Approve" : "Reject"}
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : signing ? (
+              <Fingerprint className="h-4 w-4" />
+            ) : null}
+            {approving ? (signing ? "Sign and approve" : "Approve") : "Reject"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -70,6 +70,8 @@ export interface AdminApprovalDecision {
   rank: AdminRank;
   comment?: string;
   at: string;
+  /** Set when the approval was signed with the admin's passkey through Turnkey. */
+  signature?: { activityId: string; turnkeyUserId: string; rank: AdminRank };
 }
 
 export interface AdminApprovalEvent {
@@ -130,4 +132,105 @@ export interface BulkDecisionResult {
   ok: boolean;
   approval?: AdminApproval;
   error?: string;
+}
+
+// --- Approval signing (Turnkey passkeys) -------------------------------------
+
+export type AdminSigningMode = "off" | "optional" | "required";
+
+/** A WebAuthn registration, as Turnkey's browser SDK returns it. */
+export interface PasskeyAttestation {
+  credentialId: string;
+  clientDataJson: string;
+  attestationObject: string;
+  transports: (
+    | "AUTHENTICATOR_TRANSPORT_BLE"
+    | "AUTHENTICATOR_TRANSPORT_INTERNAL"
+    | "AUTHENTICATOR_TRANSPORT_NFC"
+    | "AUTHENTICATOR_TRANSPORT_USB"
+    | "AUTHENTICATOR_TRANSPORT_HYBRID"
+  )[];
+}
+
+/** An admin as the Turnkey admin sub-org holds them. */
+export interface TurnkeyAdminUser {
+  userId: string;
+  email: string | null;
+  rank: AdminRank | null;
+  root: boolean;
+  /** Fingerprints of their passkeys. */
+  passkeys: string[];
+}
+
+/** A root action in Turnkey waiting for a second root admin. */
+export interface TurnkeyPendingActivity {
+  id: string;
+  fingerprint: string;
+  type: string;
+  summary: string;
+  requestedBy: string | null;
+  approvedBy: string[];
+  createdAt: number;
+}
+
+export interface SigningEnrollment {
+  email: string;
+  fingerprint: string;
+  status: "pending" | "used";
+  updatedAt: string;
+  /** Root admins only: what they add in Turnkey. */
+  challenge?: string;
+  attestation?: PasskeyAttestation;
+}
+
+export interface SigningOverview {
+  mode: AdminSigningMode;
+  /** The sub-org and wallet are pinned in the environment. */
+  configured: boolean;
+  /** Approvals are being signed now. */
+  active: boolean;
+  pinned: {
+    subOrganizationId?: string;
+    walletId?: string;
+    walletAddress?: string;
+  };
+  pinnedMatchesSetup: boolean;
+  subOrganizationId: string | null;
+  walletAddress: string | null;
+  setup: {
+    status: "completed" | "failed";
+    subOrganizationId?: string;
+    walletId?: string;
+    walletAddress?: string;
+    tagIds: Partial<Record<AdminRank, string>>;
+    policyId?: string;
+    rootEmails: string[];
+    threshold?: number;
+    bootstrappedBy?: string;
+    error?: string;
+    updatedAt: string;
+  } | null;
+  rootAdmins: string[];
+  rootThreshold: number;
+  isRootAdmin: boolean;
+  enrollments: SigningEnrollment[];
+  me: {
+    email: string;
+    rank: AdminRank;
+    enrollment: { fingerprint: string; status: "pending" | "used"; updatedAt: string } | null;
+    turnkey: TurnkeyAdminUser | null;
+  };
+  turnkey: {
+    users: TurnkeyAdminUser[];
+    tagIds: Partial<Record<AdminRank, string>>;
+    quorum: { threshold: number; userIds: string[] } | null;
+    pending: TurnkeyPendingActivity[];
+  } | null;
+  turnkeyError?: string;
+}
+
+/** What an approval carries once signed. */
+export interface ApprovalSignature {
+  activityId: string;
+  ids: string[];
 }

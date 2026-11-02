@@ -16,8 +16,11 @@ import type {
   AdminApprovalList,
   AdminRank,
   AdminTeamMember,
+  ApprovalSignature,
   ApproverRank,
   BulkDecisionResult,
+  PasskeyAttestation,
+  SigningOverview,
 } from "@/types/admin-access";
 import {
   AdminAuditEntry,
@@ -1244,9 +1247,14 @@ export const getApprovalSummary = () =>
  * Approve a request. The approval that completes it runs the action there and
  * then, and the answer says how the run went.
  */
-export const approveApproval = (id: string, comment?: string) =>
+export const approveApproval = (
+  id: string,
+  comment?: string,
+  signature?: ApprovalSignature,
+) =>
   api.post<{ data: AdminApproval }>(`/admin/v1/approvals/${id}/approve`, {
     ...(comment ? { comment } : {}),
+    ...(signature ? { signature } : {}),
   });
 
 /** Reject a request. One rejection closes it. */
@@ -1260,11 +1268,13 @@ export const decideApprovals = (
   ids: string[],
   decision: "approve" | "reject",
   comment?: string,
+  signature?: ApprovalSignature,
 ) =>
   api.post<{ data: BulkDecisionResult[] }>("/admin/v1/approvals/bulk", {
     ids,
     decision,
     ...(comment ? { comment } : {}),
+    ...(signature && decision === "approve" ? { signature } : {}),
   });
 
 /** Withdraw your own request while it is still waiting. */
@@ -1274,3 +1284,36 @@ export const cancelApproval = (id: string) =>
 /** Run a request that was approved but never started. */
 export const executeApproval = (id: string) =>
   api.post<{ data: AdminApproval }>(`/admin/v1/approvals/${id}/execute`);
+
+// --- Approval signing (Turnkey passkeys) ------------------------------------
+
+/** The Approval signing section: mode, admin sub-org, passkeys and ranks. */
+export const getSigningOverview = () =>
+  api.get<{ data: SigningOverview }>("/admin/v1/admin-access/signing", {
+    quietErrors: true,
+  });
+
+/** Keep the passkey just made, until it is added to the admin sub-org. */
+export const saveSigningPasskey = (
+  challenge: string,
+  attestation: PasskeyAttestation,
+) =>
+  api.post<{ data: unknown }>("/admin/v1/admin-access/signing/passkey", {
+    challenge,
+    attestation,
+  });
+
+/** Create the admin sub-org in Turnkey, once. Held for approval by default. */
+export const setupSigning = () =>
+  api.post<{ data: unknown }>("/admin/v1/admin-access/signing/setup");
+
+/** Re-read Turnkey after a root action there. */
+export const refreshSigning = () =>
+  api.post<{ data: unknown }>("/admin/v1/admin-access/signing/refresh");
+
+/** What to sign to approve these requests: one message for all of them. */
+export const getSigningMessage = (ids: string[]) =>
+  api.get<{ data: { ids: string[]; message: string } }>(
+    "/admin/v1/approvals/signing-message",
+    { params: { ids: ids.join(",") } },
+  );
