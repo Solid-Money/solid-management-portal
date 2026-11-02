@@ -3690,7 +3690,8 @@ export type InternalTeamFeatureKey =
   | "wirex_virtual_account"
   | "spend_modes"
   | "deposit_tokens"
-  | "ai_api";
+  | "ai_api"
+  | "referral_v4";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;

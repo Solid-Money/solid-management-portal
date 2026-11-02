@@ -149,6 +149,7 @@ const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
   // No longer a tag (the EUR vault is open to everyone); kept so past entries read.
   eur_vault: "EUR vault",
   ai_api: "AI API",
+  referral_v4: "Referral v4",
 };
 
 /** How the audit trail names an admin's change to a user's AI API. */
