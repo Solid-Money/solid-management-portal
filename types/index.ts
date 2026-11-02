@@ -3531,7 +3531,8 @@ export type InternalTeamFeatureKey =
   | "spend_modes"
   | "eur_vault"
   | "ai_api"
-  | "deposit_tokens";
+  | "deposit_tokens"
+  | "referral_v4";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;
