@@ -48,14 +48,14 @@ export function RewardsReferralsV4View() {
   );
   const nextPayoutScope = [
     data?.nextPayout
-      ? `Estimate for ${formatUtc(data.nextPayout.at)} · ${formatNumber(
+      ? `${config?.paused ? `Would pay ${formatUsd(data.nextPayout.estimateUsd)} at` : "Estimate for"} ${formatUtc(data.nextPayout.at)} · ${formatNumber(
           data.nextPayout.referrers,
           0,
           0,
         )} referrer${data.nextPayout.referrers === 1 ? "" : "s"} — unlocked card credit plus last week's spend share`
       : "Unlocked card credit plus last week's spend share",
     // While paused the run credits and sends nothing, whatever it estimates.
-    config?.paused &&"payouts are paused in the program settings",
+    config?.paused && "payouts are paused in the program settings",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -114,7 +114,12 @@ export function RewardsReferralsV4View() {
           className="md:col-span-2"
           title="Next payout"
           value={
-            data?.nextPayout ? formatUsd(data.nextPayout.estimateUsd) : undefined
+            // Paused pays nothing, so the estimate stays in the scope line only.
+            config?.paused
+              ? "Paused"
+              : data?.nextPayout
+                ? formatUsd(data.nextPayout.estimateUsd)
+                : undefined
           }
           scope={nextPayoutScope}
           source="derived"
