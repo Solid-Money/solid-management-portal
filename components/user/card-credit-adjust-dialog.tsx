@@ -23,6 +23,15 @@ import { Textarea } from "@/components/ui/textarea";
 export const MAX_CARD_CREDIT_GRANT_USD = 500;
 const MAX_REASON_LENGTH = 500;
 
+/**
+ * The id that makes a grant happen once, however often it is sent. None where
+ * the browser can't make a UUID: the grant then goes without one, as before.
+ */
+const newRequestId = (): string | undefined =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : undefined;
+
 interface CardCreditAdjustDialogProps {
   userId: string;
   username: string;
@@ -52,6 +61,10 @@ export default function CardCreditAdjustDialog({
 }: CardCreditAdjustDialogProps) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  // Kept across retries of the same grant, so one that landed before its
+  // response was lost is not granted again; a new amount or reason is a new
+  // grant and gets a new id.
+  const [requestId, setRequestId] = useState(newRequestId);
   const mutation = useAdjustCardCredit(userId, mode);
 
   const isGrant = mode === "grant";
@@ -86,6 +99,7 @@ export default function CardCreditAdjustDialog({
     if (!next) {
       setAmount("");
       setReason("");
+      setRequestId(newRequestId());
     }
     onOpenChange(next);
   };
@@ -93,7 +107,11 @@ export default function CardCreditAdjustDialog({
   const submit = () => {
     if (!canSubmit) return;
     mutation.mutate(
-      { amountUsd: parsed, reason: trimmedReason },
+      {
+        amountUsd: parsed,
+        reason: trimmedReason,
+        ...(isGrant && requestId && { requestId }),
+      },
       {
         onSuccess: () => {
           toast.success(
@@ -103,6 +121,7 @@ export default function CardCreditAdjustDialog({
           );
           setAmount("");
           setReason("");
+          setRequestId(newRequestId());
           onOpenChange(false);
         },
         // The API layer already toasts the server's reason; keep the dialog
@@ -149,7 +168,10 @@ export default function CardCreditAdjustDialog({
             max={max}
             step="0.01"
             value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) => {
+              setAmount(event.target.value);
+              setRequestId(newRequestId());
+            }}
             placeholder={isGrant ? "e.g. 10" : formatUsd(availableUsd)}
             disabled={mutation.isPending}
             aria-invalid={!!amountError}
@@ -170,7 +192,10 @@ export default function CardCreditAdjustDialog({
           <Textarea
             id="card-credit-reason"
             value={reason}
-            onChange={(event) => setReason(event.target.value)}
+            onChange={(event) => {
+              setReason(event.target.value);
+              setRequestId(newRequestId());
+            }}
             maxLength={MAX_REASON_LENGTH}
             placeholder={
               isGrant
