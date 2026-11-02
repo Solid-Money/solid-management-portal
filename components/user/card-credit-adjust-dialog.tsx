@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,6 +33,16 @@ const newRequestId = (): string | undefined =>
     ? crypto.randomUUID()
     : undefined;
 
+/**
+ * The id of every submission not yet confirmed by the server, by user, mode,
+ * amount and trimmed reason — what reaches the server. Kept outside the dialog,
+ * which unmounts on close: an admin whose grant went through but whose
+ * response was lost can close it, reopen it, send the same thing again and
+ * still move the credit only once. An entry is dropped once the server
+ * confirms that submission.
+ */
+const unconfirmedRequestIds = new Map<string, string | undefined>();
+
 interface CardCreditAdjustDialogProps {
   userId: string;
   username: string;
@@ -62,11 +72,6 @@ export default function CardCreditAdjustDialog({
 }: CardCreditAdjustDialogProps) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  // One id per distinct grant or removal sent from this dialog — the amount as
-  // a number and the trimmed reason, which is what reaches the server. A retry
-  // of one whose response was lost, or an edit that comes back to it ("10" vs
-  // "10.00", a trailing space), reuses its id and so cannot move credit twice.
-  const requestIds = useRef(new Map<string, string | undefined>());
   const mutation = useAdjustCardCredit(userId, mode);
 
   const isGrant = mode === "grant";
@@ -101,18 +106,20 @@ export default function CardCreditAdjustDialog({
     if (!next) {
       setAmount("");
       setReason("");
-      requestIds.current.clear();
     }
     onOpenChange(next);
   };
 
   const submit = () => {
     if (!canSubmit) return;
-    const submissionKey = `${mode}\n${parsed}\n${trimmedReason}`;
-    if (!requestIds.current.has(submissionKey)) {
-      requestIds.current.set(submissionKey, newRequestId());
+    // A retry of a submission whose response was lost — from this dialog or a
+    // reopened one, or after an edit that comes back to it ("10" vs "10.00", a
+    // trailing space) — reuses its id, so it cannot move credit twice.
+    const submissionKey = `${userId}\n${mode}\n${parsed}\n${trimmedReason}`;
+    if (!unconfirmedRequestIds.has(submissionKey)) {
+      unconfirmedRequestIds.set(submissionKey, newRequestId());
     }
-    const requestId = requestIds.current.get(submissionKey);
+    const requestId = unconfirmedRequestIds.get(submissionKey);
     mutation.mutate(
       {
         amountUsd: parsed,
@@ -126,9 +133,9 @@ export default function CardCreditAdjustDialog({
               ? `Granted ${formatUsd(parsed)} card credit to ${username}`
               : `Removed ${formatUsd(parsed)} card credit from ${username}`,
           );
+          unconfirmedRequestIds.delete(submissionKey);
           setAmount("");
           setReason("");
-          requestIds.current.clear();
           onOpenChange(false);
         },
         // The API layer already toasts the server's reason; keep the dialog
