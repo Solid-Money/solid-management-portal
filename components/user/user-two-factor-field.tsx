@@ -6,6 +6,10 @@ import { AlertTriangle, Loader2, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { getTwoFactorStatus, resetTwoFactor } from "@/lib/api";
+import { isApprovalPending } from "@/lib/admin-access";
+import ApprovalKey, {
+  ApprovalNotice,
+} from "@/components/admin-access/approval-key";
 import { formatDateTime } from "@/lib/utils";
 import { TwoFactorStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -136,6 +140,8 @@ export default function UserTwoFactorField({
  * reason — how the owner was verified — is required, recorded in the audit
  * trail and posted to Slack with the admin's name.
  */
+const RESET_ACTION = "POST /users/:id/account/two-factor/reset";
+
 function ResetTwoFactorDialog({
   userId,
   username,
@@ -169,9 +175,15 @@ function ResetTwoFactorDialog({
         queryKey: ["user-audit-log", userId],
       });
     },
-    onError: () => {
+    onError: (error) => {
       // The API layer already surfaces the server's message as a toast; this
       // only keeps the dialog open so the admin can retry or copy the reason.
+      // Sent for approval instead: nothing more to do here.
+      if (isApprovalPending(error)) {
+        setReason("");
+        setConfirmation("");
+        setOpen(false);
+      }
     },
   });
 
@@ -190,6 +202,7 @@ function ResetTwoFactorDialog({
       >
         <ShieldOff className="h-4 w-4" />
         Reset 2FA
+        <ApprovalKey action={RESET_ACTION} />
       </Button>
 
       <Dialog
@@ -250,6 +263,8 @@ function ResetTwoFactorDialog({
             />
           </div>
 
+          <ApprovalNotice action={RESET_ACTION} />
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -269,6 +284,7 @@ function ResetTwoFactorDialog({
                 <Loader2 className="h-4 w-4 animate-spin" />
               )}
               Reset 2FA
+              <ApprovalKey action={RESET_ACTION} className="text-current" />
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -17,6 +17,10 @@ import {
   sendRecoveryCode,
   setAccountEmail,
 } from "@/lib/api";
+import { isApprovalPending } from "@/lib/admin-access";
+import ApprovalKey, {
+  ApprovalNotice,
+} from "@/components/admin-access/approval-key";
 import { formatDateTime } from "@/lib/utils";
 import { RecoveryEligibility } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -319,6 +323,8 @@ function SendCodeDialog({
  * has to be typed back, the reason is required, and both addresses go into the
  * audit trail unmasked.
  */
+const SET_EMAIL_ACTION = "POST /users/:id/account/email";
+
 function SetEmailDialog({
   userId,
   username,
@@ -349,6 +355,13 @@ function SetEmailDialog({
       setOpen(false);
       onDone();
     },
+    onError: (error) => {
+      // Sent for approval instead: nothing more to do here.
+      if (isApprovalPending(error)) {
+        reset();
+        setOpen(false);
+      }
+    },
   });
 
   const reset = () => {
@@ -372,6 +385,7 @@ function SetEmailDialog({
       >
         <AlertTriangle className="h-4 w-4" />
         {eligibility.hasEmail ? "Change recovery email" : "Set recovery email"}
+        <ApprovalKey action={SET_EMAIL_ACTION} />
       </Button>
 
       <Dialog
@@ -444,6 +458,8 @@ function SetEmailDialog({
             />
           </div>
 
+          <ApprovalNotice action={SET_EMAIL_ACTION} />
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -463,6 +479,7 @@ function SetEmailDialog({
                 <Loader2 className="h-4 w-4 animate-spin" />
               )}
               {eligibility.hasEmail ? "Change email" : "Set email"}
+              <ApprovalKey action={SET_EMAIL_ACTION} className="text-current" />
             </Button>
           </DialogFooter>
         </DialogContent>

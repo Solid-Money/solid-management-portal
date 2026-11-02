@@ -34,6 +34,7 @@ import {
 } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
+import { useApprovalSummary } from "@/hooks/use-admin-access";
 
 /**
  * The number on the Support badge: cases needing a human plus the admin's
@@ -62,10 +63,12 @@ function GroupSubmenu({
   group,
   pathname,
   badge = 0,
+  approvalsBadge = 0,
 }: {
   group: NavGroup;
   pathname: string;
   badge?: number;
+  approvalsBadge?: number;
 }) {
   return (
     <NavigationMenuItem>
@@ -105,6 +108,9 @@ function GroupSubmenu({
                         )}
                       >
                         {item.label}
+                        {item.approvalsBadge && (
+                          <CountBadge count={approvalsBadge} />
+                        )}
                       </span>
                       <span className="text-muted-foreground text-xs leading-snug">
                         {item.description}
@@ -126,10 +132,12 @@ function MobileNav({
   pathname,
   groups,
   supportBadge,
+  approvalsBadge,
 }: {
   pathname: string;
   groups: NavGroup[];
   supportBadge: number;
+  approvalsBadge: number;
 }) {
   return (
     <DropdownMenu>
@@ -141,7 +149,7 @@ function MobileNav({
           aria-label={supportBadge ? `Open navigation, ${supportBadge} support cases waiting` : "Open navigation"}
         >
           <Menu className="h-4 w-4" />
-          {supportBadge > 0 && (
+          {supportBadge + approvalsBadge > 0 && (
             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
           )}
         </Button>
@@ -169,6 +177,7 @@ function MobileNav({
                 <DropdownMenuLabel className="text-muted-foreground flex items-center text-xs uppercase">
                   {group.label}
                   {group.supportBadge && <CountBadge count={supportBadge} />}
+                  {group.approvalsBadge && <CountBadge count={approvalsBadge} />}
                 </DropdownMenuLabel>
                 {group.items?.map((item) => (
                   <DropdownMenuItem key={item.href} asChild>
@@ -182,6 +191,9 @@ function MobileNav({
                       >
                         {item.label}
                       </span>
+                      {item.approvalsBadge && (
+                        <CountBadge count={approvalsBadge} />
+                      )}
                     </Link>
                   </DropdownMenuItem>
                 ))}
@@ -260,6 +272,8 @@ export default function DashboardNav() {
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const groups = NAV_GROUPS;
   const supportBadge = useSupportBadge();
+  // Requests waiting on this admin's approval.
+  const approvalsBadge = useApprovalSummary(!!user).data?.awaitingMe ?? 0;
 
   const handleSignOut = async () => {
     setIsSignOutModalOpen(false);
@@ -270,7 +284,12 @@ export default function DashboardNav() {
     <>
       <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <MobileNav pathname={pathname} groups={groups} supportBadge={supportBadge} />
+          <MobileNav
+            pathname={pathname}
+            groups={groups}
+            supportBadge={supportBadge}
+            approvalsBadge={approvalsBadge}
+          />
 
           <Link href="/users" className="shrink-0 text-xl font-bold text-indigo-600">
             Solid Admin
@@ -301,7 +320,14 @@ export default function DashboardNav() {
                     key={group.label}
                     group={group}
                     pathname={pathname}
-                    badge={group.supportBadge ? supportBadge : 0}
+                    badge={
+                      group.supportBadge
+                        ? supportBadge
+                        : group.approvalsBadge
+                          ? approvalsBadge
+                          : 0
+                    }
+                    approvalsBadge={approvalsBadge}
                   />
                 )
               )}

@@ -12,6 +12,10 @@ import {
 import { toast } from "sonner";
 
 import { recoverUserAccount } from "@/lib/api";
+import { isApprovalPending } from "@/lib/admin-access";
+import ApprovalKey, {
+  ApprovalNotice,
+} from "@/components/admin-access/approval-key";
 import { formatDateTime } from "@/lib/utils";
 import { RecoverAccountResult } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -65,6 +69,8 @@ const NOT_RESTORED = [
  * card-spend block it deliberately left in place — so support can tell the
  * user exactly where they stand.
  */
+const ACTION = "POST /users/:id/account/recover";
+
 export default function RecoverAccountDialog({
   userId,
   username,
@@ -92,9 +98,14 @@ export default function RecoverAccountDialog({
       });
       void queryClient.invalidateQueries({ queryKey: ["user-card", userId] });
     },
-    onError: () => {
+    onError: (error) => {
       // The API layer already surfaces the server's message as a toast; this
       // only keeps the dialog open so the admin can retry or copy the reason.
+      // Sent for approval instead: nothing more to do here.
+      if (isApprovalPending(error)) {
+        setOpen(false);
+        setReason("");
+      }
     },
   });
 
@@ -114,6 +125,7 @@ export default function RecoverAccountDialog({
         >
           <RotateCcw className="h-4 w-4" />
           Recover account
+          <ApprovalKey action={ACTION} className="text-current" />
         </Button>
       )}
 
@@ -186,6 +198,8 @@ export default function RecoverAccountDialog({
                 </p>
               </div>
 
+              <ApprovalNotice action={ACTION} />
+
               <DialogFooter>
                 <Button
                   variant="outline"
@@ -204,6 +218,7 @@ export default function RecoverAccountDialog({
                     <Loader2 className="h-4 w-4 animate-spin" />
                   )}
                   Recover account
+                  <ApprovalKey action={ACTION} className="text-current" />
                 </Button>
               </DialogFooter>
             </>

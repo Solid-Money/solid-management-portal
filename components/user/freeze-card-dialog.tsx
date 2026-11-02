@@ -6,6 +6,10 @@ import { AlertTriangle, Loader2, Snowflake, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import { setUserCardFreeze } from "@/lib/api";
+import { isApprovalPending } from "@/lib/admin-access";
+import ApprovalKey, {
+  ApprovalNotice,
+} from "@/components/admin-access/approval-key";
 import { UserCardOverview } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +28,8 @@ interface FreezeCardDialogProps {
   username: string;
   card: UserCardOverview;
 }
+
+const ACTION = "POST /users/:id/card/freeze";
 
 /**
  * Freeze / unfreeze a user's card on their behalf.
@@ -62,9 +68,14 @@ export default function FreezeCardDialog({
         queryKey: ["user-balances", userId],
       });
     },
-    onError: () => {
+    onError: (error) => {
       // The API layer already surfaces the server's message as a toast; this
       // only keeps the dialog open so the admin can retry or copy the reason.
+      // Sent for approval instead: nothing more to do here.
+      if (isApprovalPending(error)) {
+        setOpen(false);
+        setReason("");
+      }
     },
   });
 
@@ -82,6 +93,7 @@ export default function FreezeCardDialog({
           <Sun className="h-4 w-4" />
         )}
         {freezing ? "Freeze card" : "Unfreeze card"}
+        <ApprovalKey action={ACTION} />
       </Button>
 
       <Dialog
@@ -147,6 +159,8 @@ export default function FreezeCardDialog({
             </div>
           )}
 
+          <ApprovalNotice action={ACTION} />
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -166,6 +180,7 @@ export default function FreezeCardDialog({
                 <Loader2 className="h-4 w-4 animate-spin" />
               )}
               {freezing ? "Freeze card" : "Unfreeze card"}
+              <ApprovalKey action={ACTION} className="text-current" />
             </Button>
           </DialogFooter>
         </DialogContent>

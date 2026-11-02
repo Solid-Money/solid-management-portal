@@ -4,6 +4,7 @@ import {
   BarChart2,
   Headphones,
   Inbox,
+  KeyRound,
   Settings2,
   ArrowRightLeft,
   BarChart3,
@@ -42,6 +43,8 @@ export interface NavLink {
   /** One line explaining what the page is for, shown inside a submenu. */
   description: string;
   icon: LucideIcon;
+  /** Shows the count of approval requests the signed-in admin can decide. */
+  approvalsBadge?: boolean;
 }
 
 export interface NavGroup {
@@ -49,6 +52,8 @@ export interface NavGroup {
   icon: LucideIcon;
   /** Shows the count of support cases waiting on a human. */
   supportBadge?: boolean;
+  /** Shows the count of approval requests the signed-in admin can decide. */
+  approvalsBadge?: boolean;
   /** Present for a top-level link with no submenu. */
   href?: string;
   items?: NavLink[];
@@ -120,6 +125,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Activity",
     icon: Activity,
+    approvalsBadge: true,
     items: [
       {
         href: "/activity",
@@ -138,6 +144,14 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Errors",
         description: "What went wrong for users, live, with plain-English reasons",
         icon: AlertTriangle,
+      },
+      {
+        href: "/activity/approvals",
+        label: "Approvals",
+        description:
+          "Sensitive actions waiting on another admin — approve one by one or in bulk",
+        icon: KeyRound,
+        approvalsBadge: true,
       },
     ],
   },
@@ -270,7 +284,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/internal-team",
         label: "Internal Team",
         description:
-          "Staff and testers: who gets team-only features and rollouts first",
+          "Staff and testers' features; admin ranks and approval rules for this portal",
         icon: UserCog,
       },
       {

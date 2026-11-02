@@ -3,6 +3,23 @@ import { auth } from "./firebase";
 import { toast } from "sonner";
 import { formatErrorRef, requestIdOf } from "@/lib/error-ref";
 import {
+  ApprovalPendingError,
+  approvalHref,
+  describeRequirement,
+  heldApprovalOf,
+} from "@/lib/admin-access";
+import type {
+  AdminAccessMe,
+  AdminActionPolicyRow,
+  AdminApproval,
+  AdminApprovalGroup,
+  AdminApprovalList,
+  AdminRank,
+  AdminTeamMember,
+  ApproverRank,
+  BulkDecisionResult,
+} from "@/types/admin-access";
+import {
   AdminAuditEntry,
   AdminUserReferrals,
   ClientErrorMatch,
@@ -156,9 +173,29 @@ export function describeApiError(error: unknown): string {
 
 // Add response interceptor for better error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // An action held for another admin's approval (202): say so here, once,
+    // for every button, and reject so the caller doesn't take it for done.
+    const held = heldApprovalOf(response);
+    if (held) {
+      toast.info(`Sent for approval: ${held.label}`, {
+        id: `approval:${held.id}`,
+        description: `It runs once it has ${describeRequirement(
+          held.requiredApprovals,
+          held.approverRank,
+          held.proposerRank,
+        )}. Follow it under Activity → Approvals.`,
+        action: {
+          label: "View",
+          onClick: () => window.location.assign(approvalHref(held.id)),
+        },
+      });
+      return Promise.reject(new ApprovalPendingError(held));
+    }
+    return response;
+  },
   (error) => {
-    if (error.config?.quietErrors) {
+    if (error instanceof ApprovalPendingError || error.config?.quietErrors) {
       return Promise.reject(error);
     }
     if (error.response?.status === 401) {
@@ -1138,3 +1175,102 @@ export const triggerCohortSnapshots = () =>
   api.post("/admin/v1/cohort-snapshots/trigger");
 
 export default api;
+
+// --- Admin access & approvals ---------------------------------------------
+
+/**
+ * The signed-in admin and their rank. Refused with a 403 for a company account
+ * with no rank: only the ranked admin team may use the portal.
+ */
+export const getAdminAccessMe = () =>
+  api.get<{ data: AdminAccessMe }>("/admin/v1/admin-access/me", {
+    quietErrors: true,
+  });
+
+/** Everyone who holds or held a rank, active first. */
+export const getAdminTeam = () =>
+  api.get<{ data: AdminTeamMember[] }>("/admin/v1/admin-access/members");
+
+/**
+ * Give someone a rank, change theirs, or give a removed admin one back. Held
+ * for approval by default; nobody gives a rank above their own.
+ */
+export const setAdminRank = (email: string, rank: AdminRank, name?: string) =>
+  api.post<{ data: AdminTeamMember }>("/admin/v1/admin-access/members", {
+    email,
+    rank,
+    ...(name ? { name } : {}),
+  });
+
+/** Take an admin's rank away, which ends their portal access. Held for approval by default. */
+export const revokeAdminRank = (email: string, reason: string) =>
+  api.post<{ data: AdminTeamMember }>("/admin/v1/admin-access/members/revoke", {
+    email,
+    reason,
+  });
+
+/** Every portal action that changes something, with the approval rule it runs under. */
+export const getActionPolicies = () =>
+  api.get<{ data: AdminActionPolicyRow[] }>("/admin/v1/admin-access/policies", {
+    quietErrors: true,
+  });
+
+/** Set one action's approval rule. Held for approval by default (ranks 1–2 may ask). */
+export const setActionPolicy = (policy: {
+  action: string;
+  requiredApprovals: number;
+  approverRank: ApproverRank;
+  proposerRank: AdminRank;
+}) =>
+  api.post<{ data: unknown }>("/admin/v1/admin-access/policies", policy);
+
+/** One tab of Activity → Approvals, with how many requests each tab holds. */
+export const getApprovals = (group: AdminApprovalGroup) =>
+  api.get<{ data: AdminApprovalList }>("/admin/v1/approvals", {
+    params: { group },
+  });
+
+export const getApproval = (id: string) =>
+  api.get<{ data: AdminApproval }>(`/admin/v1/approvals/${id}`);
+
+/** Requests the signed-in admin can decide, and their own still waiting. */
+export const getApprovalSummary = () =>
+  api.get<{ data: { awaitingMe: number; mine: number } }>(
+    "/admin/v1/approvals/summary",
+    { quietErrors: true },
+  );
+
+/**
+ * Approve a request. The approval that completes it runs the action there and
+ * then, and the answer says how the run went.
+ */
+export const approveApproval = (id: string, comment?: string) =>
+  api.post<{ data: AdminApproval }>(`/admin/v1/approvals/${id}/approve`, {
+    ...(comment ? { comment } : {}),
+  });
+
+/** Reject a request. One rejection closes it. */
+export const rejectApproval = (id: string, comment?: string) =>
+  api.post<{ data: AdminApproval }>(`/admin/v1/approvals/${id}/reject`, {
+    ...(comment ? { comment } : {}),
+  });
+
+/** Approve or reject several requests in turn; each comes back with its own outcome. */
+export const decideApprovals = (
+  ids: string[],
+  decision: "approve" | "reject",
+  comment?: string,
+) =>
+  api.post<{ data: BulkDecisionResult[] }>("/admin/v1/approvals/bulk", {
+    ids,
+    decision,
+    ...(comment ? { comment } : {}),
+  });
+
+/** Withdraw your own request while it is still waiting. */
+export const cancelApproval = (id: string) =>
+  api.post<{ data: AdminApproval }>(`/admin/v1/approvals/${id}/cancel`);
+
+/** Run a request that was approved but never started. */
+export const executeApproval = (id: string) =>
+  api.post<{ data: AdminApproval }>(`/admin/v1/approvals/${id}/execute`);
