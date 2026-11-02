@@ -80,6 +80,9 @@ export default function ReferralBoostModal({
   );
   const [enabled, setEnabled] = useState(boost?.enabled ?? true);
   const [attempted, setAttempted] = useState(false);
+  // An enabled boost changes how much card credit is paid out, so saving one
+  // takes a second step that spells out what it does.
+  const [confirming, setConfirming] = useState(false);
 
   const parsedMultiplier = Number(multiplier);
   const startIso = utcInputToIso(startsAt);
@@ -116,6 +119,10 @@ export default function ReferralBoostModal({
   const submit = () => {
     setAttempted(true);
     if (error || !startIso || !endIso) return;
+    if (enabled && !confirming) {
+      setConfirming(true);
+      return;
+    }
     save.mutate(
       {
         id: boost?.id,
@@ -148,15 +155,36 @@ export default function ReferralBoostModal({
     >
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{boost ? "Edit boost" : "Create boost"}</DialogTitle>
+          <DialogTitle>
+            {confirming ? "Confirm boost" : boost ? "Edit boost" : "Create boost"}
+          </DialogTitle>
           <DialogDescription>
-            Multiplies the card credit of the chosen bonuses earned between the
-            start and the end (UTC). Boosted credit doesn&apos;t count toward
-            the per-friend cap.
+            {confirming
+              ? "It is enabled, so it changes how much card credit is paid out. Check it before saving."
+              : "Multiplies the card credit of the chosen bonuses earned between the start and the end (UTC). Boosted credit doesn't count toward the per-friend cap."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        {confirming && startIso && endIso && (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm">
+            <dt className="text-gray-500">Name</dt>
+            <dd className="text-gray-900">{name.trim()}</dd>
+            <dt className="text-gray-500">Multiplier</dt>
+            <dd className="font-medium text-gray-900">×{parsedMultiplier}</dd>
+            <dt className="text-gray-500">Bonuses</dt>
+            <dd className="text-gray-900">
+              {steps.map((step) => REFERRAL_V4_STEP_LABELS[step]).join(", ")} ·{" "}
+              {BOOST_SIDES_LABELS[sides]}
+            </dd>
+            <dt className="text-gray-500">Window (UTC)</dt>
+            <dd className="text-gray-900">
+              {formatUtc(startIso)} → {formatUtc(endIso)}
+            </dd>
+          </dl>
+        )}
+
+        {/* Kept mounted while confirming, so Back returns to the same form. */}
+        <div className={confirming ? "hidden" : "grid gap-4 sm:grid-cols-2"}>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="boost-name">Name</Label>
             <Input
@@ -288,11 +316,11 @@ export default function ReferralBoostModal({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={onClose}
+            onClick={confirming ? () => setConfirming(false) : onClose}
             disabled={save.isPending}
             className="cursor-pointer"
           >
-            Cancel
+            {confirming ? "Back" : "Cancel"}
           </Button>
           <Button
             onClick={submit}
@@ -300,7 +328,13 @@ export default function ReferralBoostModal({
             className="cursor-pointer"
           >
             {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {boost ? "Save boost" : "Create boost"}
+            {confirming
+              ? boost
+                ? "Yes, save boost"
+                : "Yes, create boost"
+              : boost
+                ? "Save boost"
+                : "Create boost"}
           </Button>
         </DialogFooter>
       </DialogContent>
