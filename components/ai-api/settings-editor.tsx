@@ -1,15 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  AntseedModelPicker,
+  type AntseedPick,
+} from "@/components/ai-api/antseed-model-picker";
+import { ModelLogoInput } from "@/components/ai-api/model-logo-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { useAiApiSettings, useSaveAiApiSettings } from "@/hooks/use-ai-api";
+import {
+  useAiApiSettings,
+  useAiApiUpstreamModels,
+  useSaveAiApiSettings,
+} from "@/hooks/use-ai-api";
+import { antseedOfferFor, formatRate, priceMultiple } from "@/lib/ai-api";
 import { fromPercentInput, toPercentInput } from "@/lib/cashback-percentage";
 import type {
   AiApiModelConfig,
@@ -26,8 +36,15 @@ interface ModelDraft {
   cachedInput: string;
   cacheWrite: string;
   aliases: string;
+  provider: string;
+  logoUrl: string;
+  officialInput: string;
+  officialOutput: string;
   enabled: boolean;
 }
+
+/** The text fields of a model row. */
+type ModelTextField = Exclude<keyof ModelDraft, "enabled" | "logoUrl" | "upstreamModel">;
 
 interface TierDraft {
   tier: number;
@@ -71,6 +88,10 @@ const toDraft = (settings: AiApiSettings): Draft => ({
     cachedInput: priceText(model.cachedInputUsdPerMTok),
     cacheWrite: priceText(model.cacheWriteUsdPerMTok),
     aliases: (model.aliases ?? []).join(", "),
+    provider: model.provider ?? "",
+    logoUrl: model.logoUrl ?? "",
+    officialInput: priceText(model.officialInputUsdPerMTok),
+    officialOutput: priceText(model.officialOutputUsdPerMTok),
     enabled: model.enabled,
   })),
 });
@@ -84,6 +105,10 @@ const EMPTY_MODEL: ModelDraft = {
   cachedInput: "",
   cacheWrite: "",
   aliases: "",
+  provider: "",
+  logoUrl: "",
+  officialInput: "",
+  officialOutput: "",
   enabled: true,
 };
 
@@ -179,6 +204,15 @@ function parseDraft(
     if ([input, output, cachedInput, cacheWrite].some((v) => Number.isNaN(v))) {
       return { error: `${label}: prices are dollars per million tokens, 0 or more.` };
     }
+    const officialInput = price(row.officialInput);
+    const officialOutput = price(row.officialOutput);
+    if (Number.isNaN(officialInput) || Number.isNaN(officialOutput)) {
+      return { error: `${label}: official prices are dollars per million tokens, 0 or more.` };
+    }
+    const provider = row.provider.trim();
+    if (provider.length > 40) {
+      return { error: `${label}: the provider can be 40 characters at most.` };
+    }
     models.push({
       id,
       name: row.name.trim(),
@@ -188,6 +222,10 @@ function parseDraft(
       ...(cachedInput !== null ? { cachedInputUsdPerMTok: cachedInput } : {}),
       ...(cacheWrite !== null ? { cacheWriteUsdPerMTok: cacheWrite } : {}),
       ...(aliases.length ? { aliases } : {}),
+      ...(provider ? { provider } : {}),
+      ...(row.logoUrl ? { logoUrl: row.logoUrl } : {}),
+      ...(officialInput !== null ? { officialInputUsdPerMTok: officialInput } : {}),
+      ...(officialOutput !== null ? { officialOutputUsdPerMTok: officialOutput } : {}),
       enabled: row.enabled,
     });
   }
@@ -252,6 +290,12 @@ export default function AiApiSettingsEditor() {
   // What was saved when editing began: a save sends only what differs from it.
   const [editBase, setEditBase] = useState<Draft | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // The row the AntSeed picker fills, while it is open.
+  const [pickingRow, setPickingRow] = useState<number | null>(null);
+  // AntSeed's rates beside each row's prices, once asked for: it is a call to
+  // the gateway, so the page doesn't make it on every visit.
+  const [showRates, setShowRates] = useState(false);
+  const catalog = useAiApiUpstreamModels(showRates);
 
   const saved = data?.data;
   const draft = edits ?? (saved ? toDraft(saved) : null);
@@ -298,10 +342,37 @@ export default function AiApiSettingsEditor() {
   const updateModel = (index: number, patch: Partial<ModelDraft>) =>
     setDraft({
       ...draft,
-      models: draft.models.map((model, i) =>
-        i === index ? { ...model, ...patch } : model,
-      ),
+      models: draft.models.map((model, i) => {
+        if (i !== index) return model;
+        const next = { ...model, ...patch };
+        // A provider another row already has a logo for brings that logo, so
+        // each provider's logo is uploaded once.
+        if (patch.provider !== undefined && !next.logoUrl) {
+          const provider = next.provider.trim().toLowerCase();
+          next.logoUrl =
+            draft.models.find(
+              (other, j) =>
+                j !== index &&
+                other.logoUrl &&
+                provider &&
+                other.provider.trim().toLowerCase() === provider,
+            )?.logoUrl ?? "";
+        }
+        return next;
+      }),
     });
+
+  /** Fill a row from the AntSeed picker: its gateway model, its id and name if blank, its prices if asked. */
+  const applyPick = (index: number, pick: AntseedPick) => {
+    const row = draft.models[index];
+    if (!row) return;
+    updateModel(index, {
+      upstreamModel: pick.upstreamModel,
+      ...(row.id.trim() ? {} : { id: pick.id }),
+      ...(row.name.trim() ? {} : { name: pick.name }),
+      ...(pick.prices ?? {}),
+    });
+  };
 
   const handleSave = async () => {
     setConfirming(false);
@@ -476,41 +547,87 @@ export default function AiApiSettingsEditor() {
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Models</h3>
             <p className="text-xs text-gray-500">
               Only these can be called. Prices are what users pay, in USD per
               million tokens. Cached and cache-write prices fall back to the
-              input price when empty.
+              input price when empty. Provider, logo and official prices are
+              what the app&apos;s price list shows; official prices give the
+              &ldquo;vs official price&rdquo; discount.
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={disabled}
-            onClick={() =>
-              setDraft({ ...draft, models: [...draft.models, { ...EMPTY_MODEL }] })
-            }
-            className="cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add model
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowRates((shown) => !shown)}
+              className="cursor-pointer"
+            >
+              {showRates && catalog.isFetching ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Search className="h-3.5 w-3.5" />
+              )}
+              {showRates ? "Hide AntSeed rates" : "Show AntSeed rates"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={disabled}
+              onClick={() => {
+                setDraft({
+                  ...draft,
+                  models: [...draft.models, { ...EMPTY_MODEL }],
+                });
+                setPickingRow(draft.models.length);
+              }}
+              className="cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add from AntSeed
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={disabled}
+              onClick={() =>
+                setDraft({
+                  ...draft,
+                  models: [...draft.models, { ...EMPTY_MODEL }],
+                })
+              }
+              className="cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add model
+            </Button>
+          </div>
         </div>
+
+        {showRates && catalog.isError ? (
+          <p className="text-xs text-red-600">
+            Couldn&apos;t load AntSeed&apos;s models from the gateway.
+          </p>
+        ) : null}
 
         <div className="overflow-x-auto rounded-md border border-gray-200">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
               <tr>
                 <th className="px-3 py-2">On</th>
+                <th className="px-3 py-2">Logo</th>
                 <th className="px-3 py-2">Model (what users send)</th>
                 <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Provider</th>
                 <th className="px-3 py-2">Gateway model</th>
                 <th className="px-3 py-2">Input</th>
                 <th className="px-3 py-2">Output</th>
                 <th className="px-3 py-2">Cached in</th>
                 <th className="px-3 py-2">Cache write</th>
+                <th className="px-3 py-2">Official in</th>
+                <th className="px-3 py-2">Official out</th>
                 <th className="px-3 py-2">Aliases</th>
                 <th className="px-3 py-2" aria-label="Remove" />
               </tr>
@@ -518,71 +635,167 @@ export default function AiApiSettingsEditor() {
             <tbody className="divide-y divide-gray-100">
               {draft.models.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-3 py-6 text-center text-gray-500">
+                  <td
+                    colSpan={14}
+                    className="px-3 py-6 text-center text-gray-500"
+                  >
                     No models yet. Users can create keys, but every request is
                     refused until a model is added.
                   </td>
                 </tr>
               ) : null}
-              {draft.models.map((model, index) => (
-                <tr key={index}>
-                  <td className="px-3 py-2">
-                    <Switch
-                      aria-label={`${model.id || "Model"} on`}
-                      checked={model.enabled}
+              {draft.models.map((model, index) => {
+                const offer =
+                  showRates && catalog.data
+                    ? antseedOfferFor(catalog.data.models, model.upstreamModel)
+                    : null;
+                const rateHint = (
+                  price: string,
+                  rate: number | null | undefined,
+                ) =>
+                  offer && rate !== null && rate !== undefined ? (
+                    <span className="mt-1 block whitespace-nowrap text-[11px] text-gray-500">
+                      AntSeed {formatRate(rate)}
+                      {priceMultiple(price, rate)
+                        ? ` · ${priceMultiple(price, rate)}`
+                        : ""}
+                    </span>
+                  ) : null;
+                const field = (
+                  key: ModelTextField,
+                  placeholder: string,
+                  width: string,
+                  hint?: React.ReactNode,
+                ) => (
+                  <td className="px-3 py-2 align-top">
+                    <Input
+                      className={width}
+                      value={model[key]}
+                      placeholder={placeholder}
                       disabled={disabled}
-                      onCheckedChange={(enabled) => updateModel(index, { enabled })}
+                      inputMode={
+                        ["id", "name", "provider", "aliases"].includes(key)
+                          ? undefined
+                          : "decimal"
+                      }
+                      onChange={(e) =>
+                        updateModel(index, { [key]: e.target.value })
+                      }
                     />
+                    {hint}
                   </td>
-                  {(
-                    [
-                      ["id", "kimi-k2.6", "w-40"],
-                      ["name", "Kimi K2.6", "w-36"],
-                      ["upstreamModel", "kimi-k2.6", "w-40"],
-                      ["input", "0.60", "w-20"],
-                      ["output", "2.50", "w-20"],
-                      ["cachedInput", "", "w-20"],
-                      ["cacheWrite", "", "w-20"],
-                      ["aliases", "kimi", "w-36"],
-                    ] as const
-                  ).map(([field, placeholder, width]) => (
-                    <td key={field} className="px-3 py-2">
-                      <Input
-                        className={width}
-                        value={model[field]}
-                        placeholder={placeholder}
+                );
+                return (
+                  <tr key={index}>
+                    <td className="px-3 py-2 align-top pt-4">
+                      <Switch
+                        aria-label={`${model.id || "Model"} on`}
+                        checked={model.enabled}
                         disabled={disabled}
-                        inputMode={
-                          ["input", "output", "cachedInput", "cacheWrite"].includes(field)
-                            ? "decimal"
-                            : undefined
+                        onCheckedChange={(enabled) =>
+                          updateModel(index, { enabled })
                         }
-                        onChange={(e) => updateModel(index, { [field]: e.target.value })}
                       />
                     </td>
-                  ))}
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      aria-label={`Remove ${model.id || "model"}`}
-                      disabled={disabled}
-                      onClick={() =>
-                        setDraft({
-                          ...draft,
-                          models: draft.models.filter((_, i) => i !== index),
-                        })
-                      }
-                      className="cursor-pointer text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-3 py-2 align-top">
+                      <ModelLogoInput
+                        value={model.logoUrl}
+                        name={model.provider || model.name || model.id}
+                        disabled={disabled}
+                        onChange={(logoUrl) => updateModel(index, { logoUrl })}
+                      />
+                    </td>
+                    {field("id", "claude-opus-5-5", "w-40")}
+                    {field("name", "Claude Opus 5.5", "w-36")}
+                    {field("provider", "Anthropic", "w-28")}
+                    <td className="px-3 py-2 align-top">
+                      <div className="flex gap-1.5">
+                        <Input
+                          className="w-44"
+                          value={model.upstreamModel}
+                          placeholder="claude-opus-5-5"
+                          disabled={disabled}
+                          onChange={(e) =>
+                            updateModel(index, {
+                              upstreamModel: e.target.value,
+                            })
+                          }
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={disabled}
+                          onClick={() => setPickingRow(index)}
+                          className="h-9 cursor-pointer px-2 text-xs"
+                          title="Pick the gateway model and prices from AntSeed"
+                        >
+                          AntSeed
+                        </Button>
+                      </div>
+                      {showRates &&
+                      catalog.data &&
+                      model.upstreamModel.trim() &&
+                      !offer ? (
+                        <span className="mt-1 block text-[11px] text-amber-700">
+                          Not listed on AntSeed right now
+                        </span>
+                      ) : null}
+                    </td>
+                    {field(
+                      "input",
+                      "0.40",
+                      "w-20",
+                      rateHint(model.input, offer?.inputUsdPerMTok),
+                    )}
+                    {field(
+                      "output",
+                      "2.40",
+                      "w-20",
+                      rateHint(model.output, offer?.outputUsdPerMTok),
+                    )}
+                    {field(
+                      "cachedInput",
+                      "",
+                      "w-20",
+                      rateHint(model.cachedInput, offer?.cachedInputUsdPerMTok),
+                    )}
+                    {field("cacheWrite", "", "w-20")}
+                    {field("officialInput", "15", "w-20")}
+                    {field("officialOutput", "75", "w-20")}
+                    {field("aliases", "claude-opus-5", "w-36")}
+                    <td className="px-3 py-2 align-top pt-4">
+                      <button
+                        type="button"
+                        aria-label={`Remove ${model.id || "model"}`}
+                        disabled={disabled}
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            models: draft.models.filter((_, i) => i !== index),
+                          })
+                        }
+                        className="cursor-pointer text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      <AntseedModelPicker
+        open={pickingRow !== null}
+        onOpenChange={(open) => {
+          if (!open) setPickingRow(null);
+        }}
+        onPick={(pick) => {
+          if (pickingRow !== null) applyPick(pickingRow, pick);
+        }}
+      />
 
       {isDirty ? (
         <div className="flex items-center justify-between gap-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3">

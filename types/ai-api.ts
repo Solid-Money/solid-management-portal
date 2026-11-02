@@ -189,7 +189,38 @@ export interface AiApiModelConfig {
   cachedInputUsdPerMTok?: number;
   cacheWriteUsdPerMTok?: number;
   aliases?: string[];
+  /** Who makes it, as the app's price list groups it: "Anthropic". */
+  provider?: string;
+  /** Uploaded to Vercel Blob from this page; the app shows it beside the model. */
+  logoUrl?: string;
+  /** The model maker's list prices, for the app's "vs official price" badge. */
+  officialInputUsdPerMTok?: number;
+  officialOutputUsdPerMTok?: number;
   enabled: boolean;
+}
+
+/** One seller's offer of a model on AntSeed, USD per million tokens. */
+export interface AiApiUpstreamOffer {
+  peerId: string;
+  seller: string | null;
+  /** Pinning to this seller is `<peerId>@<serviceId>`. */
+  serviceId: string;
+  inputUsdPerMTok: number;
+  outputUsdPerMTok: number;
+  cachedInputUsdPerMTok: number | null;
+}
+
+/** A model on the AntSeed network: its gateway id and its sellers, cheapest first. */
+export interface AiApiUpstreamModel {
+  id: string;
+  name: string;
+  aliases: string[];
+  offers: AiApiUpstreamOffer[];
+}
+
+export interface AiApiUpstreamCatalog {
+  models: AiApiUpstreamModel[];
+  fetchedAt: string;
 }
 
 /** One tier's AI cashback. Tier 1 is Core, 2 Prime, 3 Ultra. */
