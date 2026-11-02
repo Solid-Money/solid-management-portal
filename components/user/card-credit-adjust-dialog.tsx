@@ -24,8 +24,9 @@ export const MAX_CARD_CREDIT_GRANT_USD = 500;
 const MAX_REASON_LENGTH = 500;
 
 /**
- * The id that makes a grant happen once, however often it is sent. None where
- * the browser can't make a UUID: the grant then goes without one, as before.
+ * The id that makes a grant or removal happen once, however often it is sent.
+ * None where the browser can't make a UUID: it then goes without one, as
+ * before.
  */
 const newRequestId = (): string | undefined =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -61,10 +62,10 @@ export default function CardCreditAdjustDialog({
 }: CardCreditAdjustDialogProps) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  // One id per distinct grant sent from this dialog — the amount as a number
-  // and the trimmed reason, which is what reaches the server. A retry of a
-  // grant whose response was lost, or an edit that comes back to it ("10" vs
-  // "10.00", a trailing space), reuses its id and so cannot grant twice.
+  // One id per distinct grant or removal sent from this dialog — the amount as
+  // a number and the trimmed reason, which is what reaches the server. A retry
+  // of one whose response was lost, or an edit that comes back to it ("10" vs
+  // "10.00", a trailing space), reuses its id and so cannot move credit twice.
   const requestIds = useRef(new Map<string, string | undefined>());
   const mutation = useAdjustCardCredit(userId, mode);
 
@@ -107,16 +108,16 @@ export default function CardCreditAdjustDialog({
 
   const submit = () => {
     if (!canSubmit) return;
-    const grantKey = `${parsed}\n${trimmedReason}`;
-    if (!requestIds.current.has(grantKey)) {
-      requestIds.current.set(grantKey, newRequestId());
+    const submissionKey = `${mode}\n${parsed}\n${trimmedReason}`;
+    if (!requestIds.current.has(submissionKey)) {
+      requestIds.current.set(submissionKey, newRequestId());
     }
-    const requestId = requestIds.current.get(grantKey);
+    const requestId = requestIds.current.get(submissionKey);
     mutation.mutate(
       {
         amountUsd: parsed,
         reason: trimmedReason,
-        ...(isGrant && requestId && { requestId }),
+        ...(requestId && { requestId }),
       },
       {
         onSuccess: () => {
