@@ -350,6 +350,11 @@ export interface AdminCardCreditAccount {
 export interface AdminCardCredit {
   account: AdminCardCreditAccount;
   entries: AdminCardCreditEntry[];
+  /**
+   * Grants and removals only: this request id had already been applied, so
+   * the call moved nothing. Absent on older backends.
+   */
+  repeated?: boolean;
 }
 
 export interface CardCreditAdjustment {

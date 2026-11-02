@@ -107,7 +107,17 @@ export default function CardCreditAdjustDialog({
         ...(requestId && { requestId }),
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          if (data?.repeated) {
+            // The id had already been applied: a lost response retried, or a
+            // deliberate adjustment with the same details as one still
+            // unconfirmed. Either way nothing moved. The id is now confirmed
+            // and dropped, so sending it again makes it a new adjustment.
+            toast.info(
+              `Already ${isGrant ? "granted" : "removed"} earlier — nothing moved this time. Send again to make it a new ${isGrant ? "grant" : "removal"}.`,
+            );
+            return;
+          }
           toast.success(
             isGrant
               ? `Granted ${formatUsd(parsed)} card credit to ${username}`

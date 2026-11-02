@@ -11,6 +11,13 @@
  * mutation's own success handler, which runs even when the dialog has
  * unmounted. Leaving a confirmed id here would turn a later, deliberate
  * adjustment with the same details into a "repeat" that moves nothing.
+ *
+ * One case stays ambiguous on this side: a lost response the admin checked in
+ * the ledger rather than retried, then a deliberate adjustment with the same
+ * details. That reuses the still-unconfirmed id and moves nothing, but the
+ * backend answers `repeated: true`, so the dialog says so rather than
+ * reporting a grant, and the id is dropped then, so sending again moves the
+ * credit.
  */
 const unconfirmed = new Map<string, string | undefined>();
 
