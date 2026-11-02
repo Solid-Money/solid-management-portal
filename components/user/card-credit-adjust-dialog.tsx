@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,10 +61,11 @@ export default function CardCreditAdjustDialog({
 }: CardCreditAdjustDialogProps) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  // Kept across retries of the same grant, so one that landed before its
-  // response was lost is not granted again; a new amount or reason is a new
-  // grant and gets a new id.
-  const [requestId, setRequestId] = useState(newRequestId);
+  // One id per distinct grant sent from this dialog — the amount as a number
+  // and the trimmed reason, which is what reaches the server. A retry of a
+  // grant whose response was lost, or an edit that comes back to it ("10" vs
+  // "10.00", a trailing space), reuses its id and so cannot grant twice.
+  const requestIds = useRef(new Map<string, string | undefined>());
   const mutation = useAdjustCardCredit(userId, mode);
 
   const isGrant = mode === "grant";
@@ -99,13 +100,18 @@ export default function CardCreditAdjustDialog({
     if (!next) {
       setAmount("");
       setReason("");
-      setRequestId(newRequestId());
+      requestIds.current.clear();
     }
     onOpenChange(next);
   };
 
   const submit = () => {
     if (!canSubmit) return;
+    const grantKey = `${parsed}\n${trimmedReason}`;
+    if (!requestIds.current.has(grantKey)) {
+      requestIds.current.set(grantKey, newRequestId());
+    }
+    const requestId = requestIds.current.get(grantKey);
     mutation.mutate(
       {
         amountUsd: parsed,
@@ -121,7 +127,7 @@ export default function CardCreditAdjustDialog({
           );
           setAmount("");
           setReason("");
-          setRequestId(newRequestId());
+          requestIds.current.clear();
           onOpenChange(false);
         },
         // The API layer already toasts the server's reason; keep the dialog
@@ -168,10 +174,7 @@ export default function CardCreditAdjustDialog({
             max={max}
             step="0.01"
             value={amount}
-            onChange={(event) => {
-              setAmount(event.target.value);
-              setRequestId(newRequestId());
-            }}
+            onChange={(event) => setAmount(event.target.value)}
             placeholder={isGrant ? "e.g. 10" : formatUsd(availableUsd)}
             disabled={mutation.isPending}
             aria-invalid={!!amountError}
@@ -192,10 +195,7 @@ export default function CardCreditAdjustDialog({
           <Textarea
             id="card-credit-reason"
             value={reason}
-            onChange={(event) => {
-              setReason(event.target.value);
-              setRequestId(newRequestId());
-            }}
+            onChange={(event) => setReason(event.target.value)}
             maxLength={MAX_REASON_LENGTH}
             placeholder={
               isGrant

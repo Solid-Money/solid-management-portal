@@ -17,6 +17,7 @@ import { Panel } from "@/components/analytics/panel";
 import { NotAvailableYet } from "@/components/referral-v4/not-available";
 import { useReferralV4Analytics } from "@/hooks/use-analytics";
 import { useReferralV4Config } from "@/hooks/use-referral-v4";
+import { ANALYTICS_REFRESH_INTERVALS } from "@/types/analytics";
 import {
   formatUtc,
   isNotAvailable,
@@ -35,7 +36,10 @@ import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
  */
 export function RewardsReferralsV4View() {
   const { data, isLoading, error } = useReferralV4Analytics();
-  const { data: config } = useReferralV4Config();
+  // Polled with the analytics, so "Paused" follows another admin resuming.
+  const { data: config } = useReferralV4Config({
+    refetchInterval: ANALYTICS_REFRESH_INTERVALS.referralsV4,
+  });
 
   if (error && isNotAvailable(error)) {
     return <NotAvailableYet what="Referral v4 analytics" className="p-4" />;
