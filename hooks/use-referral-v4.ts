@@ -61,7 +61,10 @@ export function useReferralV4Access() {
  * sends no `referralV4` section at all. Callers fall back to wording that
  * names no number while this loads.
  */
-export function useReferralV4Config() {
+export function useReferralV4Config(options?: {
+  /** Re-read on this interval, for a page that shows live state (paused). */
+  refetchInterval?: number;
+}) {
   const { user } = useAuth();
   return useQuery({
     queryKey: REFERRAL_V4_KEYS.config,
@@ -72,6 +75,7 @@ export function useReferralV4Config() {
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
+    refetchInterval: options?.refetchInterval,
     retry: referralV4Retry,
   });
 }
