@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/components/auth-provider";
 import { REFERRAL_V4_DEFAULTS } from "@/hooks/use-config-editor";
+import { confirmCardCreditRequest } from "@/lib/card-credit-requests";
 import {
   cancelReferralV4Reward,
   createReferralBoost,
@@ -102,7 +103,10 @@ export function useAdjustCardCredit(
       mode === "grant"
         ? grantUserCardCredit(userId, body)
         : removeUserCardCredit(userId, body),
-    onSuccess: (data: AdminCardCredit) => {
+    // Here rather than in the dialog's `mutate` callbacks: this runs even when
+    // the dialog unmounted while the request was in flight.
+    onSuccess: (data: AdminCardCredit, body: CardCreditAdjustment) => {
+      confirmCardCreditRequest(body.requestId);
       if (data?.account) {
         queryClient.setQueryData(REFERRAL_V4_KEYS.userCardCredit(userId), data);
       } else {
