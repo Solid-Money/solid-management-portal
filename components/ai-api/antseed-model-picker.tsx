@@ -55,19 +55,24 @@ export function AntseedModelPicker({
   const [multiple, setMultiple] = useState(DEFAULT_MULTIPLE);
   const [setPrices, setSetPrices] = useState(true);
 
+  // Only models a seller prices: the backend leaves out the rest, and the rows
+  // below read the cheapest offer, so none must slip through without one.
+  const priced = useMemo(
+    () => (data?.models ?? []).filter((model) => model.offers.length > 0),
+    [data],
+  );
+
   const models = useMemo(() => {
     const wanted = search.trim().toLowerCase();
-    const all = data?.models ?? [];
-    if (!wanted) return all;
-    return all.filter((model) =>
+    if (!wanted) return priced;
+    return priced.filter((model) =>
       [model.id, model.name, ...model.aliases].some((name) =>
         name.toLowerCase().includes(wanted),
       ),
     );
-  }, [data, search]);
+  }, [priced, search]);
 
-  const selected =
-    data?.models.find((model) => model.id === selectedId) ?? null;
+  const selected = priced.find((model) => model.id === selectedId) ?? null;
   const offer: AiApiUpstreamOffer | null = selected
     ? ((seller === CHEAPEST
         ? selected.offers[0]
@@ -171,7 +176,7 @@ export function AntseedModelPicker({
             </p>
           ) : models.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-gray-500">
-              {data?.models.length
+              {priced.length
                 ? "No model matches."
                 : "The gateway lists no priced text models."}
             </p>
