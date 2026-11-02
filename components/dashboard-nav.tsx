@@ -272,7 +272,7 @@ export default function DashboardNav() {
         <div className="mx-auto flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <MobileNav pathname={pathname} groups={groups} supportBadge={supportBadge} />
 
-          <Link href="/users" className="shrink-0 text-xl font-bold text-indigo-600">
+          <Link href="/overview" className="shrink-0 text-xl font-bold text-indigo-600">
             Solid Admin
           </Link>
 

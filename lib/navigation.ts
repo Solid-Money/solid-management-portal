@@ -4,6 +4,7 @@ import {
   BarChart2,
   Headphones,
   Inbox,
+  LayoutDashboard,
   Settings2,
   ArrowRightLeft,
   BarChart3,
@@ -67,6 +68,11 @@ export interface NavGroup {
  * of the two moves real money out of their accounts.
  */
 export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Overview",
+    icon: LayoutDashboard,
+    href: "/overview",
+  },
   {
     label: "Users",
     icon: Users,
