@@ -21,6 +21,7 @@ import type {
 } from "@/types/radar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ReasonDialog } from "@/components/overview/reason-dialog";
+import { NoticePanel } from "@/components/overview/notice-panel";
 
 const FLOW_NAMES: Record<RadarFlow, string> = {
   send: "Send",
@@ -124,14 +125,40 @@ function Detail({
           {badge.label}
           {item.level === "incident" && live ? " · LIVE" : ""}
         </span>
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-[3px] text-[12px] font-medium",
-            TONE_CLASSES[status.tone],
-          )}
-        >
-          {status.label}
-        </span>
+        {item.status === "in_solid" && item.slackThreadTs ? null : (
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-[3px] text-[12px] font-medium",
+              TONE_CLASSES[status.tone],
+            )}
+          >
+            {status.label}
+          </span>
+        )}
+        {item.slackThreadTs ? (
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-[3px] text-[12px] font-medium",
+              TONE_CLASSES.purple,
+            )}
+          >
+            In #solid since{" "}
+            {(
+              item.timeline.find((t) => t.kind === "slack")?.at ??
+              item.firstSeenAt
+            ).slice(11, 16)}
+          </span>
+        ) : null}
+        {item.noticeDraft?.status === "pending" ? (
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-[3px] text-[12px] font-medium",
+              TONE_CLASSES.orange,
+            )}
+          >
+            App notice waiting for approval
+          </span>
+        ) : null}
         <span className="rounded-[4px] bg-[#f4f5f8] px-1.5 text-[11px] font-medium text-gray-500">
           {item.tag}
         </span>
@@ -273,6 +300,8 @@ function Detail({
           </ol>
         </div>
       </div>
+
+      <NoticePanel item={item} />
 
       {!resolved ? (
         <div className="mt-5 flex flex-wrap gap-2 border-t border-[#eef0f4] pt-4">
