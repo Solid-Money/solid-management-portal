@@ -356,8 +356,8 @@ export interface CardCreditAdjustment {
   amountUsd: number;
   reason: string;
   /**
-   * Grants only: one UUID per grant the admin submits. Sending the same one
-   * again — a double click, a retry after a timeout — grants once.
+   * One UUID per grant or removal the admin submits. Sending the same one
+   * again — a double click, a retry after a timeout — moves the credit once.
    */
   requestId?: string;
 }
