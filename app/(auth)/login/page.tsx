@@ -94,7 +94,8 @@ export default function LoginPage() {
           </button>
           
           <p className="mt-4 text-center text-xs text-gray-500">
-            Access is restricted to authorized workspace members only
+            Access is restricted to admin team members with a rank. Ask a
+            rank 1 admin to add you if you can&apos;t get in.
           </p>
         </div>
       </div>

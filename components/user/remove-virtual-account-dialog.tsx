@@ -6,6 +6,10 @@ import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { getVirtualAccountRemoval, removeVirtualAccountData } from "@/lib/api";
+import { isApprovalPending } from "@/lib/admin-access";
+import ApprovalKey, {
+  ApprovalNotice,
+} from "@/components/admin-access/approval-key";
 import { cn } from "@/lib/utils";
 import {
   VirtualAccountProvider,
@@ -98,6 +102,8 @@ function factsFor(
  * the username has to be typed back and the reason is required. Refused
  * attempts are audited too.
  */
+const ACTION = "POST /users/:id/virtual-account/remove";
+
 export default function RemoveVirtualAccountDialog({
   userId,
   username,
@@ -157,7 +163,13 @@ export default function RemoveVirtualAccountDialog({
       void queryClient.invalidateQueries({ queryKey: ["user-card", userId] });
       void queryClient.invalidateQueries({ queryKey: ["user", userId] });
     },
-    onError: () => {
+    onError: (error) => {
+      // Sent for approval instead: nothing more to do here.
+      if (isApprovalPending(error)) {
+        reset();
+        setOpen(false);
+        return;
+      }
       // The API layer already surfaces the server's message as a toast; this
       // only keeps the dialog open so the admin can read it and retry.
       void queryClient.invalidateQueries({
@@ -188,6 +200,7 @@ export default function RemoveVirtualAccountDialog({
       >
         <Trash2 className="h-4 w-4" />
         Remove VA data
+        <ApprovalKey action={ACTION} />
       </Button>
 
       <Dialog
@@ -326,6 +339,8 @@ export default function RemoveVirtualAccountDialog({
             />
           </div>
 
+          <ApprovalNotice action={ACTION} />
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -346,6 +361,7 @@ export default function RemoveVirtualAccountDialog({
               )}
               Remove {provider === "wirex" ? "Wirex" : provider === "rain" ? "Rain" : ""}{" "}
               data
+              <ApprovalKey action={ACTION} className="text-current" />
             </Button>
           </DialogFooter>
         </DialogContent>

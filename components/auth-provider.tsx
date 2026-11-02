@@ -5,19 +5,47 @@ import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { validateUserDomain, getAllowedDomain } from '@/lib/auth';
+import { describeApiError, getAdminAccessMe } from '@/lib/api';
+import type { AdminAccessMe } from '@/types/admin-access';
 import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
+  /**
+   * The signed-in admin's rank. Null while unknown — the backend still checks
+   * it on every call, so the UI only uses it to decide what to offer.
+   */
+  access: AdminAccessMe | null;
   loading: boolean;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  access: null,
   loading: true,
   signOut: async () => {},
 });
+
+/**
+ * Whether this admin may use the portal: a company account is not enough, it
+ * also needs a rank on the admin team. `denied` only on the backend's 403 —
+ * an outage lets the admin in, since every call is checked server-side anyway.
+ */
+async function checkAdminAccess(): Promise<
+  { denied: false; me: AdminAccessMe | null } | { denied: true; message: string }
+> {
+  try {
+    return { denied: false, me: (await getAdminAccessMe()).data.data };
+  } catch (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    if (status === 403) {
+      return { denied: true, message: describeApiError(error) };
+    }
+    console.error('[AuthProvider] Could not check admin access:', error);
+    return { denied: false, me: null };
+  }
+}
 
 export const useAuth = () => useContext(AuthContext);
 
@@ -51,6 +79,7 @@ function takeReturn(): string | null {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [access, setAccess] = useState<AdminAccessMe | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const routerRef = useRef(router);
@@ -85,7 +114,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[AuthProvider] Domain validation result:', isValid);
         
         if (isValid) {
+          // Only the ranked admin team gets in. Checked before the user is
+          // set, so an account without a rank never sees the dashboard.
+          const checked = await checkAdminAccess();
+          if (checked.denied) {
+            console.warn(
+              `[AuthProvider] ${firebaseUser.email} has no admin rank; signing out`
+            );
+            await signOut(auth);
+            setUser(null);
+            setAccess(null);
+            toast.error(checked.message, { id: 'no-admin-rank', duration: 10000 });
+            routerRef.current.push('/login');
+            setLoading(false);
+            return;
+          }
+
           console.log('[AuthProvider] User domain is valid, setting user');
+          setAccess(checked.me);
           setUser(firebaseUser);
           
           // Redirect away from login if already authenticated
@@ -118,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         console.log('[AuthProvider] No user signed in');
         setUser(null);
+        setAccess(null);
         // Redirect to login if trying to access protected routes
         const currentPath = window.location.pathname;
         console.log('[AuthProvider] Current path:', currentPath);
@@ -153,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut: handleSignOut }}>
+    <AuthContext.Provider value={{ user, access, loading, signOut: handleSignOut }}>
       {children}
     </AuthContext.Provider>
   );
