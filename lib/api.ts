@@ -44,6 +44,7 @@ import {
   SetTransactionCashbackPercentageResult,
   SetUserCashbackPercentageResult,
   ReevaluateFailedCashbackResult,
+  ActivityResyncResult,
   BulkReevaluateFailedCashbackResult,
   PartialRefundRestoreResult,
   PartialRefundVoidedList,
@@ -480,6 +481,18 @@ export const revokeUserTierTrial = (
 export const reevaluateFailedCashback = (userId: string, reason?: string) =>
   api.post<{ data: ReevaluateFailedCashbackResult }>(
     `/admin/v1/users/${userId}/cashback/reevaluate`,
+    { reason: reason || undefined },
+  );
+
+/**
+ * Re-read this user's on-chain activity on every chain, for "a transfer is
+ * missing from my history". The app's sync only reads what is new since its
+ * last run; this clears how far it got and reads the newest transfers again.
+ * Only adds rows that are missing; safe to repeat. Audited.
+ */
+export const resyncUserActivity = (userId: string, reason?: string) =>
+  api.post<{ data: ActivityResyncResult }>(
+    `/admin/v1/users/${userId}/activity/resync`,
     { reason: reason || undefined },
   );
 
