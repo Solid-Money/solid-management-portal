@@ -114,6 +114,16 @@ export function useAdjustCardCredit(
         queryKey: ["user-audit-log", userId],
       });
     },
+    // A failure may still have moved the credit (only the response was lost),
+    // so show the account as it now stands before the admin tries again.
+    onError: () => {
+      void queryClient.invalidateQueries({
+        queryKey: REFERRAL_V4_KEYS.userCardCredit(userId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["user-audit-log", userId],
+      });
+    },
   });
 }
 
