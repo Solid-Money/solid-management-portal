@@ -23,6 +23,26 @@ import { Textarea } from "@/components/ui/textarea";
 export const MAX_CARD_CREDIT_GRANT_USD = 500;
 const MAX_REASON_LENGTH = 500;
 
+/**
+ * The id that makes a grant or removal happen once, however often it is sent.
+ * None where the browser can't make a UUID: it then goes without one, as
+ * before.
+ */
+const newRequestId = (): string | undefined =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : undefined;
+
+/**
+ * The id of every submission not yet confirmed by the server, by user, mode,
+ * amount and trimmed reason — what reaches the server. Kept outside the dialog,
+ * which unmounts on close: an admin whose grant went through but whose
+ * response was lost can close it, reopen it, send the same thing again and
+ * still move the credit only once. An entry is dropped once the server
+ * confirms that submission.
+ */
+const unconfirmedRequestIds = new Map<string, string | undefined>();
+
 interface CardCreditAdjustDialogProps {
   userId: string;
   username: string;
@@ -92,8 +112,20 @@ export default function CardCreditAdjustDialog({
 
   const submit = () => {
     if (!canSubmit) return;
+    // A retry of a submission whose response was lost — from this dialog or a
+    // reopened one, or after an edit that comes back to it ("10" vs "10.00", a
+    // trailing space) — reuses its id, so it cannot move credit twice.
+    const submissionKey = `${userId}\n${mode}\n${parsed}\n${trimmedReason}`;
+    if (!unconfirmedRequestIds.has(submissionKey)) {
+      unconfirmedRequestIds.set(submissionKey, newRequestId());
+    }
+    const requestId = unconfirmedRequestIds.get(submissionKey);
     mutation.mutate(
-      { amountUsd: parsed, reason: trimmedReason },
+      {
+        amountUsd: parsed,
+        reason: trimmedReason,
+        ...(requestId && { requestId }),
+      },
       {
         onSuccess: () => {
           toast.success(
@@ -101,6 +133,7 @@ export default function CardCreditAdjustDialog({
               ? `Granted ${formatUsd(parsed)} card credit to ${username}`
               : `Removed ${formatUsd(parsed)} card credit from ${username}`,
           );
+          unconfirmedRequestIds.delete(submissionKey);
           setAmount("");
           setReason("");
           onOpenChange(false);

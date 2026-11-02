@@ -355,6 +355,11 @@ export interface AdminCardCredit {
 export interface CardCreditAdjustment {
   amountUsd: number;
   reason: string;
+  /**
+   * One UUID per grant or removal the admin submits. Sending the same one
+   * again — a double click, a retry after a timeout — moves the credit once.
+   */
+  requestId?: string;
 }
 
 // ---------------------------------------------------------------------------
