@@ -116,6 +116,12 @@ export function footerLine(
   return parts.join(" · ");
 }
 
+/** The first sentence of an item's description, for its row; the view shows it all. */
+export function aboutSummary(about: string): string {
+  const end = about.search(/[.!?](\s|$)/);
+  return end === -1 ? about : about.slice(0, end + 1);
+}
+
 /** "1 h 38 min", "12 min", "2 days" */
 export function elapsed(fromIso: string, toIso: string): string {
   const minutes = Math.max(

@@ -186,6 +186,11 @@ function Detail({
             ? " · still happening"
             : " · no new errors since " + item.lastSeenAt.slice(11, 16)}
       </p>
+      {item.about ? (
+        <p className="mt-3 rounded-md bg-[#f7f8fa] px-3 py-2 text-[13px] leading-relaxed text-gray-700">
+          {item.about}
+        </p>
+      ) : null}
 
       <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
         <div>

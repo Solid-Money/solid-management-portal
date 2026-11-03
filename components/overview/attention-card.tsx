@@ -17,6 +17,7 @@ import { useAttention, useAttentionAction } from "@/hooks/use-attention";
 import { describeApiError } from "@/lib/api";
 import {
   TONE_CLASSES,
+  aboutSummary,
   footerLine,
   levelBadge,
   statusPill,
@@ -120,14 +121,17 @@ export function AttentionCard() {
 
       {data && (!nothing || resolved.length > 0) ? (
         <>
-          <div className="mt-3 flex gap-1 overflow-x-auto border-b border-[#eef0f4]">
+          {/* Scrolls sideways on a narrow screen, with no scrollbar drawn. The
+              baseline is an inset shadow so the active tab's border covers it
+              without hanging below the row, which made a vertical scrollbar. */}
+          <div className="mt-3 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_#eef0f4] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {RADAR_TABS.map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
                 className={cn(
-                  "-mb-px inline-flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-[13px] whitespace-nowrap",
+                  "inline-flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-[13px] whitespace-nowrap",
                   tab === t
                     ? "border-gray-900 font-medium text-gray-900"
                     : "border-transparent text-gray-500 hover:text-gray-800",
@@ -281,6 +285,14 @@ function Row({
         <span className="mt-0.5 block truncate text-[12px] text-gray-500">
           {item.metaLine}
         </span>
+        {item.about ? (
+          <span
+            className="mt-0.5 block truncate text-[12px] text-gray-400"
+            title={item.about}
+          >
+            {aboutSummary(item.about)}
+          </span>
+        ) : null}
       </button>
 
       <span className="col-start-2 md:col-start-auto">

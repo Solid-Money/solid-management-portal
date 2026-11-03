@@ -154,6 +154,8 @@ export interface AttentionItemView {
   title: string;
   /** One line of numbers under the title. */
   metaLine: string;
+  /** What the finding means and what to check, in plain words. */
+  about: string;
   /** The short tag beside the title ("Security", "Abuse", …). */
   tag: string;
   flows: RadarFlow[];
