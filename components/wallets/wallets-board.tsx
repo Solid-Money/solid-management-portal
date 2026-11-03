@@ -741,7 +741,11 @@ function WalletCard({
                            number qualifies the floor, never the runway. */
                         <FloorNote
                           refill={refill}
-                          threshold={reading.threshold}
+                          threshold={
+                            plan?.threshold ??
+                            assetFlow?.threshold ??
+                            reading.threshold
+                          }
                           overridden={plan?.thresholdSource === "override"}
                           costPerDay={
                             plan?.realCostPerDay ?? assetFlow?.realCostPerDay
@@ -980,7 +984,7 @@ function FloorNote({
     costPerDay != null ? formatAmount(costPerDay * refill.floorDays) : null;
   const title =
     refill.floorBasis === "minimum"
-      ? `The floor is the ${formatAmount(threshold)} minimum set on this asset.${
+      ? `The floor is the ${formatAmount(refill.floorAmount)} minimum set on this asset.${
           daysFloor
             ? ` ${refill.floorDays} days at the measured cost would only be ${daysFloor}.`
             : ""
