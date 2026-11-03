@@ -37,6 +37,11 @@ export default function ResyncActivityDialog({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
+    // Offline, the default ("online") pauses the mutation as pending: the
+    // dialog could not be closed, and the re-sync would fire by itself once
+    // the connection came back. "always" sends it now, so an offline press
+    // fails at once with the API layer's network-error toast instead.
+    networkMode: "always",
     mutationFn: async () =>
       (await resyncUserActivity(userId, reason.trim())).data.data,
     onSuccess: (data) => {
@@ -182,7 +187,7 @@ function ResyncOutcome({
             ? `${result.synced} transfer${result.synced === 1 ? "" : "s"} read${
                 failed
                   ? "; transfers on the chains that could not be read may still be missing."
-                  : "; any that were missing are now in the activity tab."
+                  : "; any of them that were missing have been added."
               }`
             : failed
               ? // A chain that failed has an unknown history, not an empty one.
