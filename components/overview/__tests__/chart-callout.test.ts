@@ -26,4 +26,15 @@ describe("placeCallouts", () => {
     const placed = placeCallouts([item("first", 12), item("second", 14), item("third", 10)], 30);
     expect(placed.map((c) => c.key)).toEqual(["first", "second"]);
   });
+
+  it("moves a label down when its box would overlap on a narrow plot", () => {
+    const text = "Oct 27 · $12.4K · best day since Oct 12";
+    const at = (key: string, index: number) => ({ key, date: key, text, index });
+    // A phone-width plot: bars 2 and 20 of 30 are far apart by count, not by pixels.
+    const narrow = placeCallouts([at("a", 2), at("b", 20)], 30, 320);
+    expect(narrow.map((c) => c.row)).toEqual([0, 1]);
+    // A desktop plot has room for both on the first row.
+    const wide = placeCallouts([at("a", 2), at("b", 20)], 30, 900);
+    expect(wide.map((c) => c.row)).toEqual([0, 0]);
+  });
 });
