@@ -85,12 +85,19 @@ export default function SuspendAccountDialog({
   const trimmedReason = reason.trim();
 
   // The same query the page runs for its card panel, so this is usually a cache hit.
-  const { data: card } = useQuery<{ data: UserCardOverview }>({
+  const {
+    data: card,
+    isLoading: cardLoading,
+    isError: cardCheckFailed,
+  } = useQuery<{ data: UserCardOverview }>({
     queryKey: ["user-card", userId],
     queryFn: async () => (await getUserCard(userId)).data,
     enabled: open && suspending,
   });
   const canFreezeCard = Boolean(card?.data?.hasCard && !card.data.frozen);
+  // Until the card is known, submitting would skip the freeze without anyone
+  // deciding to: the checkbox only appears once there is a card to freeze.
+  const checkingCard = suspending && cardLoading;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["user", userId] });
@@ -293,6 +300,14 @@ export default function SuspendAccountDialog({
             </div>
           )}
 
+          {suspending && cardCheckFailed && !canFreezeCard && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Could not check whether they have a card, so it will not be
+              frozen with the suspension. If they have one, freeze it from the
+              Card panel.
+            </p>
+          )}
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -305,13 +320,17 @@ export default function SuspendAccountDialog({
             <Button
               variant={suspending ? "destructive" : "default"}
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !trimmedReason}
+              disabled={mutation.isPending || !trimmedReason || checkingCard}
               className="cursor-pointer"
             >
-              {mutation.isPending && (
+              {(mutation.isPending || checkingCard) && (
                 <Loader2 className="h-4 w-4 animate-spin" />
               )}
-              {suspending ? "Suspend account" : "Lift suspension"}
+              {checkingCard
+                ? "Checking card…"
+                : suspending
+                  ? "Suspend account"
+                  : "Lift suspension"}
             </Button>
           </DialogFooter>
         </DialogContent>
