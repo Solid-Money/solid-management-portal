@@ -56,14 +56,19 @@ export function AttentionDetail({
   id: string | null;
   onClose: () => void;
 }) {
-  const { data: item, isLoading } = useAttentionItem(id);
+  const { data: item, isLoading, error } = useAttentionItem(id);
   return (
     <Dialog open={id !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogTitle className="sr-only">
           {item?.title ?? "Attention item"}
         </DialogTitle>
-        {isLoading || !item ? (
+        {!item && error ? (
+          // Resolved or expired since the list loaded, or the read failed.
+          <p className="py-8 text-center text-[13px] text-red-700">
+            Could not load this item: {describeApiError(error)}.
+          </p>
+        ) : isLoading || !item ? (
           <p className="py-8 text-center text-[13px] text-gray-400">Loading…</p>
         ) : (
           <Detail item={item} onDone={onClose} />

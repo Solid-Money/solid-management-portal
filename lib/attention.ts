@@ -56,8 +56,14 @@ const STATUS: Record<RadarStatus, { label: string; tone: Tone }> = {
   resolved: { label: "Resolved", tone: "green" },
 };
 
+/** A status this mirror does not know yet reads as its own words, in grey. */
 export function statusPill(status: RadarStatus): { label: string; tone: Tone } {
-  return STATUS[status];
+  return STATUS[status] ?? { label: humanize(String(status)), tone: "gray" };
+}
+
+function humanize(value: string): string {
+  const words = value.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** "No live incidents", "5 new", "1 to check", "1 watching" — only what is non-zero, bar the first. */

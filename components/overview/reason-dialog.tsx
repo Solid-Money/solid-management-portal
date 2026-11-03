@@ -31,6 +31,14 @@ export function ReasonDialog({
   const [reason, setReason] = useState("");
   const valid = reason.trim().length >= 3;
 
+  // Cleared when the dialog closes, not on confirm: a failed action leaves it
+  // open with the reason still there to retry.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setReason("");
+  }
+
   return (
     <Dialog
       open={open}
@@ -75,10 +83,7 @@ export function ReasonDialog({
           <button
             type="button"
             disabled={!valid || pending}
-            onClick={() => {
-              onConfirm(reason.trim());
-              setReason("");
-            }}
+            onClick={() => onConfirm(reason.trim())}
             className="rounded-md bg-gray-900 px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-40"
           >
             {confirmLabel}

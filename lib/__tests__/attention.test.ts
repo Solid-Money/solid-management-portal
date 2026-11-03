@@ -6,7 +6,7 @@ import {
   statusPill,
   summaryPills,
 } from "@/lib/attention";
-import type { AttentionItemView } from "@/types/radar";
+import type { AttentionItemView, RadarStatus } from "@/types/radar";
 
 const item = (over: Partial<AttentionItemView>): AttentionItemView =>
   ({
@@ -39,6 +39,10 @@ describe("attention card rules", () => {
   it("names statuses as the design does", () => {
     expect(statusPill("in_solid").label).toBe("In #solid");
     expect(statusPill("needs_check").label).toBe("Needs a check");
+  });
+
+  it("shows a status it does not know yet instead of throwing", () => {
+    expect(statusPill("on_hold" as RadarStatus)).toEqual({ label: "On hold", tone: "gray" });
   });
 
   it("shows the summary pills that matter", () => {
