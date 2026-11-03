@@ -833,7 +833,13 @@ export interface WalletFailuresResponse {
 export interface WalletRefillPlan {
   floorDays: number;
   targetDays: number;
+  /** Days of cover at the measured cost, or the threshold override where higher. */
   floorAmount: number;
+  /**
+   * Which of the two set `floorAmount`. Absent from a backend that predates
+   * overrides being minimums, which only ever used days.
+   */
+  floorBasis?: "days" | "minimum";
   targetAmount: number;
   /** What to actually send now. Zero when the balance already covers it. */
   refillAmount: number;

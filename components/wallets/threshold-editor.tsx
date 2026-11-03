@@ -74,8 +74,8 @@ export default function ThresholdEditor({
                 plan.thresholdUpdatedAt
                   ? ` on ${new Date(plan.thresholdUpdatedAt).toLocaleDateString()}`
                   : ""
-              }. Click to change.`
-            : "The configured default. Click to change."
+              }. Held as a minimum: the floor never goes below it. Click to change.`
+            : "The configured default, used only until a cost is measured. A value set here is held as a minimum floor. Click to change."
         }
       >
         <Pencil className="h-3 w-3" />
