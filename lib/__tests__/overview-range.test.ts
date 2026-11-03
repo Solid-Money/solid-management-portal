@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isLatestWeek,
   matchPreset,
   parseRange,
   presetRange,
@@ -93,5 +94,15 @@ describe("labels", () => {
     expect(rangeError("2025-01-01", "2026-11-01", TODAY)).toMatch(/365/);
     expect(rangeError("2025-11-02", "2026-11-01", TODAY)).toBeNull();
     expect(matchPreset("2026-11-02", "2026-11-02", TODAY)).toBe("today");
+  });
+});
+
+describe("isLatestWeek", () => {
+  it("is true only for the seven days ending yesterday or today", () => {
+    // Last 7 days: ends yesterday, and the charts run to today.
+    expect(isLatestWeek({ days: 7, chartTo: TODAY, today: TODAY })).toBe(true);
+    // Any other seven days, such as a week last year.
+    expect(isLatestWeek({ days: 7, chartTo: "2025-01-07", today: TODAY })).toBe(false);
+    expect(isLatestWeek({ days: 30, chartTo: TODAY, today: TODAY })).toBe(false);
   });
 });

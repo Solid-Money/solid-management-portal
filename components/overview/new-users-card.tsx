@@ -1,7 +1,7 @@
 "use client";
 
 import { formatCount, formatRatio } from "@/lib/overview-format";
-import { spanLabel } from "@/lib/overview-range";
+import { isLatestWeek, spanLabel } from "@/lib/overview-range";
 import type { OverviewFunnelSteps, OverviewResponse } from "@/types/overview";
 import {
   ArrowLink,
@@ -25,8 +25,9 @@ export function NewUsersCard({
 }) {
   const { range, newUsers } = data;
   const { current, previous, biggestDrop } = newUsers;
-  const period = range.days === 7 ? "this week" : "in this range";
-  const previousLabel = range.days === 7 ? "Last week’s sign-ups" : "Previous period’s sign-ups";
+  const thisWeek = isLatestWeek(range);
+  const period = thisWeek ? "this week" : "in this range";
+  const previousLabel = thisWeek ? "Last week’s sign-ups" : "Previous period’s sign-ups";
 
   const steps: Array<{
     key: keyof OverviewFunnelSteps;
@@ -133,11 +134,11 @@ function DropInsight({
   );
 }
 
-/** 0.75 → "3 in 4", 0.5 → "1 in 2"; plain percent when no small fraction fits. */
+/** 0.75 → "3 in 4", 0.5 → "1 in 2"; "43% of" when no small fraction fits. */
 function fractionWords(share: number): string {
   for (const d of [2, 3, 4, 5, 10]) {
     const n = Math.round(share * d);
     if (n > 0 && n < d && Math.abs(n / d - share) < 0.03) return `${n} in ${d}`;
   }
-  return formatRatio(share);
+  return `${formatRatio(share)} of`;
 }

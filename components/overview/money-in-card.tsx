@@ -124,7 +124,8 @@ export function MoneyInCard({
         <MethodChip
           label="All"
           usd={moneyIn.total.current}
-          active={selected === "all"}
+          // From what is drawn: a picked method that left the data shows all.
+          active={picked === null}
           onClick={() => setSelected("all")}
         />
         {methods.map((m) => (
