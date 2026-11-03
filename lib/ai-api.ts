@@ -4,6 +4,8 @@ import type {
   AiApiChargeStatus,
   AiApiKeyStatus,
   AiApiPauseReason,
+  AiApiUpstreamModel,
+  AiApiUpstreamOffer,
 } from "@/types/ai-api";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "muted";
@@ -61,3 +63,54 @@ export const formatDay = (day: string): string =>
     day: "numeric",
     timeZone: "UTC",
   });
+
+/**
+ * What AntSeed charges for a gateway model as entered in the table: the
+ * pinned seller's offer for `<peerId>@<serviceId>`, otherwise the cheapest
+ * seller's, which is where the gateway routes a request that names only a
+ * model. Null when the catalog doesn't list it.
+ */
+export function antseedOfferFor(
+  models: AiApiUpstreamModel[] | undefined,
+  upstreamModel: string,
+): AiApiUpstreamOffer | null {
+  const wanted = upstreamModel.trim().toLowerCase();
+  if (!models || !wanted) return null;
+
+  const at = wanted.indexOf("@");
+  if (at > 0) {
+    const peerId = wanted.slice(0, at);
+    const serviceId = wanted.slice(at + 1);
+    for (const model of models) {
+      const offer = model.offers.find(
+        (candidate) =>
+          candidate.peerId.toLowerCase() === peerId &&
+          candidate.serviceId.toLowerCase() === serviceId,
+      );
+      if (offer) return offer;
+    }
+    return null;
+  }
+
+  const model = models.find(
+    (candidate) =>
+      candidate.id.toLowerCase() === wanted ||
+      candidate.aliases.some((alias) => alias.toLowerCase() === wanted),
+  );
+  return model?.offers[0] ?? null;
+}
+
+/** A rate times a multiple, as a price to type: no float noise, at most 6 decimals. */
+export const scaledPrice = (rate: number, multiple: number): string =>
+  String(Number((rate * multiple).toFixed(6)));
+
+/** How many times AntSeed's rate a typed price is, as `4.0×`; null when it can't be said. */
+export function priceMultiple(price: string, rate: number): string | null {
+  const value = Number(price);
+  if (price.trim() === "" || !Number.isFinite(value) || rate <= 0) return null;
+  return `${(value / rate).toFixed(1)}×`;
+}
+
+/** A per-million-token rate: `$2.40`, `$0.0003`. */
+export const formatRate = (usd: number): string =>
+  usd >= 1 ? `$${usd.toFixed(2)}` : `$${Number(usd.toPrecision(3))}`;

@@ -15,6 +15,7 @@ import type {
   AiApiKeyAction,
   AiApiSettings,
   AiApiSettingsPatch,
+  AiApiUpstreamCatalog,
 } from "@/types/ai-api";
 
 export const AI_API_KEYS = {
@@ -25,6 +26,7 @@ export const AI_API_KEYS = {
     ["ai-api", "users", search, page] as const,
   user: (userId: string) => ["ai-api", "user", userId] as const,
   settings: ["ai-api", "settings"] as const,
+  upstreamModels: ["ai-api", "upstream-models"] as const,
 };
 
 export function useAiApiOverview(range: { from?: string; to?: string }) {
@@ -71,6 +73,21 @@ export function useAiApiSettings() {
   return useQuery<{ data: AiApiSettings; canEdit: boolean }>({
     queryKey: AI_API_KEYS.settings,
     queryFn: async () => (await api.get("/admin/v1/ai-api/settings")).data,
+  });
+}
+
+/**
+ * AntSeed's models with their gateway ids and seller rates. Only read once an
+ * admin asks for it: it is a call to the gateway, not to our database.
+ */
+export function useAiApiUpstreamModels(enabled: boolean) {
+  return useQuery<AiApiUpstreamCatalog>({
+    queryKey: AI_API_KEYS.upstreamModels,
+    queryFn: async () =>
+      (await api.get("/admin/v1/ai-api/upstream-models")).data.data,
+    enabled,
+    staleTime: 60 * 1000,
+    retry: false,
   });
 }
 
