@@ -348,7 +348,16 @@ function Row({
           >
             {item.mainAction.label}
           </Link>
-        ) : null}
+        ) : (
+          // No page to send it to: the item view is the drill-down.
+          <button
+            type="button"
+            onClick={onOpen}
+            className="rounded-[7px] border border-[#e6e8ee] bg-white px-2.5 py-[5px] text-[12px] font-medium text-gray-800 hover:border-gray-300"
+          >
+            {item.affectedCount > 0 ? "See accounts" : "Details"}
+          </button>
+        )}
         {!resolved && onAssign && onSnooze && onClose ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

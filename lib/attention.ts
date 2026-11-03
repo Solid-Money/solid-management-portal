@@ -116,6 +116,16 @@ export function footerLine(
   return parts.join(" · ");
 }
 
+/** The outside wallet a cash-out pattern is about, from its signals' evidence. */
+export function walletOf(item: Pick<AttentionItemView, "signals">): string | null {
+  // An item read without signals has no wallet; it must not break the view.
+  for (const signal of item.signals ?? []) {
+    const address = (signal.evidence as { address?: unknown } | undefined)?.address;
+    if (typeof address === "string" && address) return address;
+  }
+  return null;
+}
+
 /** "1 h 38 min", "12 min", "2 days" */
 export function elapsed(fromIso: string, toIso: string): string {
   const minutes = Math.max(

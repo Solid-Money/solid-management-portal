@@ -14,6 +14,7 @@ import {
 } from "@/lib/attention";
 import { formatCount } from "@/lib/overview-format";
 import { useAttentionAction, useAttentionItem } from "@/hooks/use-attention";
+import { AttentionAccounts } from "@/components/overview/attention-accounts";
 import type {
   AttentionItemView,
   RadarFlow,
@@ -277,6 +278,8 @@ function Detail({
               ) : null}
             </div>
           ) : null}
+
+          <AttentionAccounts item={item} />
         </div>
 
         <div>
