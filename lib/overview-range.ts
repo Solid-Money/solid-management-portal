@@ -152,6 +152,14 @@ export function spanLabel(from: string, to: string, today?: string): string {
     : `${dayLabel(from, year)} – ${dayLabel(to, year)}`;
 }
 
+/**
+ * Whether the range is the latest seven days, ending yesterday or today, so
+ * "this week" is true of it. Any other seven days is just a range.
+ */
+export function isLatestWeek(range: { days: number; chartTo: string; today: string }): boolean {
+  return range.days === 7 && range.chartTo === range.today;
+}
+
 export function presetLabel(preset: OverviewPreset): string {
   return OVERVIEW_PRESETS.find((p) => p.id === preset)?.label ?? "Custom range";
 }

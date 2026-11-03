@@ -23,6 +23,7 @@ import {
   SectionHeader,
 } from "@/components/overview/overview-ui";
 import { supportHref } from "@/components/overview/overview-links";
+import { isLatestWeek } from "@/lib/overview-range";
 
 const QUEUES: Array<{ id: OverviewSupportQueue; label: string }> = [
   { id: "needs_human", label: "Need a human" },
@@ -51,7 +52,7 @@ export function SupportPulse({
       <SectionHeader
         title="Support pulse"
         subtitle={`${formatCount(support.newCases.current)} new cases ${
-          range.days === 7 ? "this week" : "in this range"
+          isLatestWeek(range) ? "this week" : "in this range"
         }${compare && newChange.text ? ` (${newChange.text})` : ""}`}
         action={<ArrowLink href={supportHref()}>Open inbox</ArrowLink>}
       />

@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { spendBars, type SpendBar } from "@/lib/overview-charts";
 import { axisUsd, compactUsd, formatCount } from "@/lib/overview-format";
-import { dayLabel, spanLabel } from "@/lib/overview-range";
+import { dayLabel, isLatestWeek, spanLabel } from "@/lib/overview-range";
 import type { OverviewResponse } from "@/types/overview";
 import {
   ArrowLink,
@@ -47,6 +47,8 @@ export function SpendChart({ data }: { data: OverviewResponse }) {
   const incidents = bars.filter((b) => b.incident).slice(-MAX_INCIDENT_LABELS);
   const updatedAt = data.generatedAt.slice(11, 16);
   const indexOf = (date: string) => bars.findIndex((b) => b.date === date);
+  // By week, the best day sits in the bar whose days cover it.
+  const bestIndex = best ? bars.findIndex((b) => b.date <= best.date && best.date <= b.until) : -1;
   const callouts = placeCallouts(
     [
       ...incidents.map((bar) => ({
@@ -55,12 +57,12 @@ export function SpendChart({ data }: { data: OverviewResponse }) {
         index: indexOf(bar.date),
         text: `${dayLabel(bar.date)} · ${compactUsd(bar.usd)} · ${bar.incident?.label ?? ""}`,
       })),
-      ...(best && indexOf(best.date) >= 0
+      ...(best && bestIndex >= 0
         ? [
             {
               key: "best",
-              date: best.date,
-              index: indexOf(best.date),
+              date: bars[bestIndex].date,
+              index: bestIndex,
               text: `${dayLabel(best.date)} · ${compactUsd(best.usd)} · ${
                 best.bestSince ? `best day since ${dayLabel(best.bestSince)}` : "best day shown"
               }`,
@@ -148,7 +150,7 @@ export function SpendChart({ data }: { data: OverviewResponse }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-gray-500">
-        <Legend color={OVERVIEW_ACCENT} label={range.days === 7 ? "This week" : spanLabel(range.from, range.to, range.today)} />
+        <Legend color={OVERVIEW_ACCENT} label={isLatestWeek(range) ? "This week" : spanLabel(range.from, range.to, range.today)} />
         <Legend color={OVERVIEW_FADED} label="Before" />
         <Legend color={OVERVIEW_INCIDENT} label="Incident day" />
         {today ? (
