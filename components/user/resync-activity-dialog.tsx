@@ -182,7 +182,10 @@ function ResyncOutcome({
             ? `${result.synced} transfer${
                 result.synced === 1 ? "" : "s"
               } read; any that were missing are now in the activity tab.`
-            : "No transfers found on any chain."}
+            : failed
+              ? // A chain that failed has an unknown history, not an empty one.
+                "No transfers found on the chains that could be read."
+              : "No transfers found on any chain."}
           {failed &&
             ` ${result.errors} chain${
               result.errors === 1 ? "" : "s"
