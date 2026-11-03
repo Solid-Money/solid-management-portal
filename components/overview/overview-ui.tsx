@@ -66,11 +66,12 @@ export function ArrowLink({ href, children }: { href: string; children: ReactNod
   );
 }
 
-export type ChipTone = "good" | "bad" | "neutral";
+export type ChipTone = "good" | "bad" | "warn" | "neutral";
 
 const CHIP_TONES: Record<ChipTone, string> = {
   good: "bg-[#e8f7ee] text-[#15803d]",
   bad: "bg-[#fdecec] text-[#b91c1c]",
+  warn: "bg-[#fef3e2] text-[#b45309]",
   neutral: "bg-[#f1f2f6] text-[#4b5563]",
 };
 

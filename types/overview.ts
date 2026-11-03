@@ -231,4 +231,79 @@ export const OVERVIEW_REFRESH_MS = 5 * 60_000;
 export const OVERVIEW_QUERY_KEYS = {
   all: ["overview"] as const,
   range: (from: string, to: string) => ["overview", from, to] as const,
+  goodCustomers: (to: string) => ["overview", "good-customers", to] as const,
 };
+
+// ---------------------------------------------------------------------------
+// Good customers tab, `GET /admin/v1/overview/good-customers`
+// ---------------------------------------------------------------------------
+
+/** The rules a person is counted by; the version goes up when one changes. */
+export interface GoodCustomersDefinition {
+  version: number;
+  windowDays: number;
+  minSpendDays: number;
+  minSpendUsd: number;
+  highValueSpendUsd: number;
+  highValueMoneyInUsd: number;
+}
+
+export interface GoodCustomersLadder {
+  cardholders: number;
+  /** Funded or spent, ever. */
+  realCustomers: number;
+  activeSpenders: number;
+  qualified: number;
+  highValue: number;
+  neverFundedOrSpent: number;
+  neverFundedTopCountry: { country: string; count: number } | null;
+}
+
+/** The window ending on `date`, inclusive. */
+export interface GoodCustomersWeek {
+  date: string;
+  activeSpenders: number;
+  qualified: number;
+}
+
+export interface GoodCustomersCohort {
+  /** `YYYY-MM` of the first card. */
+  month: string;
+  cardholders: number;
+  realCustomers: number;
+  firstPurchase: number;
+  qualified: number;
+  /** Everyone in the month has had their 30 days. */
+  complete: boolean;
+}
+
+export interface GoodCustomersRetention {
+  asOf: string;
+  qualified: { people: number; spentAgain: number };
+  otherSpenders: { people: number; spentAgain: number };
+}
+
+export interface GoodCustomersResponse {
+  /** The window's last day, inclusive. */
+  asOf: string;
+  definition: GoodCustomersDefinition;
+  ladder: GoodCustomersLadder;
+  spend: { allUsd: number; qualifiedUsd: number };
+  /** 13 snapshots, oldest first. */
+  weekly: GoodCustomersWeek[];
+  retention: GoodCustomersRetention | null;
+  /** Today's qualified people over the last `days`. */
+  economics: {
+    days: number;
+    cashbackUsd: number;
+    feesUsd: number;
+    primeUsd: number;
+    coveringOwnCashback: number;
+  };
+  allCustomers90: { cashbackUsd: number; primeUsd: number };
+  referralBar: { spendUsd: number; bunched: number } | null;
+  cohorts: GoodCustomersCohort[];
+  feeRevenueUsd90: number | null;
+  generatedAt: string;
+}
+

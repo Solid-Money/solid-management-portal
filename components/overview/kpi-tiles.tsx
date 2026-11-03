@@ -140,7 +140,8 @@ export function KpiTiles({
   );
 }
 
-function Tile({
+/** One KPI tile. With `href` the whole tile links to the rows behind it. */
+export function Tile({
   title,
   href,
   value,
@@ -149,26 +150,31 @@ function Tile({
   children,
 }: {
   title: string;
-  href: string;
+  href?: string;
   value: string;
   chip: ReactNode;
   context: string;
   children: ReactNode;
 }) {
-  return (
+  const card = (
+    <OverviewCard className="flex h-full flex-col gap-1.5 px-4 pt-4 pb-3 transition-shadow group-hover:shadow-sm">
+      <p className="text-xs font-medium text-gray-500">{title}</p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-[26px] leading-none font-semibold tracking-[-0.5px] text-gray-900">
+          {value}
+        </span>
+        {chip}
+      </div>
+      <p className="min-h-[31px] text-[11.5px] leading-[15.5px] text-gray-500">{context}</p>
+      <div className="mt-auto">{children}</div>
+    </OverviewCard>
+  );
+  return href ? (
     <Link href={href} className="group block">
-      <OverviewCard className="flex h-full flex-col gap-1.5 px-4 pt-4 pb-3 transition-shadow group-hover:shadow-sm">
-        <p className="text-xs font-medium text-gray-500">{title}</p>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[26px] leading-none font-semibold tracking-[-0.5px] text-gray-900">
-            {value}
-          </span>
-          {chip}
-        </div>
-        <p className="min-h-[31px] text-[11.5px] leading-[15.5px] text-gray-500">{context}</p>
-        <div className="mt-auto">{children}</div>
-      </OverviewCard>
+      {card}
     </Link>
+  ) : (
+    card
   );
 }
 
