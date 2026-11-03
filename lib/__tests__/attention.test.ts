@@ -95,4 +95,13 @@ describe("aboutSummary", () => {
     ).toBe("Several Solid accounts sent money to the same address outside Solid.");
     expect(aboutSummary("No full stop at all")).toBe("No full stop at all");
   });
+
+  it("does not end a sentence at an abbreviation", () => {
+    expect(aboutSummary("Check e.g. the same wallet. It is suspicious.")).toBe(
+      "Check e.g. the same wallet.",
+    );
+    expect(aboutSummary("One owner, i.e. one person. Check them.")).toBe(
+      "One owner, i.e. one person.",
+    );
+  });
 });
