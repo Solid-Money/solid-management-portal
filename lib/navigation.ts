@@ -32,6 +32,7 @@ import {
   Users,
   UsersRound,
   Wallet,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -308,6 +309,19 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Approve or reject held referral rewards, block referrers, re-check unpaid",
         icon: ShieldCheck,
+      },
+      {
+        href: "/referral-v4-review",
+        label: "Referral v4 review",
+        description: "Approve or reject referral v4 card credit bonuses held for review",
+        icon: ShieldCheck,
+      },
+      {
+        href: "/referral-boosts",
+        label: "Referral boosts",
+        description:
+          "Limited-time multipliers on referral v4 card credit bonuses",
+        icon: Zap,
       },
     ],
   },
