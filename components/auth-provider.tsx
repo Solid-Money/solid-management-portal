@@ -98,9 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log(
               back
                 ? '[AuthProvider] Returning to the page that needed sign-in'
-                : '[AuthProvider] Redirecting to /users',
+                : '[AuthProvider] Redirecting to /overview',
             );
-            routerRef.current.push(back ?? '/users');
+            routerRef.current.push(back ?? '/overview');
           }
         } else {
           // User is not from allowed domain, sign them out
