@@ -118,7 +118,8 @@ export function footerLine(
 
 /** The outside wallet a cash-out pattern is about, from its signals' evidence. */
 export function walletOf(item: Pick<AttentionItemView, "signals">): string | null {
-  for (const signal of item.signals) {
+  // An item read without signals has no wallet; it must not break the view.
+  for (const signal of item.signals ?? []) {
     const address = (signal.evidence as { address?: unknown } | undefined)?.address;
     if (typeof address === "string" && address) return address;
   }

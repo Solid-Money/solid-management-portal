@@ -92,5 +92,8 @@ describe("walletOf", () => {
       ({ evidence }) as AttentionItemView["signals"][number];
     expect(walletOf({ signals: [signal({ address: "0xabc", accounts: 5 })] })).toBe("0xabc");
     expect(walletOf({ signals: [signal({ signUps: 15 })] })).toBeNull();
+    expect(
+      walletOf({ signals: null } as unknown as Pick<AttentionItemView, "signals">),
+    ).toBeNull();
   });
 });
