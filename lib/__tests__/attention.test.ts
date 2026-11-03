@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   elapsed,
+  walletOf,
   footerLine,
   levelBadge,
   statusPill,
@@ -82,5 +83,14 @@ describe("attention card rules", () => {
     expect(elapsed("2026-10-28T18:00:00Z", "2026-10-30T20:00:00Z")).toBe(
       "2 days",
     );
+  });
+});
+
+describe("walletOf", () => {
+  it("finds the wallet in a cash-out signal, and nothing elsewhere", () => {
+    const signal = (evidence: Record<string, unknown>) =>
+      ({ evidence }) as AttentionItemView["signals"][number];
+    expect(walletOf({ signals: [signal({ address: "0xabc", accounts: 5 })] })).toBe("0xabc");
+    expect(walletOf({ signals: [signal({ signUps: 15 })] })).toBeNull();
   });
 });

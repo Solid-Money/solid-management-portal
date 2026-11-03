@@ -145,6 +145,14 @@ export interface RadarAction {
   href: string;
 }
 
+/** An account behind an item, for the item view. */
+export interface RadarAccount {
+  id: string;
+  username: string | null;
+  country: string | null;
+  signedUpAt: string | null;
+}
+
 export interface AttentionItemView {
   id: string;
   level: RadarLevel;
@@ -156,6 +164,8 @@ export interface AttentionItemView {
   metaLine: string;
   /** What the finding means and what to check, in plain words. */
   about: string;
+  /** The accounts behind it (up to 50); only on a single item's read. */
+  accounts?: RadarAccount[];
   /** The short tag beside the title ("Security", "Abuse", …). */
   tag: string;
   flows: RadarFlow[];
