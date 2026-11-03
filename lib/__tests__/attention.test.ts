@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  aboutSummary,
   elapsed,
   footerLine,
   levelBadge,
@@ -82,26 +81,6 @@ describe("attention card rules", () => {
     );
     expect(elapsed("2026-10-28T18:00:00Z", "2026-10-30T20:00:00Z")).toBe(
       "2 days",
-    );
-  });
-});
-
-describe("aboutSummary", () => {
-  it("keeps the first sentence for the row", () => {
-    expect(
-      aboutSummary(
-        "Several Solid accounts sent money to the same address outside Solid. It can be one person running many accounts.",
-      ),
-    ).toBe("Several Solid accounts sent money to the same address outside Solid.");
-    expect(aboutSummary("No full stop at all")).toBe("No full stop at all");
-  });
-
-  it("does not end a sentence at an abbreviation", () => {
-    expect(aboutSummary("Check e.g. the same wallet. It is suspicious.")).toBe(
-      "Check e.g. the same wallet.",
-    );
-    expect(aboutSummary("One owner, i.e. one person. Check them.")).toBe(
-      "One owner, i.e. one person.",
     );
   });
 });

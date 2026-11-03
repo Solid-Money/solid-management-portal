@@ -116,23 +116,6 @@ export function footerLine(
   return parts.join(" · ");
 }
 
-/** Abbreviations whose full stop does not end a sentence. */
-const ABBREVIATIONS = new Set(["e.g", "i.e", "etc", "vs", "approx", "incl"]);
-
-/**
- * The first sentence of an item's description, for its row; the view shows
- * it all. A sentence ends at ".", "!" or "?" followed by a space or the end,
- * unless the stop belongs to an abbreviation such as "e.g." or "i.e.".
- */
-export function aboutSummary(about: string): string {
-  for (const match of about.matchAll(/[.!?](?=\s|$)/g)) {
-    const before = about.slice(0, match.index).split(/\s/).pop() ?? "";
-    if (match[0] === "." && ABBREVIATIONS.has(before.toLowerCase())) continue;
-    return about.slice(0, match.index + 1);
-  }
-  return about;
-}
-
 /** "1 h 38 min", "12 min", "2 days" */
 export function elapsed(fromIso: string, toIso: string): string {
   const minutes = Math.max(

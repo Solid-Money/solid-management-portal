@@ -17,7 +17,6 @@ import { useAttention, useAttentionAction } from "@/hooks/use-attention";
 import { describeApiError } from "@/lib/api";
 import {
   TONE_CLASSES,
-  aboutSummary,
   footerLine,
   levelBadge,
   statusPill,
@@ -286,11 +285,12 @@ function Row({
           {item.metaLine}
         </span>
         {item.about ? (
+          // One line, cut by the layout; the whole text on hover and in the view.
           <span
             className="mt-0.5 block truncate text-[12px] text-gray-400"
             title={item.about}
           >
-            {aboutSummary(item.about)}
+            {item.about}
           </span>
         ) : null}
       </button>
