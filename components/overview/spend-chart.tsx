@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -25,6 +26,7 @@ import {
 } from "@/components/overview/overview-ui";
 import { analyticsHref } from "@/components/overview/overview-links";
 import {
+  CHART_SIDE_PX,
   CalloutLabel,
   calloutMargin,
   placeCallouts,
@@ -40,6 +42,7 @@ const MAX_INCIDENT_LABELS = 2;
  */
 export function SpendChart({ data }: { data: OverviewResponse }) {
   const { range, spendDaily } = data;
+  const [plotWidth, setPlotWidth] = useState(0);
   const bars = spendBars(spendDaily.days);
   const weekly = bars.length < spendDaily.days.length;
   const today = bars.find((b) => b.partial);
@@ -71,6 +74,7 @@ export function SpendChart({ data }: { data: OverviewResponse }) {
         : []),
     ],
     bars.length,
+    plotWidth,
   );
 
   return (
@@ -84,7 +88,7 @@ export function SpendChart({ data }: { data: OverviewResponse }) {
       />
 
       <div className="mt-4 h-[280px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" onResize={(width) => setPlotWidth(width - CHART_SIDE_PX)}>
           <BarChart data={bars} margin={{ top: calloutMargin(callouts), right: 4, left: 0, bottom: 0 }}>
             <defs>
               <pattern id="spend-today" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

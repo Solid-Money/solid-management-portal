@@ -38,6 +38,7 @@ import {
 } from "@/components/overview/overview-ui";
 import { analyticsHref } from "@/components/overview/overview-links";
 import {
+  CHART_SIDE_PX,
   CalloutLabel,
   calloutMargin,
   placeCallouts,
@@ -61,6 +62,7 @@ export function MoneyInCard({
   const { range, moneyIn } = data;
   const [view, setView] = useState<View>("method");
   const [selected, setSelected] = useState<MoneyInMethod | "all">("all");
+  const [plotWidth, setPlotWidth] = useState(0);
 
   const bars = useMemo(() => moneyBars(moneyIn.daily), [moneyIn.daily]);
   const weekly = bars.length < moneyIn.daily.length;
@@ -80,6 +82,7 @@ export function MoneyInCard({
       text: capText(bar, picked?.method ?? null),
     })),
     bars.length,
+    plotWidth,
   );
   const gaps = picked ? moneyIn.gaps.filter((g) => g.method === picked.method) : moneyIn.gaps;
   const totalChange = change(moneyIn.total.current, moneyIn.total.previous);
@@ -144,7 +147,7 @@ export function MoneyInCard({
       <div className={cn("mt-4 grid gap-6", insights.length ? "lg:grid-cols-[minmax(0,1fr)_400px]" : "")}>
         <div>
           <div className="h-[290px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" onResize={(width) => setPlotWidth(width - CHART_SIDE_PX)}>
               <BarChart data={chartData} margin={{ top: calloutMargin(callouts), right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
                 <XAxis
