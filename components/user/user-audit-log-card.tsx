@@ -19,6 +19,12 @@ type BadgeVariant = "warning" | "success" | "info" | "danger" | "muted";
 const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
   {
     account_recovered: { label: "Account recovered", variant: "success" },
+    account_suspended: { label: "Account suspended", variant: "danger" },
+    account_unsuspended: { label: "Suspension lifted", variant: "success" },
+    account_security_closed: {
+      label: "Closed for security",
+      variant: "danger",
+    },
     recovery_code_sent: { label: "Recovery code sent", variant: "info" },
     account_email_set: { label: "Recovery email changed", variant: "danger" },
     two_factor_reset: { label: "2FA reset", variant: "warning" },
@@ -178,6 +184,24 @@ function detailFor(entry: AdminAuditEntry): string | null {
       stillBlocked ? `card spend still blocked: ${stillBlocked}` : null,
     ].filter(Boolean);
     return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "account_suspended") {
+    const sessions = entry.metadata?.sessionsInvalidated;
+    return typeof sessions === "number"
+      ? `${sessions} session${sessions === 1 ? "" : "s"} ended`
+      : null;
+  }
+
+  if (entry.action === "account_unsuspended") {
+    const lifted = entry.metadata?.suspension as
+      | { adminEmail?: unknown; at?: unknown; reason?: unknown }
+      | undefined;
+    if (!lifted || typeof lifted.adminEmail !== "string") return null;
+    const at =
+      typeof lifted.at === "string" ? ` on ${formatDateTime(lifted.at)}` : "";
+    const why = typeof lifted.reason === "string" ? `: ${lifted.reason}` : "";
+    return `suspended by ${lifted.adminEmail}${at}${why}`;
   }
 
   if (entry.action === "ai_api_key_updated") {

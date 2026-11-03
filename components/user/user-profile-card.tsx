@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, ShieldAlert, UserCircle } from "lucide-react";
+import { ExternalLink, ShieldAlert, ShieldOff, UserCircle } from "lucide-react";
 
 import { formatDateTime } from "@/lib/utils";
 import { User } from "@/types";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyableValue } from "@/components/ui/copy-button";
 import RecoverAccountDialog from "@/components/user/recover-account-dialog";
+import SuspendAccountDialog from "@/components/user/suspend-account-dialog";
 import UserTwoFactorField from "@/components/user/user-two-factor-field";
 
 function Field({
@@ -65,6 +66,35 @@ function SecurityClosedNotice({
   );
 }
 
+/**
+ * A suspended account: locked out until an admin lifts it, nothing deleted.
+ * Said in full, with who and why, because the next question support gets is
+ * "why can't I sign in?" and the answer has to be right here.
+ */
+function SuspendedNotice({
+  suspension,
+}: {
+  suspension: NonNullable<User["suspension"]>;
+}) {
+  return (
+    <div className="flex w-full gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+      <ShieldOff className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="space-y-1">
+        <p>
+          Suspended by {suspension.adminEmail} on{" "}
+          {formatDateTime(suspension.at)}:{" "}
+          <span className="font-medium">{suspension.reason}</span>
+        </p>
+        <p>
+          They cannot use the app, sign in, recover or chat with support until
+          the suspension is lifted. Their passkeys, wallet and rewards are
+          untouched.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const KYC_VARIANT: Record<string, "success" | "warning" | "danger" | "muted"> = {
   approved: "success",
   under_review: "warning",
@@ -90,6 +120,8 @@ const CARD_PROVIDER_LABEL: Record<string, string> = {
 export default function UserProfileCard({ user }: { user: User }) {
   const closed = Boolean(user.isDeleted);
   const securityHold = user.securityHold ?? null;
+  const suspension = user.suspension ?? null;
+  const username = user.username || user.email || user._id;
 
   return (
     <Card>
@@ -116,17 +148,28 @@ export default function UserProfileCard({ user }: { user: User }) {
                   </span>
                 </>
               ) : (
-                <Badge variant="success">Open</Badge>
+                !suspension && <Badge variant="success">Open</Badge>
               )}
-              <span className={closed ? "ml-auto" : undefined}>
+              {suspension && <Badge variant="warning">Suspended</Badge>}
+              <span className="ml-auto flex flex-wrap items-center gap-2">
                 <RecoverAccountDialog
                   userId={user._id}
-                  username={user.username || user.email || user._id}
+                  username={username}
                   // Never offered for a security close: the backend refuses it.
                   closed={closed && !securityHold}
                   closedAt={user.deletedAt}
                 />
+                {/* Not offered on a security close: that account is already
+                    shut for good, and a suspension would add nothing. */}
+                {!securityHold && (
+                  <SuspendAccountDialog
+                    userId={user._id}
+                    username={username}
+                    suspension={suspension}
+                  />
+                )}
               </span>
+              {suspension && <SuspendedNotice suspension={suspension} />}
             </div>
           </Field>
           <Field label="Two-factor (authenticator app)" wide>

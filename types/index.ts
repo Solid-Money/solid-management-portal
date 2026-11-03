@@ -80,6 +80,19 @@ export interface User {
     at: string;
     safeAddress?: string;
   } | null;
+  /**
+   * Present while an admin has suspended the account: every request it makes
+   * is refused and it cannot sign in or start a recovery. Reversible from the
+   * profile; absent once lifted. Each suspension and lift is in the audit log.
+   */
+  suspension?: AccountSuspension | null;
+}
+
+/** An admin's suspension of an account, as it sits on the user row. */
+export interface AccountSuspension {
+  reason: string;
+  adminEmail: string;
+  at: string;
 }
 
 /**
@@ -2358,6 +2371,28 @@ export interface VirtualAccountRemovalResult {
 }
 
 /** What the backend reports after reopening a closed account. */
+/** What `account/suspend` returns. */
+export interface SuspendAccountResult {
+  userId: string;
+  username?: string;
+  suspendedAt: string;
+  adminUsername: string;
+  reason: string;
+  /** Live sessions invalidated, so none can be refreshed after a lift. */
+  sessionsInvalidated: number;
+}
+
+/** What `account/unsuspend` returns. */
+export interface UnsuspendAccountResult {
+  userId: string;
+  username?: string;
+  unsuspendedAt: string;
+  adminUsername: string;
+  reason: string;
+  /** The suspension that was lifted. */
+  suspension: AccountSuspension;
+}
+
 export interface RecoverAccountResult {
   userId: string;
   username?: string;

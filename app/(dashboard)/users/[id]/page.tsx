@@ -9,6 +9,7 @@ import {
   Eye,
   Loader2,
   ShieldAlert,
+  ShieldOff,
   Snowflake,
 } from "lucide-react";
 
@@ -189,6 +190,15 @@ export default function UserDetailPage({
               Account closed
             </Badge>
           )
+        )}
+        {user.suspension && (
+          <Badge
+            variant="warning"
+            title={`Suspended by ${user.suspension.adminEmail}: ${user.suspension.reason}`}
+          >
+            <ShieldOff className="h-3 w-3" />
+            Suspended
+          </Badge>
         )}
         {cardOverview?.hasCard && (
           <Badge variant="info">{cardOverview.provider} card</Badge>
@@ -387,6 +397,16 @@ export default function UserDetailPage({
           <SectionAnchor id="user-recovery">
             {/* No access help for a security close: the backend refuses every
                 action on this card for it, and none of them would be right. */}
+            {user.suspension && !user.securityHold && (
+              <div className="mb-3 flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <ShieldOff className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  This account is suspended, so self-serve recovery is refused
+                  and no recovery code, email change or two-factor reset can
+                  be sent for it. Lift the suspension from the profile first.
+                </span>
+              </div>
+            )}
             {user.securityHold ? (
               <div className="flex gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />

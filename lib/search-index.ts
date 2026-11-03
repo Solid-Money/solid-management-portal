@@ -26,6 +26,7 @@ import {
   Scale,
   ShieldAlert,
   ShieldCheck,
+  ShieldOff,
   Snowflake,
   Sparkles,
   Terminal,
@@ -419,6 +420,7 @@ const USER_TARGETS: UserTarget[] = [
   { key: "reevaluate-tier", kind: "action", label: "Re-evaluate tier lock", tab: "rewards", anchor: "user-tier", icon: RefreshCw, keywords: ["tier lock", "downgrade"] },
   { key: "reevaluate-referral", kind: "action", label: "Re-evaluate referral reward", tab: "rewards", anchor: "user-referrals", icon: RefreshCw, keywords: ["referral reward", "reversed", "expired"] },
   { key: "recover-account", kind: "action", label: "Recover closed account", tab: "overview", anchor: "user-profile", icon: LifeBuoy, keywords: ["reopen", "deleted account", "undelete"] },
+  { key: "suspend-account", kind: "action", label: "Suspend account or lift suspension", tab: "overview", anchor: "user-profile", icon: ShieldOff, keywords: ["block user", "ban", "lock account", "unblock user", "unsuspend"] },
   { key: "reset-2fa", kind: "action", label: "Reset two-factor", tab: "overview", anchor: "user-profile", icon: KeyRound, keywords: ["2fa", "authenticator", "totp"] },
   { key: "recovery-code", kind: "action", label: "Send recovery code or set email", tab: "support", anchor: "user-recovery", icon: KeyRound, keywords: ["change email", "recovery email", "locked out"] },
 ];
