@@ -179,9 +179,11 @@ function ResyncOutcome({
         </DialogTitle>
         <DialogDescription>
           {result.synced > 0
-            ? `${result.synced} transfer${
-                result.synced === 1 ? "" : "s"
-              } read; any that were missing are now in the activity tab.`
+            ? `${result.synced} transfer${result.synced === 1 ? "" : "s"} read${
+                failed
+                  ? "; transfers on the chains that could not be read may still be missing."
+                  : "; any that were missing are now in the activity tab."
+              }`
             : failed
               ? // A chain that failed has an unknown history, not an empty one.
                 "No transfers found on the chains that could be read."
