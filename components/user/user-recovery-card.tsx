@@ -39,8 +39,9 @@ interface UserRecoveryCardProps {
   username: string;
   /**
    * The account is suspended: the backend refuses every action on this card
-   * for it, so they are not offered. Optional because not every caller knows;
-   * where it is left out the backend's refusal is still shown.
+   * for it, so they are not offered. Every caller passes it; it is optional
+   * only for the moment the caller is still loading the user, when the
+   * backend's refusal is what shows.
    */
   suspended?: boolean;
 }
