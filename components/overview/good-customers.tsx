@@ -237,7 +237,10 @@ function WeeklyChart({ data }: { data: GoodCustomersResponse }) {
               width={48}
               tick={{ fontSize: 11, fill: "#9ca3af" }}
             />
-            <Tooltip cursor={{ fill: "#f4f5fb" }} content={<WeekTooltip />} />
+            <Tooltip
+              cursor={{ fill: "#f4f5fb" }}
+              content={<WeekTooltip windowDays={data.definition.windowDays} />}
+            />
             <Bar dataKey="qualified" stackId="people" fill={OVERVIEW_ACCENT} maxBarSize={36} />
             <Bar dataKey="others" stackId="people" fill={OVERVIEW_FADED} radius={[3, 3, 0, 0]} maxBarSize={36} />
           </BarChart>
@@ -263,15 +266,19 @@ function WeeklyChart({ data }: { data: GoodCustomersResponse }) {
 function WeekTooltip({
   active,
   payload,
+  windowDays,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ReturnType<typeof weeklyBars>[number] }>;
+  windowDays: number;
 }) {
   const bar = payload?.[0]?.payload;
   if (!active || !bar) return null;
   return (
     <div className="rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg">
-      <div className="font-semibold">28 days to {dayLabel(bar.date)}</div>
+      <div className="font-semibold">
+        {windowDays} days to {dayLabel(bar.date)}
+      </div>
       <div className="mt-1">
         {formatCount(bar.qualified)} qualified of {formatCount(bar.activeSpenders)} active spenders
       </div>

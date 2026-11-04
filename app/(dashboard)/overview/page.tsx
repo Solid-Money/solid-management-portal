@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, type KeyboardEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useOverview } from "@/hooks/use-overview";
@@ -61,7 +61,8 @@ function OverviewView() {
   };
 
   // Arrow keys, Home and End move between tabs, as the WAI tabs pattern has it.
-  const moveTab = (key: string, from: OverviewTab) => {
+  const moveTab = (event: KeyboardEvent<HTMLButtonElement>, from: OverviewTab) => {
+    const key = event.key;
     const index = OVERVIEW_TABS.indexOf(from);
     const last = OVERVIEW_TABS.length - 1;
     const next =
@@ -71,6 +72,8 @@ function OverviewView() {
       : key === "End" ? last
       : null;
     if (next === null) return;
+    // Home/End would scroll the page and arrows the tab strip; these keys only move between tabs.
+    event.preventDefault();
     const target = OVERVIEW_TABS[next];
     setTab(target);
     document.getElementById(`overview-tab-${target}`)?.focus();
@@ -108,7 +111,7 @@ function OverviewView() {
             aria-controls={`overview-panel-${t}`}
             tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
-            onKeyDown={(event) => moveTab(event.key, t)}
+            onKeyDown={(event) => moveTab(event, t)}
             className={cn(
               "inline-flex items-center gap-1.5 border-b-2 px-3 pt-1.5 pb-2.5 text-[13.5px] whitespace-nowrap",
               tab === t
