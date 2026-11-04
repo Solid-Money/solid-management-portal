@@ -3021,6 +3021,17 @@ export interface ReevaluateFailedCashbackResult {
   expectedBy?: string;
 }
 
+/** What re-reading a user's on-chain activity found. */
+export interface ActivityResyncResult {
+  /** Chains the sync had already read, whose record was cleared. */
+  cursorsCleared: number;
+  /** Rows the fresh read found, counting ones already in the feed (left as they were). */
+  synced: number;
+  skipped: number;
+  /** Chains that could not be read. Running it again is safe. */
+  errors: number;
+}
+
 /** Why a stuck cashback row gave up, read off its last error. */
 export type StuckCashbackCause =
   | "rpc_unavailable"

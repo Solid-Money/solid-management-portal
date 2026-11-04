@@ -132,6 +132,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "AI API account changed",
       variant: "warning",
     },
+    activity_resynced: { label: "Activity re-synced", variant: "info" },
   };
 
 /** How the audit trail names a referral v4 reward step. */
@@ -205,6 +206,17 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "referral_reward_reevaluated") {
     return referralReevaluationDetail(entry);
+  }
+
+  if (entry.action === "activity_resynced") {
+    const synced = entry.metadata?.synced;
+    const errors = entry.metadata?.errors;
+    if (typeof synced !== "number") return null;
+    const failed =
+      typeof errors === "number" && errors > 0
+        ? ` · ${errors} chain${errors === 1 ? "" : "s"} failed`
+        : "";
+    return `${synced} row${synced === 1 ? "" : "s"} read${failed}`;
   }
 
   if (
