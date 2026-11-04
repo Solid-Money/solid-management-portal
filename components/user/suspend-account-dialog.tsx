@@ -88,6 +88,7 @@ export default function SuspendAccountDialog({
   const {
     data: card,
     isLoading: cardLoading,
+    isFetching: cardFetching,
     isError: cardCheckFailed,
   } = useQuery<{ data: UserCardOverview }>({
     queryKey: ["user-card", userId],
@@ -97,7 +98,9 @@ export default function SuspendAccountDialog({
   const canFreezeCard = Boolean(card?.data?.hasCard && !card.data.frozen);
   // Until the card is known, submitting would skip the freeze without anyone
   // deciding to: the checkbox only appears once there is a card to freeze.
-  const checkingCard = suspending && cardLoading;
+  // That includes the refetch opening the dialog starts over a cached result,
+  // which may be out of date (no card then, or one frozen since unfrozen).
+  const checkingCard = suspending && (cardLoading || cardFetching);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["user", userId] });

@@ -93,6 +93,11 @@ export default function UserRecoveryCard({
     void queryClient.invalidateQueries({ queryKey: ["user-audit-log", userId] });
   };
 
+  // A suspension refuses recovery outright, whatever the recovery setup. The
+  // backend already reports such an account as unable to self-recover; this
+  // keeps the card consistent if the eligibility it shows predates the suspension.
+  const canSelfRecover = Boolean(data?.canSelfRecover) && !suspended;
+
   return (
     <Card className="@container">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -101,8 +106,12 @@ export default function UserRecoveryCard({
           Account access
         </CardTitle>
         {data && (
-          <Badge variant={data.canSelfRecover ? "success" : "warning"}>
-            {data.canSelfRecover ? "Can self-recover" : "Needs support"}
+          <Badge variant={canSelfRecover ? "success" : "warning"}>
+            {suspended
+              ? "Suspended"
+              : canSelfRecover
+                ? "Can self-recover"
+                : "Needs support"}
           </Badge>
         )}
       </CardHeader>
@@ -170,7 +179,7 @@ export default function UserRecoveryCard({
               </ul>
             )}
 
-            {data.canSelfRecover && (
+            {canSelfRecover && (
               <p className="text-xs text-gray-500">
                 Point them at the Recover your account link on the sign-in
                 screen. They can enter either their email or{" "}
