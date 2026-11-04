@@ -181,6 +181,7 @@ export default function UserProfileCard({ user }: { user: User }) {
               <UserTwoFactorField
                 userId={user._id}
                 username={user.username || user.email || user._id}
+                suspended={Boolean(suspension)}
               />
             )}
           </Field>

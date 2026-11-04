@@ -37,6 +37,12 @@ import { Textarea } from "@/components/ui/textarea";
 interface UserRecoveryCardProps {
   userId: string;
   username: string;
+  /**
+   * The account is suspended: the backend refuses every action on this card
+   * for it, so they are not offered. Optional because not every caller knows;
+   * where it is left out the backend's refusal is still shown.
+   */
+  suspended?: boolean;
 }
 
 function Stat({
@@ -70,6 +76,7 @@ function Stat({
 export default function UserRecoveryCard({
   userId,
   username,
+  suspended = false,
 }: UserRecoveryCardProps) {
   const queryClient = useQueryClient();
 
@@ -171,20 +178,27 @@ export default function UserRecoveryCard({
               </p>
             )}
 
-            <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
-              <SendCodeDialog
-                userId={userId}
-                username={username}
-                eligibility={data}
-                onDone={refresh}
-              />
-              <SetEmailDialog
-                userId={userId}
-                username={username}
-                eligibility={data}
-                onDone={refresh}
-              />
-            </div>
+            {suspended ? (
+              <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">
+                No recovery code or email change while the account is
+                suspended. Lift the suspension from the profile first.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+                <SendCodeDialog
+                  userId={userId}
+                  username={username}
+                  eligibility={data}
+                  onDone={refresh}
+                />
+                <SetEmailDialog
+                  userId={userId}
+                  username={username}
+                  eligibility={data}
+                  onDone={refresh}
+                />
+              </div>
+            )}
           </>
         )}
       </CardContent>
