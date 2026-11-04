@@ -60,6 +60,22 @@ function OverviewView() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
+  // Arrow keys, Home and End move between tabs, as the WAI tabs pattern has it.
+  const moveTab = (key: string, from: OverviewTab) => {
+    const index = OVERVIEW_TABS.indexOf(from);
+    const last = OVERVIEW_TABS.length - 1;
+    const next =
+      key === "ArrowRight" ? (index === last ? 0 : index + 1)
+      : key === "ArrowLeft" ? (index === 0 ? last : index - 1)
+      : key === "Home" ? 0
+      : key === "End" ? last
+      : null;
+    if (next === null) return;
+    const target = OVERVIEW_TABS[next];
+    setTab(target);
+    document.getElementById(`overview-tab-${target}`)?.focus();
+  };
+
   return (
     <div className="mx-auto flex max-w-[1376px] flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -85,10 +101,14 @@ function OverviewView() {
         {OVERVIEW_TABS.map((t) => (
           <button
             key={t}
+            id={`overview-tab-${t}`}
             type="button"
             role="tab"
             aria-selected={tab === t}
+            aria-controls={`overview-panel-${t}`}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
+            onKeyDown={(event) => moveTab(event.key, t)}
             className={cn(
               "inline-flex items-center gap-1.5 border-b-2 px-3 pt-1.5 pb-2.5 text-[13.5px] whitespace-nowrap",
               tab === t
@@ -106,10 +126,23 @@ function OverviewView() {
         ))}
       </div>
 
-      {tab === "good-customers" ? <GoodCustomersTab from={range.from} to={range.to} /> : null}
+      {tab === "good-customers" ? (
+        <div
+          role="tabpanel"
+          id="overview-panel-good-customers"
+          aria-labelledby="overview-tab-good-customers"
+        >
+          <GoodCustomersTab from={range.from} to={range.to} />
+        </div>
+      ) : null}
 
       {tab === "summary" ? (
-        <>
+        <div
+          role="tabpanel"
+          id="overview-panel-summary"
+          aria-labelledby="overview-tab-summary"
+          className="flex flex-col gap-5"
+        >
           <AttentionCard />
 
           {error && !data ? (
@@ -137,7 +170,7 @@ function OverviewView() {
               <OverviewFooter data={data} />
             </>
           ) : null}
-        </>
+        </div>
       ) : null}
     </div>
   );

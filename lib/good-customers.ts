@@ -5,6 +5,73 @@ import type { GoodCustomersCohort, GoodCustomersResponse } from "@/types/overvie
  * so the limits are tested once.
  */
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+const isNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+const hasNumbers = (value: unknown, keys: string[]): boolean =>
+  isObject(value) && keys.every((key) => isNumber(value[key]));
+
+/** Whether a payload has everything the tab reads, checked at runtime. */
+export function isGoodCustomersResponse(value: unknown): value is GoodCustomersResponse {
+  if (!isObject(value) || typeof value.asOf !== "string") return false;
+  const ladder = value.ladder;
+  return (
+    hasNumbers(value.definition, [
+      "version",
+      "windowDays",
+      "minSpendDays",
+      "minSpendUsd",
+      "highValueSpendUsd",
+      "highValueMoneyInUsd",
+    ]) &&
+    hasNumbers(ladder, [
+      "cardholders",
+      "realCustomers",
+      "activeSpenders",
+      "qualified",
+      "highValue",
+      "neverFundedOrSpent",
+    ]) &&
+    isObject(ladder) &&
+    (ladder.neverFundedTopCountry === null ||
+      (isObject(ladder.neverFundedTopCountry) &&
+        typeof ladder.neverFundedTopCountry.country === "string" &&
+        isNumber(ladder.neverFundedTopCountry.count))) &&
+    hasNumbers(value.spend, ["allUsd", "qualifiedUsd"]) &&
+    Array.isArray(value.weekly) &&
+    value.weekly.every(
+      (week) =>
+        isObject(week) &&
+        typeof week.date === "string" &&
+        hasNumbers(week, ["activeSpenders", "qualified"]),
+    ) &&
+    (value.retention === null ||
+      (isObject(value.retention) &&
+        typeof value.retention.asOf === "string" &&
+        hasNumbers(value.retention.qualified, ["people", "spentAgain"]) &&
+        hasNumbers(value.retention.otherSpenders, ["people", "spentAgain"]))) &&
+    hasNumbers(value.economics, [
+      "days",
+      "cashbackUsd",
+      "feesUsd",
+      "primeUsd",
+      "coveringOwnCashback",
+    ]) &&
+    hasNumbers(value.allCustomers90, ["cashbackUsd", "primeUsd"]) &&
+    (value.referralBar === null || hasNumbers(value.referralBar, ["spendUsd", "bunched"])) &&
+    Array.isArray(value.cohorts) &&
+    value.cohorts.every(
+      (cohort) =>
+        isObject(cohort) &&
+        typeof cohort.month === "string" &&
+        typeof cohort.complete === "boolean" &&
+        hasNumbers(cohort, ["cardholders", "realCustomers", "firstPurchase", "qualified"]),
+    ) &&
+    (value.feeRevenueUsd90 === null || isNumber(value.feeRevenueUsd90))
+  );
+}
+
 /** `part / whole`, or null when there is nothing to divide by. */
 export function share(part: number, whole: number): number | null {
   return whole > 0 ? part / whole : null;

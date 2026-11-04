@@ -231,7 +231,8 @@ export const OVERVIEW_REFRESH_MS = 5 * 60_000;
 export const OVERVIEW_QUERY_KEYS = {
   all: ["overview"] as const,
   range: (from: string, to: string) => ["overview", from, to] as const,
-  goodCustomers: (to: string) => ["overview", "good-customers", to] as const,
+  goodCustomers: (from: string, to: string) =>
+    ["overview", "good-customers", from, to] as const,
 };
 
 // ---------------------------------------------------------------------------

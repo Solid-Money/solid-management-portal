@@ -3,6 +3,7 @@ import {
   cashbackToRevenue,
   cohortLabel,
   guardrails,
+  isGoodCustomersResponse,
   netPerQualified,
   qualifiedCashbackMultiple,
   weeklyBars,
@@ -101,3 +102,22 @@ describe("guardrails", () => {
     expect(guardrails(response({ referralBar: null })).map((r) => r.key)).not.toContain("referral-bar");
   });
 });
+
+describe("isGoodCustomersResponse", () => {
+  it("accepts a full response, with or without the optional parts", () => {
+    expect(isGoodCustomersResponse(response())).toBe(true);
+    expect(
+      isGoodCustomersResponse(response({ referralBar: null, feeRevenueUsd90: null, retention: null })),
+    ).toBe(true);
+  });
+
+  it("rejects a payload missing what the tab reads", () => {
+    const noDefinition: Record<string, unknown> = { ...response() };
+    delete noDefinition.definition;
+    expect(isGoodCustomersResponse(noDefinition)).toBe(false);
+    expect(isGoodCustomersResponse({ ...response(), weekly: [{ date: "2026-11-02" }] })).toBe(false);
+    expect(isGoodCustomersResponse(null)).toBe(false);
+    expect(isGoodCustomersResponse("<html>")).toBe(false);
+  });
+});
+

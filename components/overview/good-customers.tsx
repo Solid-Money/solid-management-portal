@@ -49,7 +49,7 @@ const LADDER_DEEP = "#25259a";
  * day, counted per person, whatever the range's length.
  */
 export function GoodCustomersTab({ from, to }: { from: string; to: string }) {
-  const { data, error, isLoading, refetch } = useGoodCustomers(from, to, true);
+  const { data, error, isLoading, isPlaceholderData, refetch } = useGoodCustomers(from, to, true);
 
   if (error && !data) {
     return (
@@ -69,6 +69,21 @@ export function GoodCustomersTab({ from, to }: { from: string; to: string }) {
     );
   }
 
+  // While a new range loads, the previous one stays on screen, dimmed and
+  // marked, so its numbers are never read as the new range's.
+  if (isPlaceholderData) {
+    return (
+      <div aria-busy="true" className="relative">
+        <p className="mb-3 inline-flex items-center gap-2 text-[12.5px] text-gray-500">
+          <Loader2 className="size-3.5 animate-spin" />
+          Updating to the {data.definition.windowDays} days to {dayLabel(to)}…
+        </p>
+        <div className="pointer-events-none opacity-50">
+          <GoodCustomersView data={data} />
+        </div>
+      </div>
+    );
+  }
   return <GoodCustomersView data={data} />;
 }
 
