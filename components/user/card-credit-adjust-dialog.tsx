@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAdjustCardCredit } from "@/hooks/use-referral-v4";
+import { cardCreditRequestId } from "@/lib/card-credit-requests";
 import { formatUsd } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,26 +23,6 @@ import { Textarea } from "@/components/ui/textarea";
 /** The most one grant can give, mirroring the backend's bound. */
 export const MAX_CARD_CREDIT_GRANT_USD = 500;
 const MAX_REASON_LENGTH = 500;
-
-/**
- * The id that makes a grant or removal happen once, however often it is sent.
- * None where the browser can't make a UUID: it then goes without one, as
- * before.
- */
-const newRequestId = (): string | undefined =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : undefined;
-
-/**
- * The id of every submission not yet confirmed by the server, by user, mode,
- * amount and trimmed reason — what reaches the server. Kept outside the dialog,
- * which unmounts on close: an admin whose grant went through but whose
- * response was lost can close it, reopen it, send the same thing again and
- * still move the credit only once. An entry is dropped once the server
- * confirms that submission.
- */
-const unconfirmedRequestIds = new Map<string, string | undefined>();
 
 interface CardCreditAdjustDialogProps {
   userId: string;
@@ -115,11 +96,10 @@ export default function CardCreditAdjustDialog({
     // A retry of a submission whose response was lost — from this dialog or a
     // reopened one, or after an edit that comes back to it ("10" vs "10.00", a
     // trailing space) — reuses its id, so it cannot move credit twice.
-    const submissionKey = `${userId}\n${mode}\n${parsed}\n${trimmedReason}`;
-    if (!unconfirmedRequestIds.has(submissionKey)) {
-      unconfirmedRequestIds.set(submissionKey, newRequestId());
-    }
-    const requestId = unconfirmedRequestIds.get(submissionKey);
+    // The server confirming it drops the id (`useAdjustCardCredit`).
+    const requestId = cardCreditRequestId(
+      `${userId}\n${mode}\n${parsed}\n${trimmedReason}`,
+    );
     mutation.mutate(
       {
         amountUsd: parsed,
@@ -127,13 +107,22 @@ export default function CardCreditAdjustDialog({
         ...(requestId && { requestId }),
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          if (data?.repeated) {
+            // The id had already been applied: a lost response retried, or a
+            // deliberate adjustment with the same details as one still
+            // unconfirmed. Either way nothing moved. The id is now confirmed
+            // and dropped, so sending it again makes it a new adjustment.
+            toast.info(
+              `Already ${isGrant ? "granted" : "removed"} earlier — nothing moved this time. Send again to make it a new ${isGrant ? "grant" : "removal"}.`,
+            );
+            return;
+          }
           toast.success(
             isGrant
               ? `Granted ${formatUsd(parsed)} card credit to ${username}`
               : `Removed ${formatUsd(parsed)} card credit from ${username}`,
           );
-          unconfirmedRequestIds.delete(submissionKey);
           setAmount("");
           setReason("");
           onOpenChange(false);
