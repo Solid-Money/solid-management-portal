@@ -4,6 +4,7 @@ import {
   walletOf,
   footerLine,
   levelBadge,
+  resolvedLink,
   statusPill,
   summaryPills,
 } from "@/lib/attention";
@@ -95,5 +96,18 @@ describe("walletOf", () => {
     expect(
       walletOf({ signals: null } as unknown as Pick<AttentionItemView, "signals">),
     ).toBeNull();
+  });
+});
+
+describe("resolvedLink", () => {
+  it("puts one line on All instead of listing resolved items", () => {
+    expect(resolvedLink("all", 3)).toBe("3 items resolved this week");
+    expect(resolvedLink("all", 1)).toBe("1 item resolved this week");
+  });
+
+  it("says nothing when none were resolved, or on another tab", () => {
+    expect(resolvedLink("all", 0)).toBeNull();
+    expect(resolvedLink("abuse", 3)).toBeNull();
+    expect(resolvedLink("resolved", 3)).toBeNull();
   });
 });

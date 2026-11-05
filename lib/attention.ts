@@ -2,6 +2,7 @@ import type {
   AttentionItemView,
   AttentionListResponse,
   RadarStatus,
+  RadarTab,
 } from "@/types/radar";
 
 /**
@@ -114,6 +115,18 @@ export function footerLine(
   );
   parts.push("escalations go to #solid");
   return parts.join(" · ");
+}
+
+/**
+ * Resolved items are listed only under the Resolved tab, so the open list
+ * stays short. On All, this one line says how many there are and opens that
+ * tab; other tabs show nothing about them.
+ */
+export function resolvedLink(tab: RadarTab, count: number): string | null {
+  if (tab !== "all" || count <= 0) return null;
+  return count === 1
+    ? "1 item resolved this week"
+    : `${count} items resolved this week`;
 }
 
 /** The outside wallet a cash-out pattern is about, from its signals' evidence. */
