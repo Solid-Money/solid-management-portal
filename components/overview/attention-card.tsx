@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -52,6 +52,8 @@ const TAB_LABELS: Record<RadarTab, string> = {
 export function AttentionCard() {
   const [tab, setTab] = useState<RadarTab>("all");
   const [openId, setOpenId] = useState<string | null>(null);
+  // "Show" disappears once Resolved opens; focus moves to that tab instead.
+  const resolvedTab = useRef<HTMLButtonElement>(null);
   const [closing, setClosing] = useState<{
     item: AttentionItemView;
     kind: "dismiss" | "resolve";
@@ -130,6 +132,7 @@ export function AttentionCard() {
             {RADAR_TABS.map((t) => (
               <button
                 key={t}
+                ref={t === "resolved" ? resolvedTab : undefined}
                 type="button"
                 onClick={() => setTab(t)}
                 className={cn(
@@ -198,7 +201,10 @@ export function AttentionCard() {
             {resolvedNote ? (
               <button
                 type="button"
-                onClick={() => setTab("resolved")}
+                onClick={() => {
+                  setTab("resolved");
+                  resolvedTab.current?.focus();
+                }}
                 className="mt-1 w-full border-t border-[#eef0f4] pt-2.5 pb-1 text-left text-[12.5px] text-gray-500 hover:text-gray-800"
               >
                 {resolvedNote} · <span className="text-[#3b3bd6]">Show</span>
