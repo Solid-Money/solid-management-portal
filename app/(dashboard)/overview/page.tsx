@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, type KeyboardEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useOverview } from "@/hooks/use-overview";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import { describeApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import {
   parseRange,
   rangeQuery,
@@ -20,6 +22,14 @@ import { NewUsersCard } from "@/components/overview/new-users-card";
 import { MoneyInCard } from "@/components/overview/money-in-card";
 import { SupportPulse } from "@/components/overview/support-pulse";
 import { OverviewFooter } from "@/components/overview/overview-footer";
+import { GoodCustomersTab } from "@/components/overview/good-customers";
+
+const OVERVIEW_TABS = ["summary", "good-customers"] as const;
+type OverviewTab = (typeof OVERVIEW_TABS)[number];
+const TAB_LABELS: Record<OverviewTab, string> = {
+  summary: "Summary",
+  "good-customers": "Good customers",
+};
 
 /**
  * The admin landing page: what changed in the picked range, what is broken and
@@ -40,10 +50,33 @@ function OverviewView() {
   const today = utcToday();
   const range = parseRange(searchParams, today);
   const { data, error, isLoading, isFetching, refetch } = useOverview(range.from, range.to);
+  const [tab, setTab] = useUrlTab(OVERVIEW_TABS, "summary");
 
+  // A new range keeps the open tab.
   const apply = (next: OverviewRangeState) => {
-    const query = rangeQuery(next, today);
+    const params = new URLSearchParams(rangeQuery(next, today));
+    if (tab !== "summary") params.set("tab", tab);
+    const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  // Arrow keys, Home and End move between tabs, as the WAI tabs pattern has it.
+  const moveTab = (event: KeyboardEvent<HTMLButtonElement>, from: OverviewTab) => {
+    const key = event.key;
+    const index = OVERVIEW_TABS.indexOf(from);
+    const last = OVERVIEW_TABS.length - 1;
+    const next =
+      key === "ArrowRight" ? (index === last ? 0 : index + 1)
+      : key === "ArrowLeft" ? (index === 0 ? last : index - 1)
+      : key === "Home" ? 0
+      : key === "End" ? last
+      : null;
+    if (next === null) return;
+    // Home/End would scroll the page and arrows the tab strip; these keys only move between tabs.
+    event.preventDefault();
+    const target = OVERVIEW_TABS[next];
+    setTab(target);
+    document.getElementById(`overview-tab-${target}`)?.focus();
   };
 
   return (
@@ -64,32 +97,83 @@ function OverviewView() {
         </div>
       </header>
 
-      <AttentionCard />
-
-      {error && !data ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-          The Overview could not load: {describeApiError(error)}.{" "}
-          <button type="button" onClick={() => void refetch()} className="font-medium underline">
-            Try again
+      <div
+        role="tablist"
+        className="-mt-1 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_#e6e8ee] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {OVERVIEW_TABS.map((t) => (
+          <button
+            key={t}
+            id={`overview-tab-${t}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            aria-controls={`overview-panel-${t}`}
+            tabIndex={tab === t ? 0 : -1}
+            onClick={() => setTab(t)}
+            onKeyDown={(event) => moveTab(event, t)}
+            className={cn(
+              "inline-flex items-center gap-1.5 border-b-2 px-3 pt-1.5 pb-2.5 text-[13.5px] whitespace-nowrap",
+              tab === t
+                ? "border-gray-900 font-semibold text-gray-900"
+                : "border-transparent text-gray-500 hover:text-gray-800",
+            )}
+          >
+            {TAB_LABELS[t]}
+            {t === "good-customers" ? (
+              <span className="rounded-full bg-[#eef0ff] px-1.5 text-[10.5px] font-semibold text-[#3b3bd6]">
+                New
+              </span>
+            ) : null}
           </button>
+        ))}
+      </div>
+
+      {tab === "good-customers" ? (
+        <div
+          role="tabpanel"
+          id="overview-panel-good-customers"
+          aria-labelledby="overview-tab-good-customers"
+        >
+          <GoodCustomersTab from={range.from} to={range.to} />
         </div>
       ) : null}
 
-      {isLoading && !data ? <PageSpinner /> : null}
+      {tab === "summary" ? (
+        <div
+          role="tabpanel"
+          id="overview-panel-summary"
+          aria-labelledby="overview-tab-summary"
+          className="flex flex-col gap-5"
+        >
+          <AttentionCard />
 
-      {data ? (
-        <>
-          <KpiTiles data={data} compare={range.compare} />
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <SpendChart data={data} />
+          {error && !data ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+              The Overview could not load: {describeApiError(error)}.{" "}
+              <button type="button" onClick={() => void refetch()} className="font-medium underline">
+                Try again
+              </button>
             </div>
-            <NewUsersCard data={data} compare={range.compare} />
-          </div>
-          <MoneyInCard data={data} compare={range.compare} />
-          <SupportPulse data={data} compare={range.compare} />
-          <OverviewFooter data={data} />
-        </>
+          ) : null}
+
+          {isLoading && !data ? <PageSpinner /> : null}
+
+          {data ? (
+            <>
+              <KpiTiles data={data} compare={range.compare} />
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <SpendChart data={data} />
+                </div>
+                <NewUsersCard data={data} compare={range.compare} />
+              </div>
+              <MoneyInCard data={data} compare={range.compare} />
+              <SupportPulse data={data} compare={range.compare} />
+              <OverviewFooter data={data} />
+            </>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
