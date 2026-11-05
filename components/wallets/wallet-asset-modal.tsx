@@ -165,7 +165,9 @@ function Header({
                 className="ml-2 text-sm font-normal text-gray-600"
                 title={
                   flow.plan
-                    ? `${flow.plan.floorDays} days at the measured cost. The configured threshold is ${formatAmount(flow.threshold)}.`
+                    ? flow.plan.floorBasis === "minimum"
+                      ? "The minimum set on this asset, which is above its days of cover at the measured cost."
+                      : `${flow.plan.floorDays} days at the measured cost. The configured threshold is ${formatAmount(flow.threshold)}.`
                     : "Its configured threshold — no cost has been measured yet."
                 }
               >
@@ -260,17 +262,40 @@ function Header({
               <strong>
                 Send {formatAmount(flow.plan.refillAmount)} {label}
               </strong>{" "}
-              to reach {flow.plan.targetDays} days of cover (
-              {formatAmount(flow.plan.targetAmount)} {label}).
+              {flow.plan.floorBasis === "minimum" ? (
+                <>
+                  to reach {formatAmount(flow.plan.targetAmount)} {label}, the
+                  minimum plus {flow.plan.targetDays - flow.plan.floorDays} days
+                  of cover.
+                </>
+              ) : (
+                <>
+                  to reach {flow.plan.targetDays} days of cover (
+                  {formatAmount(flow.plan.targetAmount)} {label}).
+                </>
+              )}
             </>
           ) : (
             <>
-              Covered past {flow.plan.targetDays} days. Nothing to send.
+              Covered past{" "}
+              {flow.plan.floorBasis === "minimum"
+                ? `${formatAmount(flow.plan.targetAmount)} ${label}`
+                : `${flow.plan.targetDays} days`}
+              . Nothing to send.
             </>
           )}{" "}
           <span className="opacity-80">
-            Floor is {flow.plan.floorDays} days ={" "}
-            {formatAmount(flow.plan.floorAmount)} {label}.
+            {flow.plan.floorBasis === "minimum" ? (
+              <>
+                Floor is the {formatAmount(flow.plan.floorAmount)} {label}{" "}
+                minimum set on this asset.
+              </>
+            ) : (
+              <>
+                Floor is {flow.plan.floorDays} days ={" "}
+                {formatAmount(flow.plan.floorAmount)} {label}.
+              </>
+            )}
           </span>
         </div>
       )}

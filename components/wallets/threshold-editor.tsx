@@ -58,6 +58,10 @@ export default function ThresholdEditor({
   });
 
   if (!editing) {
+    // A measured plan without `floorBasis` is from a backend that predates
+    // overrides being minimums; there the floor can sit under the override,
+    // so the tooltip must not promise otherwise.
+    const minimumHeld = !plan.plan || plan.plan.floorBasis != null;
     return (
       <button
         type="button"
@@ -74,7 +78,13 @@ export default function ThresholdEditor({
                 plan.thresholdUpdatedAt
                   ? ` on ${new Date(plan.thresholdUpdatedAt).toLocaleDateString()}`
                   : ""
-              }. Click to change.`
+              }.${
+                minimumHeld
+                  ? " Held as a minimum: the floor never goes below it."
+                  : ""
+              } Click to change.`
+            : minimumHeld
+            ? "The configured default, used only until a cost is measured. A value set here is held as a minimum floor. Click to change."
             : "The configured default. Click to change."
         }
       >

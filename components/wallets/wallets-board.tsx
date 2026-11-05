@@ -739,12 +739,18 @@ function WalletCard({
                            made a wallet with under a day of cover look like it
                            had three, and its CRITICAL badge look wrong. The
                            number qualifies the floor, never the runway. */
-                        <span
-                          className="ml-1 text-gray-400"
-                          title={`The floor is ${refill.floorDays} days at the measured cost, rather than the fixed ${formatAmount(reading.threshold)} configured. Time left is in the Runway column.`}
-                        >
-                          ({refill.floorDays}-day floor)
-                        </span>
+                        <FloorNote
+                          refill={refill}
+                          threshold={
+                            plan?.threshold ??
+                            assetFlow?.threshold ??
+                            reading.threshold
+                          }
+                          overridden={plan?.thresholdSource === "override"}
+                          costPerDay={
+                            plan?.realCostPerDay ?? assetFlow?.realCostPerDay
+                          }
+                        />
                       )}
                       {plan?.isResidue && (
                         <span
@@ -764,6 +770,7 @@ function WalletCard({
                       plan={plan}
                       flow={assetFlow}
                       runwayDays={runwayDays}
+                      verdict={verdict}
                     />
                   </td>
                   <td className="px-4 py-2 text-xs text-gray-600">
@@ -955,14 +962,61 @@ function CostCell({
   );
 }
 
+/**
+ * What the "(… floor)" note beside a balance says set the floor.
+ *
+ * The threshold pencil sits on the same line, so the note has to say whether
+ * that number is the floor, under it, or not in use — otherwise an edit that
+ * changes nothing on screen reads as an edit that did not save.
+ */
+function FloorNote({
+  refill,
+  threshold,
+  overridden,
+  costPerDay,
+}: {
+  refill: WalletRefillPlan;
+  threshold: string;
+  overridden: boolean;
+  costPerDay?: number;
+}) {
+  const daysFloor =
+    costPerDay != null ? formatAmount(costPerDay * refill.floorDays) : null;
+  const title =
+    refill.floorBasis === "minimum"
+      ? `The floor is the ${formatAmount(refill.floorAmount)} minimum set on this asset.${
+          daysFloor
+            ? ` ${refill.floorDays} days at the measured cost would only be ${daysFloor}.`
+            : ""
+        } Time left is in the Runway column.`
+      : overridden
+      ? `The floor is ${refill.floorDays} days at the measured cost, which is above the ${formatAmount(threshold)} minimum set here. Time left is in the Runway column.`
+      : `The floor is ${refill.floorDays} days at the measured cost. The configured ${formatAmount(threshold)} only applies until a cost is measured. Set a threshold here to hold a minimum. Time left is in the Runway column.`;
+
+  /* "{n}-day floor", not "({n}d)". The short form sat beside a balance in a
+     row whose other column reads "~23h left" and was taken for days remaining
+     — which made a wallet with under a day of cover look like it had three,
+     and its CRITICAL badge look wrong. The number qualifies the floor, never
+     the runway. */
+  return (
+    <span className="ml-1 text-gray-400" title={title}>
+      {refill.floorBasis === "minimum"
+        ? "(minimum floor)"
+        : `(${refill.floorDays}-day floor)`}
+    </span>
+  );
+}
+
 function RunwayCell({
   plan,
   flow,
   runwayDays,
+  verdict,
 }: {
   plan?: WalletAssetPlan;
   flow?: WalletAssetFlow;
   runwayDays?: number;
+  verdict: BalanceStatus;
 }) {
   // Same read as the chip above it, which already quotes days of cover on
   // anything inside a week. Two different runways for one asset on one screen
@@ -986,12 +1040,19 @@ function RunwayCell({
     );
   }
 
-  // Under a week of cover is worth funding this week whatever the threshold
-  // says — a wallet at 3x its floor with two days left needs money today.
-  const urgent = runwayDays < 7;
+  // Under a week of cover is worth planning around whatever the threshold
+  // says — a wallet at 3x its floor with two days left needs money soon. Red
+  // is kept for a CRITICAL verdict, though: red runway beside a status that
+  // says OK read as the page contradicting itself.
+  const tone =
+    verdict === "CRITICAL"
+      ? "font-medium text-red-700"
+      : runwayDays < 7
+      ? "font-medium text-amber-700"
+      : "text-gray-700";
   return (
     <span
-      className={urgent ? "font-medium text-red-700" : "text-gray-700"}
+      className={tone}
       title={
         basis === "measured"
           ? "Measured from balance history, gas fees included."
@@ -1044,7 +1105,9 @@ function AssetChip({
       className={`rounded border px-1.5 py-0.5 text-[11px] ${tone}`}
       title={
         plan
-          ? `${label} on ${chainName}: ${balance} held against a floor of ${formatAmount(floor)}, which is ${plan.floorDays} days at the measured cost. Configured threshold is ${formatAmount(threshold)}.`
+          ? plan.floorBasis === "minimum"
+            ? `${label} on ${chainName}: ${balance} held against a floor of ${formatAmount(floor)}, the minimum set on this asset.`
+            : `${label} on ${chainName}: ${balance} held against a floor of ${formatAmount(floor)}, which is ${plan.floorDays} days at the measured cost. Configured threshold is ${formatAmount(threshold)}.`
           : `${label} on ${chainName}: ${balance} held against a floor of ${threshold}`
       }
     >
