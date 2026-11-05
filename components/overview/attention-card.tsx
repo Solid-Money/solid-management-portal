@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import {
   TONE_CLASSES,
   footerLine,
   levelBadge,
+  resolvedLink,
   statusPill,
   summaryPills,
 } from "@/lib/attention";
@@ -43,13 +44,16 @@ const TAB_LABELS: Record<RadarTab, string> = {
 
 /**
  * Needs your attention: the incident radar. Live incidents first, then High,
- * Check and Watch, then what was resolved this week. Every row has one main
+ * Check and Watch. Resolved items live under the Resolved tab; All shows one
+ * line linking there. Every row has one main
  * action and a menu (Assign, Snooze, Dismiss with a reason); every click is
  * audited server side.
  */
 export function AttentionCard() {
   const [tab, setTab] = useState<RadarTab>("all");
   const [openId, setOpenId] = useState<string | null>(null);
+  // "Show" disappears once Resolved opens; focus moves to that tab instead.
+  const resolvedTab = useRef<HTMLButtonElement>(null);
   const [closing, setClosing] = useState<{
     item: AttentionItemView;
     kind: "dismiss" | "resolve";
@@ -66,6 +70,7 @@ export function AttentionCard() {
   const items = tab === "resolved" ? [] : (data?.items ?? []);
   const resolved = data?.resolved ?? [];
   const nothing = data && data.counts.all === 0;
+  const resolvedNote = data ? resolvedLink(tab, data.counts.resolved) : null;
 
   return (
     <OverviewCard className="px-5 pt-4 pb-3">
@@ -127,6 +132,7 @@ export function AttentionCard() {
             {RADAR_TABS.map((t) => (
               <button
                 key={t}
+                ref={t === "resolved" ? resolvedTab : undefined}
                 type="button"
                 onClick={() => setTab(t)}
                 className={cn(
@@ -178,19 +184,31 @@ export function AttentionCard() {
               </p>
             ) : null}
 
-            {resolved.length > 0 && (tab === "all" || tab === "resolved") ? (
-              <>
-                <p className="mt-2 border-t border-[#eef0f4] pt-3 pb-1 text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
-                  Resolved this week
-                </p>
-                {resolved.slice(0, tab === "resolved" ? 50 : 3).map((item) => (
+            {tab === "resolved"
+              ? resolved.slice(0, 50).map((item) => (
                   <Row
                     key={item.id}
                     item={item}
                     onOpen={() => setOpenId(item.id)}
                   />
-                ))}
-              </>
+                ))
+              : null}
+            {tab === "resolved" && resolved.length === 0 ? (
+              <p className="py-4 text-[13px] text-gray-500">
+                Nothing resolved this week.
+              </p>
+            ) : null}
+            {resolvedNote ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("resolved");
+                  resolvedTab.current?.focus();
+                }}
+                className="mt-1 w-full border-t border-[#eef0f4] pt-2.5 pb-1 text-left text-[12.5px] text-gray-500 hover:text-gray-800"
+              >
+                {resolvedNote} · <span className="text-[#3b3bd6]">Show</span>
+              </button>
             ) : null}
           </div>
         </>
