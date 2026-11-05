@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
+import api from "@/lib/api";
+import { User } from "@/types";
 import { CopyButton } from "@/components/ui/copy-button";
 import UserKycCard from "@/components/user/user-kyc-card";
 import UserTierMembershipCard from "@/components/user/user-tier-membership-card";
@@ -22,9 +25,17 @@ import {
  */
 export default function ContextPanel({ conversationId }: { conversationId: string }) {
   const { data } = useSupportConversation(conversationId);
+  const userId = data?.conversation.userId;
+  // The user page's own query (same key, same response), so the two share one
+  // cache entry. Only read for the suspension, which the recovery card needs to
+  // keep from offering a code or an email change the backend would refuse.
+  const { data: user } = useQuery<User>({
+    queryKey: ["user", userId],
+    queryFn: async () => (await api.get(`/admin/v1/users/${userId}`)).data,
+    enabled: Boolean(userId),
+  });
   if (!data) return <aside className="rounded-lg bg-white shadow-sm" />;
   const { conversation, cases } = data;
-  const userId = conversation.userId;
   const username = conversation.userLabel ?? "";
 
   return (
@@ -87,7 +98,11 @@ export default function ContextPanel({ conversationId }: { conversationId: strin
           <UserKycCard userId={userId} username={username} />
           <UserTierMembershipCard userId={userId} />
           <UserCashbackCard userId={userId} />
-          <UserRecoveryCard userId={userId} username={username} />
+          <UserRecoveryCard
+            userId={userId}
+            username={username}
+            suspended={Boolean(user?.suspension)}
+          />
         </div>
       )}
     </aside>

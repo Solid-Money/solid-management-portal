@@ -36,6 +36,8 @@ import {
   VirtualAccountRemovalResult,
   VirtualAccountRemovalState,
   RecoverAccountResult,
+  SuspendAccountResult,
+  UnsuspendAccountResult,
   RecoveryEligibility,
   ResetTwoFactorResult,
   SendRecoveryCodeResult,
@@ -646,6 +648,33 @@ export const setTransactionCashbackPercentage = (
 export const recoverUserAccount = (userId: string, reason: string) =>
   api.post<{ data: RecoverAccountResult }>(
     `/admin/v1/users/${userId}/account/recover`,
+    { reason },
+  );
+
+/**
+ * Suspend an account — the reversible block. Every request it makes is
+ * refused, its sessions are invalidated, and it cannot sign in or start a
+ * recovery until the suspension is lifted. Passkeys, the Safe, the card and
+ * rewards are untouched; the card is frozen separately.
+ *
+ * The reason is required: it goes to the audit trail and Slack with the admin's
+ * name. Refused with a 409 for an account that is already suspended. The admin
+ * identity comes from the Firebase token server-side, never from here.
+ */
+export const suspendUserAccount = (userId: string, reason: string) =>
+  api.post<{ data: SuspendAccountResult }>(
+    `/admin/v1/users/${userId}/account/suspend`,
+    { reason },
+  );
+
+/**
+ * Lift a suspension. The owner signs back in with the passkey they already
+ * have; the sessions the suspension ended stay ended. Refused with a 409 for an
+ * account that is not suspended.
+ */
+export const unsuspendUserAccount = (userId: string, reason: string) =>
+  api.post<{ data: UnsuspendAccountResult }>(
+    `/admin/v1/users/${userId}/account/unsuspend`,
     { reason },
   );
 

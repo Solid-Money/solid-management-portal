@@ -214,6 +214,15 @@ export default function UsersTable() {
                           {describeMatch(user, search)}
                         </Badge>
                       )}
+                      {user.suspension && !user.securityHold && (
+                        <Badge
+                          variant="warning"
+                          className="ml-2"
+                          title={`Suspended by ${user.suspension.adminEmail}: ${user.suspension.reason}`}
+                        >
+                          suspended
+                        </Badge>
+                      )}
                       {user.securityHold ? (
                         <Badge
                           variant="danger"

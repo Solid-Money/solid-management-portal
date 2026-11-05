@@ -25,6 +25,8 @@ import { Textarea } from "@/components/ui/textarea";
 interface UserTwoFactorFieldProps {
   userId: string;
   username: string;
+  /** The account is suspended: the backend refuses a reset, so none is offered. */
+  suspended?: boolean;
 }
 
 /** "set up Oct 11, 2026 · last used Oct 11, 2026", or as much of it as is known. */
@@ -50,6 +52,7 @@ function enrollmentDetail(status: TwoFactorStatus): string {
 export default function UserTwoFactorField({
   userId,
   username,
+  suspended = false,
 }: UserTwoFactorFieldProps) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["user-two-factor", userId],
@@ -102,13 +105,15 @@ export default function UserTwoFactorField({
           </Badge>
         )}
         <span className="text-gray-600">{enrollmentDetail(data)}</span>
-        <span className="ml-auto">
-          <ResetTwoFactorDialog
-            userId={userId}
-            username={username}
-            status={data}
-          />
-        </span>
+        {!suspended && (
+          <span className="ml-auto">
+            <ResetTwoFactorDialog
+              userId={userId}
+              username={username}
+              status={data}
+            />
+          </span>
+        )}
       </div>
       {data.verified ? (
         <p className="text-xs text-gray-500">

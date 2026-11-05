@@ -9,6 +9,7 @@ import {
   Eye,
   Loader2,
   ShieldAlert,
+  ShieldOff,
   Snowflake,
 } from "lucide-react";
 
@@ -190,6 +191,15 @@ export default function UserDetailPage({
               Account closed
             </Badge>
           )
+        )}
+        {user.suspension && (
+          <Badge
+            variant="warning"
+            title={`Suspended by ${user.suspension.adminEmail}: ${user.suspension.reason}`}
+          >
+            <ShieldOff className="h-3 w-3" />
+            Suspended
+          </Badge>
         )}
         {cardOverview?.hasCard && (
           <Badge variant="info">{cardOverview.provider} card</Badge>
@@ -404,7 +414,11 @@ export default function UserDetailPage({
                 </span>
               </div>
             ) : (
-              <UserRecoveryCard userId={id} username={displayName} />
+              <UserRecoveryCard
+                userId={id}
+                username={displayName}
+                suspended={Boolean(user.suspension)}
+              />
             )}
           </SectionAnchor>
           {/* Above the chats: a Ref quoted in one resolves here without a lookup. */}

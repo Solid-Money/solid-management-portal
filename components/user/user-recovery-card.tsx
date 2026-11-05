@@ -37,6 +37,13 @@ import { Textarea } from "@/components/ui/textarea";
 interface UserRecoveryCardProps {
   userId: string;
   username: string;
+  /**
+   * The account is suspended: the backend refuses every action on this card
+   * for it, so they are not offered. Every caller passes it; it is optional
+   * only for the moment the caller is still loading the user, when the
+   * backend's refusal is what shows.
+   */
+  suspended?: boolean;
 }
 
 function Stat({
@@ -70,6 +77,7 @@ function Stat({
 export default function UserRecoveryCard({
   userId,
   username,
+  suspended = false,
 }: UserRecoveryCardProps) {
   const queryClient = useQueryClient();
 
@@ -86,6 +94,11 @@ export default function UserRecoveryCard({
     void queryClient.invalidateQueries({ queryKey: ["user-audit-log", userId] });
   };
 
+  // A suspension refuses recovery outright, whatever the recovery setup. The
+  // backend already reports such an account as unable to self-recover; this
+  // keeps the card consistent if the eligibility it shows predates the suspension.
+  const canSelfRecover = Boolean(data?.canSelfRecover) && !suspended;
+
   return (
     <Card className="@container">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -94,8 +107,12 @@ export default function UserRecoveryCard({
           Account access
         </CardTitle>
         {data && (
-          <Badge variant={data.canSelfRecover ? "success" : "warning"}>
-            {data.canSelfRecover ? "Can self-recover" : "Needs support"}
+          <Badge variant={canSelfRecover ? "success" : "warning"}>
+            {suspended
+              ? "Suspended"
+              : canSelfRecover
+                ? "Can self-recover"
+                : "Needs support"}
           </Badge>
         )}
       </CardHeader>
@@ -163,7 +180,7 @@ export default function UserRecoveryCard({
               </ul>
             )}
 
-            {data.canSelfRecover && (
+            {canSelfRecover && (
               <p className="text-xs text-gray-500">
                 Point them at the Recover your account link on the sign-in
                 screen. They can enter either their email or{" "}
@@ -171,20 +188,27 @@ export default function UserRecoveryCard({
               </p>
             )}
 
-            <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
-              <SendCodeDialog
-                userId={userId}
-                username={username}
-                eligibility={data}
-                onDone={refresh}
-              />
-              <SetEmailDialog
-                userId={userId}
-                username={username}
-                eligibility={data}
-                onDone={refresh}
-              />
-            </div>
+            {suspended ? (
+              <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">
+                No recovery code or email change while the account is
+                suspended. Lift the suspension from the profile first.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+                <SendCodeDialog
+                  userId={userId}
+                  username={username}
+                  eligibility={data}
+                  onDone={refresh}
+                />
+                <SetEmailDialog
+                  userId={userId}
+                  username={username}
+                  eligibility={data}
+                  onDone={refresh}
+                />
+              </div>
+            )}
           </>
         )}
       </CardContent>
