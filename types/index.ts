@@ -692,7 +692,8 @@ export interface ChainBalance {
   soFuseStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   soFuseAddress?: string;
   // EURC on Base: the float the Wirex bank deposit payout wallet pays SEPA
-  // deposits out of. Refilled from the Wirex Master Account; gas is ETH.
+  // deposits out of, and the euro refund float of the Card Refund Payout
+  // Wallet. Both refilled from the Wirex Master Account; gas is ETH.
   eurcBalance?: string;
   eurcThreshold?: string;
   eurcStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
@@ -734,7 +735,11 @@ export const WALLET_ROLE_ORDER: WalletRole[] = [
 ];
 
 export type WalletFailureSource =
-  "cashback_payout" | "referral_payout" | "user_activity";
+  | "cashback_payout"
+  // Wirex card refunds owed from the Card Refund Payout Wallet on Base.
+  | "card_refund_payout"
+  | "referral_payout"
+  | "user_activity";
 
 export type WalletForecastSource = "cashback" | "referral";
 
