@@ -65,8 +65,18 @@ function Row({
   return (
     <tr
       onClick={onOpen}
+      tabIndex={0}
+      aria-label={`T-${row.number}: ${row.title}`}
+      onKeyDown={(event) => {
+        // Keys pressed on a control inside the row (a label) are that control's.
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
       className={cn(
-        "group cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-gray-50",
+        "group cursor-pointer border-b border-gray-100 outline-none last:border-b-0 hover:bg-gray-50 focus-visible:bg-indigo-50/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400",
         selected && "bg-indigo-50/60 hover:bg-indigo-50",
       )}
     >

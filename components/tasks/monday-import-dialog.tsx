@@ -41,21 +41,28 @@ export default function MondayImportDialog({
   const { data: job } = useTaskImport(open);
   const running = job?.status === "running";
 
+  // The token never outlives its use: cleared on close and after every try.
+  const close = (next: boolean) => {
+    if (!next) setToken("");
+    onOpenChange(next);
+  };
+
   const start = async () => {
+    if (!boards.length || token.trim().length < 20) return;
     setStarting(true);
     try {
       const started = await startMondayImport(token.trim(), boards);
       queryClient.setQueryData(TASK_KEYS.import, started);
-      setToken("");
     } catch {
       // The API layer shows the error.
     } finally {
+      setToken("");
       setStarting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Import from monday</DialogTitle>
@@ -137,7 +144,7 @@ export default function MondayImportDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => close(false)}>
             {running ? "Close (it keeps going)" : "Close"}
           </Button>
           {!running && (

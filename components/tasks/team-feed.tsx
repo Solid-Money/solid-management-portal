@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,16 @@ export default function TeamFeed({ highlight }: { highlight: string | null }) {
   const posts = useMemo(() => feed.data?.pages.flatMap((page) => page.posts) ?? [], [feed.data]);
   const refresh = () => void queryClient.invalidateQueries({ queryKey: TASK_KEYS.feed });
 
-  // A link to a post (from an email or the bell) scrolls to it.
+  // A link to a post (from an email or the bell) scrolls to it once, as soon
+  // as it is on the page; later refreshes don't pull the page back to it.
+  const scrolledTo = useRef<string | null>(null);
   useEffect(() => {
-    if (!highlight || !posts.length) return;
-    document.getElementById(`post-${highlight}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlight, posts.length]);
+    if (!highlight || scrolledTo.current === highlight) return;
+    const element = document.getElementById(`post-${highlight}`);
+    if (!element) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrolledTo.current = highlight;
+  }, [highlight, posts]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">

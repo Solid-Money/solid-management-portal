@@ -68,11 +68,17 @@ export function useTaskList(filters: TaskListFilters) {
   });
 }
 
+/** A task id as the backend makes them (a Mongo ObjectId). */
+export function isTaskId(id: string | null | undefined): id is string {
+  return !!id && /^[a-f0-9]{24}$/i.test(id);
+}
+
 export function useTask(id: string | null) {
   return useQuery({
     queryKey: TASK_KEYS.task(id ?? "none"),
     queryFn: () => getTask(id!),
-    enabled: !!id,
+    // A mistyped ?task= never reaches the API.
+    enabled: isTaskId(id),
     // Image links are signed for five minutes; refresh well before that.
     refetchInterval: 4 * 60_000,
   });

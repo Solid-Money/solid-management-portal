@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/components/auth-provider";
-import { usePatchTask, useRefreshTask, useTask, useTaskPeople } from "@/hooks/use-tasks";
+import { isTaskId, usePatchTask, useRefreshTask, useTask, useTaskPeople } from "@/hooks/use-tasks";
 import {
   addChecklistItem,
   deleteChecklistItem,
@@ -583,7 +583,9 @@ export default function TaskDrawer({ taskId, onClose }: { taskId: string | null;
             <SheetTitle className="sr-only">Task</SheetTitle>
             <SheetDescription className="sr-only">Loading the task</SheetDescription>
             {isLoading && <Loader2 className="size-5 animate-spin text-indigo-600" />}
-            {isError && <p>This task doesn&apos;t exist or isn&apos;t shared with you.</p>}
+            {(isError || (!!taskId && !isTaskId(taskId))) && (
+              <p>This task doesn&apos;t exist or isn&apos;t shared with you.</p>
+            )}
           </div>
         )}
       </SheetContent>
