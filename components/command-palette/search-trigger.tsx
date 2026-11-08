@@ -17,7 +17,11 @@ function useShortcutLabel(): string | null {
   );
 }
 
-/** The search box in the top bar. Looks like a field; opens the search. */
+/**
+ * The search box in the top bar. Looks like a field; opens the search.
+ * Below 1536px it is just the icon (⌘K still works), so the menu bar keeps
+ * room for every group without scrolling sideways.
+ */
 export function NavSearchTrigger() {
   const { openPalette } = useCommandPalette();
   const shortcut = useShortcutLabel();
@@ -28,7 +32,7 @@ export function NavSearchTrigger() {
         type="button"
         onClick={() => openPalette()}
         aria-label="Search users, card IDs, pages and settings"
-        className="hidden h-9 w-64 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 text-sm text-gray-400 shadow-xs transition-colors hover:border-gray-300 hover:bg-gray-50 lg:flex xl:w-80"
+        className="hidden h-9 w-80 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 text-sm text-gray-400 shadow-xs transition-colors hover:border-gray-300 hover:bg-gray-50 2xl:flex"
       >
         <Search className="h-4 w-4 shrink-0" />
         <span className="flex-1 truncate text-left">
@@ -43,8 +47,9 @@ export function NavSearchTrigger() {
       <button
         type="button"
         onClick={() => openPalette()}
+        title={shortcut ? `Search (${shortcut})` : "Search"}
         aria-label="Search"
-        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 shadow-xs hover:bg-gray-50 lg:hidden"
+        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 shadow-xs hover:bg-gray-50 2xl:hidden"
       >
         <Search className="h-4 w-4" />
       </button>

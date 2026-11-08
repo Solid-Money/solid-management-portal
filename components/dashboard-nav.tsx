@@ -34,6 +34,7 @@ import {
 } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
+import { useTaskCounts } from "@/hooks/use-tasks";
 
 /**
  * The number on the Support badge: cases needing a human plus the admin's
@@ -46,12 +47,21 @@ function useSupportBadge(): number {
   return live ? (live.needs_human ?? 0) + (live.mine ?? 0) : 0;
 }
 
-function CountBadge({ count }: { count: number }) {
+/** Tasks where someone mentioned the admin or something moved on theirs. */
+function useTasksBadge(): number {
+  const { data: counts } = useTaskCounts();
+  return counts?.forYou ?? 0;
+}
+
+function CountBadge({ count, tone = "red" }: { count: number; tone?: "red" | "indigo" }) {
   if (!count) return null;
   return (
     <span
-      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold leading-5 text-white"
-      aria-label={`${count} waiting`}
+      className={cn(
+        "ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-5 text-white",
+        tone === "red" ? "bg-red-500" : "bg-indigo-600"
+      )}
+      aria-label={tone === "red" ? `${count} waiting` : `${count} new for you`}
     >
       {count > 99 ? "99+" : count}
     </span>
@@ -126,10 +136,12 @@ function MobileNav({
   pathname,
   groups,
   supportBadge,
+  tasksBadge,
 }: {
   pathname: string;
   groups: NavGroup[];
   supportBadge: number;
+  tasksBadge: number;
 }) {
   return (
     <DropdownMenu>
@@ -141,7 +153,7 @@ function MobileNav({
           aria-label={supportBadge ? `Open navigation, ${supportBadge} support cases waiting` : "Open navigation"}
         >
           <Menu className="h-4 w-4" />
-          {supportBadge > 0 && (
+          {supportBadge + tasksBadge > 0 && (
             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
           )}
         </Button>
@@ -162,6 +174,7 @@ function MobileNav({
                   >
                     {group.label}
                   </span>
+                  {group.tasksBadge && <CountBadge count={tasksBadge} tone="indigo" />}
                 </Link>
               </DropdownMenuItem>
             ) : (
@@ -260,6 +273,7 @@ export default function DashboardNav() {
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const groups = NAV_GROUPS;
   const supportBadge = useSupportBadge();
+  const tasksBadge = useTasksBadge();
 
   const handleSignOut = async () => {
     setIsSignOutModalOpen(false);
@@ -270,7 +284,12 @@ export default function DashboardNav() {
     <>
       <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <MobileNav pathname={pathname} groups={groups} supportBadge={supportBadge} />
+          <MobileNav
+            pathname={pathname}
+            groups={groups}
+            supportBadge={supportBadge}
+            tasksBadge={tasksBadge}
+          />
 
           <Link href="/overview" className="shrink-0 text-xl font-bold text-indigo-600">
             Solid Admin
@@ -293,6 +312,7 @@ export default function DashboardNav() {
                       >
                         <group.icon className="mr-2 h-4 w-4" />
                         {group.label}
+                        {group.tasksBadge && <CountBadge count={tasksBadge} tone="indigo" />}
                       </Link>
                     </NavigationMenuLink>
                   </NavigationMenuItem>
