@@ -233,6 +233,8 @@ export const OVERVIEW_QUERY_KEYS = {
   range: (from: string, to: string) => ["overview", from, to] as const,
   goodCustomers: (from: string, to: string) =>
     ["overview", "good-customers", from, to] as const,
+  incentives: (from: string, to: string) =>
+    ["overview", "incentives", from, to] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -308,3 +310,161 @@ export interface GoodCustomersResponse {
   generatedAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Incentives tab, `GET /admin/v1/overview/incentives`
+// ---------------------------------------------------------------------------
+
+/** How the numbers are counted; the version goes up when a rule changes. */
+export interface IncentivesDefinition {
+  version: number;
+  timezone: string;
+  weekStartsOn: string;
+}
+
+/** A pair of UTC days, both inclusive. */
+export interface IncentivesDaySpan {
+  from: string;
+  to: string;
+}
+
+export interface IncentivesSplit {
+  cashback: number;
+  referrals: number;
+  /** Subscription perks and yield boost. */
+  other: number;
+}
+
+export interface IncentivesTotals {
+  /** Tokens that left the payout wallets in the range, valued when sent. */
+  sent: Compared;
+  /** Cashback includes every rate and the payout corrections. */
+  sentSplit: IncentivesSplit;
+  /** Cashback sent in the range that was due before it started. */
+  lateCashbackInSentUsd: number;
+  /** Owed for the range's activity, minus anything already cancelled. */
+  earned: Compared;
+  earnedSplit: IncentivesSplit;
+  /** When the range's earned cashback and referral rewards pay out. */
+  earnedPaysOn: { cashback: IncentivesDaySpan; referrals: IncentivesDaySpan };
+  cardSpend: Compared;
+  /** Card spend ÷ earned; null when nothing was earned. */
+  cardSpendPerIncentiveDollar: {
+    current: number | null;
+    previous: number | null;
+    average13Weeks: number | null;
+  };
+  /** Earned ÷ card spend, 0–1; null without spend. */
+  earnedShareOfCardSpend: number | null;
+}
+
+/** `live`, or `not_launched` until a program has data; open for later states. */
+export type IncentivesProgramStatus = "live" | "not_launched" | (string & {});
+
+/** One row of "Where it went". An open list: new programs need no portal change. */
+export interface IncentivesProgram {
+  key: string;
+  label: string;
+  status: IncentivesProgramStatus;
+  sentUsd: number | null;
+  /** Null where earning does not apply (payout corrections). */
+  earnedUsd: number | null;
+  payments: number | null;
+}
+
+export interface IncentivesWeek {
+  /** Monday, `YYYY-MM-DD`. */
+  weekStart: string;
+  weekEnd: string;
+  /** The week is still running. */
+  partial: boolean;
+  sent: {
+    cashback: number;
+    referrals: number;
+    perks: number;
+    yieldBoost: number;
+    corrections: number;
+    total: number;
+  };
+  earned: {
+    cashback: number;
+    referrals: number;
+    perks: number;
+    yieldBoost: number;
+    total: number;
+  };
+  cardSpend: number;
+}
+
+/** One due bucket; the first is the rest of this week, the last ends 30 days out. */
+export interface IncentivesDueWeek {
+  from: string;
+  to: string;
+  cashbackAll: number;
+  cashbackExpected: number;
+  referralsAll: number;
+  referralsExpected: number;
+}
+
+/** What is already owed, as of now, whatever the range. */
+export interface IncentivesComingDue {
+  asOf: string;
+  /** Share actually paid in the last 4 weeks, 0–1. */
+  rates: { cashback: number; referrals: number };
+  totalAll: number;
+  totalExpected: number;
+  cashbackAll: number;
+  referralsAll: number;
+  overdueReferralsUsd: number;
+  weeks: IncentivesDueWeek[];
+  /** Average earned cashback a week, last 4 full weeks. */
+  newCashbackPerWeekUsd: number;
+}
+
+export type IncentivesCheckStatus =
+  | "on_track"
+  | "watch"
+  | "off_track"
+  | "not_available";
+
+export interface IncentivesCheck {
+  key: string;
+  label: string;
+  /** 0–1 for `percent`; null when not available. */
+  value: number | null;
+  unit: "percent" | "count" | (string & {});
+  status: IncentivesCheckStatus | (string & {});
+  detail: string;
+}
+
+/** Costs that look like incentives but stay out of the totals. */
+export interface IncentivesNotIncluded {
+  key: string;
+  label: string;
+  /** Preformatted by the backend. */
+  size: string;
+  why: string;
+}
+
+/**
+ * The Overview range shape; the tab only relies on the picked days, the
+ * previous range and the length.
+ */
+export type IncentivesRange = Pick<
+  OverviewRange,
+  "from" | "to" | "previousFrom" | "previousTo" | "days"
+> &
+  Partial<Omit<OverviewRange, "from" | "to" | "previousFrom" | "previousTo" | "days">>;
+
+export interface IncentivesResponse {
+  range: IncentivesRange;
+  definition: IncentivesDefinition;
+  generatedAt: string;
+  totals: IncentivesTotals;
+  programs: IncentivesProgram[];
+  /** 13 full weeks, then the partial week if any, oldest first. */
+  weekly: IncentivesWeek[];
+  weeklyTotals13: { sent: number; earned: number };
+  comingDue: IncentivesComingDue;
+  checks: IncentivesCheck[];
+  notIncluded: IncentivesNotIncluded[];
+}
