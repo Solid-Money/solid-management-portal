@@ -8,6 +8,7 @@ import {
   CircleDot,
   Flag,
   Headphones,
+  LayoutGrid,
   Link2,
   Loader2,
   Lock,
@@ -25,7 +26,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/components/auth-provider";
-import { isTaskId, usePatchTask, useRefreshTask, useTask, useTaskPeople } from "@/hooks/use-tasks";
+import {
+  isTaskId,
+  usePatchTask,
+  useRefreshTask,
+  useTask,
+  useTaskBoards,
+  useTaskPeople,
+} from "@/hooks/use-tasks";
 import {
   addChecklistItem,
   deleteChecklistItem,
@@ -37,6 +45,7 @@ import { cn } from "@/lib/utils";
 import TaskComposer from "@/components/tasks/task-composer";
 import TaskUpdateCard, { Attachments, taskUpdateApi } from "@/components/tasks/task-update-card";
 import {
+  BoardPicker,
   DuePicker,
   PeoplePicker,
   PersonPicker,
@@ -388,6 +397,9 @@ function Description({
 function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]; me: string }) {
   const patch = usePatchTask(task.id);
   const refresh = useRefreshTask();
+  const { data: boardList } = useTaskBoards();
+  const boards = boardList?.boards ?? [];
+  const boardName = task.board ? (boards.find((b) => b.key === task.board)?.name ?? task.board) : null;
   const [following, setFollowing] = useState<boolean | null>(null);
   const isFollowing = following ?? task.following;
   const closed = task.status === "done" || task.status === "cancelled";
@@ -447,6 +459,13 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
         <SheetDescription className="sr-only">Task T-{task.number}</SheetDescription>
 
         <div className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1">
+          <Field icon={LayoutGrid} label="Board">
+            <BoardPicker boards={boards} value={task.board} onChange={(board) => patch.mutate({ board })}>
+              <button type="button" className={fieldButton}>
+                {boardName ? <span className="truncate">{boardName}</span> : <span className="text-gray-400">No board</span>}
+              </button>
+            </BoardPicker>
+          </Field>
           <Field icon={CircleDot} label="Status">
             <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>
               <button type="button" className="cursor-pointer">

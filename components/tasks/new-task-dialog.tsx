@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Flag, Loader2, User } from "lucide-react";
+import { CalendarDays, Flag, LayoutGrid, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -13,10 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useTaskPeople, TASK_KEYS } from "@/hooks/use-tasks";
+import { useTaskBoards, useTaskPeople, TASK_KEYS } from "@/hooks/use-tasks";
 import { createTask } from "@/lib/tasks-api";
 import TaskComposer, { type ComposerValue } from "@/components/tasks/task-composer";
-import { DuePicker, PersonPicker, PriorityPicker, StatusPicker } from "@/components/tasks/task-pickers";
+import {
+  BoardPicker,
+  DuePicker,
+  PersonPicker,
+  PriorityPicker,
+  StatusPicker,
+} from "@/components/tasks/task-pickers";
 import { Avatar, DueLabel, PriorityLabel, StatusPill, personName } from "@/components/tasks/task-format";
 import type { TaskPriority, TaskStatus } from "@/types/tasks";
 
@@ -26,15 +32,26 @@ const chip =
 /** A task by hand: a title is enough; everything else can wait. */
 export default function NewTaskDialog({
   open,
+  defaultBoard = null,
   onOpenChange,
   onCreated,
 }: {
   open: boolean;
+  /** The board being looked at: new tasks go there unless changed. */
+  defaultBoard?: string | null;
   onOpenChange: (open: boolean) => void;
   onCreated: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
   const { data: people = [] } = useTaskPeople();
+  const { data: boardList } = useTaskBoards();
+  const boards = boardList?.boards ?? [];
+  const [board, setBoard] = useState<string | null>(defaultBoard);
+  // Each time it opens, start on the board being looked at.
+  useEffect(() => {
+    if (open) setBoard(defaultBoard);
+  }, [open, defaultBoard]);
+  const boardName = boards.find((b) => b.key === board)?.name ?? null;
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [owner, setOwner] = useState<string | null>(null);
@@ -69,6 +86,7 @@ export default function NewTaskDialog({
         ...(priority ? { priority } : {}),
         ...(due ? { dueDate: due } : {}),
         ...(restricted ? { visibility: "restricted" as const } : {}),
+        ...(board ? { board } : {}),
         ...(body.trim() || attachmentIds.length
           ? { description: { body: body.trim(), mentions, attachmentIds } }
           : {}),
@@ -108,6 +126,12 @@ export default function NewTaskDialog({
         />
 
         <div className="flex flex-wrap gap-2">
+          <BoardPicker boards={boards} value={board} onChange={setBoard}>
+            <button type="button" className={chip}>
+              <LayoutGrid className="size-4 text-gray-400" />
+              {boardName ?? "Board"}
+            </button>
+          </BoardPicker>
           <StatusPicker value={status} onChange={setStatus}>
             <button type="button" className={chip}>
               <StatusPill status={status} className="h-5" />

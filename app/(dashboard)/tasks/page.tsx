@@ -10,6 +10,7 @@ import TeamFeed from "@/components/tasks/team-feed";
 import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
 import TaskList from "@/components/tasks/task-list";
+import BoardTabs from "@/components/tasks/board-tabs";
 import {
   TASK_PRIORITIES,
   TASK_VIEWS,
@@ -27,10 +28,10 @@ function isPriority(value: string | null): value is TaskPriority {
 }
 
 /**
- * The team's tasks: everything open, by hand or opened by Solid AI and the
- * radar, and the Team feed beside them. The tab, view, filters and the open
- * task live in the URL (`?tab=feed&post=`, `?view=&owner=&priority=&label=&q=&task=`),
- * so any task or post is a link.
+ * The team's tasks, on boards (Features, Bugs, Support, …), by hand or opened
+ * by Solid AI and the radar, and the Team feed beside them. The tab, board,
+ * view, filters and the open task live in the URL (`?tab=feed&post=`,
+ * `?board=&view=&owner=&priority=&label=&q=&task=`), so any task or post is a link.
  */
 function TasksScreen() {
   const router = useRouter();
@@ -40,10 +41,15 @@ function TasksScreen() {
   const tab = params.get("tab") === "feed" ? "feed" : "tasks";
   const { data: counts } = useTaskCounts();
 
-  const view = params.get("view");
+  const rawView = params.get("view");
+  // Old links: the "From support" and "From radar" views are boards now.
+  const legacyBoard = rawView === "support" || rawView === "radar" ? rawView : null;
+  const view = legacyBoard ? "open" : rawView;
+  const board = params.get("board") ?? legacyBoard;
   const priority = params.get("priority");
   const filters: TaskListFilters = {
     view: isView(view) ? view : "open",
+    ...(board ? { board } : {}),
     ...(params.get("owner") ? { owner: params.get("owner")! } : {}),
     ...(isPriority(priority) ? { priority } : {}),
     ...(params.get("label") ? { label: params.get("label")! } : {}),
@@ -104,18 +110,25 @@ function TasksScreen() {
       {tab === "feed" ? (
         <TeamFeed highlight={params.get("post")} />
       ) : (
-        <TaskList
+        <>
+          <BoardTabs
+            value={board}
+            onChange={(next) => update(legacyBoard ? { board: next, view: null } : { board: next })}
+          />
+          <TaskList
           filters={filters}
           onFilters={(next) => update(next)}
           selected={open}
           onOpen={(id) => update({ task: id })}
           counts={counts}
         />
+        </>
       )}
 
       <TaskDrawer taskId={open} onClose={() => update({ task: null })} />
       <NewTaskDialog
         open={creating}
+        defaultBoard={board && board !== "none" ? board : null}
         onOpenChange={setCreating}
         onCreated={(id) => update({ task: id, tab: null })}
       />

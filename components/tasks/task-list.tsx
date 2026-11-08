@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2, MessageSquare, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTaskList, useTaskPeople } from "@/hooks/use-tasks";
+import { useTaskBoards, useTaskList, useTaskPeople } from "@/hooks/use-tasks";
 import { cn } from "@/lib/utils";
 import { PersonPicker, PriorityPicker } from "@/components/tasks/task-pickers";
 import {
@@ -33,8 +33,6 @@ const VIEWS: Array<{ view: TaskListView; label: string; count?: keyof TaskListCo
   { view: "open", label: "All open", count: "open" },
   { view: "mine", label: "Mine", count: "mine" },
   { view: "mentions", label: "Mentions", count: "mentions" },
-  { view: "support", label: "From support", count: "support" },
-  { view: "radar", label: "From radar", count: "radar" },
   { view: "done", label: "Done" },
 ];
 
@@ -54,13 +52,17 @@ function Row({
   selected,
   onOpen,
   onLabel,
+  boardName,
 }: {
   row: TaskRow;
   people: TaskPerson[];
   selected: boolean;
   onOpen: () => void;
   onLabel: (label: string) => void;
+  /** Set when every board is listed: each row says which board it's on. */
+  boardName?: (key: string) => string | null;
 }) {
+  const board = boardName && row.board ? boardName(row.board) : null;
   const closed = row.status === "done" || row.status === "cancelled";
   return (
     <tr
@@ -96,6 +98,11 @@ function Row({
           >
             {row.title}
           </span>
+          {board && (
+            <span className="hidden shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-500 md:inline">
+              {board}
+            </span>
+          )}
           {row.labels.slice(0, 2).map((label) => (
             <button
               key={label}
@@ -160,6 +167,7 @@ function Table({
   selected,
   onOpen,
   onLabel,
+  boardName,
   done,
 }: {
   rows: TaskRow[];
@@ -167,6 +175,7 @@ function Table({
   selected: string | null;
   onOpen: (id: string) => void;
   onLabel: (label: string) => void;
+  boardName?: (key: string) => string | null;
   done?: boolean;
 }) {
   return (
@@ -191,6 +200,7 @@ function Table({
             selected={row.id === selected}
             onOpen={() => onOpen(row.id)}
             onLabel={onLabel}
+            boardName={boardName}
           />
         ))}
       </tbody>
@@ -209,6 +219,7 @@ function Group({
   selected: string | null;
   onOpen: (id: string) => void;
   onLabel: (label: string) => void;
+  boardName?: (key: string) => string | null;
 }) {
   const [open, setOpen] = useState(true);
   const meta = STATUS_META[status];
@@ -271,7 +282,18 @@ export default function TaskList({
     [rows],
   );
   const filtered = !!(filters.owner || filters.priority || filters.label || filters.q);
-  const table = { people, selected, onOpen, onLabel: (label: string) => onFilters({ label }) };
+  const { data: boards } = useTaskBoards();
+  const boardNames = useMemo(
+    () => new Map((boards?.boards ?? []).map((board) => [board.key, board.name])),
+    [boards],
+  );
+  const table = {
+    people,
+    selected,
+    onOpen,
+    onLabel: (label: string) => onFilters({ label }),
+    ...(filters.board ? {} : { boardName: (key: string) => boardNames.get(key) ?? null }),
+  };
 
   return (
     <div className="space-y-4">

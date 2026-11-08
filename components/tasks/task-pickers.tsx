@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, UserX } from "lucide-react";
+import { Check, LayoutGrid, UserX } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Command,
@@ -22,6 +22,7 @@ import {
 } from "@/components/tasks/task-format";
 import {
   TASK_PRIORITIES,
+  type TaskBoard,
   type TaskPerson,
   type TaskPriority,
   type TaskStatus,
@@ -164,6 +165,51 @@ export function StatusPicker({
             <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_META[status].swatch)} />
             {STATUS_META[status].label}
             {status === value && <Check className="ml-auto size-4" />}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Put a task on a board, or on none. */
+export function BoardPicker({
+  boards,
+  value,
+  onChange,
+  children,
+}: {
+  boards: TaskBoard[];
+  value: string | null;
+  onChange: (board: string | null) => void;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const options: Array<{ key: string | null; name: string }> = [
+    ...boards.map((board) => ({ key: board.key, name: board.name })),
+    { key: null, name: "No board" },
+  ];
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent align="start" className="max-h-80 w-52 overflow-y-auto p-1">
+        {options.map((option) => (
+          <button
+            key={option.key ?? "none"}
+            type="button"
+            onClick={() => {
+              onChange(option.key);
+              setOpen(false);
+            }}
+            className={cn(
+              "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-gray-100",
+              option.key === value && "bg-gray-50 font-medium",
+              option.key === null && "text-gray-500",
+            )}
+          >
+            <LayoutGrid className="size-3.5 shrink-0 text-gray-400" />
+            <span className="truncate">{option.name}</span>
+            {option.key === value && <Check className="ml-auto size-4 shrink-0" />}
           </button>
         ))}
       </PopoverContent>

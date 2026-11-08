@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/components/auth-provider";
 import {
   getTask,
+  getTaskBoards,
   getTaskCounts,
   getTaskFeed,
   getTaskNotifications,
@@ -25,6 +26,7 @@ export const TASK_KEYS = {
   all: ["tasks"] as const,
   people: ["tasks", "people"] as const,
   counts: ["tasks", "counts"] as const,
+  boards: ["tasks", "boards"] as const,
   list: (filters: TaskListFilters) => ["tasks", "list", filters] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
@@ -52,6 +54,17 @@ export function useTaskCounts() {
     // Live events refresh it; this is the fallback when the socket is down.
     refetchInterval: 60_000,
     retry: false,
+  });
+}
+
+/** The boards, in tab order, with their open counts. */
+export function useTaskBoards() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: TASK_KEYS.boards,
+    queryFn: getTaskBoards,
+    enabled: !!user,
+    refetchInterval: 60_000,
   });
 }
 
@@ -91,6 +104,7 @@ export function usePatchTask(id: string) {
       queryClient.setQueryData(TASK_KEYS.task(id), task);
       void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
+      void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
     },
   });
 }
@@ -103,6 +117,7 @@ export function useRefreshTask() {
     else void queryClient.invalidateQueries({ queryKey: TASK_KEYS.task(id) });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
+    void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
   };
 }
 

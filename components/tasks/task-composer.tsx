@@ -17,11 +17,18 @@ import { uploadTaskFile } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import { Avatar, personName } from "@/components/tasks/task-format";
 import { mentionQuery, mentionsInText } from "@/lib/task-format";
+import { caretCoordinates } from "@/lib/textarea-caret";
 import type { TaskBodyInput, TaskPerson, TaskUpload } from "@/types/tasks";
 
 const MAX_FILES = 10;
 const MAX_BYTES = 20 * 1024 * 1024;
 const ACCEPT = "image/png,image/jpeg,image/gif,image/webp,image/heic,application/pdf";
+/** The @mention list: w-72, and six rows at most. */
+const MENTION_LIST_WIDTH = 288;
+const MENTION_LIST_HEIGHT = 6 * 38 + 8;
+
+/** Where the @mention list opens, inside the composer box. */
+type MentionAnchor = { left: number } & ({ top: number } | { bottom: number });
 
 interface PendingFile {
   localId: string;
@@ -81,6 +88,7 @@ export default function TaskComposer({
   const [dragging, setDragging] = useState(false);
   const [query, setQuery] = useState<{ text: string; start: number } | null>(null);
   const [active, setActive] = useState(0);
+  const [anchor, setAnchor] = useState<MentionAnchor | null>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
 
@@ -119,8 +127,30 @@ export default function TaskComposer({
       .slice(0, 6);
   }, [query, people]);
 
+  // Right under the line being typed on, at the @; above it when there is no
+  // room below in the window.
+  const placeList = (start: number): MentionAnchor | null => {
+    const el = textarea.current;
+    const box = el?.parentElement;
+    if (!el || !box) return null;
+    const caret = caretCoordinates(el, start);
+    const lineTop = el.offsetTop + caret.top - el.scrollTop;
+    const left = Math.max(
+      8,
+      Math.min(el.offsetLeft + caret.left - 12, box.clientWidth - MENTION_LIST_WIDTH - 8),
+    );
+    const boxTop = box.getBoundingClientRect().top;
+    const roomBelow = window.innerHeight - (boxTop + lineTop + caret.height);
+    const roomAbove = boxTop + lineTop;
+    if (roomBelow < MENTION_LIST_HEIGHT && roomAbove > roomBelow)
+      return { left, bottom: box.clientHeight - lineTop + 4 };
+    return { left, top: lineTop + caret.height + 4 };
+  };
+
   const readQuery = (value: string, caret: number) => {
-    setQuery(mentionQuery(value, caret));
+    const next = mentionQuery(value, caret);
+    setQuery(next);
+    setAnchor(next ? placeList(next.start) : null);
     setActive(0);
   };
 
@@ -273,7 +303,10 @@ export default function TaskComposer({
       />
 
       {query && matches.length > 0 && (
-        <div className="absolute left-3 top-full z-30 mt-1 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div
+          className="absolute z-30 w-72 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          style={anchor ?? { left: 12, top: "100%" }}
+        >
           {matches.map((person, index) => (
             <button
               key={person.email}
@@ -289,8 +322,10 @@ export default function TaskComposer({
               )}
             >
               <Avatar email={person.email} people={people} size={22} />
-              <span className="font-medium text-gray-900">{personName(person.email, people)}</span>
-              <span className="truncate text-xs text-gray-400">{person.email}</span>
+              <span className="min-w-0 max-w-[60%] shrink-0 truncate whitespace-nowrap font-medium text-gray-900">
+                {personName(person.email, people)}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-xs text-gray-400">{person.email}</span>
             </button>
           ))}
         </div>
