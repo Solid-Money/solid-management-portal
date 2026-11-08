@@ -91,7 +91,15 @@ export default function UserRecoveryCard({
 }: UserRecoveryCardProps) {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, dataUpdatedAt, errorUpdatedAt } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+    dataUpdatedAt,
+    errorUpdatedAt,
+  } = useQuery({
     queryKey: ["user-recovery-eligibility", userId],
     queryFn: async () => (await getRecoveryEligibility(userId)).data.data,
   });
@@ -158,6 +166,30 @@ export default function UserRecoveryCard({
             <Loader2 className="h-4 w-4 animate-spin" />
             Checking…
           </p>
+        )}
+
+        {isError && (
+          // A failed re-read keeps the last answer on screen, hold included,
+          // and the next automatic check may be the hold's own deadline. Say
+          // so, and let support re-read now rather than repeat whatever they
+          // just did.
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+            <span>
+              {data
+                ? "Couldn't refresh account access. What this card shows may be out of date."
+                : "Couldn't load account access."}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
+              {isFetching && <Loader2 className="h-4 w-4 animate-spin" />}
+              Retry
+            </Button>
+          </div>
         )}
 
         {data && (
