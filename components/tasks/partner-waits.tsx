@@ -301,6 +301,12 @@ export default function PartnerWaits() {
         {overdue > 0 && <span className="font-medium text-red-700"> · {overdue} past their follow-up</span>}. Past
         their follow-up, cases are back in the inbox too; give one a new date once you&apos;ve chased the partner.
       </p>
+      {data.partnersUnavailable && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Couldn&apos;t check which card issuer or KYC provider some customers are with, so they&apos;re under
+          &ldquo;unknown&rdquo;. It&apos;s checked again on the next refresh.
+        </p>
+      )}
       {data.groups.map((group) => (
         <Group key={group.partner} group={group} onChanged={refresh} />
       ))}

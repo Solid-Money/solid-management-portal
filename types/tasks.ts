@@ -196,6 +196,8 @@ export interface TaskPartnerGroup {
 export interface TaskPartners {
   groups: TaskPartnerGroup[];
   total: number;
+  /** Who some customers are with couldn't be read; they're under "unknown". */
+  partnersUnavailable?: boolean;
 }
 
 export interface TaskBoard {
