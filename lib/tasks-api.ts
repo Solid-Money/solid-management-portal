@@ -3,7 +3,6 @@ import type {
   TaskCreateInput,
   TaskDetail,
   TaskFeedPage,
-  TaskImport,
   TaskNotifications,
   TaskListFilters,
   TaskListPage,
@@ -123,12 +122,3 @@ export const deleteFeedPost = async (postId: string) =>
 
 export const reactToFeedPost = async (postId: string, emoji: TaskReaction) =>
   (await api.post<TaskUpdate>(`${base}/feed/${postId}/reactions`, { emoji })).data;
-
-// ---- monday import ---------------------------------------------------------
-
-/** The token is used for this import only; the backend never stores it. */
-export const startMondayImport = async (token: string, boardIds: string[]) =>
-  (await api.post<TaskImport>(`${base}/import/monday`, { token, boardIds })).data;
-
-export const getTaskImport = async () =>
-  (await api.get<TaskImport | null>(`${base}/import`, { quietErrors: true })).data;

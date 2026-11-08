@@ -23,7 +23,7 @@ export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 export const TASK_VIEWS = ["open", "mine", "mentions", "support", "radar", "done"] as const;
 export type TaskListView = (typeof TASK_VIEWS)[number];
 
-export type TaskSourceKind = "manual" | "support" | "radar" | "claude" | "monday";
+export type TaskSourceKind = "manual" | "support" | "radar" | "claude";
 export type TaskVisibility = "everyone" | "restricted";
 export type TaskLinkKind = "conversation" | "user" | "task" | "url";
 export type TaskBot = "solid-ai" | "radar" | "claude";
@@ -221,21 +221,4 @@ export interface TaskNotifications {
 export interface TaskFeedPage {
   posts: TaskUpdate[];
   hasMore: boolean;
-}
-
-export interface TaskImport {
-  id: string;
-  status: "running" | "done" | "failed";
-  boards: Array<{ id: string; name: string | null }>;
-  startedBy: string;
-  startedAt: string;
-  finishedAt: string | null;
-  items: number;
-  created: number;
-  skipped: number;
-  updates: number;
-  images: number;
-  failed: Array<{ itemId: string; reason: string }>;
-  unmatchedPeople: string[];
-  error: string | null;
 }

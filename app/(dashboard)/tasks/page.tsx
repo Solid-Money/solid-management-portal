@@ -2,11 +2,10 @@
 
 import { Suspense, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, ListTodo, Loader2, MessagesSquare, Plus } from "lucide-react";
+import { ListTodo, Loader2, MessagesSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTaskCounts } from "@/hooks/use-tasks";
 import NewTaskDialog from "@/components/tasks/new-task-dialog";
-import MondayImportDialog from "@/components/tasks/monday-import-dialog";
 import TeamFeed from "@/components/tasks/team-feed";
 import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
@@ -38,7 +37,6 @@ function TasksScreen() {
   const pathname = usePathname();
   const params = useSearchParams();
   const [creating, setCreating] = useState(false);
-  const [importing, setImporting] = useState(false);
   const tab = params.get("tab") === "feed" ? "feed" : "tasks";
   const { data: counts } = useTaskCounts();
 
@@ -76,14 +74,9 @@ function TasksScreen() {
             Everything the team is working on, opened by hand or by Solid AI and the radar.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImporting(true)}>
-            <Download /> Import from monday
-          </Button>
-          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => setCreating(true)}>
-            <Plus /> New task
-          </Button>
-        </div>
+        <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => setCreating(true)}>
+          <Plus /> New task
+        </Button>
       </div>
 
       <div className="inline-flex rounded-lg bg-gray-200/70 p-1">
@@ -126,7 +119,6 @@ function TasksScreen() {
         onOpenChange={setCreating}
         onCreated={(id) => update({ task: id, tab: null })}
       />
-      <MondayImportDialog open={importing} onOpenChange={setImporting} />
     </div>
   );
 }
