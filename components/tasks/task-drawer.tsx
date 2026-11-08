@@ -35,7 +35,7 @@ import {
 } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import TaskComposer from "@/components/tasks/task-composer";
-import TaskUpdateCard, { Attachments } from "@/components/tasks/task-update-card";
+import TaskUpdateCard, { Attachments, taskUpdateApi } from "@/components/tasks/task-update-card";
 import {
   DuePicker,
   PeoplePicker,
@@ -545,7 +545,7 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
             {task.updates.map((update) => (
               <TaskUpdateCard
                 key={update.id}
-                taskId={task.id}
+                api={taskUpdateApi(task.id)}
                 update={update}
                 me={me}
                 people={people}

@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSupportCounts, useSupportMe } from "@/hooks/use-support";
 import { useTaskCounts } from "@/hooks/use-tasks";
+import TaskBell from "@/components/tasks/task-bell";
 
 /**
  * The number on the Support badge: cases needing a human plus the admin's
@@ -85,7 +86,7 @@ function GroupSubmenu({
             "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800"
         )}
       >
-        <group.icon className="mr-2 h-4 w-4" />
+        <group.icon className="mr-2 hidden h-4 w-4 2xl:block" />
         {group.label}
         <CountBadge count={badge} />
       </NavigationMenuTrigger>
@@ -149,7 +150,7 @@ function MobileNav({
         <Button
           variant="outline"
           size="icon"
-          className="relative md:hidden"
+          className="relative xl:hidden"
           aria-label={supportBadge ? `Open navigation, ${supportBadge} support cases waiting` : "Open navigation"}
         >
           <Menu className="h-4 w-4" />
@@ -295,7 +296,7 @@ export default function DashboardNav() {
             Solid Admin
           </Link>
 
-          <NavigationMenu className="hidden md:flex" viewport={false}>
+          <NavigationMenu className="hidden xl:flex" viewport={false}>
             <NavigationMenuList>
               {groups.map((group) =>
                 group.href ? (
@@ -310,7 +311,7 @@ export default function DashboardNav() {
                             "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800"
                         )}
                       >
-                        <group.icon className="mr-2 h-4 w-4" />
+                        <group.icon className="mr-2 hidden h-4 w-4 2xl:block" />
                         {group.label}
                         {group.tasksBadge && <CountBadge count={tasksBadge} tone="indigo" />}
                       </Link>
@@ -332,6 +333,7 @@ export default function DashboardNav() {
             {/* Users, card ids, Refs, pages and settings — the most common
                 support entry point, so it is on every page. */}
             <NavSearchTrigger />
+            <TaskBell />
             <ProfileMenu
               email={user?.email}
               onSignOut={() => setIsSignOutModalOpen(true)}

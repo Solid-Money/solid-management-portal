@@ -11,8 +11,12 @@ import { useAuth } from "@/components/auth-provider";
 import {
   getTask,
   getTaskCounts,
+  getTaskFeed,
+  getTaskImport,
+  getTaskNotifications,
   getTaskPeople,
   getTasks,
+  markTaskNotificationsRead,
   patchTask,
 } from "@/lib/tasks-api";
 import type { TaskDetail, TaskListFilters, TaskPatchInput } from "@/types/tasks";
@@ -24,6 +28,9 @@ export const TASK_KEYS = {
   counts: ["tasks", "counts"] as const,
   list: (filters: TaskListFilters) => ["tasks", "list", filters] as const,
   task: (id: string) => ["tasks", "task", id] as const,
+  notifications: ["tasks", "notifications"] as const,
+  feed: ["tasks", "feed"] as const,
+  import: ["tasks", "import"] as const,
 };
 
 /** Admins who can own a task or be @mentioned. */
@@ -93,4 +100,48 @@ export function useRefreshTask() {
     void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
   };
+}
+
+/** The bell: newest entries and the unread count. */
+export function useTaskNotifications() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: TASK_KEYS.notifications,
+    queryFn: getTaskNotifications,
+    enabled: !!user,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+}
+
+export function useMarkNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markTaskNotificationsRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: TASK_KEYS.notifications });
+    },
+  });
+}
+
+/** The Team feed, newest first, a page at a time. */
+export function useTaskFeed() {
+  return useInfiniteQuery({
+    queryKey: TASK_KEYS.feed,
+    queryFn: ({ pageParam }) => getTaskFeed(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => (last.hasMore ? last.posts.at(-1)?.id : undefined),
+    // Image links are signed for five minutes.
+    refetchInterval: 4 * 60_000,
+  });
+}
+
+/** The latest monday import; polled while one runs. */
+export function useTaskImport(enabled: boolean) {
+  return useQuery({
+    queryKey: TASK_KEYS.import,
+    queryFn: getTaskImport,
+    enabled,
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 2_000 : false),
+  });
 }

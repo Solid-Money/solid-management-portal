@@ -2,10 +2,13 @@
 
 import { Suspense, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Download, ListTodo, Loader2, MessagesSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTaskCounts } from "@/hooks/use-tasks";
 import NewTaskDialog from "@/components/tasks/new-task-dialog";
+import MondayImportDialog from "@/components/tasks/monday-import-dialog";
+import TeamFeed from "@/components/tasks/team-feed";
+import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
 import TaskList from "@/components/tasks/task-list";
 import {
@@ -26,14 +29,17 @@ function isPriority(value: string | null): value is TaskPriority {
 
 /**
  * The team's tasks: everything open, by hand or opened by Solid AI and the
- * radar. The view, the filters and the open task live in the URL
- * (`?view=&owner=&priority=&label=&q=&task=`), so any task is a link.
+ * radar, and the Team feed beside them. The tab, view, filters and the open
+ * task live in the URL (`?tab=feed&post=`, `?view=&owner=&priority=&label=&q=&task=`),
+ * so any task or post is a link.
  */
 function TasksScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const tab = params.get("tab") === "feed" ? "feed" : "tasks";
   const { data: counts } = useTaskCounts();
 
   const view = params.get("view");
@@ -70,21 +76,57 @@ function TasksScreen() {
             Everything the team is working on, opened by hand or by Solid AI and the radar.
           </p>
         </div>
-        <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => setCreating(true)}>
-          <Plus /> New task
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImporting(true)}>
+            <Download /> Import from monday
+          </Button>
+          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => setCreating(true)}>
+            <Plus /> New task
+          </Button>
+        </div>
       </div>
 
-      <TaskList
-        filters={filters}
-        onFilters={(next) => update(next)}
-        selected={open}
-        onOpen={(id) => update({ task: id })}
-        counts={counts}
-      />
+      <div className="inline-flex rounded-lg bg-gray-200/70 p-1">
+        {(
+          [
+            { key: "tasks", label: "Tasks", icon: ListTodo },
+            { key: "feed", label: "Team feed", icon: MessagesSquare },
+          ] as const
+        ).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => update({ tab: key === "feed" ? "feed" : null, post: null })}
+            className={cn(
+              "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+              tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900",
+            )}
+          >
+            <Icon className="size-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "feed" ? (
+        <TeamFeed highlight={params.get("post")} />
+      ) : (
+        <TaskList
+          filters={filters}
+          onFilters={(next) => update(next)}
+          selected={open}
+          onOpen={(id) => update({ task: id })}
+          counts={counts}
+        />
+      )}
 
       <TaskDrawer taskId={open} onClose={() => update({ task: null })} />
-      <NewTaskDialog open={creating} onOpenChange={setCreating} onCreated={(id) => update({ task: id })} />
+      <NewTaskDialog
+        open={creating}
+        onOpenChange={setCreating}
+        onCreated={(id) => update({ task: id, tab: null })}
+      />
+      <MondayImportDialog open={importing} onOpenChange={setImporting} />
     </div>
   );
 }

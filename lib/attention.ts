@@ -94,7 +94,7 @@ const QUIET_NAMES: Record<string, string> = {
   signup_spike: "sign-ups",
 };
 
-/** "No spike this week in card declines, card spend or sign-ups · checks every 5 min · last check 11:30 UTC · escalations go to #solid" */
+/** "No spike this week in card declines, card spend or sign-ups · checks every 5 min · last check 11:30 UTC · escalations open a task" */
 export function footerLine(
   list: Pick<AttentionListResponse, "quiet" | "lastCheckAt">,
 ): string {
@@ -113,7 +113,7 @@ export function footerLine(
       ? `last check ${list.lastCheckAt.slice(11, 16)} UTC`
       : "not checked yet",
   );
-  parts.push("escalations go to #solid");
+  parts.push("escalations open a task");
   return parts.join(" · ");
 }
 

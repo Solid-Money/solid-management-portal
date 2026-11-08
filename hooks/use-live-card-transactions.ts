@@ -115,6 +115,8 @@ export function useLiveCardTransactions(enabled: boolean): void {
       tasksTimer = undefined;
       void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "counts"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "feed"] });
       for (const id of changedTasks) {
         void queryClient.invalidateQueries({ queryKey: ["tasks", "task", id] });
       }

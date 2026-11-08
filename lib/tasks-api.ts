@@ -2,6 +2,9 @@ import api from "@/lib/api";
 import type {
   TaskCreateInput,
   TaskDetail,
+  TaskFeedPage,
+  TaskImport,
+  TaskNotifications,
   TaskListFilters,
   TaskListPage,
   TaskPatchInput,
@@ -94,3 +97,38 @@ export const uploadTaskFile = async (file: File) => {
   form.append("file", file, file.name || "image.png");
   return (await api.post<TaskUpload>(`${base}/uploads`, form)).data;
 };
+
+// ---- The bell ------------------------------------------------------------
+
+/** Polled for the bell: a failure just leaves it quiet. */
+export const getTaskNotifications = async () =>
+  (await api.get<TaskNotifications>(`${base}/notifications`, { quietErrors: true })).data;
+
+export const markTaskNotificationsRead = async (input: { ids?: string[]; all?: boolean }) =>
+  (await api.post<{ unread: number }>(`${base}/notifications/read`, input)).data;
+
+// ---- Team feed -------------------------------------------------------------
+
+export const getTaskFeed = async (before?: string) =>
+  (await api.get<TaskFeedPage>(`${base}/feed`, { params: before ? { before } : {} })).data;
+
+export const postToFeed = async (input: TaskBodyInput & { parentId?: string }) =>
+  (await api.post<TaskUpdate>(`${base}/feed`, input)).data;
+
+export const editFeedPost = async (postId: string, input: { body: string; mentions?: string[] }) =>
+  (await api.patch<TaskUpdate>(`${base}/feed/${postId}`, input)).data;
+
+export const deleteFeedPost = async (postId: string) =>
+  (await api.delete<{ deleted: true }>(`${base}/feed/${postId}`)).data;
+
+export const reactToFeedPost = async (postId: string, emoji: TaskReaction) =>
+  (await api.post<TaskUpdate>(`${base}/feed/${postId}/reactions`, { emoji })).data;
+
+// ---- monday import ---------------------------------------------------------
+
+/** The token is used for this import only; the backend never stores it. */
+export const startMondayImport = async (token: string, boardIds: string[]) =>
+  (await api.post<TaskImport>(`${base}/import/monday`, { token, boardIds })).data;
+
+export const getTaskImport = async () =>
+  (await api.get<TaskImport | null>(`${base}/import`, { quietErrors: true })).data;

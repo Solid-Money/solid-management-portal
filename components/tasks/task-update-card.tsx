@@ -12,9 +12,13 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
+  deleteFeedPost,
   deleteTaskUpdate,
+  editFeedPost,
   editTaskUpdate,
   postTaskUpdate,
+  postToFeed,
+  reactToFeedPost,
   reactToTaskUpdate,
 } from "@/lib/tasks-api";
 import TaskComposer from "@/components/tasks/task-composer";
@@ -35,9 +39,35 @@ import {
   type TaskAttachment,
   type TaskPerson,
   type TaskPriority,
+  type TaskBodyInput,
+  type TaskReaction,
   type TaskStatus,
   type TaskUpdate,
 } from "@/types/tasks";
+
+/** Where an update lives: a task's feed, or the Team feed. */
+export interface UpdateApi {
+  react: (updateId: string, emoji: TaskReaction) => Promise<unknown>;
+  edit: (updateId: string, input: { body: string; mentions: string[] }) => Promise<unknown>;
+  remove: (updateId: string) => Promise<unknown>;
+  reply: (parentId: string, input: Required<TaskBodyInput>) => Promise<unknown>;
+}
+
+export function taskUpdateApi(taskId: string): UpdateApi {
+  return {
+    react: (updateId, emoji) => reactToTaskUpdate(taskId, updateId, emoji),
+    edit: (updateId, input) => editTaskUpdate(taskId, updateId, input),
+    remove: (updateId) => deleteTaskUpdate(taskId, updateId),
+    reply: (parentId, input) => postTaskUpdate(taskId, { ...input, parentId }),
+  };
+}
+
+export const feedUpdateApi: UpdateApi = {
+  react: (postId, emoji) => reactToFeedPost(postId, emoji),
+  edit: (postId, input) => editFeedPost(postId, input),
+  remove: (postId) => deleteFeedPost(postId),
+  reply: (parentId, input) => postToFeed({ ...input, parentId }),
+};
 
 /** Images inside the message, at a readable size; other files as chips. */
 export function Attachments({ attachments }: { attachments: TaskAttachment[] }) {
@@ -175,14 +205,14 @@ function Reactions({
  * changes render as a single line instead.
  */
 export default function TaskUpdateCard({
-  taskId,
+  api,
   update,
   me,
   people,
   isReply = false,
   onChanged,
 }: {
-  taskId: string;
+  api: UpdateApi;
   update: TaskUpdate;
   me: string;
   people: TaskPerson[];
@@ -200,7 +230,7 @@ export default function TaskUpdateCard({
 
   const react = async (emoji: (typeof TASK_REACTIONS)[number]) => {
     setReactOpen(false);
-    await reactToTaskUpdate(taskId, update.id, emoji);
+    await api.react(update.id, emoji);
     onChanged();
   };
 
@@ -251,7 +281,7 @@ export default function TaskUpdateCard({
                         className="text-red-600 focus:text-red-700"
                         onSelect={async () => {
                           if (!window.confirm("Delete this update?")) return;
-                          await deleteTaskUpdate(taskId, update.id);
+                          await api.remove(update.id);
                           onChanged();
                         }}
                       >
@@ -277,7 +307,7 @@ export default function TaskUpdateCard({
               submitLabel="Save"
               onCancel={() => setEditing(false)}
               onSubmit={async ({ body, mentions }) => {
-                await editTaskUpdate(taskId, update.id, { body, mentions });
+                await api.edit(update.id, { body, mentions });
                 setEditing(false);
                 onChanged();
               }}
@@ -321,7 +351,7 @@ export default function TaskUpdateCard({
           {update.replies.map((reply) => (
             <TaskUpdateCard
               key={reply.id}
-              taskId={taskId}
+              api={api}
               update={reply}
               me={me}
               people={people}
@@ -339,7 +369,7 @@ export default function TaskUpdateCard({
               minRows={2}
               onCancel={() => setReplying(false)}
               onSubmit={async (input) => {
-                await postTaskUpdate(taskId, { ...input, parentId: update.id });
+                await api.reply(update.id, input);
                 setReplying(false);
                 onChanged();
               }}

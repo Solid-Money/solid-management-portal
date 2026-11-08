@@ -189,3 +189,53 @@ export interface TaskUpload {
   height: number | null;
   url: string | null;
 }
+
+export type TaskNotificationKind =
+  | "mention"
+  | "assigned"
+  | "reply"
+  | "update"
+  | "status"
+  | "nudge"
+  | "feed_mention";
+
+export interface TaskNotification {
+  id: string;
+  kind: TaskNotificationKind;
+  /** Null for a Team feed mention. */
+  taskId: string | null;
+  taskNumber: number | null;
+  taskTitle: string | null;
+  actor: TaskAuthor;
+  excerpt: string;
+  updateId: string | null;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface TaskNotifications {
+  items: TaskNotification[];
+  unread: number;
+}
+
+export interface TaskFeedPage {
+  posts: TaskUpdate[];
+  hasMore: boolean;
+}
+
+export interface TaskImport {
+  id: string;
+  status: "running" | "done" | "failed";
+  boards: Array<{ id: string; name: string | null }>;
+  startedBy: string;
+  startedAt: string;
+  finishedAt: string | null;
+  items: number;
+  created: number;
+  skipped: number;
+  updates: number;
+  images: number;
+  failed: Array<{ itemId: string; reason: string }>;
+  unmatchedPeople: string[];
+  error: string | null;
+}
