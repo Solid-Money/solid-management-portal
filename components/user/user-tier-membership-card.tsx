@@ -96,6 +96,10 @@ function FundingNote({ funding }: { funding: TierSubscriptionFundingView }) {
 const formatFuse = (amount: number) =>
   `${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })} FUSE`;
 
+/** FUSE to the cent, for figures a threshold is decided on. */
+const formatFuseExact = (amount: number) =>
+  `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} FUSE`;
+
 /** One past membership, for the history list. */
 function SubscriptionRow({ subscription }: { subscription: TierSubscriptionView }) {
   return (
@@ -219,6 +223,16 @@ export default function UserTierMembershipCard({
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Locked" value={formatFuse(lock.lockedFuse)} />
+                  {/* What the tier is resolved from. Shown to the cent: a lock
+                      a fraction of a FUSE under a threshold is exactly the case
+                      this is here to explain, and whole FUSE would round it
+                      up to the threshold. */}
+                  {lock.committedFuse !== undefined ? (
+                    <Stat
+                      label="Graded at"
+                      value={formatFuseExact(lock.committedFuse)}
+                    />
+                  ) : null}
                   <Stat
                     label="Unlocks tier"
                     value={lock.unlockedTier}
