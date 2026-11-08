@@ -17,7 +17,7 @@ import { uploadTaskFile } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import { Avatar, personName } from "@/components/tasks/task-format";
 import { mentionQuery, mentionsInText } from "@/lib/task-format";
-import { caretCoordinates } from "@/lib/textarea-caret";
+import { caretCoordinates, visibleBounds } from "@/lib/textarea-caret";
 import type { TaskBodyInput, TaskPerson, TaskUpload } from "@/types/tasks";
 
 const MAX_FILES = 10;
@@ -28,7 +28,7 @@ const MENTION_LIST_WIDTH = 288;
 const MENTION_LIST_HEIGHT = 6 * 38 + 8;
 
 /** Where the @mention list opens, inside the composer box. */
-type MentionAnchor = { left: number } & ({ top: number } | { bottom: number });
+type MentionAnchor = { left: number; width: number } & ({ top: number } | { bottom: number });
 
 interface PendingFile {
   localId: string;
@@ -135,16 +135,18 @@ export default function TaskComposer({
     if (!el || !box) return null;
     const caret = caretCoordinates(el, start);
     const lineTop = el.offsetTop + caret.top - el.scrollTop;
-    const left = Math.max(
-      8,
-      Math.min(el.offsetLeft + caret.left - 12, box.clientWidth - MENTION_LIST_WIDTH - 8),
-    );
-    const boxTop = box.getBoundingClientRect().top;
-    const roomBelow = window.innerHeight - (boxTop + lineTop + caret.height);
-    const roomAbove = boxTop + lineTop;
+    // Never wider than the box (a narrow phone dialog), and inside it.
+    const width = Math.min(MENTION_LIST_WIDTH, box.clientWidth - 16);
+    const left = Math.max(8, Math.min(el.offsetLeft + caret.left - 12, box.clientWidth - width - 8));
+    // Room that can actually be seen: inside the window and any scrolling
+    // ancestor (the task drawer), not the part of the page it clips.
+    const view = visibleBounds(box);
+    const lineOnScreen = box.getBoundingClientRect().top + lineTop;
+    const roomBelow = view.bottom - (lineOnScreen + caret.height);
+    const roomAbove = lineOnScreen - view.top;
     if (roomBelow < MENTION_LIST_HEIGHT && roomAbove > roomBelow)
-      return { left, bottom: box.clientHeight - lineTop + 4 };
-    return { left, top: lineTop + caret.height + 4 };
+      return { left, width, bottom: box.clientHeight - lineTop + 4 };
+    return { left, width, top: lineTop + caret.height + 4 };
   };
 
   const readQuery = (value: string, caret: number) => {
@@ -304,8 +306,8 @@ export default function TaskComposer({
 
       {query && matches.length > 0 && (
         <div
-          className="absolute z-30 w-72 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-          style={anchor ?? { left: 12, top: "100%" }}
+          className="absolute z-30 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          style={anchor ?? { left: 12, top: "100%", width: MENTION_LIST_WIDTH }}
         >
           {matches.map((person, index) => (
             <button

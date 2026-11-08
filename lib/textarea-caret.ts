@@ -5,8 +5,6 @@
  */
 const COPIED = [
   "direction",
-  "box-sizing",
-  "width",
   "border-top-width",
   "border-right-width",
   "border-bottom-width",
@@ -37,7 +35,8 @@ export function caretCoordinates(
 ): { top: number; left: number; height: number } {
   const computed = window.getComputedStyle(textarea);
   const mirror = document.createElement("div");
-  for (const property of COPIED) mirror.style.setProperty(property, computed.getPropertyValue(property));
+  for (const property of COPIED)
+    mirror.style.setProperty(property, computed.getPropertyValue(property));
   mirror.style.position = "absolute";
   mirror.style.visibility = "hidden";
   mirror.style.top = "0";
@@ -45,6 +44,13 @@ export function caretCoordinates(
   mirror.style.whiteSpace = "pre-wrap";
   mirror.style.overflowWrap = "break-word";
   mirror.style.overflow = "hidden";
+  // The width text wraps in: the textarea's inner width, without a scrollbar
+  // it may have (clientWidth leaves it out), plus its borders.
+  const borders =
+    (parseFloat(computed.borderLeftWidth) || 0) +
+    (parseFloat(computed.borderRightWidth) || 0);
+  mirror.style.boxSizing = "border-box";
+  mirror.style.width = `${textarea.clientWidth + borders}px`;
   mirror.textContent = textarea.value.slice(0, position);
   const marker = document.createElement("span");
   // Something to measure even at the very end of the text.
@@ -60,4 +66,30 @@ export function caretCoordinates(
   };
   mirror.remove();
   return coordinates;
+}
+
+/**
+ * The part of the window an element can be seen in: the window, cut down by
+ * every ancestor that clips or scrolls (a drawer, a dialog body).
+ */
+export function visibleBounds(element: HTMLElement): {
+  top: number;
+  bottom: number;
+} {
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const overflow = window.getComputedStyle(node).overflowY;
+    if (
+      overflow === "auto" ||
+      overflow === "scroll" ||
+      overflow === "hidden" ||
+      overflow === "clip"
+    ) {
+      const rect = node.getBoundingClientRect();
+      top = Math.max(top, rect.top);
+      bottom = Math.min(bottom, rect.bottom);
+    }
+  }
+  return { top, bottom };
 }
