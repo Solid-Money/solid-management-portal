@@ -1,8 +1,8 @@
-import { compactUsd, formatCount } from "@/lib/overview-format";
+import { compactUsd, formatCount, formatRatio } from "@/lib/overview-format";
 import { addDays, dayLabel, rangeDays } from "@/lib/overview-range";
 import type {
   IncentivesCheck,
-  IncentivesDueWeek,
+  IncentivesComingDue,
   IncentivesProgram,
   IncentivesResponse,
   IncentivesSplit,
@@ -83,7 +83,8 @@ export function isIncentivesResponse(value: unknown): value is IncentivesRespons
     hasNumbers(value.weeklyTotals13, ["sent", "earned"]) &&
     isObject(due) &&
     isString(due.asOf) &&
-    hasNumbers(due.rates, ["cashback", "referrals"]) &&
+    (due.rates === null ||
+      (isObject(due.rates) && isNumberOrNull(due.rates.cashback) && isNumberOrNull(due.rates.referrals))) &&
     hasNumbers(due, [
       "totalAll",
       "totalExpected",
@@ -192,7 +193,8 @@ export function checkChip(status: string): { tone: CheckTone; label: string } {
     case "off_track":
       return { tone: "bad", label: "Off track" };
     default:
-      return { tone: "neutral", label: "No data yet" };
+      // `not_available`, and any status this portal does not know yet.
+      return { tone: "neutral", label: "Not available yet" };
   }
 }
 
@@ -473,19 +475,113 @@ export function payDelayText(data: IncentivesResponse): string {
 // Coming due
 // ---------------------------------------------------------------------------
 
-export interface DueBar extends IncentivesDueWeek {
-  label: string;
-  expected: number;
-  all: number;
+export interface DuePayRates {
+  cashback: number | null;
+  referrals: number | null;
 }
 
-export function dueBars(weeks: IncentivesDueWeek[]): DueBar[] {
-  return weeks.map((week) => ({
-    ...week,
-    label: shortSpan(week.from, week.to),
-    expected: week.cashbackExpected + week.referralsExpected,
-    all: week.cashbackAll + week.referralsAll,
-  }));
+/** Each part's measured pay rate; null where there were no payouts to measure. */
+export function duePayRates(comingDue: IncentivesComingDue): DuePayRates {
+  return {
+    cashback: comingDue.rates?.cashback ?? null,
+    referrals: comingDue.rates?.referrals ?? null,
+  };
+}
+
+export interface DueBar {
+  from: string;
+  to: string;
+  label: string;
+  cashbackAll: number;
+  referralsAll: number;
+  /** Null when cashback has no measured pay rate. */
+  cashbackExpected: number | null;
+  /** Null when referral rewards have no measured pay rate. */
+  referralsExpected: number | null;
+  all: number;
+  /** Null when a part with money in this bucket has no pay rate. */
+  expected: number | null;
+}
+
+/**
+ * One bucket per due week. A part without a pay rate has no expected amount:
+ * the backend fills it with the full amount, which would read as a forecast.
+ */
+export function dueBars(comingDue: IncentivesComingDue): DueBar[] {
+  const rates = duePayRates(comingDue);
+  return comingDue.weeks.map((week) => {
+    const cashbackExpected = rates.cashback === null ? null : week.cashbackExpected;
+    const referralsExpected = rates.referrals === null ? null : week.referralsExpected;
+    const unknown =
+      (cashbackExpected === null && week.cashbackAll > 0) ||
+      (referralsExpected === null && week.referralsAll > 0);
+    return {
+      from: week.from,
+      to: week.to,
+      label: shortSpan(week.from, week.to),
+      cashbackAll: week.cashbackAll,
+      referralsAll: week.referralsAll,
+      cashbackExpected,
+      referralsExpected,
+      all: week.cashbackAll + week.referralsAll,
+      expected: unknown ? null : (cashbackExpected ?? 0) + (referralsExpected ?? 0),
+    };
+  });
+}
+
+/**
+ * The 30 days' expected total, or null when a part that is owed money has no
+ * pay rate to expect it by.
+ */
+export function dueExpectedTotal(comingDue: IncentivesComingDue): number | null {
+  const rates = duePayRates(comingDue);
+  if (rates.cashback === null && comingDue.cashbackAll > 0) return null;
+  if (rates.referrals === null && comingDue.referralsAll > 0) return null;
+  return comingDue.totalExpected;
+}
+
+/**
+ * The Coming due header: "$17.7K expected over the next 30 days, up to $32.3K
+ * if nothing is cancelled", or "$32.3K owed over the next 30 days" without a
+ * pay rate. `lead` is set in bold.
+ */
+export function dueHeadline(comingDue: IncentivesComingDue): { lead: string; rest: string } {
+  const expected = dueExpectedTotal(comingDue);
+  return expected === null
+    ? { lead: compactUsd(comingDue.totalAll), rest: " owed over the next 30 days · by the week it pays out" }
+    : {
+        lead: compactUsd(expected),
+        rest: ` expected over the next 30 days, up to ${compactUsd(
+          comingDue.totalAll,
+        )} if nothing is cancelled · by the week it pays out`,
+      };
+}
+
+/** "How it's defined": the pay rates behind Expected, only for parts that have one. */
+export function dueDefinition(comingDue: IncentivesComingDue): string {
+  const rates = duePayRates(comingDue);
+  const head = "Already owed, by the day it pays out, as of now.";
+  const known = [
+    rates.cashback === null ? null : `cashback ${formatRatio(rates.cashback, 1)}`,
+    rates.referrals === null ? null : `referral rewards ${formatRatio(rates.referrals, 1)}`,
+  ].filter((part): part is string => part !== null);
+  const missing = [
+    rates.cashback === null ? "cashback" : null,
+    rates.referrals === null ? "referral reward" : null,
+  ].filter((part): part is string => part !== null);
+  const expected =
+    known.length > 0
+      ? ` Expected = owed × the share actually paid in the last 4 weeks (${known.join(", ")}).`
+      : "";
+  const none =
+    missing.length === 2
+      ? " No payouts in the last 4 weeks to measure, so only what is owed is shown."
+      : missing.length === 1
+        ? ` No ${missing[0]} payouts in the last 4 weeks to measure, so ${
+            missing[0] === "cashback" ? "cashback" : "referral rewards"
+          } show only what is owed.`
+        : "";
+  return `${head}${expected}${none}`;
 }
 
 /**

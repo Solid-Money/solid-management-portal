@@ -3,8 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useIncentives } from "@/hooks/use-incentives";
 import { describeApiError } from "@/lib/api";
-import { keepTogether, shortSpan } from "@/lib/incentives";
-import { formatRatio } from "@/lib/overview-format";
+import { dueDefinition, keepTogether, shortSpan } from "@/lib/incentives";
 import { dayLabel } from "@/lib/overview-range";
 import type { IncentivesResponse } from "@/types/overview";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -93,7 +92,6 @@ export function IncentivesView({ data, compare }: { data: IncentivesResponse; co
  * plain words; the footer keeps the version, data time and wallets.
  */
 function Definitions({ data }: { data: IncentivesResponse }) {
-  const { rates } = data.comingDue;
   const rows: Array<[string, string]> = [
     [
       "Sent",
@@ -104,13 +102,7 @@ function Definitions({ data }: { data: IncentivesResponse }) {
       "What the range's purchases, qualified referrals and accrued yield boost entitle users to, minus anything already cancelled. Cashback pays 14 days after the purchase, referral rewards 30 days after the friend qualifies.",
     ],
     ["Payout corrections", "What payments moved on-chain beyond the amounts on their records."],
-    [
-      "Coming due",
-      `Already owed, by the day it pays out, as of now. Expected = owed × the share actually paid in the last 4 weeks (cashback ${formatRatio(
-        rates.cashback,
-        1,
-      )}, referral rewards ${formatRatio(rates.referrals, 1)}).`,
-    ],
+    ["Coming due", dueDefinition(data.comingDue)],
     ["Card spend per $1", "Settled card spend, by the Summary tab's rule, ÷ earned, same range."],
   ];
   return (

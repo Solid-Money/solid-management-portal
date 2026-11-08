@@ -10,7 +10,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { axisTicks, dueBars, newCashbackNote, overdueNote, type DueBar } from "@/lib/incentives";
+import {
+  axisTicks,
+  dueBars,
+  dueHeadline,
+  newCashbackNote,
+  overdueNote,
+  type DueBar,
+} from "@/lib/incentives";
 import { axisUsd, compactUsd } from "@/lib/overview-format";
 import type { IncentivesResponse } from "@/types/overview";
 import { OverviewCard, SectionHeader } from "@/components/overview/overview-ui";
@@ -23,19 +30,28 @@ import {
   type ChartLayerProps,
 } from "@/components/overview/incentives/incentives-ui";
 
-const EXPECTED_KEYS = ["cashbackExpected", "referralsExpected"];
+const EXPECTED_KEYS = ["cashbackExpectedBar", "referralsExpectedBar"];
 const ALL_KEYS = ["cashbackAll", "referralsAll"];
 
 /**
  * What is already owed, by the week it pays out: what we expect to pay at
  * the last four weeks' pay rates (solid) next to everything owed if nothing
- * is cancelled (outlined). Always as of now, whatever the range.
+ * is cancelled (outlined). Always as of now, whatever the range. A part with
+ * no measured pay rate shows only what is owed.
  */
 export function ComingDueCard({ data }: { data: IncentivesResponse }) {
   const { comingDue } = data;
-  const bars = dueBars(comingDue.weeks);
-  const ticks = axisTicks(Math.max(0, ...bars.map((b) => Math.max(b.all, b.expected))));
+  const bars = dueBars(comingDue);
+  const ticks = axisTicks(Math.max(0, ...bars.map((b) => Math.max(b.all, b.expected ?? 0))));
   const overdue = overdueNote(data);
+  const headline = dueHeadline(comingDue);
+  const anyExpected = bars.some((b) => b.cashbackExpected !== null || b.referralsExpected !== null);
+  // An unknown expected part draws no solid bar; the tooltip still reads the nulls.
+  const chartBars: ChartDueBar[] = bars.map((b) => ({
+    ...b,
+    cashbackExpectedBar: b.cashbackExpected ?? 0,
+    referralsExpectedBar: b.referralsExpected ?? 0,
+  }));
 
   return (
     <OverviewCard className="flex h-full flex-col p-5">
@@ -43,8 +59,8 @@ export function ComingDueCard({ data }: { data: IncentivesResponse }) {
         title="Coming due"
         subtitle={
           <>
-            <span className="font-semibold text-gray-900">{compactUsd(comingDue.totalExpected)}</span> expected over
-            the next 30 days, up to {compactUsd(comingDue.totalAll)} if nothing is cancelled · by the week it pays out
+            <span className="font-semibold text-gray-900">{headline.lead}</span>
+            {headline.rest}
           </>
         }
       />
@@ -55,7 +71,7 @@ export function ComingDueCard({ data }: { data: IncentivesResponse }) {
         <div className="mt-2 h-[218px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={bars}
+              data={chartBars}
               margin={{ top: 24, right: 4, left: 0, bottom: 0 }}
               barGap={12}
               barCategoryGap="10%"
@@ -79,8 +95,8 @@ export function ComingDueCard({ data }: { data: IncentivesResponse }) {
                 tick={AXIS_TICK}
               />
               <Tooltip cursor={{ fill: "#f4f5fb" }} content={<DueTooltip />} />
-              <Bar dataKey="cashbackExpected" stackId="expected" fill={INCENTIVE_COLORS.cashback} maxBarSize={34} isAnimationActive={false} />
-              <Bar dataKey="referralsExpected" stackId="expected" fill={INCENTIVE_COLORS.referrals} maxBarSize={34} isAnimationActive={false} />
+              <Bar dataKey="cashbackExpectedBar" stackId="expected" fill={INCENTIVE_COLORS.cashback} maxBarSize={34} isAnimationActive={false} />
+              <Bar dataKey="referralsExpectedBar" stackId="expected" fill={INCENTIVE_COLORS.referrals} maxBarSize={34} isAnimationActive={false} />
               <Bar dataKey="cashbackAll" stackId="all" fill={INCENTIVE_OUTLINE.cashback} maxBarSize={34} isAnimationActive={false} />
               <Bar dataKey="referralsAll" stackId="all" fill={INCENTIVE_OUTLINE.referrals} maxBarSize={34} isAnimationActive={false} />
               <Customized component={<DueLayer bars={bars} />} />
@@ -95,7 +111,7 @@ export function ComingDueCard({ data }: { data: IncentivesResponse }) {
           <Legend color={INCENTIVE_COLORS.referrals} label="Referral rewards" />
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1">
-          <Legend color="#6b7280" label="Expected" />
+          {anyExpected ? <Legend color="#6b7280" label="Expected" /> : null}
           <Legend color="#ffffff" dashed label="If nothing is cancelled" />
         </div>
       </div>
@@ -107,7 +123,12 @@ export function ComingDueCard({ data }: { data: IncentivesResponse }) {
   );
 }
 
-/** The expected total over each solid bar, and one dashed outline per outlined bar. */
+type ChartDueBar = DueBar & { cashbackExpectedBar: number; referralsExpectedBar: number };
+
+/**
+ * The expected total over each solid bar (or, with no pay rate, what is owed
+ * over the outlined bar), and one dashed outline per outlined bar.
+ */
 function DueLayer({ bars, ...chart }: ChartLayerProps & { bars: DueBar[] }) {
   if (!chart.offset) return null;
   return (
@@ -128,7 +149,7 @@ function DueLayer({ bars, ...chart }: ChartLayerProps & { bars: DueBar[] }) {
                 strokeDasharray="3 2"
               />
             ) : null}
-            {expected ? (
+            {bar.expected !== null && expected ? (
               <text
                 x={expected.x + expected.width / 2}
                 y={expected.y - 7}
@@ -138,6 +159,17 @@ function DueLayer({ bars, ...chart }: ChartLayerProps & { bars: DueBar[] }) {
                 fill="#111827"
               >
                 {compactUsd(bar.expected)}
+              </text>
+            ) : bar.expected === null && all && bar.all > 0 ? (
+              <text
+                x={all.x + all.width / 2}
+                y={all.y - 7}
+                textAnchor="middle"
+                fontSize={11.5}
+                fontWeight={600}
+                fill="#4b5563"
+              >
+                {compactUsd(bar.all)}
               </text>
             ) : null}
           </g>
@@ -158,15 +190,18 @@ function DueTooltip({ active, payload }: { active?: boolean; payload?: Array<{ p
         <span className="text-right text-gray-400">Expected</span>
         <span className="text-right text-gray-400">If none cancelled</span>
         <span>Cashback & perks</span>
-        <span className="text-right">{compactUsd(bar.cashbackExpected)}</span>
+        <span className="text-right">{maybeUsd(bar.cashbackExpected)}</span>
         <span className="text-right">{compactUsd(bar.cashbackAll)}</span>
         <span>Referral rewards</span>
-        <span className="text-right">{compactUsd(bar.referralsExpected)}</span>
+        <span className="text-right">{maybeUsd(bar.referralsExpected)}</span>
         <span className="text-right">{compactUsd(bar.referralsAll)}</span>
         <span className="font-semibold">Total</span>
-        <span className="text-right font-semibold">{compactUsd(bar.expected)}</span>
+        <span className="text-right font-semibold">{maybeUsd(bar.expected)}</span>
         <span className="text-right font-semibold">{compactUsd(bar.all)}</span>
       </div>
     </div>
   );
 }
+
+/** An expected amount, or a dash when there is no pay rate to expect it by. */
+const maybeUsd = (value: number | null) => (value === null ? "—" : compactUsd(value));

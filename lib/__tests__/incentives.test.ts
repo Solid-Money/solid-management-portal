@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fixtureJson from "@/lib/__tests__/fixtures/incentives-oct26-nov1.json";
+import backendJson from "@/lib/__tests__/fixtures/incentives-backend-oct26-nov1.json";
 import {
   axisTicks,
   centsUsd,
@@ -7,6 +8,9 @@ import {
   checkChip,
   checkValue,
   dueBars,
+  dueDefinition,
+  dueExpectedTotal,
+  dueHeadline,
   earnedCaption,
   isIncentivesResponse,
   lateCashbackNote,
@@ -170,7 +174,8 @@ describe("formatting", () => {
     expect(checkChip("watch")).toEqual({ tone: "warn", label: "Watch" });
     expect(checkChip("off_track")).toEqual({ tone: "bad", label: "Off track" });
     expect(checkChip("on_track")).toEqual({ tone: "good", label: "On track" });
-    expect(checkChip("something_new").tone).toBe("neutral");
+    expect(checkChip("not_available")).toEqual({ tone: "neutral", label: "Not available yet" });
+    expect(checkChip("something_new")).toEqual({ tone: "neutral", label: "Not available yet" });
   });
 });
 
@@ -356,7 +361,7 @@ describe("chart notes", () => {
 
 describe("coming due", () => {
   it("labels the buckets and adds their parts", () => {
-    const bars = dueBars(fixture.comingDue.weeks);
+    const bars = dueBars(fixture.comingDue);
     expect(bars.map((b) => b.label)).toEqual([
       "Nov 8",
       "Nov 9 – 15",
@@ -367,7 +372,55 @@ describe("coming due", () => {
     ]);
     expect(bars.map((b) => compactUsd(b.expected))).toEqual(["$433", "$7.7K", "$6.8K", "$1.4K", "$1.1K", "$265"]);
     expect(bars.reduce((sum, b) => sum + b.all, 0)).toBeCloseTo(fixture.comingDue.totalAll, 2);
-    expect(bars.reduce((sum, b) => sum + b.expected, 0)).toBeCloseTo(fixture.comingDue.totalExpected, 2);
+    expect(bars.reduce((sum, b) => sum + (b.expected ?? 0), 0)).toBeCloseTo(fixture.comingDue.totalExpected, 2);
+    expect(dueHeadline(fixture.comingDue)).toEqual({
+      lead: "$17.7K",
+      rest: " expected over the next 30 days, up to $32.3K if nothing is cancelled · by the week it pays out",
+    });
+    expect(dueDefinition(fixture.comingDue)).toBe(
+      "Already owed, by the day it pays out, as of now. Expected = owed × the share actually paid in the last 4 weeks (cashback 94.7%, referral rewards 33.1%).",
+    );
+  });
+
+  it("shows only what is owed when there were no payouts to measure a rate", () => {
+    const data = clone();
+    data.comingDue.rates = null;
+    expect(isIncentivesResponse(data)).toBe(true);
+    const bars = dueBars(data.comingDue);
+    expect(bars.every((b) => b.cashbackExpected === null && b.referralsExpected === null && b.expected === null)).toBe(true);
+    expect(bars.map((b) => compactUsd(b.all))).toEqual(["$457", "$13.0K", "$10.3K", "$4.3K", "$3.4K", "$800"]);
+    expect(dueExpectedTotal(data.comingDue)).toBeNull();
+    expect(dueHeadline(data.comingDue)).toEqual({
+      lead: "$32.3K",
+      rest: " owed over the next 30 days · by the week it pays out",
+    });
+    expect(dueDefinition(data.comingDue)).toBe(
+      "Already owed, by the day it pays out, as of now. No payouts in the last 4 weeks to measure, so only what is owed is shown.",
+    );
+  });
+
+  it("drops only the part without a rate", () => {
+    const data = clone();
+    data.comingDue.rates = { cashback: 0.947, referrals: null };
+    expect(isIncentivesResponse(data)).toBe(true);
+    const bars = dueBars(data.comingDue);
+    // Nov 8 has only cashback, so its expected total is still known.
+    expect(bars[0]).toMatchObject({ cashbackExpected: 432.51, referralsExpected: null, expected: 432.51 });
+    expect(bars[1]).toMatchObject({ cashbackExpected: 5221.36, referralsExpected: null, expected: null, all: 12993.66 });
+    expect(dueExpectedTotal(data.comingDue)).toBeNull();
+    expect(dueHeadline(data.comingDue).lead).toBe("$32.3K");
+    expect(dueDefinition(data.comingDue)).toBe(
+      "Already owed, by the day it pays out, as of now. Expected = owed × the share actually paid in the last 4 weeks (cashback 94.7%). No referral reward payouts in the last 4 weeks to measure, so referral rewards show only what is owed.",
+    );
+    // Nothing owed in a part without a rate: the expected total still holds.
+    data.comingDue.referralsAll = 0;
+    expect(dueExpectedTotal(data.comingDue)).toBe(data.comingDue.totalExpected);
+  });
+
+  it("rejects a pay rate that is not a number or null", () => {
+    const data = clone() as unknown as { comingDue: { rates: Record<string, unknown> } };
+    data.comingDue.rates.cashback = "94.7%";
+    expect(isIncentivesResponse(data)).toBe(false);
   });
 
   it("puts overdue referral rewards in the first bucket after today", () => {
@@ -378,5 +431,73 @@ describe("coming due", () => {
     expect(newCashbackNote(fixture)).toBe(
       "Only what's owed today. New purchases add about $5.5K of cashback a week.",
     );
+  });
+});
+
+/**
+ * The backend PR's real response for Oct 26 – Nov 1 ("Admin Overview:
+ * Incentives tab endpoint + cashback paidAt"), so the portal is held to what
+ * the endpoint actually sends, not only to the contract's example.
+ */
+describe("the backend's response", () => {
+  const backend = backendJson as unknown as IncentivesResponse;
+  const copy = (): IncentivesResponse => structuredClone(backend);
+
+  it("passes the response check", () => {
+    expect(isIncentivesResponse(backendJson)).toBe(true);
+  });
+
+  it("reads as the tiles should", () => {
+    expect(wholeUsd(backend.totals.sent.current)).toBe("$10,659");
+    expect(wholeUsd(backend.totals.earned.current)).toBe("$9,906");
+    expect(changeVsText(backend.totals.sent.current, backend.totals.sent.previous, 7)).toBe("+71% vs last week");
+    expect(centsUsd(backend.totals.cardSpendPerIncentiveDollar.current)).toBe("$16.89");
+    // $1,376.41 of late cashback rounds to $1.4K.
+    expect(plain(sentCaption(backend))).toBe(
+      "Left our wallets Oct 26 – Nov 1. About $1.4K of it was cashback due the week before, paid late.",
+    );
+    expect(lateCashbackNote(backend)?.text).toBe("$1.4K of late cashback caught up");
+    expect(plain(earnedCaption(backend))).toBe(
+      "Activity Oct 26 – Nov 1. Cashback pays Nov 9 – 15, referral rewards Nov 25 – Dec 1.",
+    );
+  });
+
+  it("fills the table, chart and checks", () => {
+    const { rows, total } = programRows(backend.programs);
+    expect(rows.map((r) => r.key)).not.toContain("cashback_other");
+    expect(rows.map((r) => sharePercent(r.share))).toEqual(["34.0%", "27.2%", "6.9%", "26.8%", "3.5%", "0.7%", "0.9%"]);
+    expect(total.sentUsd).toBeCloseTo(backend.totals.sent.current, 2);
+    expect(weeksDescription(backend.weekly, "2026-11-08")).toBe("13 weeks");
+    expect(referralPauseNotes(backend.weekly).map((n) => n.text)).toEqual(["Referral payouts paused Oct 12 – 18"]);
+    expect(backend.checks.map(checkValue)).toEqual(["99.1%", "5.0%", "33%", "26"]);
+    expect(dueHeadline(backend.comingDue).lead).toBe("$17.7K");
+  });
+
+  it("before the on-chain check has data: a grey chip, and no corrections row", () => {
+    const data = copy();
+    const onchain = data.checks.find((c) => c.key === "onchain_match")!;
+    onchain.value = null;
+    onchain.status = "not_available";
+    // The backend sends no corrections until the check can measure them.
+    data.programs.find((p) => p.key === "payout_corrections")!.sentUsd = 0;
+    expect(isIncentivesResponse(data)).toBe(true);
+    expect(checkValue(onchain)).toBe("—");
+    expect(checkChip(onchain.status)).toEqual({ tone: "neutral", label: "Not available yet" });
+    const { rows } = programRows(data.programs);
+    expect(rows.map((r) => r.key)).not.toContain("payout_corrections");
+    expect(rows.reduce((sum, r) => sum + (r.share ?? 0), 0)).toBeCloseTo(1, 10);
+  });
+
+  it("takes null rates, nulls per dollar and a running last week", () => {
+    const data = copy();
+    data.comingDue.rates = null;
+    data.totals.cardSpendPerIncentiveDollar = { current: null, previous: null, average13Weeks: null };
+    data.totals.earnedShareOfCardSpend = null;
+    data.weekly[data.weekly.length - 1].partial = true;
+    expect(isIncentivesResponse(data)).toBe(true);
+    expect(dueHeadline(data.comingDue)).toEqual({
+      lead: "$32.1K",
+      rest: " owed over the next 30 days · by the week it pays out",
+    });
   });
 });

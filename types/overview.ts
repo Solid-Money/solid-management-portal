@@ -408,8 +408,12 @@ export interface IncentivesDueWeek {
 /** What is already owed, as of now, whatever the range. */
 export interface IncentivesComingDue {
   asOf: string;
-  /** Share actually paid in the last 4 weeks, 0–1. */
-  rates: { cashback: number; referrals: number };
+  /**
+   * Share actually paid in the last 4 weeks, 0–1. Null (whole or per part)
+   * when there were no payouts to measure: that part's expected amount is
+   * then unknown, whatever the `…Expected` fields say.
+   */
+  rates: { cashback: number | null; referrals: number | null } | null;
   totalAll: number;
   totalExpected: number;
   cashbackAll: number;
