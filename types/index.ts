@@ -2453,6 +2453,14 @@ export interface RecoveryEligibility {
   accountClosed: boolean;
   platforms?: string[];
   lastActivityAt?: string;
+  /**
+   * Set while the email, changed by the owner in the app, cannot start a
+   * recovery or receive a recovery code (SEC-010). Setting the email from this
+   * card lifts it.
+   */
+  recoveryEmailHoldUntil?: string;
+  /** When the email last changed to a different address. */
+  emailChangedAt?: string;
 }
 
 /** What the backend reports after mailing an account its recovery code. */

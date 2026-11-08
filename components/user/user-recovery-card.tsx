@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
+  Clock,
   KeyRound,
   Loader2,
   Mail,
@@ -133,7 +134,11 @@ export default function UserRecoveryCard({
                 value={
                   data.hasEmail ? (
                     <span className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      {data.recoveryEmailHoldUntil ? (
+                        <Clock className="h-3.5 w-3.5 text-amber-600" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      )}
                       {data.emailHint}
                     </span>
                   ) : (
@@ -143,7 +148,11 @@ export default function UserRecoveryCard({
                     </span>
                   )
                 }
-                hint="Where a recovery code would go"
+                hint={
+                  data.recoveryEmailHoldUntil
+                    ? `Changed in the app — no recovery codes until ${formatDateTime(data.recoveryEmailHoldUntil)}`
+                    : "Where a recovery code would go"
+                }
               />
               <Stat
                 label="Passkeys (Turnkey)"
@@ -255,17 +264,23 @@ function SendCodeDialog({
     setOpen(false);
   };
 
+  // An address the owner changed in the app is held out of recovery for a
+  // while; the backend refuses a code to it, so the button says why up front.
+  const onHold = !!eligibility.recoveryEmailHoldUntil;
+
   return (
     <>
       <Button
         size="sm"
         variant="outline"
         className="cursor-pointer"
-        disabled={!eligibility.hasEmail}
+        disabled={!eligibility.hasEmail || onHold}
         title={
-          eligibility.hasEmail
-            ? undefined
-            : "No email on file — set one first"
+          !eligibility.hasEmail
+            ? "No email on file — set one first"
+            : onHold
+              ? `Email changed recently — on hold until ${formatDateTime(eligibility.recoveryEmailHoldUntil!)}. Setting the email lifts it.`
+              : undefined
         }
         onClick={() => setOpen(true)}
       >
@@ -425,6 +440,28 @@ function SetEmailDialog({
               some other means.
             </span>
           </div>
+
+          {eligibility.recoveryEmailHoldUntil && (
+            <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                The current email was changed in the app
+                {eligibility.emailChangedAt
+                  ? ` on ${formatDateTime(eligibility.emailChangedAt)}`
+                  : ""}{" "}
+                and is held out of recovery until{" "}
+                {formatDateTime(eligibility.recoveryEmailHoldUntil)}. Setting
+                an email here — even the same one — lifts that hold
+                immediately. If the owner did not make that change, set their
+                own address instead.
+              </span>
+            </div>
+          )}
+
+          <p className="text-muted-foreground text-xs">
+            If the account already has an address, that address is emailed
+            that it was changed.
+          </p>
 
           <div className="space-y-2">
             <Label htmlFor="recovery-email">New recovery email</Label>
