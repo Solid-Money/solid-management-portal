@@ -38,6 +38,12 @@ import { Textarea } from "@/components/ui/textarea";
 /** The longest delay setTimeout honours; longer ones fire immediately. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
+/**
+ * How often eligibility is re-read once the hold should have ended by this
+ * browser's clock but the server still reports it (the clocks disagree).
+ */
+const HOLD_RECHECK_MS = 30_000;
+
 interface UserRecoveryCardProps {
   userId: string;
   username: string;
@@ -85,7 +91,7 @@ export default function UserRecoveryCard({
 }: UserRecoveryCardProps) {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, dataUpdatedAt } = useQuery({
     queryKey: ["user-recovery-eligibility", userId],
     queryFn: async () => (await getRecoveryEligibility(userId)).data.data,
   });
@@ -100,6 +106,10 @@ export default function UserRecoveryCard({
 
   // The hold ends on its own. Re-read eligibility when it does, so a card left
   // open does not keep "Send recovery code" disabled past it.
+  //
+  // Re-armed after every read (`dataUpdatedAt`): if this browser's clock runs
+  // ahead of the server's, the first re-read still comes back on hold, and it
+  // is then retried every HOLD_RECHECK_MS until the server lets it go.
   const holdUntil = data?.recoveryEmailHoldUntil;
   useEffect(() => {
     if (!holdUntil) return;
@@ -107,14 +117,16 @@ export default function UserRecoveryCard({
     if (!Number.isFinite(endsAt)) return;
     // A second past the end, so the backend no longer reports it; capped at
     // what setTimeout can hold (a hold is 48 hours, far below it).
-    const delay = Math.min(Math.max(endsAt - Date.now() + 1000, 0), MAX_TIMEOUT_MS);
+    const untilEnd = endsAt - Date.now() + 1000;
+    const delay =
+      untilEnd > 0 ? Math.min(untilEnd, MAX_TIMEOUT_MS) : HOLD_RECHECK_MS;
     const timer = setTimeout(() => {
       void queryClient.invalidateQueries({
         queryKey: ["user-recovery-eligibility", userId],
       });
     }, delay);
     return () => clearTimeout(timer);
-  }, [holdUntil, queryClient, userId]);
+  }, [holdUntil, dataUpdatedAt, queryClient, userId]);
 
   // A suspension refuses recovery outright, whatever the recovery setup. The
   // backend already reports such an account as unable to self-recover; this
@@ -237,6 +249,20 @@ export default function UserRecoveryCard({
                   eligibility={data}
                   onDone={refresh}
                 />
+                {data.recoveryEmailHoldUntil && (
+                  // Visible text, not only the disabled button's tooltip:
+                  // a disabled button takes no focus or hover, so a title on
+                  // it reaches neither keyboard nor screen-reader users.
+                  <p
+                    id={`recovery-hold-note-${userId}`}
+                    className="w-full text-xs text-amber-700"
+                  >
+                    Send recovery code is unavailable until{" "}
+                    {formatDateTime(data.recoveryEmailHoldUntil)}: the email
+                    was changed in the app. Setting the email here lifts the
+                    hold.
+                  </p>
+                )}
               </div>
             )}
           </>
@@ -302,6 +328,11 @@ function SendCodeDialog({
             : onHold
               ? `Email changed recently — on hold until ${formatDateTime(eligibility.recoveryEmailHoldUntil!)}. Setting the email lifts it.`
               : undefined
+        }
+        // The visible note under the buttons says why, for anyone the
+        // tooltip cannot reach.
+        aria-describedby={
+          onHold ? `recovery-hold-note-${userId}` : undefined
         }
         onClick={() => setOpen(true)}
       >
