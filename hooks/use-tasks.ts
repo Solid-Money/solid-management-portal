@@ -12,6 +12,7 @@ import {
   getTask,
   getTaskBoards,
   getTaskCounts,
+  getTaskPartners,
   getTaskFeed,
   getTaskNotifications,
   getTaskPeople,
@@ -27,6 +28,7 @@ export const TASK_KEYS = {
   people: ["tasks", "people"] as const,
   counts: ["tasks", "counts"] as const,
   boards: ["tasks", "boards"] as const,
+  partners: ["tasks", "partners"] as const,
   list: (filters: TaskListFilters) => ["tasks", "list", filters] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
@@ -54,6 +56,17 @@ export function useTaskCounts() {
     // Live events refresh it; this is the fallback when the socket is down.
     refetchInterval: 60_000,
     retry: false,
+  });
+}
+
+/** Escalations waiting on partners; refreshed every minute while shown. */
+export function useTaskPartners(enabled: boolean) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: TASK_KEYS.partners,
+    queryFn: getTaskPartners,
+    enabled: !!user && enabled,
+    refetchInterval: 60_000,
   });
 }
 
