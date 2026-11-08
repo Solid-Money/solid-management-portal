@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { getTierLockReevaluationPreview, reevaluateTierLock } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatFuseExact } from "@/lib/utils";
 import {
   TierLockReevaluationPreview,
   TierLockReevaluationResult,
@@ -30,10 +30,6 @@ import { Textarea } from "@/components/ui/textarea";
 
 const formatFuse = (amount: number) =>
   `${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })} FUSE`;
-
-/** FUSE to the cent, for figures a threshold is decided on. */
-const formatFuseExact = (amount: number) =>
-  `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} FUSE`;
 
 const formatPrices = ({ tier2Amount, tier3Amount }: TierLockThresholds) =>
   `Prime ${formatFuse(tier2Amount)} · Ultra ${formatFuse(tier3Amount)}`;
@@ -444,7 +440,8 @@ function FloorsPreview({ preview }: { preview: TierLockReevaluationPreview }) {
       <ul className="space-y-1.5">
         {preview.tranches.map((tranche) => (
           <li
-            key={tranche.shares}
+            // Shares alone are not unique if two locks bought the same count.
+            key={`${tranche.lockedAt}-${tranche.shares}`}
             className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
           >
             <span>
@@ -514,7 +511,7 @@ function ReevaluationOutcome({
       {result.tranches.length > 0 ? (
         <ul className="space-y-2">
           {result.tranches.map((tranche) => (
-            <li key={tranche.shares}>
+            <li key={`${tranche.lockedAt ?? ""}-${tranche.shares}`}>
               <dl className="grid grid-cols-2 gap-3 rounded-md border border-gray-100 bg-gray-50 p-3 text-xs">
                 <div>
                   <dt className="text-gray-500">Worth when locked</dt>

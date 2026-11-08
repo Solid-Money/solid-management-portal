@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, KeyRound, Loader2, Lock, RefreshCw } from "lucide-react";
 
 import { getUserTierMembership } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatFuseExact } from "@/lib/utils";
 import {
   TierMembershipView,
   TierSubscriptionFundingView,
@@ -95,10 +95,6 @@ function FundingNote({ funding }: { funding: TierSubscriptionFundingView }) {
 
 const formatFuse = (amount: number) =>
   `${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })} FUSE`;
-
-/** FUSE to the cent, for figures a threshold is decided on. */
-const formatFuseExact = (amount: number) =>
-  `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} FUSE`;
 
 /** One past membership, for the history list. */
 function SubscriptionRow({ subscription }: { subscription: TierSubscriptionView }) {
@@ -227,7 +223,7 @@ export default function UserTierMembershipCard({
                       a fraction of a FUSE under a threshold is exactly the case
                       this is here to explain, and whole FUSE would round it
                       up to the threshold. */}
-                  {lock.committedFuse !== undefined ? (
+                  {typeof lock.committedFuse === "number" ? (
                     <Stat
                       label="Graded at"
                       value={formatFuseExact(lock.committedFuse)}
