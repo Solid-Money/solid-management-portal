@@ -2580,6 +2580,31 @@ export interface AdminReferralRewardRow {
   reinstatedBy?: string;
   /** Reversed and expired rewards can be put back through the rules. */
   canReevaluate: boolean;
+  /**
+   * What each leg's payout netted against an earlier debt instead of sending.
+   * A leg whose offset is its whole amount was settled without a transfer.
+   */
+  referrerDebtOffsetUsd?: number;
+  newUserDebtOffsetUsd?: number;
+  /**
+   * For a reward reversed after it was paid: what each paid leg owes back and
+   * how much of it has actually been recovered. Absent on older backends.
+   */
+  clawbackDebts?: AdminReferralClawbackDebt[];
+}
+
+/** One paid leg's debt from a reward reversed after payout. */
+export interface AdminReferralClawbackDebt {
+  id: string;
+  side: "referrer" | "friend";
+  /** Who owes it. */
+  userId: string;
+  amountUsd: number;
+  remainingUsd: number;
+  recoveredUsd: number;
+  /** open | recovered | waived | written_off | cancelled */
+  status: string;
+  writeOffAt: string;
 }
 
 /** A user's referral cashback from both sides of the program. */

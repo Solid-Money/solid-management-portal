@@ -117,15 +117,16 @@ export default function ReferralV4DebtsSection({
       </div>
       {debts.length === 0 ? (
         <p className="text-sm text-gray-500">
-          Nothing owed — none of this user&apos;s credited bonuses has been
-          reversed.
+          Nothing owed — none of this user&apos;s credited bonuses or paid
+          cashback rewards has been reversed.
         </p>
       ) : (
         <>
           <p className="text-[11px] text-gray-500">
-            Credited bonuses reversed after a refund took their spend below the
-            bar. Recovered from this user&apos;s future v4 bonuses and weekly
-            spend share — never from their card credit.
+            Credited bonuses, and paid cashback rewards (legacy), reversed
+            after a refund took their spend below the bar. Recovered from this
+            user&apos;s future v4 bonuses, weekly spend share and cashback
+            payouts — never from their card credit or wallet.
           </p>
           <div className="max-h-96 overflow-auto rounded-lg border border-gray-100">
             <table className="min-w-full text-xs">
