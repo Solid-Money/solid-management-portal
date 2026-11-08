@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -34,6 +34,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
+/** The longest delay setTimeout honours; longer ones fire immediately. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 interface UserRecoveryCardProps {
   userId: string;
@@ -94,6 +97,24 @@ export default function UserRecoveryCard({
     void queryClient.invalidateQueries({ queryKey: ["user", userId] });
     void queryClient.invalidateQueries({ queryKey: ["user-audit-log", userId] });
   };
+
+  // The hold ends on its own. Re-read eligibility when it does, so a card left
+  // open does not keep "Send recovery code" disabled past it.
+  const holdUntil = data?.recoveryEmailHoldUntil;
+  useEffect(() => {
+    if (!holdUntil) return;
+    const endsAt = new Date(holdUntil).getTime();
+    if (!Number.isFinite(endsAt)) return;
+    // A second past the end, so the backend no longer reports it; capped at
+    // what setTimeout can hold (a hold is 48 hours, far below it).
+    const delay = Math.min(Math.max(endsAt - Date.now() + 1000, 0), MAX_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      void queryClient.invalidateQueries({
+        queryKey: ["user-recovery-eligibility", userId],
+      });
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [holdUntil, queryClient, userId]);
 
   // A suspension refuses recovery outright, whatever the recovery setup. The
   // backend already reports such an account as unable to self-recover; this
