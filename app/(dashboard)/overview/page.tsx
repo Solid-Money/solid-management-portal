@@ -23,13 +23,17 @@ import { MoneyInCard } from "@/components/overview/money-in-card";
 import { SupportPulse } from "@/components/overview/support-pulse";
 import { OverviewFooter } from "@/components/overview/overview-footer";
 import { GoodCustomersTab } from "@/components/overview/good-customers";
+import { IncentivesTab } from "@/components/overview/incentives/incentives-tab";
 
-const OVERVIEW_TABS = ["summary", "good-customers"] as const;
+const OVERVIEW_TABS = ["summary", "good-customers", "incentives"] as const;
 type OverviewTab = (typeof OVERVIEW_TABS)[number];
 const TAB_LABELS: Record<OverviewTab, string> = {
   summary: "Summary",
   "good-customers": "Good customers",
+  incentives: "Incentives",
 };
+/** The tab marked "New" until people know it is there. */
+const NEW_TAB: OverviewTab = "incentives";
 
 /**
  * The admin landing page: what changed in the picked range, what is broken and
@@ -120,7 +124,7 @@ function OverviewView() {
             )}
           >
             {TAB_LABELS[t]}
-            {t === "good-customers" ? (
+            {t === NEW_TAB ? (
               <span className="rounded-full bg-[#eef0ff] px-1.5 text-[10.5px] font-semibold text-[#3b3bd6]">
                 New
               </span>
@@ -136,6 +140,16 @@ function OverviewView() {
           aria-labelledby="overview-tab-good-customers"
         >
           <GoodCustomersTab from={range.from} to={range.to} />
+        </div>
+      ) : null}
+
+      {tab === "incentives" ? (
+        <div
+          role="tabpanel"
+          id="overview-panel-incentives"
+          aria-labelledby="overview-tab-incentives"
+        >
+          <IncentivesTab from={range.from} to={range.to} compare={range.compare} />
         </div>
       ) : null}
 
