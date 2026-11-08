@@ -19,6 +19,7 @@ import {
   Image,
   Layers,
   LayoutTemplate,
+  ListTodo,
   Megaphone,
   Percent,
   Receipt,
@@ -50,6 +51,8 @@ export interface NavGroup {
   icon: LucideIcon;
   /** Shows the count of support cases waiting on a human. */
   supportBadge?: boolean;
+  /** Shows the count of tasks with something new for the admin. */
+  tasksBadge?: boolean;
   /** Present for a top-level link with no submenu. */
   href?: string;
   items?: NavLink[];
@@ -73,6 +76,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Overview",
     icon: LayoutDashboard,
     href: "/overview",
+  },
+  {
+    label: "Tasks",
+    icon: ListTodo,
+    tasksBadge: true,
+    href: "/tasks",
   },
   {
     label: "Users",

@@ -8,6 +8,7 @@ import {
   getLiveStatus,
   isAdminCardTransactionChange,
   isSupportQueueChange,
+  isTaskChange,
   setLiveStatus,
   subscribeLiveStatus,
   type LiveStatus,
@@ -21,6 +22,9 @@ const REFRESH_DEBOUNCE_MS = 1_500;
 const SUPPORT_REFRESH_DEBOUNCE_MS = 300;
 /** A busy queue still refreshes at least this often while events keep coming. */
 const SUPPORT_REFRESH_MAX_WAIT_MS = 2_000;
+
+/** Tasks re-read once a burst of edits settles. */
+const TASKS_REFRESH_DEBOUNCE_MS = 400;
 
 /**
  * Backoff for a handshake the server refused, which Socket.IO never retries on
@@ -54,6 +58,8 @@ export function useLiveCardTransactions(enabled: boolean): void {
     let supportTimer: ReturnType<typeof setTimeout> | undefined;
     let supportWaitingSince: number | undefined;
     const changedConversations = new Set<string>();
+    let tasksTimer: ReturnType<typeof setTimeout> | undefined;
+    const changedTasks = new Set<string>();
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryAttempt = 0;
     let tokenRefreshed = false;
@@ -104,6 +110,19 @@ export function useLiveCardTransactions(enabled: boolean): void {
       supportTimer = setTimeout(refreshSupport, wait);
     };
 
+    // Tasks: the list, the nav badge and any open task that changed.
+    const refreshTasks = () => {
+      tasksTimer = undefined;
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "counts"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "feed"] });
+      for (const id of changedTasks) {
+        void queryClient.invalidateQueries({ queryKey: ["tasks", "task", id] });
+      }
+      changedTasks.clear();
+    };
+
     const scheduleRetry = () => {
       if (retryTimer) clearTimeout(retryTimer);
       const delay =
@@ -125,6 +144,7 @@ export function useLiveCardTransactions(enabled: boolean): void {
       if (hasBeenLive) {
         scheduleRefresh();
         void queryClient.invalidateQueries({ queryKey: ["support"] });
+        void queryClient.invalidateQueries({ queryKey: ["tasks"] });
       }
       hasBeenLive = true;
     });
@@ -141,6 +161,13 @@ export function useLiveCardTransactions(enabled: boolean): void {
           conversationId: change.conversationId,
         });
       }
+    });
+
+    socket.on("tasks_updated", (change: unknown) => {
+      if (!isTaskChange(change)) return;
+      changedTasks.add(change.taskId);
+      if (tasksTimer) clearTimeout(tasksTimer);
+      tasksTimer = setTimeout(refreshTasks, TASKS_REFRESH_DEBOUNCE_MS);
     });
 
     socket.on("card_transaction", (change: unknown) => {
@@ -191,6 +218,7 @@ export function useLiveCardTransactions(enabled: boolean): void {
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       if (supportTimer) clearTimeout(supportTimer);
+      if (tasksTimer) clearTimeout(tasksTimer);
       if (retryTimer) clearTimeout(retryTimer);
       socket.removeAllListeners();
       socket.disconnect();
