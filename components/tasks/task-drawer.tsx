@@ -414,7 +414,7 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
           {task.source.kind !== "manual" && (
             <span className="hidden min-w-0 items-center gap-1.5 truncate sm:inline-flex">
               <BotAvatar size={16} />
-              {task.source.kind === "monday" ? "Imported from monday" : `Opened by ${authorName(task.createdBy, people)}`}
+              Opened by {authorName(task.createdBy, people)}
               {task.source.label && <span className="text-gray-400">· {task.source.label}</span>}
             </span>
           )}

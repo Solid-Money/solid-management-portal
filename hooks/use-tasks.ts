@@ -12,7 +12,6 @@ import {
   getTask,
   getTaskCounts,
   getTaskFeed,
-  getTaskImport,
   getTaskNotifications,
   getTaskPeople,
   getTasks,
@@ -30,7 +29,6 @@ export const TASK_KEYS = {
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
   feed: ["tasks", "feed"] as const,
-  import: ["tasks", "import"] as const,
 };
 
 /** Admins who can own a task or be @mentioned. */
@@ -142,12 +140,3 @@ export function useTaskFeed() {
   });
 }
 
-/** The latest monday import; polled while one runs. */
-export function useTaskImport(enabled: boolean) {
-  return useQuery({
-    queryKey: TASK_KEYS.import,
-    queryFn: getTaskImport,
-    enabled,
-    refetchInterval: (query) => (query.state.data?.status === "running" ? 2_000 : false),
-  });
-}

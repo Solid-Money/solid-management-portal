@@ -188,15 +188,6 @@ export function PriorityLabel({ priority }: { priority: TaskPriority | null }) {
 }
 
 export function TaskSource({ row, people }: { row: TaskRow; people?: TaskPerson[] }) {
-  if (row.source.kind === "monday")
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
-        <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-gray-400">
-          m
-        </span>
-        Imported
-      </span>
-    );
   if (row.createdBy.bot || row.source.kind !== "manual") {
     const what =
       row.source.kind === "support"
