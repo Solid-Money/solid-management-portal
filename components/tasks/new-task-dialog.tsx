@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Flag, LayoutGrid, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,10 +47,13 @@ export default function NewTaskDialog({
   const { data: boardList } = useTaskBoards();
   const boards = boardList?.boards ?? [];
   const [board, setBoard] = useState<string | null>(defaultBoard);
-  // Each time it opens, start on the board being looked at.
-  useEffect(() => {
+  // Each time it opens, start on the board being looked at (set during
+  // render when `open` or the board changes, not in an effect).
+  const [seen, setSeen] = useState({ open, defaultBoard });
+  if (seen.open !== open || seen.defaultBoard !== defaultBoard) {
+    setSeen({ open, defaultBoard });
     if (open) setBoard(defaultBoard);
-  }, [open, defaultBoard]);
+  }
   const boardName = boards.find((b) => b.key === board)?.name ?? null;
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<TaskStatus>("todo");

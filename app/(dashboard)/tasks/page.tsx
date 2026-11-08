@@ -60,6 +60,11 @@ function TasksScreen() {
   const update = useCallback(
     (changes: Record<string, string | null | undefined>) => {
       const next = new URLSearchParams(params.toString());
+      // An old ?view=support|radar link moves onto ?board= on the first change.
+      if (legacyBoard) {
+        if (!next.has("board")) next.set("board", legacyBoard);
+        next.delete("view");
+      }
       for (const [key, value] of Object.entries(changes)) {
         if (value) next.set(key, value);
         else next.delete(key);
@@ -68,7 +73,7 @@ function TasksScreen() {
       const query = next.toString();
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     },
-    [params, pathname, router],
+    [params, pathname, router, legacyBoard],
   );
 
   return (
@@ -113,7 +118,7 @@ function TasksScreen() {
         <>
           <BoardTabs
             value={board}
-            onChange={(next) => update(legacyBoard ? { board: next, view: null } : { board: next })}
+            onChange={(next) => update({ board: next })}
           />
           <TaskList
           filters={filters}
