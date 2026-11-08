@@ -78,12 +78,18 @@ const dayAndTime: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
-/** "3% · $50/mo cap", or the live tier's cap when none is frozen on the row. */
-function terms(side: { percentage?: number; monthlyCapUsd?: number }): string {
+/**
+ * "3% · $50/mo cap", or the live tier's cap when none is frozen on the row.
+ * A subscription discount has no rate: it pays its own figure, `earns`.
+ */
+function terms(
+  side: { percentage?: number; monthlyCapUsd?: number },
+  earns?: string,
+): string {
   return [
     side.percentage !== undefined
       ? formatCashbackRate(side.percentage)
-      : "tier rate",
+      : (earns ?? "tier rate"),
     formatMonthlyCap(side.monthlyCapUsd) ?? "live tier cap",
   ].join(" · ");
 }
@@ -97,7 +103,8 @@ function terms(side: { percentage?: number; monthlyCapUsd?: number }): string {
  * on payout day, and purchases the card issuer posted inside the trial but
  * reported after it ended. This finds every purchase made during the user's
  * trials and offers to put the trial's terms back on it, never lowering
- * anything. Nothing is sent from here: the hourly escrow run pays re-queued
+ * anything. Subscription discounts get the trial's cap only: their figure was
+ * already priced at the trial's tier. Nothing is sent from here: the hourly escrow run pays re-queued
  * rows and top-ups through the normal payout path, monthly cap included.
  */
 export default function TrialCashbackTermsDialog({
@@ -423,6 +430,10 @@ function CorrectionRow({
 }) {
   const action = ACTIONS[row.action];
   const spend = Number(row.fiatAmount);
+  const earns =
+    row.type === "SubscriptionDiscount"
+      ? `${formatUsd(row.owedUsd)} discount`
+      : undefined;
 
   return (
     <TableRow data-state={checked ? "selected" : undefined}>
@@ -459,7 +470,7 @@ function CorrectionRow({
           {action.label}
         </Badge>
         <div className="mt-0.5 text-xs whitespace-nowrap text-gray-500">
-          {terms(row.from)} → {terms(row.to)}
+          {terms(row.from, earns)} → {terms(row.to, earns)}
         </div>
       </TableCell>
       <TableCell className="text-right font-medium whitespace-nowrap text-gray-900 tabular-nums">

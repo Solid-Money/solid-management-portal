@@ -3244,6 +3244,12 @@ export type TrialCorrectionAction = "update_terms" | "rearm" | "top_up";
 export interface TrialCorrectionRow {
   cashbackId: string;
   transactionId: string;
+  /**
+   * A subscription discount owes its own fixed figure (`owedUsd`), not a rate
+   * on the spend: only its cap is corrected, and `to` carries no percentage.
+   * Absent from a backend that predates subscription-discount corrections.
+   */
+  type?: "Cashback" | "SubscriptionDiscount";
   merchantName?: string;
   fiatAmount: string;
   fiatCurrency: string;
