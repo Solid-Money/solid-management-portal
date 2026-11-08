@@ -400,8 +400,8 @@ function PricesSection({
  *
  * The case it makes visible is a top-up: the app sized it against what the
  * older lock had grown to, so the older lock is protected at that value. Shown
- * to the cent because the case it exists for is a lock a fraction of a FUSE
- * under a threshold, which whole FUSE would round up to the threshold.
+ * with `formatFuseExact` because the case it exists for is a lock a fraction of
+ * a FUSE under a threshold, which coarser rounding would show as reaching it.
  */
 function FloorsPreview({ preview }: { preview: TierLockReevaluationPreview }) {
   // An older backend sends none of this; the press still works without it.

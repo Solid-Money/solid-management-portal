@@ -219,10 +219,10 @@ export default function UserTierMembershipCard({
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Locked" value={formatFuse(lock.lockedFuse)} />
-                  {/* What the tier is resolved from. Shown to the cent: a lock
-                      a fraction of a FUSE under a threshold is exactly the case
-                      this is here to explain, and whole FUSE would round it
-                      up to the threshold. */}
+                  {/* What the tier is resolved from, to the grade's own slack:
+                      a lock a fraction of a FUSE under a threshold is exactly
+                      the case this is here to explain, and coarser rounding
+                      would show it as reaching the threshold. */}
                   {typeof lock.committedFuse === "number" ? (
                     <Stat
                       label="Graded at"
