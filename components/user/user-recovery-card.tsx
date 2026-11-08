@@ -91,7 +91,7 @@ export default function UserRecoveryCard({
 }: UserRecoveryCardProps) {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, dataUpdatedAt } = useQuery({
+  const { data, isLoading, dataUpdatedAt, errorUpdatedAt } = useQuery({
     queryKey: ["user-recovery-eligibility", userId],
     queryFn: async () => (await getRecoveryEligibility(userId)).data.data,
   });
@@ -107,9 +107,10 @@ export default function UserRecoveryCard({
   // The hold ends on its own. Re-read eligibility when it does, so a card left
   // open does not keep "Send recovery code" disabled past it.
   //
-  // Re-armed after every read (`dataUpdatedAt`): if this browser's clock runs
-  // ahead of the server's, the first re-read still comes back on hold, and it
-  // is then retried every HOLD_RECHECK_MS until the server lets it go.
+  // Re-armed after every read, successful (`dataUpdatedAt`) or failed
+  // (`errorUpdatedAt`): if this browser's clock runs ahead of the server's, or
+  // the re-read itself fails, the card still holds the old hold, and it is then
+  // retried every HOLD_RECHECK_MS until the server lets it go.
   const holdUntil = data?.recoveryEmailHoldUntil;
   useEffect(() => {
     if (!holdUntil) return;
@@ -126,7 +127,7 @@ export default function UserRecoveryCard({
       });
     }, delay);
     return () => clearTimeout(timer);
-  }, [holdUntil, dataUpdatedAt, queryClient, userId]);
+  }, [holdUntil, dataUpdatedAt, errorUpdatedAt, queryClient, userId]);
 
   // A suspension refuses recovery outright, whatever the recovery setup. The
   // backend already reports such an account as unable to self-recover; this
