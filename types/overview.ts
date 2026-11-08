@@ -355,6 +355,11 @@ export interface IncentivesTotals {
   };
   /** Earned ÷ card spend, 0–1; null without spend. */
   earnedShareOfCardSpend: number | null;
+  /**
+   * Whether the daily on-chain check has run for the range's days, so Sent
+   * includes payout corrections. Missing from older responses: read as true.
+   */
+  correctionsKnown?: { current?: boolean; previous?: boolean };
 }
 
 /** `live`, or `not_launched` until a program has data; open for later states. */
@@ -377,6 +382,8 @@ export interface IncentivesWeek {
   weekEnd: string;
   /** The week is still running. */
   partial: boolean;
+  /** The on-chain check has run for the week's days. Missing: read as true. */
+  correctionsKnown?: boolean;
   sent: {
     cashback: number;
     referrals: number;

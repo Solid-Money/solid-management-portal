@@ -15,6 +15,7 @@ import {
 import {
   axisTicks,
   payDelayText,
+  unknownCorrectionsNote,
   shortSpan,
   weeklyBars,
   weeklyNotes,
@@ -65,6 +66,7 @@ export function WeeklyChart({ data }: { data: IncentivesResponse }) {
   const lastFull = bars.map((b) => b.partial).lastIndexOf(false);
   const today = data.range.today ?? data.generatedAt.slice(0, 10);
   const weeks = weeksDescription(data.weekly, today);
+  const unknownCorrections = unknownCorrectionsNote(data.weekly, mode);
 
   return (
     <OverviewCard className="flex h-full flex-col p-5">
@@ -149,6 +151,7 @@ export function WeeklyChart({ data }: { data: IncentivesResponse }) {
         <span>{weeklyTotalsText(data)}</span>
       </div>
       <p className="mt-3 text-[12px] leading-4 text-gray-500">{payDelayText(data)}</p>
+      {unknownCorrections ? <p className="mt-1 text-[12px] leading-4 text-gray-500">{unknownCorrections}</p> : null}
     </OverviewCard>
   );
 }

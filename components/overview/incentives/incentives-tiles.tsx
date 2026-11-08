@@ -6,6 +6,7 @@ import {
   earnedCaption,
   previousRangeLabel,
   sentCaption,
+  sentChangeText,
   spendCaption,
   splitAmounts,
   splitShares,
@@ -22,7 +23,7 @@ import { KIND_COLORS } from "@/components/overview/incentives/incentives-ui";
  */
 export function IncentivesTiles({ data, compare }: { data: IncentivesResponse; compare: boolean }) {
   const { totals, range } = data;
-  const sentChange = compare ? changeVsText(totals.sent.current, totals.sent.previous, range.days) : null;
+  const sentChange = compare ? sentChangeText(data) : null;
   const earnedChange = compare
     ? changeVsText(totals.earned.current, totals.earned.previous, range.days)
     : null;

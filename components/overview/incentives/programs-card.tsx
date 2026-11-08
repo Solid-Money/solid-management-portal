@@ -1,6 +1,13 @@
 "use client";
 
-import { keepTogether, programRows, sharePercent, shortSpan, wholeUsd } from "@/lib/incentives";
+import {
+  correctionsKnown,
+  keepTogether,
+  programRows,
+  sharePercent,
+  shortSpan,
+  wholeUsd,
+} from "@/lib/incentives";
 import { formatCount } from "@/lib/overview-format";
 import type { IncentivesResponse } from "@/types/overview";
 import { OverviewCard, SectionHeader } from "@/components/overview/overview-ui";
@@ -18,10 +25,11 @@ const BAR_COLORS = {
  * that have not started stay hidden until they have money.
  */
 export function ProgramsCard({ data }: { data: IncentivesResponse }) {
-  const { rows, total } = programRows(data.programs);
+  const known = correctionsKnown(data).current;
+  const { rows, total } = programRows(data.programs, { correctionsKnown: known });
   const head = "py-1.5 text-[10.5px] font-semibold tracking-[0.4px] text-gray-400 uppercase";
   const year = (data.range.today ?? data.generatedAt).slice(0, 4);
-  const hasCorrections = rows.some((r) => r.key === "payout_corrections");
+  const hasCorrections = known && rows.some((r) => r.key === "payout_corrections");
 
   return (
     <OverviewCard className="flex h-full flex-col p-5">
@@ -51,7 +59,9 @@ export function ProgramsCard({ data }: { data: IncentivesResponse }) {
               rows.map((row) => (
                 <tr key={row.key} className="h-[30px] border-b border-[#eef0f3]">
                   <td className="py-1.5 pr-3 font-medium whitespace-nowrap text-gray-900">{row.label}</td>
-                  <td className="py-1.5 pr-3 text-right text-gray-700">{wholeUsd(row.sentUsd)}</td>
+                  <td className="py-1.5 pr-3 text-right text-gray-700">
+                    {row.sentUsd === null ? <Dash /> : wholeUsd(row.sentUsd)}
+                  </td>
                   <td className="py-1.5 pr-3 text-right text-gray-700">
                     {row.earnedUsd === null ? <Dash /> : wholeUsd(row.earnedUsd)}
                   </td>

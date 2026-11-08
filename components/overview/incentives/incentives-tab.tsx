@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useIncentives } from "@/hooks/use-incentives";
 import { describeApiError } from "@/lib/api";
-import { dueDefinition, keepTogether, shortSpan } from "@/lib/incentives";
+import { dueDefinition, keepTogether, payDelays, shortSpan } from "@/lib/incentives";
 import { dayLabel } from "@/lib/overview-range";
 import type { IncentivesResponse } from "@/types/overview";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -92,6 +92,7 @@ export function IncentivesView({ data, compare }: { data: IncentivesResponse; co
  * plain words; the footer keeps the version, data time and wallets.
  */
 function Definitions({ data }: { data: IncentivesResponse }) {
+  const { cashbackDays, referralDays } = payDelays(data);
   const rows: Array<[string, string]> = [
     [
       "Sent",
@@ -99,7 +100,7 @@ function Definitions({ data }: { data: IncentivesResponse }) {
     ],
     [
       "Earned",
-      "What the range's purchases, qualified referrals and accrued yield boost entitle users to, minus anything already cancelled. Cashback pays 14 days after the purchase, referral rewards 30 days after the friend qualifies.",
+      `What the range's purchases, qualified referrals and accrued yield boost entitle users to, minus anything already cancelled. Cashback pays ${cashbackDays} days after the purchase, referral rewards ${referralDays} days after the friend qualifies.`,
     ],
     ["Payout corrections", "What payments moved on-chain beyond the amounts on their records."],
     ["Coming due", dueDefinition(data.comingDue)],

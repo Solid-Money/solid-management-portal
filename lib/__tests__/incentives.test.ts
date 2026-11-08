@@ -7,6 +7,7 @@ import {
   changeVsText,
   checkChip,
   checkValue,
+  correctionsKnown,
   dueBars,
   dueDefinition,
   dueExpectedTotal,
@@ -17,14 +18,17 @@ import {
   newCashbackNote,
   overdueNote,
   payDelayText,
+  payDelays,
   programRows,
   referralPauseNotes,
   sentCaption,
+  sentChangeText,
   sharePercent,
   shortSpan,
   spendCaption,
   splitAmounts,
   splitShares,
+  unknownCorrectionsNote,
   weeklyBars,
   weeklyNotes,
   weeklyTicks,
@@ -200,7 +204,7 @@ describe("tiles", () => {
 
   it("builds the captions from the data", () => {
     expect(plain(sentCaption(fixture))).toBe(
-      "Left our wallets Oct 26 – Nov 1. About $1.2K of it was cashback due the week before, paid late.",
+      "Left our wallets Oct 26 – Nov 1. About $1.2K of it was cashback due before Oct 26, paid late.",
     );
     expect(plain(earnedCaption(fixture))).toBe(
       "Activity Oct 26 – Nov 1. Cashback pays Nov 9 – 15, referral rewards Nov 25 – Dec 1.",
@@ -454,7 +458,7 @@ describe("the backend's response", () => {
     expect(centsUsd(backend.totals.cardSpendPerIncentiveDollar.current)).toBe("$16.89");
     // $1,376.41 of late cashback rounds to $1.4K.
     expect(plain(sentCaption(backend))).toBe(
-      "Left our wallets Oct 26 – Nov 1. About $1.4K of it was cashback due the week before, paid late.",
+      "Left our wallets Oct 26 – Nov 1. About $1.4K of it was cashback due before Oct 26, paid late.",
     );
     expect(lateCashbackNote(backend)?.text).toBe("$1.4K of late cashback caught up");
     expect(plain(earnedCaption(backend))).toBe(
@@ -499,5 +503,81 @@ describe("the backend's response", () => {
       lead: "$32.1K",
       rest: " owed over the next 30 days · by the week it pays out",
     });
+  });
+});
+
+describe("payout corrections before the on-chain check has run", () => {
+  it("reads missing flags as known", () => {
+    expect(correctionsKnown(fixture)).toEqual({ current: true, previous: true });
+    expect(sentChangeText(fixture)).toBe("+70% vs last week");
+    expect(unknownCorrectionsNote(fixture.weekly, "sent")).toBeNull();
+  });
+
+  it("accepts the flags as booleans and rejects anything else", () => {
+    const data = clone();
+    data.totals.correctionsKnown = { current: false, previous: true };
+    data.weekly[12].correctionsKnown = false;
+    expect(isIncentivesResponse(data)).toBe(true);
+    const badWeek = clone() as unknown as { weekly: Array<Record<string, unknown>> };
+    badWeek.weekly[0].correctionsKnown = "no";
+    expect(isIncentivesResponse(badWeek)).toBe(false);
+    const badTotals = clone() as unknown as { totals: Record<string, unknown> };
+    badTotals.totals.correctionsKnown = { current: 0, previous: true };
+    expect(isIncentivesResponse(badTotals)).toBe(false);
+    badTotals.totals.correctionsKnown = true;
+    expect(isIncentivesResponse(badTotals)).toBe(false);
+  });
+
+  it("says Sent excludes them and shows the corrections row as unknown", () => {
+    const data = clone();
+    data.totals.correctionsKnown = { current: false, previous: true };
+    data.programs.find((p) => p.key === "payout_corrections")!.sentUsd = 0;
+    expect(plain(sentCaption(data))).toBe(
+      "Left our wallets Oct 26 – Nov 1. About $1.2K of it was cashback due before Oct 26, paid late. Excludes payout corrections (on-chain check not run for these days).",
+    );
+    const { rows, total } = programRows(data.programs, { correctionsKnown: correctionsKnown(data).current });
+    const corrections = rows.find((r) => r.key === "payout_corrections");
+    expect(corrections).toMatchObject({ sentUsd: null, share: null, earnedUsd: null });
+    expect(sharePercent(corrections!.share)).toBe("—");
+    // The other rows still add to 100% of what is known.
+    expect(rows.reduce((sum, r) => sum + (r.share ?? 0), 0)).toBeCloseTo(1, 10);
+    expect(total.sentUsd).toBeCloseTo(10_658.98 - 91.12, 2);
+    // Once known, a $0 correction is hidden like any other empty row.
+    expect(programRows(data.programs).rows.map((r) => r.key)).not.toContain("payout_corrections");
+  });
+
+  it("drops Sent's change chip when the two ranges are not counted alike", () => {
+    const data = clone();
+    data.totals.correctionsKnown = { current: true, previous: false };
+    expect(sentChangeText(data)).toBeNull();
+    data.totals.correctionsKnown = { current: false, previous: true };
+    expect(sentChangeText(data)).toBeNull();
+    data.totals.correctionsKnown = {};
+    expect(sentChangeText(data)).toBe("+70% vs last week");
+  });
+
+  it("adds one footnote under the Sent chart when any week is not known", () => {
+    const data = clone();
+    data.weekly[11].correctionsKnown = false;
+    data.weekly[12].correctionsKnown = false;
+    expect(unknownCorrectionsNote(data.weekly, "sent")).toBe("Payout corrections aren't known for some weeks yet.");
+    expect(unknownCorrectionsNote(data.weekly, "earned")).toBeNull();
+    data.weekly.forEach((w) => (w.correctionsKnown = true));
+    expect(unknownCorrectionsNote(data.weekly, "sent")).toBeNull();
+  });
+});
+
+describe("pay delays", () => {
+  it("come from earnedPaysOn, not fixed numbers", () => {
+    expect(payDelays(fixture)).toEqual({ cashbackDays: 14, referralDays: 30 });
+    const data = clone();
+    data.totals.earnedPaysOn = {
+      cashback: { from: "2026-11-16", to: "2026-11-22" },
+      referrals: { from: "2026-12-10", to: "2026-12-16" },
+    };
+    expect(payDelays(data)).toEqual({ cashbackDays: 21, referralDays: 45 });
+    expect(payDelayText(data)).toBe(
+      "Earned runs ahead because cashback pays 21 days and referral rewards 45 days after they're earned.",
+    );
   });
 });

@@ -24,6 +24,7 @@ const isNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 const isNumberOrNull = (value: unknown): boolean => value === null || isNumber(value);
 const isString = (value: unknown): value is string => typeof value === "string";
+const isOptionalBoolean = (value: unknown): boolean => value === undefined || typeof value === "boolean";
 const hasNumbers = (value: unknown, keys: string[]): boolean =>
   isObject(value) && keys.every((key) => isNumber(value[key]));
 const hasStrings = (value: unknown, keys: string[]): boolean =>
@@ -61,6 +62,10 @@ export function isIncentivesResponse(value: unknown): value is IncentivesRespons
     isNumberOrNull(perDollar.previous) &&
     isNumberOrNull(perDollar.average13Weeks) &&
     isNumberOrNull(totals.earnedShareOfCardSpend) &&
+    (totals.correctionsKnown === undefined ||
+      (isObject(totals.correctionsKnown) &&
+        isOptionalBoolean(totals.correctionsKnown.current) &&
+        isOptionalBoolean(totals.correctionsKnown.previous))) &&
     isListOf(
       value.programs,
       (p) =>
@@ -76,6 +81,7 @@ export function isIncentivesResponse(value: unknown): value is IncentivesRespons
         hasStrings(w, ["weekStart", "weekEnd"]) &&
         isObject(w) &&
         typeof w.partial === "boolean" &&
+        isOptionalBoolean(w.correctionsKnown) &&
         hasNumbers(w.sent, ["cashback", "referrals", "perks", "yieldBoost", "corrections", "total"]) &&
         hasNumbers(w.earned, ["cashback", "referrals", "perks", "yieldBoost", "total"]) &&
         isNumber(w.cardSpend),
@@ -231,14 +237,43 @@ export function splitAmounts(split: IncentivesSplit): Array<{ kind: IncentiveKin
 
 const yearOf = (data: IncentivesResponse) => (data.range.today ?? data.generatedAt).slice(0, 4);
 
-/** "Left our wallets Oct 26 – Nov 1. About $1.2K of it was cashback due the week before, paid late." */
+/** Whether Sent includes payout corrections for the range and the one before; missing reads as known. */
+export function correctionsKnown(data: IncentivesResponse): { current: boolean; previous: boolean } {
+  const known = data.totals.correctionsKnown;
+  return { current: known?.current !== false, previous: known?.previous !== false };
+}
+
+/**
+ * Sent's change chip, or null when there is nothing to compare or the two
+ * ranges are not counted alike (one includes payout corrections, one not yet).
+ */
+export function sentChangeText(data: IncentivesResponse): string | null {
+  const known = correctionsKnown(data);
+  if (!known.current || !known.previous) return null;
+  const { sent } = data.totals;
+  return changeVsText(sent.current, sent.previous, data.range.days);
+}
+
+/**
+ * "Left our wallets Oct 26 – Nov 1. About $1.4K of it was cashback due before
+ * Oct 26, paid late." Late = due before the range started, however long
+ * before (old rows re-sent count too).
+ */
 export function sentCaption(data: IncentivesResponse): string {
   const { range, totals } = data;
-  const span = keepTogether(shortSpan(range.from, range.to, yearOf(data)));
+  const year = yearOf(data);
+  const span = keepTogether(shortSpan(range.from, range.to, year));
   const late = totals.lateCashbackInSentUsd;
-  if (!(late >= 0.5)) return `Left our wallets ${span}.`;
-  const before = range.days === 7 ? "the week before" : keepTogether(`before ${dayLabel(range.from)}`);
-  return `Left our wallets ${span}. About ${compactUsd(late)} of it was cashback due ${before}, paid late.`;
+  const parts = [`Left our wallets ${span}.`];
+  if (late >= 0.5) {
+    parts.push(
+      `About ${compactUsd(late)} of it was cashback due ${keepTogether(`before ${dayLabel(range.from, year)}`)}, paid late.`,
+    );
+  }
+  if (!correctionsKnown(data).current) {
+    parts.push("Excludes payout corrections (on-chain check not run for these days).");
+  }
+  return parts.join(" ");
 }
 
 /** "Activity Oct 26 – Nov 1. Cashback pays Nov 9 – 15, referral rewards Nov 25 – Dec 1." */
@@ -273,10 +308,11 @@ export interface ProgramRow {
   key: string;
   label: string;
   kind: IncentiveKind;
-  sentUsd: number;
+  /** Null when not known yet (payout corrections before the on-chain check). */
+  sentUsd: number | null;
   earnedUsd: number | null;
   payments: number | null;
-  /** Share of the table's sent total, 0–1; null when nothing was sent. */
+  /** Share of the table's sent total, 0–1; null when nothing was sent or it is not known. */
   share: number | null;
 }
 
@@ -287,26 +323,39 @@ export function programKind(key: string): IncentiveKind {
   return "other";
 }
 
+const CORRECTIONS_KEY = "payout_corrections";
+
 /**
  * The table's rows in the order they came, without those that neither sent
  * nor earned anything in the range, each with its share of what was sent.
+ * While the on-chain check has not run (`correctionsKnown` false), payout
+ * corrections stay in the table as unknown ("—") instead of a $0 that reads
+ * as checked.
  */
-export function programRows(programs: IncentivesProgram[]): {
+export function programRows(
+  programs: IncentivesProgram[],
+  options: { correctionsKnown?: boolean } = {},
+): {
   rows: ProgramRow[];
   total: { sentUsd: number; earnedUsd: number };
 } {
-  const shown = programs.filter((p) => (p.sentUsd ?? 0) !== 0 || (p.earnedUsd ?? 0) !== 0);
-  const sentTotal = shown.reduce((sum, p) => sum + (p.sentUsd ?? 0), 0);
+  const known = options.correctionsKnown !== false;
+  const unknown = (p: IncentivesProgram) => !known && p.key === CORRECTIONS_KEY;
+  const shown = programs.filter(
+    (p) => unknown(p) || (p.sentUsd ?? 0) !== 0 || (p.earnedUsd ?? 0) !== 0,
+  );
+  const sentOf = (p: IncentivesProgram) => (unknown(p) ? 0 : (p.sentUsd ?? 0));
+  const sentTotal = shown.reduce((sum, p) => sum + sentOf(p), 0);
   const earnedTotal = shown.reduce((sum, p) => sum + (p.earnedUsd ?? 0), 0);
   return {
     rows: shown.map((p) => ({
       key: p.key,
       label: p.label,
       kind: programKind(p.key),
-      sentUsd: p.sentUsd ?? 0,
+      sentUsd: unknown(p) ? null : sentOf(p),
       earnedUsd: p.earnedUsd,
       payments: p.payments,
-      share: sentTotal > 0 ? (p.sentUsd ?? 0) / sentTotal : null,
+      share: unknown(p) || sentTotal <= 0 ? null : sentOf(p) / sentTotal,
     })),
     total: { sentUsd: sentTotal, earnedUsd: earnedTotal },
   };
@@ -459,11 +508,27 @@ export function weeklyTotalsText(data: IncentivesResponse): string {
   )} earned.`;
 }
 
+/** Days from earning to payout: from the range's first day to when its earned parts start paying. */
+export function payDelays(data: IncentivesResponse): { cashbackDays: number; referralDays: number } {
+  const { range, totals } = data;
+  return {
+    cashbackDays: rangeDays(range.from, totals.earnedPaysOn.cashback.from) - 1,
+    referralDays: rangeDays(range.from, totals.earnedPaysOn.referrals.from) - 1,
+  };
+}
+
+/** "Payout corrections aren't known for some weeks yet." when the on-chain check is behind; Sent only. */
+export function unknownCorrectionsNote(weekly: IncentivesWeek[], mode: WeeklyMode): string | null {
+  if (mode !== "sent") return null;
+  return weekly.some((w) => w.correctionsKnown === false)
+    ? "Payout corrections aren't known for some weeks yet."
+    : null;
+}
+
 /** "Earned runs ahead because cashback pays 14 days and referral rewards 30 days after they're earned." */
 export function payDelayText(data: IncentivesResponse): string {
-  const { range, totals, weeklyTotals13 } = data;
-  const cashbackDays = rangeDays(range.from, totals.earnedPaysOn.cashback.from) - 1;
-  const referralDays = rangeDays(range.from, totals.earnedPaysOn.referrals.from) - 1;
+  const { weeklyTotals13 } = data;
+  const { cashbackDays, referralDays } = payDelays(data);
   const lead =
     weeklyTotals13.earned > weeklyTotals13.sent
       ? "Earned runs ahead"
