@@ -2513,7 +2513,12 @@ export interface ResetTwoFactorResult {
 
 /** Ledger state of a referral cashback reward, as rewards-service stores it. */
 export type ReferralRewardStatus =
-  "pending" | "qualified" | "paid" | "expired" | "reversed" | "under_review";
+  | "pending"
+  | "qualified"
+  | "paid"
+  | "expired"
+  | "reversed"
+  | "under_review";
 
 /** The spend a referral reward is judged on, read live from card data. */
 export interface ReferralSpendReading {
@@ -2646,7 +2651,10 @@ export interface AdminUserReferrals {
  * did clear the bar in their window) or `still_expired`.
  */
 export type ReferralReevaluationOutcome =
-  "reinstated" | "still_reversed" | "qualified" | "still_expired";
+  | "reinstated"
+  | "still_reversed"
+  | "qualified"
+  | "still_expired";
 
 export interface ReferralReevaluationResult {
   referredUserId: string;
@@ -2755,12 +2763,19 @@ export interface CardIssuanceContext {
     shipping?: Partial<CardShippingAddress>;
   };
   cardholder?: { firstName?: string; lastName?: string; email?: string };
+  /**
+   * Rain sunset: no Rain card can be issued, but the one the user holds can
+   * still be cancelled for good. Only with `canIssue: false`.
+   */
+  cancelOnly?: boolean;
 }
 
 export interface IssueCardRequest {
   type: CardType;
   /** Cancel the card they hold today, at the issuer. Irreversible. */
   cancelExisting: boolean;
+  /** Rain sunset: cancel the Rain card and issue nothing. */
+  cancelOnly?: boolean;
   displayName?: string;
   limit?: CardLimit;
   shipping?: CardShippingAddress;
@@ -2777,6 +2792,8 @@ export interface IssueCardResult {
   expiration?: string;
   previousCardId?: string;
   previousCardCanceled: boolean;
+  /** False for a cancel-only request: `cardId` is the card that was cancelled. */
+  replacementIssued?: boolean;
   adminUsername: string;
   reason?: string;
 }
@@ -2945,7 +2962,10 @@ export type TierTrialSource = "admin_gift" | "promotion";
  * the user accepts it — the duration is theirs to start.
  */
 export type TierTrialStatus =
-  "pending_activation" | "active" | "expired" | "revoked";
+  | "pending_activation"
+  | "active"
+  | "expired"
+  | "revoked";
 
 /**
  * A temporary tier upgrade: the user holds `tier` for `durationDays` from the
@@ -3261,7 +3281,10 @@ export type PartialRefundRestoreSkipReason =
 export interface PartialRefundRestoreResult {
   batchId: string;
   requested: number;
-  restored: (PartialRefundVoidedRow & { percentage: number; payoutAt: string })[];
+  restored: (PartialRefundVoidedRow & {
+    percentage: number;
+    payoutAt: string;
+  })[];
   skipped: {
     id: string;
     userId?: string;
