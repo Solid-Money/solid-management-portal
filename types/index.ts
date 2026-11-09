@@ -2652,6 +2652,18 @@ export interface ReferralReevaluationResult {
   payoutEtaAt?: string;
   reinstatedAt?: string;
   reinstatedBy?: string;
+  /**
+   * For a reward reinstated after it was reversed after payout: what became
+   * of the debts that reversal booked. Absent when it booked none.
+   */
+  clawbackDebts?: {
+    /** Debts cancelled — no longer taken from the user's payouts. */
+    cancelled: number;
+    /** Already taken from later payouts: support has to pay it back. */
+    recoveredUsd: number;
+    /** Some may still be open: cancel them by hand under Referral debts. */
+    needsManualCancellation: boolean;
+  };
 }
 
 export type CardType = "virtual" | "physical";

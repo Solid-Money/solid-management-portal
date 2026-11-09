@@ -313,6 +313,8 @@ function ReevaluationOutcome({
         </div>
       </dl>
 
+      <ClawbackDebtsNotice result={result} />
+
       <p className="text-xs text-gray-500">
         Recorded on {friendLabel}&apos;s audit trail
         {result.reinstatedBy ? ` by ${result.reinstatedBy}` : ""}.
@@ -324,5 +326,43 @@ function ReevaluationOutcome({
         </Button>
       </DialogFooter>
     </>
+  );
+}
+
+/**
+ * What reinstating a reward reversed after payout did to the debts that
+ * reversal booked. A debt left open would be taken from the user's next
+ * payouts although nothing is owed, so a failure is said loudly.
+ */
+function ClawbackDebtsNotice({
+  result,
+}: {
+  result: ReferralReevaluationResult;
+}) {
+  const debts = result.clawbackDebts;
+  if (!debts) return null;
+  return (
+    <div className="space-y-1 text-xs">
+      {debts.cancelled > 0 && (
+        <p className="text-gray-600">
+          {debts.cancelled === 1
+            ? "Its clawback debt was cancelled."
+            : `Its ${debts.cancelled} clawback debts were cancelled.`}
+        </p>
+      )}
+      {debts.recoveredUsd > 0 && (
+        <p className="text-amber-700">
+          {formatUsd(debts.recoveredUsd)} had already been taken from later
+          payouts to repay them. Nothing was owed, so pay it back to the user.
+        </p>
+      )}
+      {debts.needsManualCancellation && (
+        <p className="font-medium text-red-700">
+          Some clawback debts could not be cancelled. Write them off under
+          Referral debts on this user&apos;s page, or they will be taken from
+          their next referral payouts.
+        </p>
+      )}
+    </div>
   );
 }
