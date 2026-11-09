@@ -196,9 +196,10 @@ function CaseRow({ item, onChanged }: { item: TaskPartnerCase; onChanged: () => 
         {item.task && (
           <Link
             href={`/tasks?task=${encodeURIComponent(item.task.id)}`}
-            className="mt-0.5 inline-block text-[11px] font-medium text-indigo-700 hover:underline"
+            className="mt-0.5 block truncate text-[11px] font-medium text-indigo-700 hover:underline"
+            title={item.task.title}
           >
-            Open the task
+            {item.task.title ? `Task: ${item.task.title}` : "Open the task"}
           </Link>
         )}
       </div>

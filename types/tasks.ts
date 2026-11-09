@@ -220,7 +220,8 @@ export interface TaskPartnerCase {
   customerWroteSince: boolean;
   /** The follow-up passed and it went back to the inbox: chase the partner. */
   backInInbox: boolean;
-  task: { id: string; number: number } | null;
+  /** `title` is missing from servers older than the partner-wait title change. */
+  task: { id: string; number: number; title?: string } | null;
 }
 
 export interface TaskPartnerGroup {

@@ -85,6 +85,17 @@ function withoutForeignImages(html: string): string {
   return html.replace(/<img\b(?![^>]*\bdata-key=)[^>]*>/gi, "");
 }
 
+/**
+ * Excel, Word and Sheets put a picture of the selection on the clipboard
+ * next to its HTML. When the HTML still has text or a table once foreign
+ * images are gone, that is what was copied, not the picture.
+ */
+function hasRichContent(html: string): boolean {
+  if (!html.trim() || typeof DOMParser === "undefined") return false;
+  const doc = new DOMParser().parseFromString(withoutForeignImages(html), "text/html");
+  return Boolean(doc.body.textContent?.trim() || doc.body.querySelector("table, img"));
+}
+
 /** The people mentioned in the text, by email. */
 function mentionedIn(editor: Editor): string[] {
   const found = new Set<string>();
@@ -393,6 +404,8 @@ export default function TaskComposer({
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
   const addRef = useRef<(incoming: File[], inline: boolean) => void>(() => undefined);
+  /** The @mention list is showing: Escape closes it, not the edit. */
+  const listOpen = useRef(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -468,6 +481,7 @@ export default function TaskComposer({
       handlePaste: (_view, event) => {
         const pasted = Array.from(event.clipboardData?.files ?? []);
         if (!pasted.length || !allowAttachments) return false;
+        if (hasRichContent(event.clipboardData?.getData("text/html") ?? "")) return false;
         event.preventDefault();
         addRef.current(pasted, true);
         return true;
@@ -486,7 +500,7 @@ export default function TaskComposer({
           sendRef.current();
           return true;
         }
-        if (event.key === "Escape" && cancelRef.current) {
+        if (event.key === "Escape" && cancelRef.current && !listOpen.current) {
           event.preventDefault();
           event.stopPropagation();
           cancelRef.current();
@@ -580,6 +594,7 @@ export default function TaskComposer({
 
   // The @mention list: arrows move, Enter or Tab picks, Escape closes.
   const matches = mention?.items ?? [];
+  listOpen.current = Boolean(mention && matches.length);
   mentionKeys.current = ({ event }) => {
     if (!mention || !matches.length) return false;
     if (event.key === "ArrowDown") {
@@ -632,7 +647,9 @@ export default function TaskComposer({
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={(event) => {
-        // Dropped on the files row or toolbar, not in the text.
+        // Dropped on the files row or toolbar, not in the text (the editor
+        // handles those and marks the drop as handled).
+        if (event.nativeEvent.defaultPrevented) return;
         if (!allowAttachments || !event.dataTransfer.files.length) return;
         event.preventDefault();
         setDragging(false);

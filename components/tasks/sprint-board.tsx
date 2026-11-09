@@ -79,7 +79,7 @@ function Card({
     <div
       role="button"
       tabIndex={0}
-      aria-label={row.title}
+      aria-label={`${row.title}, task ${row.number}`}
       draggable={draggable}
       onDragStart={(event) => {
         event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: row.id, from: "sprint" }));
