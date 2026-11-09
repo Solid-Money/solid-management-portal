@@ -133,6 +133,8 @@ function activityValue(activity: TaskActivity, value: string | null, people: Tas
       return personName(value, people);
     case "due":
       return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDue(value) : value;
+    case "board":
+      return value;
     default:
       return `“${value}”`;
   }
@@ -148,7 +150,11 @@ function ActivityLine({ update, people }: { update: TaskUpdate; people: TaskPers
       ? "created this task"
       : activity.field === "title"
         ? `renamed it to ${activityValue(activity, activity.to, people)}`
-        : `changed ${activity.field === "due" ? "the due date" : activity.field} from ${activityValue(
+        : activity.field === "board"
+          ? activity.to
+            ? `moved it to ${activity.to}`
+            : `took it off ${activity.from ?? "its board"}`
+          : `changed ${activity.field === "due" ? "the due date" : activity.field} from ${activityValue(
             activity,
             activity.from,
             people,

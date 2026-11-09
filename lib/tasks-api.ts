@@ -1,5 +1,6 @@
 import api from "@/lib/api";
 import type {
+  TaskBoards,
   TaskCreateInput,
   TaskDetail,
   TaskFeedPage,
@@ -33,6 +34,7 @@ export const getTasks = async (filters: TaskListFilters, page = 0) =>
         ...(filters.priority ? { priority: filters.priority } : {}),
         ...(filters.label ? { label: filters.label } : {}),
         ...(filters.q ? { q: filters.q } : {}),
+        ...(filters.board ? { board: filters.board } : {}),
         ...(page ? { page } : {}),
       },
     })
@@ -46,6 +48,21 @@ export const getTaskCounts = async () =>
       quietErrors: true,
     })
   ).data.counts;
+
+// ---- Boards ------------------------------------------------------------------
+
+export const getTaskBoards = async () =>
+  (await api.get<TaskBoards>(`${base}/boards`)).data;
+
+export const createTaskBoard = async (name: string) =>
+  (await api.post<TaskBoards>(`${base}/boards`, { name })).data;
+
+export const renameTaskBoard = async (key: string, name: string) =>
+  (await api.patch<TaskBoards>(`${base}/boards/${encodeURIComponent(key)}`, { name })).data;
+
+/** Its tasks stay, on no board. */
+export const deleteTaskBoard = async (key: string) =>
+  (await api.delete<TaskBoards>(`${base}/boards/${encodeURIComponent(key)}`)).data;
 
 export const getTask = async (id: string) =>
   (await api.get<TaskDetail>(`${base}/${id}`)).data;

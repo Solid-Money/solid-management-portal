@@ -69,7 +69,7 @@ export interface TaskAuthor {
 }
 
 export interface TaskActivity {
-  field: "status" | "owner" | "priority" | "due" | "title" | "created";
+  field: "status" | "owner" | "priority" | "due" | "title" | "created" | "board";
   from: string | null;
   to: string | null;
 }
@@ -102,6 +102,8 @@ export interface TaskRow {
   dueDate: string | null;
   labels: string[];
   group: string | null;
+  /** The board's key; null when on no board. */
+  board: string | null;
   source: { kind: TaskSourceKind; label: string | null };
   createdBy: TaskAuthor;
   visibility: TaskVisibility;
@@ -145,6 +147,25 @@ export interface TaskListFilters {
   priority?: TaskPriority;
   label?: string;
   q?: string;
+  /** A board's key, or "none" for tasks on no board. Every board when absent. */
+  board?: string;
+}
+
+export interface TaskBoard {
+  key: string;
+  name: string;
+  /** Support or Radar: filled automatically, can't be deleted. */
+  system: boolean;
+  /** Open tasks on it. */
+  open: number;
+}
+
+export interface TaskBoards {
+  boards: TaskBoard[];
+  /** Open tasks on every board and on none. */
+  all: number;
+  /** Open tasks on no board. */
+  unsorted: number;
 }
 
 export interface TaskBodyInput {
@@ -163,6 +184,7 @@ export interface TaskCreateInput {
   dueDate?: string;
   labels?: string[];
   group?: string;
+  board?: string;
   visibility?: TaskVisibility;
 }
 
@@ -176,6 +198,7 @@ export interface TaskPatchInput {
   dueDate?: string | null;
   labels?: string[];
   group?: string | null;
+  board?: string | null;
   visibility?: TaskVisibility;
 }
 
