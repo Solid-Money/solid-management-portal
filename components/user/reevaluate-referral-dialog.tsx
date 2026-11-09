@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, RefreshCw, XCircle } from "lucide-react";
@@ -119,6 +120,7 @@ export default function ReevaluateReferralDialog({
             <ReevaluationOutcome
               result={result}
               friendLabel={friendLabel}
+              friendUsername={reward.username}
               onDone={close}
             />
           ) : (
@@ -224,10 +226,13 @@ export default function ReevaluateReferralDialog({
 function ReevaluationOutcome({
   result,
   friendLabel,
+  friendUsername,
   onDone,
 }: {
   result: ReferralReevaluationResult;
   friendLabel: string;
+  /** The referred friend's username, when the row knows it. */
+  friendUsername?: string;
   onDone: () => void;
 }) {
   const reinstated =
@@ -313,6 +318,8 @@ function ReevaluationOutcome({
         </div>
       </dl>
 
+      <ClawbackDebtsNotice result={result} friendUsername={friendUsername} />
+
       <p className="text-xs text-gray-500">
         Recorded on {friendLabel}&apos;s audit trail
         {result.reinstatedBy ? ` by ${result.reinstatedBy}` : ""}.
@@ -324,5 +331,82 @@ function ReevaluationOutcome({
         </Button>
       </DialogFooter>
     </>
+  );
+}
+
+/**
+ * What reinstating a reward reversed after payout did to the debts that
+ * reversal booked. A debt left open would be taken from the user's next
+ * payouts although nothing is owed, so a failure is said loudly.
+ *
+ * The debts belong to the referrer, the friend or both — not necessarily the
+ * user whose page the dialog was opened from — so every instruction names
+ * and links the user it is about.
+ */
+function ClawbackDebtsNotice({
+  result,
+  friendUsername,
+}: {
+  result: ReferralReevaluationResult;
+  friendUsername?: string;
+}) {
+  const debts = result.clawbackDebts;
+  if (!debts) return null;
+
+  const userLink = (userId: string) => (
+    <Link
+      href={`/users/${userId}`}
+      className="font-medium underline underline-offset-2"
+    >
+      {userId === result.referrerId
+        ? "the referrer"
+        : userId === result.referredUserId
+          ? "the friend"
+          : userId}
+    </Link>
+  );
+  const recoveries = (debts.recoveries ?? []).filter(
+    (recovery) => recovery.usd > 0,
+  );
+
+  return (
+    <div className="space-y-1 text-xs">
+      {debts.cancelled > 0 && (
+        <p className="text-gray-600">
+          {debts.cancelled === 1
+            ? "Its clawback debt was cancelled."
+            : `Its ${debts.cancelled} clawback debts were cancelled.`}
+        </p>
+      )}
+      {recoveries.length > 0
+        ? recoveries.map((recovery) => (
+            <p key={recovery.debtId} className="text-amber-700">
+              {formatUsd(recovery.usd)} had already been taken from{" "}
+              {userLink(recovery.userId)}&apos;s later payouts. Nothing was
+              owed, so pay it back to them.
+            </p>
+          ))
+        : debts.recoveredUsd > 0 && (
+            <p className="text-amber-700">
+              {formatUsd(debts.recoveredUsd)} had already been taken from later
+              payouts to {userLink(result.referrerId)} or{" "}
+              {userLink(result.referredUserId)}. Nothing was owed, so pay it
+              back to whoever it was taken from.
+            </p>
+          )}
+      {debts.needsManualCancellation && (
+        <p className="font-medium text-red-700">
+          Some clawback debts could not be cancelled, and would be taken from
+          the next referral payouts. Under Referral debts on{" "}
+          {userLink(result.referrerId)}&apos;s and{" "}
+          {userLink(result.referredUserId)}&apos;s pages, write off only open{" "}
+          &ldquo;Cashback (legacy)&rdquo; debts for{" "}
+          {friendUsername ? `friend ${friendUsername}` : "this referral's friend"}
+          {" "}— any other debt listed there belongs to a different reward. If
+          those lists do not load either, try again later rather than write
+          anything off.
+        </p>
+      )}
+    </div>
   );
 }

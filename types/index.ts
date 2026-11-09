@@ -2588,6 +2588,31 @@ export interface AdminReferralRewardRow {
   reinstatedBy?: string;
   /** Reversed and expired rewards can be put back through the rules. */
   canReevaluate: boolean;
+  /**
+   * What each leg's payout netted against an earlier debt instead of sending.
+   * A leg whose offset is its whole amount was settled without a transfer.
+   */
+  referrerDebtOffsetUsd?: number;
+  newUserDebtOffsetUsd?: number;
+  /**
+   * For a reward reversed after it was paid: what each paid leg owes back and
+   * how much of it has actually been recovered. Absent on older backends.
+   */
+  clawbackDebts?: AdminReferralClawbackDebt[];
+}
+
+/** One paid leg's debt from a reward reversed after payout. */
+export interface AdminReferralClawbackDebt {
+  id: string;
+  side: "referrer" | "friend";
+  /** Who owes it. */
+  userId: string;
+  amountUsd: number;
+  remainingUsd: number;
+  recoveredUsd: number;
+  /** open | recovered | waived | written_off | cancelled */
+  status: string;
+  writeOffAt: string;
 }
 
 /** A user's referral cashback from both sides of the program. */
@@ -2635,6 +2660,20 @@ export interface ReferralReevaluationResult {
   payoutEtaAt?: string;
   reinstatedAt?: string;
   reinstatedBy?: string;
+  /**
+   * For a reward reinstated after it was reversed after payout: what became
+   * of the debts that reversal booked. Absent when it booked none.
+   */
+  clawbackDebts?: {
+    /** Debts cancelled — no longer taken from the user's payouts. */
+    cancelled: number;
+    /** Already taken from later payouts: support has to pay it back. */
+    recoveredUsd: number;
+    /** Whom each recovered amount was taken from. Absent on older backends. */
+    recoveries?: Array<{ userId: string; debtId: string; usd: number }>;
+    /** Some may still be open: cancel them by hand under Referral debts. */
+    needsManualCancellation: boolean;
+  };
 }
 
 export type CardType = "virtual" | "physical";

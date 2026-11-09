@@ -12,6 +12,7 @@ import {
   spendAgainstBar,
   spendBreakdown,
 } from "@/lib/referral";
+import { formatUtcDay } from "@/lib/referral-v4";
 import { formatDateTime, formatUsd } from "@/lib/utils";
 import { AdminReferralRewardRow, AdminUserReferrals } from "@/types";
 import ReevaluateReferralDialog from "@/components/user/reevaluate-referral-dialog";
@@ -82,6 +83,8 @@ function StatusCell({ row }: { row: AdminReferralRewardRow }) {
           {shortDate(row.reinstatedAt)}
         </p>
       )}
+      <DebtOffsetLines row={row} />
+      <ClawbackLines row={row} />
       {row.payoutTxUrl && (
         <a
           href={row.payoutTxUrl}
@@ -92,6 +95,61 @@ function StatusCell({ row }: { row: AdminReferralRewardRow }) {
           Payout <ExternalLink className="h-3 w-3" />
         </a>
       )}
+    </div>
+  );
+}
+
+/** A leg that repaid an earlier debt instead of being sent, in part or whole. */
+function DebtOffsetLines({ row }: { row: AdminReferralRewardRow }) {
+  const legs = [
+    { who: "Referrer", offset: row.referrerDebtOffsetUsd },
+    { who: "Friend", offset: row.newUserDebtOffsetUsd },
+  ].filter((leg) => (leg.offset ?? 0) > 0);
+  if (legs.length === 0) return null;
+  return (
+    <>
+      {legs.map((leg) => (
+        <p key={leg.who} className="text-[11px] text-gray-500">
+          {leg.who}&apos;s leg: {formatUsd(leg.offset ?? 0)} repaid an earlier
+          debt instead of being sent
+        </p>
+      ))}
+    </>
+  );
+}
+
+const CLAWBACK_STATUS: Record<string, string> = {
+  open: "open",
+  recovered: "recovered",
+  waived: "waived",
+  written_off: "written off",
+  cancelled: "cancelled",
+};
+
+/**
+ * What a reward reversed after payout owes back, leg by leg — and how much has
+ * really been recovered. Reversed is not clawed back until this says so.
+ */
+function ClawbackLines({ row }: { row: AdminReferralRewardRow }) {
+  if (!row.clawbackDebts || row.clawbackDebts.length === 0) return null;
+  return (
+    <div className="space-y-0.5">
+      {row.clawbackDebts.map((debt) => (
+        <p
+          key={debt.id}
+          className={`text-[11px] ${
+            debt.status === "open" ? "text-amber-700" : "text-gray-500"
+          }`}
+        >
+          {debt.status === "open" ? "Owed back by" : "Clawback debt for"} the{" "}
+          {debt.side}: {formatUsd(debt.amountUsd)} ·{" "}
+          {formatUsd(debt.recoveredUsd)} recovered ·{" "}
+          {CLAWBACK_STATUS[debt.status] ?? debt.status}
+          {debt.status === "open"
+            ? ` · written off ${formatUtcDay(debt.writeOffAt)} if not recovered`
+            : ""}
+        </p>
+      ))}
     </div>
   );
 }
