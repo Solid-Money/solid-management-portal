@@ -4,7 +4,8 @@ import { Suspense, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Headphones, ListTodo, Loader2, MessagesSquare, Plus, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTaskBoards, useTaskCounts } from "@/hooks/use-tasks";
+import { useQueryClient } from "@tanstack/react-query";
+import { TASK_KEYS, useTaskBoards, useTaskCounts } from "@/hooks/use-tasks";
 import NewTaskDialog from "@/components/tasks/new-task-dialog";
 import TeamFeed from "@/components/tasks/team-feed";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ import {
   type TaskListFilters,
   type TaskListView,
   type TaskPriority,
+  type TaskSprintPage,
 } from "@/types/tasks";
 
 function isView(value: string | null): value is TaskListView {
@@ -86,6 +88,7 @@ function TasksScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const queryClient = useQueryClient();
   const [creating, setCreating] = useState<{ sprint: string | null } | null>(null);
   const { data: counts } = useTaskCounts();
 
@@ -163,11 +166,14 @@ function TasksScreen() {
       post: null,
     });
 
-  // From the Sprint tab, into the week shown (this week's when none is in
-  // the URL), unless that week is over.
+  // From the Sprint tab, into the week the board shows (until it has loaded,
+  // the one in the URL, else this week), unless that week is over.
   const newTask = () => {
-    const shown = sprint ?? sprintStart();
-    setCreating({ sprint: tab === "sprint" && shown >= sprintStart() ? shown : null });
+    if (tab !== "sprint") return setCreating({ sprint: null });
+    const shown = queryClient.getQueryData<TaskSprintPage>(TASK_KEYS.sprint(sprint))?.sprint;
+    if (shown) return setCreating({ sprint: shown.when === "past" ? null : shown.start });
+    const start = sprint ?? sprintStart();
+    setCreating({ sprint: start >= sprintStart() ? start : null });
   };
 
   return (

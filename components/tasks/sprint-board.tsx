@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState, type DragEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDeferredValue, useMemo, useState, type DragEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TASK_KEYS, useTaskBoards, useTaskPeople, useTaskSprint } from "@/hooks/use-tasks";
-import { patchTask } from "@/lib/tasks-api";
+import { getTasks, patchTask } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import {
   Avatar,
@@ -178,6 +178,16 @@ export default function SprintBoard({
   const [over, setOver] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const key = TASK_KEYS.sprint(start);
+  // The board brings the most urgent 200; past that, a search asks the API
+  // for the rest of the open product tasks.
+  const term = useDeferredValue(search.trim());
+  const searchAll = !!data?.backlogHasMore && data.sprint.when !== "past" && term.length >= 2;
+  const { data: found, isFetching: searching } = useQuery({
+    queryKey: ["tasks", "backlog-search", term],
+    queryFn: () => getTasks({ view: "open", area: "product", q: term }),
+    enabled: searchAll,
+    staleTime: 30_000,
+  });
 
   const move = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TaskPatchInput }) => patchTask(id, input),
@@ -226,9 +236,13 @@ export default function SprintBoard({
   const done = rows.filter((row) => row.status === "done").length;
   const counted = rows.filter((row) => row.status !== "cancelled").length;
   const query = search.trim().toLowerCase();
-  const backlog = query
+  const shown = query
     ? data.backlog.filter((row) => `t-${row.number} ${row.title}`.toLowerCase().includes(query))
     : data.backlog;
+  const shownIds = new Set(shown.map((row) => row.id));
+  const backlog = searchAll
+    ? [...shown, ...(found?.rows ?? []).filter((row) => row.sprint === null && !shownIds.has(row.id))]
+    : shown;
 
   const drop = (event: DragEvent, column: (typeof COLUMNS)[number]) => {
     event.preventDefault();
@@ -357,6 +371,7 @@ export default function SprintBoard({
               </h3>
               <p className="text-xs text-gray-500">
                 Open product tasks in no sprint, most urgent first. Drag one onto the board, or press Add.
+                {data.backlogHasMore && " Showing the most urgent; search finds the rest."}
               </p>
             </div>
             <div className="relative ml-auto w-full sm:w-56">
@@ -371,7 +386,11 @@ export default function SprintBoard({
           </header>
           {backlog.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-gray-500">
-              {query ? "Nothing in the backlog matches." : "The backlog is empty: every open product task is in a sprint."}
+              {query
+                ? searchAll && searching
+                  ? "Searching the whole backlog…"
+                  : "Nothing in the backlog matches."
+                : "The backlog is empty: every open product task is in a sprint."}
             </p>
           ) : (
             <ul className="divide-y divide-gray-100">
