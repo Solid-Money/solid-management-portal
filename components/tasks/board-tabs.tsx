@@ -31,7 +31,7 @@ import type { TaskBoard, TaskBoards } from "@/types/tasks";
 
 const NAME_MAX = 40;
 
-function Pill({
+export function Pill({
   active,
   label,
   count,
@@ -70,8 +70,10 @@ function Pill({
 }
 
 /**
- * Boards across the top of the task list: All, then each board, then a way
- * to add one. The board open in the URL gets a menu to rename or delete it.
+ * Product boards across the top of the task list: All (every product board
+ * and no board), then each board, then a way to add one. Support and Radar
+ * live under the Support tab instead. The board open in the URL gets a menu
+ * to rename or delete it.
  */
 export default function BoardTabs({
   value,
@@ -89,7 +91,8 @@ export default function BoardTabs({
   const [deleting, setDeleting] = useState<TaskBoard | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
-  const boards = data?.boards ?? [];
+  const boards = (data?.boards ?? []).filter((board) => !board.system);
+  const productOpen = data ? boards.reduce((sum, board) => sum + board.open, 0) + data.unsorted : null;
 
   const saved = (next: TaskBoards) => {
     queryClient.setQueryData(TASK_KEYS.boards, next);
@@ -171,7 +174,7 @@ export default function BoardTabs({
       <Pill
         active={value === null}
         label="All"
-        count={data?.all ?? null}
+        count={productOpen}
         onClick={() => onChange(null)}
       />
       {boards.map((board) => (

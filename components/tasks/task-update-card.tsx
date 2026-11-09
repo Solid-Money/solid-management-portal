@@ -140,13 +140,26 @@ function activityValue(activity: TaskActivity, value: string | null, people: Tas
   }
 }
 
+function sprintChange(activity: TaskActivity, automatic: boolean): string {
+  if (!activity.to) return `took it out of the ${activity.from ?? ""} sprint, back to the backlog`;
+  if (!activity.from) return `added it to the ${activity.to} sprint`;
+  return automatic
+    ? `carried it over to ${activity.to}: it wasn't done by the end of ${activity.from}`
+    : `moved it from the ${activity.from} sprint to ${activity.to}`;
+}
+
 /** A field change, shown as one quiet line in the feed. */
 function ActivityLine({ update, people }: { update: TaskUpdate; people: TaskPerson[] }) {
   const activity = update.activity;
   if (!activity) return null;
-  const who = update.author.bot ? authorName(update.author, people) : firstName(update.author.email, people);
+  // Bots and the sprint carry-over have no email: they go by their name.
+  const automatic = !update.author.bot && !update.author.email;
+  const who =
+    update.author.bot || automatic ? authorName(update.author, people) : firstName(update.author.email, people);
   const what =
-    activity.field === "created"
+    activity.field === "sprint"
+      ? sprintChange(activity, automatic)
+      : activity.field === "created"
       ? "created this task"
       : activity.field === "title"
         ? `renamed it to ${activityValue(activity, activity.to, people)}`

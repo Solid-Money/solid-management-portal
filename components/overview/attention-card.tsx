@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -51,7 +52,30 @@ const TAB_LABELS: Record<RadarTab, string> = {
  */
 export function AttentionCard() {
   const [tab, setTab] = useState<RadarTab>("all");
-  const [openId, setOpenId] = useState<string | null>(null);
+  // `?item=<id>` opens that item: the links in radar tasks and Slack posts.
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const linked = params.get("item");
+  const linkedId = linked && /^[a-f0-9]{24}$/i.test(linked) ? linked : null;
+  const [openId, setOpenId] = useState<string | null>(linkedId);
+  // Another ?item= link followed while here opens that one (set during
+  // render when the link changes, not in an effect).
+  const [seenLinked, setSeenLinked] = useState(linkedId);
+  if (seenLinked !== linkedId) {
+    setSeenLinked(linkedId);
+    if (linkedId) setOpenId(linkedId);
+    // The link went away (back button): close what it opened, not a row opened by hand.
+    else if (openId === seenLinked) setOpenId(null);
+  }
+  const closeItem = () => {
+    setOpenId(null);
+    if (!params.has("item")) return;
+    const next = new URLSearchParams(params.toString());
+    next.delete("item");
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
   // "Show" disappears once Resolved opens; focus moves to that tab instead.
   const resolvedTab = useRef<HTMLButtonElement>(null);
   const [closing, setClosing] = useState<{
@@ -223,7 +247,7 @@ export function AttentionCard() {
         </div>
       ) : null}
 
-      <AttentionDetail id={openId} onClose={() => setOpenId(null)} />
+      <AttentionDetail id={openId} onClose={closeItem} />
       <ReasonDialog
         open={closing !== null}
         title={

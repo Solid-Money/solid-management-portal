@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, LayoutGrid, UserX } from "lucide-react";
+import { Check, Inbox, LayoutGrid, Timer, UserX } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Command,
@@ -20,6 +20,7 @@ import {
   STATUS_META,
   personName,
 } from "@/components/tasks/task-format";
+import { shiftSprint, sprintLabel, sprintStart } from "@/lib/task-format";
 import {
   TASK_PRIORITIES,
   type TaskBoard,
@@ -209,6 +210,65 @@ export function BoardPicker({
           >
             <LayoutGrid className="size-3.5 shrink-0 text-gray-400" />
             <span className="truncate">{option.name}</span>
+            {option.key === value && <Check className="ml-auto size-4 shrink-0" />}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Pick a sprint: this week's, the next two, or the backlog. A task already
+ * planned further out keeps its sprint in the list.
+ */
+export function SprintPicker({
+  value,
+  onChange,
+  children,
+}: {
+  /** The sprint's Monday, or null for the backlog. */
+  value: string | null;
+  onChange: (sprint: string | null) => void;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = sprintStart();
+  const starts = [current, shiftSprint(current, 1), shiftSprint(current, 2)];
+  if (value && value > current && !starts.includes(value)) starts.push(value);
+  const names = ["This sprint", "Next sprint", "In two weeks"];
+  const options: Array<{ key: string | null; name: string; hint: string | null }> = [
+    ...starts.map((start, index) => ({
+      key: start,
+      name: names[index] ?? "Later",
+      hint: sprintLabel(start),
+    })),
+    { key: null, name: "Backlog", hint: "no sprint" },
+  ];
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent align="start" className="w-60 p-1">
+        {options.map((option) => (
+          <button
+            key={option.key ?? "backlog"}
+            type="button"
+            onClick={() => {
+              onChange(option.key);
+              setOpen(false);
+            }}
+            className={cn(
+              "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-gray-100",
+              option.key === value && "bg-gray-50 font-medium",
+            )}
+          >
+            {option.key ? (
+              <Timer className="size-3.5 shrink-0 text-gray-400" />
+            ) : (
+              <Inbox className="size-3.5 shrink-0 text-gray-400" />
+            )}
+            <span className="truncate">{option.name}</span>
+            {option.hint && <span className="text-xs text-gray-400">{option.hint}</span>}
             {option.key === value && <Check className="ml-auto size-4 shrink-0" />}
           </button>
         ))}

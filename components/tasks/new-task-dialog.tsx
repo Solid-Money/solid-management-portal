@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Flag, LayoutGrid, Loader2, User } from "lucide-react";
+import { CalendarDays, Flag, LayoutGrid, Loader2, Timer, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -21,8 +21,10 @@ import {
   DuePicker,
   PersonPicker,
   PriorityPicker,
+  SprintPicker,
   StatusPicker,
 } from "@/components/tasks/task-pickers";
+import { sprintLabel } from "@/lib/task-format";
 import { Avatar, DueLabel, PriorityLabel, StatusPill, personName } from "@/components/tasks/task-format";
 import type { TaskPriority, TaskStatus } from "@/types/tasks";
 
@@ -33,12 +35,15 @@ const chip =
 export default function NewTaskDialog({
   open,
   defaultBoard = null,
+  defaultSprint = null,
   onOpenChange,
   onCreated,
 }: {
   open: boolean;
   /** The board being looked at: new tasks go there unless changed. */
   defaultBoard?: string | null;
+  /** The sprint being looked at (this one or later): new tasks go in it unless changed. */
+  defaultSprint?: string | null;
   onOpenChange: (open: boolean) => void;
   onCreated: (id: string) => void;
 }) {
@@ -47,12 +52,20 @@ export default function NewTaskDialog({
   const { data: boardList } = useTaskBoards();
   const boards = boardList?.boards ?? [];
   const [board, setBoard] = useState<string | null>(defaultBoard);
-  // Each time it opens, start on the board being looked at (set during
-  // render when `open` or the board changes, not in an effect).
-  const [seen, setSeen] = useState({ open, defaultBoard });
-  if (seen.open !== open || seen.defaultBoard !== defaultBoard) {
-    setSeen({ open, defaultBoard });
-    if (open) setBoard(defaultBoard);
+  const [sprint, setSprint] = useState<string | null>(defaultSprint);
+  // Each time it opens, start on the board and sprint being looked at (set
+  // during render when `open` or they change, not in an effect).
+  const [seen, setSeen] = useState({ open, defaultBoard, defaultSprint });
+  if (
+    seen.open !== open ||
+    seen.defaultBoard !== defaultBoard ||
+    seen.defaultSprint !== defaultSprint
+  ) {
+    setSeen({ open, defaultBoard, defaultSprint });
+    if (open) {
+      setBoard(defaultBoard);
+      setSprint(defaultSprint);
+    }
   }
   const boardName = boards.find((b) => b.key === board)?.name ?? null;
   const [title, setTitle] = useState("");
@@ -90,6 +103,7 @@ export default function NewTaskDialog({
         ...(due ? { dueDate: due } : {}),
         ...(restricted ? { visibility: "restricted" as const } : {}),
         ...(board ? { board } : {}),
+        ...(sprint ? { sprint } : {}),
         ...(body.trim() || attachmentIds.length
           ? { description: { body: body.trim(), mentions, attachmentIds } }
           : {}),
@@ -135,6 +149,12 @@ export default function NewTaskDialog({
               {boardName ?? "Board"}
             </button>
           </BoardPicker>
+          <SprintPicker value={sprint} onChange={setSprint}>
+            <button type="button" className={chip}>
+              <Timer className="size-4 text-gray-400" />
+              {sprint ? sprintLabel(sprint) : "Backlog"}
+            </button>
+          </SprintPicker>
           <StatusPicker value={status} onChange={setStatus}>
             <button type="button" className={chip}>
               <StatusPill status={status} className="h-5" />

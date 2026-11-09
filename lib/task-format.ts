@@ -106,3 +106,88 @@ export function mentionQuery(text: string, caret: number): { text: string; start
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+export type RichPart =
+  | { kind: "text"; text: string }
+  | { kind: "bold"; text: string }
+  | { kind: "link"; text: string; href: string; internal: boolean };
+
+const RICH =
+  /\[([^\]\n]+)\]\(([^)\s]+)\)|\*\*([^*\n]+)\*\*|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])/g;
+
+/** A link Tasks will follow: a portal path (`/support?c=…`) or an http(s) address. */
+function safeHref(href: string): { href: string; internal: boolean } | null {
+  // `//host` and `/\host` leave the portal in a browser: not internal paths.
+  if (href.startsWith("/") && href[1] !== "/" && href[1] !== "\\") return { href, internal: true };
+  if (/^https?:\/\//i.test(href)) return { href, internal: false };
+  return null;
+}
+
+/**
+ * Splits text Solid AI, the radar or a person wrote into plain runs,
+ * `**bold**` headings, `[label](link)` links and bare `https://` addresses.
+ * Anything else (a `javascript:` link, say) stays plain text.
+ */
+export function splitRich(body: string): RichPart[] {
+  if (!body) return [];
+  const parts: RichPart[] = [];
+  let last = 0;
+  const text = (value: string) => {
+    if (!value) return;
+    const prev = parts.at(-1);
+    if (prev?.kind === "text") prev.text += value;
+    else parts.push({ kind: "text", text: value });
+  };
+  for (const match of body.matchAll(RICH)) {
+    const start = match.index ?? 0;
+    text(body.slice(last, start));
+    last = start + match[0].length;
+    if (match[1] !== undefined && match[2] !== undefined) {
+      const link = safeHref(match[2]);
+      if (link) parts.push({ kind: "link", text: match[1], ...link });
+      else text(match[0]);
+    } else if (match[3] !== undefined) {
+      parts.push({ kind: "bold", text: match[3] });
+    } else if (match[4] !== undefined) {
+      parts.push({ kind: "link", text: match[4], href: match[4], internal: false });
+    }
+  }
+  text(body.slice(last));
+  return parts;
+}
+
+/** The text without its marks, for one-line previews. */
+export function plainText(body: string): string {
+  return splitRich(body)
+    .map((part) => part.text)
+    .join("");
+}
+
+// ---- Sprints: weeks, Monday to Sunday (UTC), named by the Monday ----------
+
+const WEEK_MS = 7 * 86_400_000;
+
+function isoDay(at: Date): string {
+  return at.toISOString().slice(0, 10);
+}
+
+/** This week's sprint (its Monday, `YYYY-MM-DD`). */
+export function sprintStart(now = new Date()): string {
+  const day = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const back = (new Date(day).getUTCDay() + 6) % 7;
+  return isoDay(new Date(day - back * 86_400_000));
+}
+
+export function shiftSprint(start: string, weeks: number): string {
+  return isoDay(new Date(Date.parse(`${start}T00:00:00Z`) + weeks * WEEK_MS));
+}
+
+/** "Nov 9–15", or "Oct 26–Nov 1" across a month. */
+export function sprintLabel(start: string): string {
+  const from = new Date(`${start}T00:00:00Z`);
+  const to = new Date(from.getTime() + WEEK_MS - 86_400_000);
+  const head = `${MONTHS[from.getUTCMonth()]} ${from.getUTCDate()}`;
+  return from.getUTCMonth() === to.getUTCMonth()
+    ? `${head}–${to.getUTCDate()}`
+    : `${head}–${MONTHS[to.getUTCMonth()]} ${to.getUTCDate()}`;
+}

@@ -7,7 +7,12 @@ import {
   mentionQuery,
   mentionsInText,
   personName,
+  plainText,
+  shiftSprint,
   splitMentions,
+  splitRich,
+  sprintLabel,
+  sprintStart,
 } from "@/lib/task-format";
 import { isTaskChange } from "@/lib/realtime";
 
@@ -80,5 +85,41 @@ describe("isTaskChange", () => {
     expect(isTaskChange({ taskId: "nope", number: 661, reason: "update" })).toBe(false);
     expect(isTaskChange({ taskId: "a".repeat(24), number: 661, reason: "deleted" })).toBe(false);
     expect(isTaskChange(null)).toBe(false);
+  });
+});
+
+describe("splitRich", () => {
+  it("finds headings, portal links and pasted addresses", () => {
+    expect(
+      splitRich("**Customer:** [fuseprime](/users/u1) · see https://basescan.org/tx/0xab, thanks"),
+    ).toEqual([
+      { kind: "bold", text: "Customer:" },
+      { kind: "text", text: " " },
+      { kind: "link", text: "fuseprime", href: "/users/u1", internal: true },
+      { kind: "text", text: " · see " },
+      { kind: "link", text: "https://basescan.org/tx/0xab", href: "https://basescan.org/tx/0xab", internal: false },
+      { kind: "text", text: ", thanks" },
+    ]);
+  });
+
+  it("never makes a link of anything but a portal path or http(s)", () => {
+    expect(splitRich("[click](javascript:alert(1)) and [x](//evil.example)")).toEqual([
+      { kind: "text", text: "[click](javascript:alert(1)) and [x](//evil.example)" },
+    ]);
+    expect(splitRich("[x](/\\evil.example)")).toEqual([{ kind: "text", text: "[x](/\\evil.example)" }]);
+  });
+
+  it("gives plain text for previews", () => {
+    expect(plainText("**Waiting on:** [Open the chat](/support?c=1)")).toBe("Waiting on: Open the chat");
+  });
+});
+
+describe("sprints", () => {
+  it("are weeks from Monday (UTC)", () => {
+    expect(sprintStart(new Date("2026-11-15T23:00:00Z"))).toBe("2026-11-09");
+    expect(sprintStart(new Date("2026-11-16T00:30:00Z"))).toBe("2026-11-16");
+    expect(shiftSprint("2026-11-09", 1)).toBe("2026-11-16");
+    expect(sprintLabel("2026-11-09")).toBe("Nov 9–15");
+    expect(sprintLabel("2026-11-30")).toBe("Nov 30–Dec 6");
   });
 });
