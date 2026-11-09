@@ -136,6 +136,13 @@ export default function UserRainSunsetCard({ userId }: UserRainSunsetCardProps) 
               <Stat
                 label="Moved on"
                 value={data.retiredAt ? formatDateTime(data.retiredAt) : "—"}
+                hint={
+                  data.retired
+                    ? data.rainVirtualAccountKept
+                      ? "Rain bank account kept: no Wirex bank account for them"
+                      : "Rain bank account closed"
+                    : undefined
+                }
               />
             </dl>
 
