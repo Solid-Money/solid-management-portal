@@ -264,6 +264,8 @@ export interface SupportReport {
   };
   cost: { aiRuns: number; totalUsd: number; perCaseUsd: number | null };
   contentGaps: Array<{ intent: string; count: number }>;
+  /** AI turns a security check stopped. Absent from support services older than the check. */
+  aiSecurity?: { unknownTool: number; modelMismatch: number };
 }
 
 export interface SupportAuditEntry {
