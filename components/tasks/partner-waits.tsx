@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -65,7 +65,8 @@ function FollowUpPicker({
         <Calendar
           mode="single"
           selected={new Date(value)}
-          disabled={{ before: morningIn(0) }}
+          // A day's follow-up is 09:00: today only while that's still ahead.
+          disabled={{ before: new Date().getHours() >= 9 ? morningIn(1) : morningIn(0) }}
           onSelect={(date) => {
             if (date) pick(new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9, 0));
           }}
@@ -82,9 +83,11 @@ function RefEditor({ value, onSave }: { value: string | null; onSave: (ref: stri
   // someone else set in the meantime (a refresh brought it) is kept.
   const [started, setStarted] = useState<string | null>(value);
   const [saving, setSaving] = useState(false);
+  // Escape closes without saving, even if the input then loses focus.
+  const cancelled = useRef(false);
   const save = async () => {
     // Enter then blur would save twice.
-    if (saving) return;
+    if (saving || cancelled.current) return;
     const next = draft.trim() || null;
     if (next === started || next === value) return setEditing(false);
     setSaving(true);
@@ -114,6 +117,7 @@ function RefEditor({ value, onSave }: { value: string | null; onSave: (ref: stri
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
+              cancelled.current = true;
               setDraft(value ?? "");
               setEditing(false);
             }
@@ -128,6 +132,7 @@ function RefEditor({ value, onSave }: { value: string | null; onSave: (ref: stri
     <button
       type="button"
       onClick={() => {
+        cancelled.current = false;
         setDraft(value ?? "");
         setStarted(value);
         setEditing(true);
