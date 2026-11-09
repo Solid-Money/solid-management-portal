@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Eye, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
+import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { fileSize, imageUrls, inlineKeys, renderableHtml } from "@/lib/task-rich";
+import { fileSize, imageUrls, inlineKeys, isClaudeLooking, renderableHtml } from "@/lib/task-rich";
 import {
   deleteFeedPost,
   deleteTaskUpdate,
@@ -411,6 +411,10 @@ export default function TaskUpdateCard({
                 onChanged();
               }}
             />
+          ) : isClaudeLooking(update) ? (
+            <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-gray-500">
+              <Loader2 className="size-3.5 animate-spin text-indigo-600" /> Looking into it…
+            </p>
           ) : (
             <>
               <TaskText
@@ -465,8 +469,9 @@ export default function TaskUpdateCard({
             <TaskComposer
               className="my-2"
               people={people}
-              placeholder="Reply… @ to mention"
+              placeholder="Reply… @ to mention, @Claude to ask AI"
               submitLabel="Reply"
+              askClaude
               autoFocus
               minRows={2}
               onCancel={() => setReplying(false)}

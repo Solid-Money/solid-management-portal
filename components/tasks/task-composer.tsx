@@ -37,8 +37,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { uploadTaskFile } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
-import { Avatar, personName } from "@/components/tasks/task-format";
-import { bodyToHtml, fileSize, imageUrls, withImageSources } from "@/lib/task-rich";
+import { Avatar, BotAvatar, personName } from "@/components/tasks/task-format";
+import { CLAUDE_MENTION_ID, bodyToHtml, fileSize, imageUrls, withImageSources } from "@/lib/task-rich";
 import { visibleBounds } from "@/lib/textarea-caret";
 import type { TaskAttachment, TaskBodyFormat, TaskBodyInput, TaskPerson, TaskUpload } from "@/types/tasks";
 
@@ -102,7 +102,16 @@ function mentionedIn(editor: Editor): string[] {
   editor.state.doc.descendants((node) => {
     if (node.type.name === "mention" && typeof node.attrs.id === "string") found.add(node.attrs.id);
   });
+  // Claude isn't a person: tagging it asks, nobody is emailed.
+  found.delete(CLAUDE_MENTION_ID);
   return [...found];
+}
+
+/** Claude, first in the @ list where it can be asked. */
+const CLAUDE_ENTRY: TaskPerson = { email: CLAUDE_MENTION_ID, name: "Claude" };
+
+function claudeMatches(needle: string): boolean {
+  return !needle || "claude".startsWith(needle) || "ai".startsWith(needle);
 }
 
 /** The keys of the images still in the text. */
@@ -366,6 +375,7 @@ export default function TaskComposer({
   autoFocus = false,
   minRows = 3,
   hideSubmit = false,
+  askClaude = false,
   onSubmit,
   onCancel,
   onChange,
@@ -381,6 +391,8 @@ export default function TaskComposer({
   minRows?: number;
   /** For a form that sends the text with its own button (new task). */
   hideSubmit?: boolean;
+  /** Offer @Claude in the @ list: it answers updates and replies on a task. */
+  askClaude?: boolean;
   onSubmit?: (input: Required<TaskBodyInput>) => Promise<unknown>;
   onCancel?: () => void;
   onChange?: (value: ComposerValue) => void;
@@ -399,6 +411,8 @@ export default function TaskComposer({
   const filePicker = useRef<HTMLInputElement>(null);
   const peopleRef = useRef(people);
   peopleRef.current = people;
+  const claudeRef = useRef(askClaude);
+  claudeRef.current = askClaude;
   const mentionKeys = useRef<(props: SuggestionKeyDownProps) => boolean>(() => false);
   const sendRef = useRef<() => void>(() => undefined);
   const cancelRef = useRef(onCancel);
@@ -436,7 +450,8 @@ export default function TaskComposer({
           items: ({ query }) => {
             const needle = query.toLowerCase();
             const list = peopleRef.current;
-            return list
+            const claude = claudeRef.current && claudeMatches(needle) ? [CLAUDE_ENTRY] : [];
+            const others = list
               .filter((person) => {
                 const name = personName(person.email, list).toLowerCase();
                 return (
@@ -447,6 +462,7 @@ export default function TaskComposer({
                 );
               })
               .slice(0, 6);
+            return [...claude, ...others];
           },
           command: ({ editor: e, range, props }) => {
             e.chain()
@@ -593,6 +609,8 @@ export default function TaskComposer({
   sendRef.current = () => void send();
 
   // The @mention list: arrows move, Enter or Tab picks, Escape closes.
+  const mentionLabel = (person: TaskPerson) =>
+    person.email === CLAUDE_MENTION_ID ? "Claude" : personName(person.email, people);
   const matches = mention?.items ?? [];
   listOpen.current = Boolean(mention && matches.length);
   mentionKeys.current = ({ event }) => {
@@ -607,7 +625,7 @@ export default function TaskComposer({
     }
     if (event.key === "Enter" || event.key === "Tab") {
       const person = matches[Math.min(active, matches.length - 1)]!;
-      mention.command({ id: person.email, label: personName(person.email, people) });
+      mention.command({ id: person.email, label: mentionLabel(person) });
       return true;
     }
     if (event.key === "Escape") {
@@ -678,7 +696,7 @@ export default function TaskComposer({
               type="button"
               onMouseDown={(event) => {
                 event.preventDefault();
-                mention.command({ id: person.email, label: personName(person.email, people) });
+                mention.command({ id: person.email, label: mentionLabel(person) });
               }}
               onMouseEnter={() => setActive(index)}
               className={cn(
@@ -686,11 +704,17 @@ export default function TaskComposer({
                 index === active ? "bg-indigo-50" : "hover:bg-gray-50",
               )}
             >
-              <Avatar email={person.email} people={people} size={22} />
+              {person.email === CLAUDE_MENTION_ID ? (
+                <BotAvatar size={22} />
+              ) : (
+                <Avatar email={person.email} people={people} size={22} />
+              )}
               <span className="min-w-0 max-w-[60%] shrink-0 truncate whitespace-nowrap font-medium text-gray-900">
-                {personName(person.email, people)}
+                {mentionLabel(person)}
               </span>
-              <span className="min-w-0 flex-1 truncate text-xs text-gray-400">{person.email}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
+                {person.email === CLAUDE_MENTION_ID ? "AI · looks into this task" : person.email}
+              </span>
             </button>
           ))}
         </div>

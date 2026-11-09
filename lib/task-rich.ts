@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import type { TaskAttachment, TaskBodyFormat } from "@/types/tasks";
+import type { TaskAttachment, TaskBodyFormat, TaskDetail, TaskUpdate } from "@/types/tasks";
 
 /**
  * Rich task text is HTML from the editor, cleaned again by the server to a
@@ -119,4 +119,18 @@ export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** Tagging Claude (Tasks' AI): a mention without an email, never emailed. */
+export const CLAUDE_MENTION_ID = "claude";
+/** What Claude's reply says until it has finished looking into the task. */
+export const CLAUDE_HOLDING_LINE = "Looking into it…";
+
+export function isClaudeLooking(update: TaskUpdate): boolean {
+  return update.author.bot === "claude" && !update.deleted && update.body === CLAUDE_HOLDING_LINE;
+}
+
+/** Claude is still working on an answer somewhere in the task. */
+export function claudeLookingIn(task: TaskDetail | undefined): boolean {
+  return !!task?.updates.some((update) => isClaudeLooking(update) || update.replies.some(isClaudeLooking));
 }

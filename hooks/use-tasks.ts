@@ -22,6 +22,7 @@ import {
   patchTask,
 } from "@/lib/tasks-api";
 import type { TaskDetail, TaskListFilters, TaskPatchInput } from "@/types/tasks";
+import { claudeLookingIn } from "@/lib/task-rich";
 
 /** Every tasks query sits under this key: a live event refreshes them all. */
 export const TASK_KEYS = {
@@ -117,7 +118,9 @@ export function useTask(id: string | null) {
     // A mistyped ?task= never reaches the API.
     enabled: isTaskId(id),
     // Image links are signed for five minutes; refresh well before that.
-    refetchInterval: 4 * 60_000,
+    // While Claude is looking into something, check often in case the live
+    // update doesn't arrive.
+    refetchInterval: (query) => (claudeLookingIn(query.state.data) ? 5_000 : 4 * 60_000),
   });
 }
 

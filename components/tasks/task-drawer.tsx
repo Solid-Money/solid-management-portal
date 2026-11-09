@@ -603,6 +603,8 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
           </div>
           <TaskComposer
             people={people}
+            placeholder="Write an update… @ to mention, @Claude to ask AI to look into it"
+            askClaude
             onSubmit={async (input) => {
               await postTaskUpdate(task.id, input);
               refresh(task.id);

@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { bodyToHtml, fileSize, imageUrls, inlineKeys, textToHtml } from "@/lib/task-rich";
+import {
+  CLAUDE_HOLDING_LINE,
+  bodyToHtml,
+  claudeLookingIn,
+  fileSize,
+  imageUrls,
+  inlineKeys,
+  isClaudeLooking,
+  textToHtml,
+} from "@/lib/task-rich";
+import type { TaskDetail, TaskUpdate } from "@/types/tasks";
 
 describe("rich task text", () => {
   it("opens old plain text in the editor as it looked", () => {
@@ -28,5 +38,37 @@ describe("rich task text", () => {
     expect(fileSize(900)).toBe("900 B");
     expect(fileSize(482_100)).toBe("471 KB");
     expect(fileSize(1_820_100)).toBe("1.7 MB");
+  });
+});
+
+describe("Claude in a task", () => {
+  const update = (bot: "claude" | null, body: string, replies: TaskUpdate[] = []): TaskUpdate =>
+    ({
+      id: body,
+      kind: "update",
+      parentId: null,
+      author: { email: bot ? null : "eli@fuse.io", name: null, bot },
+      body,
+      format: "text",
+      mentions: [],
+      attachments: [],
+      activity: null,
+      reactions: [],
+      seenBy: [],
+      createdAt: "2026-11-09T20:00:00Z",
+      editedAt: null,
+      deleted: false,
+      replies,
+    }) as unknown as TaskUpdate;
+
+  it("knows when Claude is still looking, in a reply too", () => {
+    const asked = update(null, "@Claude follow up", [update("claude", CLAUDE_HOLDING_LINE)]);
+    expect(isClaudeLooking(asked.replies[0]!)).toBe(true);
+    expect(claudeLookingIn({ updates: [asked] } as unknown as TaskDetail)).toBe(true);
+    const answered = update(null, "@Claude follow up", [update("claude", "The batch went out at 10:00.")]);
+    expect(claudeLookingIn({ updates: [answered] } as unknown as TaskDetail)).toBe(false);
+    // Someone typing the same words isn't Claude.
+    expect(isClaudeLooking(update(null, CLAUDE_HOLDING_LINE))).toBe(false);
+    expect(claudeLookingIn(undefined)).toBe(false);
   });
 });
