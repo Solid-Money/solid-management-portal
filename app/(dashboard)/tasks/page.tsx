@@ -13,6 +13,7 @@ import TaskList from "@/components/tasks/task-list";
 import BoardTabs, { Pill } from "@/components/tasks/board-tabs";
 import PartnerWaits from "@/components/tasks/partner-waits";
 import SprintBoard from "@/components/tasks/sprint-board";
+import { sprintStart } from "@/lib/task-format";
 import {
   TASK_PRIORITIES,
   TASK_VIEWS,
@@ -120,7 +121,12 @@ function TasksScreen() {
     ...(params.get("q") ? { q: params.get("q")! } : {}),
   };
   const open = params.get("task");
-  const sprint = params.get("sprint");
+  // A sprint in the URL is a day (`YYYY-MM-DD`); anything else means this week.
+  const rawSprint = params.get("sprint");
+  const sprint =
+    rawSprint && /^\d{4}-\d{2}-\d{2}$/.test(rawSprint) && !Number.isNaN(Date.parse(rawSprint))
+      ? rawSprint
+      : null;
 
   const update = useCallback(
     (changes: Record<string, string | null | undefined>) => {
@@ -157,8 +163,9 @@ function TasksScreen() {
       post: null,
     });
 
+  // From the Sprint tab, into the week shown, unless that week is over.
   const newTask = () =>
-    setCreating({ sprint: tab === "sprint" ? (sprint ?? null) : null });
+    setCreating({ sprint: tab === "sprint" && sprint && sprint >= sprintStart() ? sprint : null });
 
   return (
     <div className="space-y-5">

@@ -168,7 +168,7 @@ export default function SprintBoard({
   onNewTask: (sprint: string | null) => void;
 }) {
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useTaskSprint(start);
+  const { data, isLoading } = useTaskSprint(start);
   const { data: people = [] } = useTaskPeople();
   const { data: boardList } = useTaskBoards();
   const boardNames = useMemo(
@@ -217,7 +217,8 @@ export default function SprintBoard({
         <Loader2 className="size-6 animate-spin text-indigo-600" />
       </div>
     );
-  if (error || !data)
+  // A failed refresh keeps the board it has; the message is for no board at all.
+  if (!data)
     return <p className="py-10 text-center text-sm text-gray-500">The sprint couldn&apos;t be loaded. Try again in a moment.</p>;
 
   const { sprint, rows } = data;

@@ -106,6 +106,7 @@ describe("splitRich", () => {
     expect(splitRich("[click](javascript:alert(1)) and [x](//evil.example)")).toEqual([
       { kind: "text", text: "[click](javascript:alert(1)) and [x](//evil.example)" },
     ]);
+    expect(splitRich("[x](/\\evil.example)")).toEqual([{ kind: "text", text: "[x](/\\evil.example)" }]);
   });
 
   it("gives plain text for previews", () => {

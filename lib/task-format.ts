@@ -117,7 +117,8 @@ const RICH =
 
 /** A link Tasks will follow: a portal path (`/support?c=…`) or an http(s) address. */
 function safeHref(href: string): { href: string; internal: boolean } | null {
-  if (href.startsWith("/") && !href.startsWith("//")) return { href, internal: true };
+  // `//host` and `/\host` leave the portal in a browser: not internal paths.
+  if (href.startsWith("/") && href[1] !== "/" && href[1] !== "\\") return { href, internal: true };
   if (/^https?:\/\//i.test(href)) return { href, internal: false };
   return null;
 }

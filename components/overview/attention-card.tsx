@@ -65,6 +65,8 @@ export function AttentionCard() {
   if (seenLinked !== linkedId) {
     setSeenLinked(linkedId);
     if (linkedId) setOpenId(linkedId);
+    // The link went away (back button): close what it opened, not a row opened by hand.
+    else if (openId === seenLinked) setOpenId(null);
   }
   const closeItem = () => {
     setOpenId(null);
