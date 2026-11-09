@@ -84,10 +84,11 @@ export function useTaskBoards() {
 }
 
 /** A week's sprint and the backlog to plan it from (this week's when `start` is null). */
-export function useTaskSprint(start: string | null) {
+export function useTaskSprint(start: string | null, enabled = true) {
   return useQuery({
     queryKey: TASK_KEYS.sprint(start),
     queryFn: () => getTaskSprint(start ?? undefined),
+    enabled,
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
   });
