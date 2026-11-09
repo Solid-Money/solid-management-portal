@@ -3638,9 +3638,15 @@ export interface UserRainSunsetState {
   countryServedByWirex: boolean;
   hasRainCard: boolean;
   hasWirexCard: boolean;
-  /** Moved: their Rain card and Rain account were retired. */
+  /** Moved: their Rain card was retired. */
   retired: boolean;
   retiredAt: string | null;
+  /**
+   * Moved to a Wirex card, but Wirex has no bank account for them (Wirex only
+   * issues EUR IBANs, in SEPA countries), so their Rain virtual account stays
+   * open. Optional: older backends do not send it.
+   */
+  rainVirtualAccountKept?: boolean;
   /** Their Sumsub check for the move, once started. */
   migration: {
     startedAt: string | null;
