@@ -68,14 +68,28 @@ import {
 } from "@/components/tasks/task-format";
 import type { TaskDetail, TaskLink, TaskPerson } from "@/types/tasks";
 
-function Field({ icon: Icon, label, children }: { icon: typeof User; label: string; children: ReactNode }) {
+/** A label and its value: two cells, so the grid fits two fields a row from `sm`. */
+function Field({
+  icon: Icon,
+  label,
+  wide = false,
+  children,
+}: {
+  icon: typeof User;
+  label: string;
+  /** Takes the rest of the row (links). */
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
     <>
       <div className="flex h-8 items-center gap-2 text-xs text-gray-500">
-        <Icon className="size-3.5" />
+        <Icon className="size-3.5 shrink-0" />
         {label}
       </div>
-      <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-1.5">{children}</div>
+      <div className={cn("flex min-h-8 min-w-0 flex-wrap items-center gap-1.5", wide && "sm:col-span-3")}>
+        {children}
+      </div>
     </>
   );
 }
@@ -463,7 +477,47 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
         <TitleEditor task={task} onSave={(title) => patch.mutate({ title })} />
         <SheetDescription className="sr-only">Task T-{task.number}</SheetDescription>
 
-        <div className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1">
+        <div className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 sm:grid-cols-[5rem_minmax(0,1fr)_5rem_minmax(0,1fr)]">
+          <Field icon={CircleDot} label="Status">
+            <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>
+              <button type="button" className="cursor-pointer">
+                <StatusPill status={task.status} />
+              </button>
+            </StatusPicker>
+            {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
+          </Field>
+          <Field icon={User} label="Owner">
+            <PersonPicker
+              people={people}
+              value={task.ownerEmail}
+              onChange={(ownerEmail) => patch.mutate({ ownerEmail })}
+            >
+              <button type="button" className={fieldButton}>
+                {task.ownerEmail ? (
+                  <>
+                    <Avatar email={task.ownerEmail} people={people} size={20} />
+                    <span className="truncate">{personName(task.ownerEmail, people)}</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400">Nobody yet</span>
+                )}
+              </button>
+            </PersonPicker>
+          </Field>
+          <Field icon={Flag} label="Priority">
+            <PriorityPicker value={task.priority} onChange={(priority) => patch.mutate({ priority })}>
+              <button type="button" className={fieldButton}>
+                <PriorityLabel priority={task.priority} />
+              </button>
+            </PriorityPicker>
+          </Field>
+          <Field icon={CalendarDays} label="Due">
+            <DuePicker value={task.dueDate} onChange={(dueDate) => patch.mutate({ dueDate })}>
+              <button type="button" className={fieldButton}>
+                <DueLabel date={task.dueDate} closed={closed} />
+              </button>
+            </DuePicker>
+          </Field>
           <Field icon={LayoutGrid} label="Board">
             <BoardPicker boards={boards} value={task.board} onChange={(board) => patch.mutate({ board })}>
               <button type="button" className={fieldButton}>
@@ -493,32 +547,6 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               </span>
             )}
           </Field>
-          <Field icon={CircleDot} label="Status">
-            <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>
-              <button type="button" className="cursor-pointer">
-                <StatusPill status={task.status} />
-              </button>
-            </StatusPicker>
-            {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
-          </Field>
-          <Field icon={User} label="Owner">
-            <PersonPicker
-              people={people}
-              value={task.ownerEmail}
-              onChange={(ownerEmail) => patch.mutate({ ownerEmail })}
-            >
-              <button type="button" className={fieldButton}>
-                {task.ownerEmail ? (
-                  <>
-                    <Avatar email={task.ownerEmail} people={people} size={20} />
-                    <span className="truncate">{personName(task.ownerEmail, people)}</span>
-                  </>
-                ) : (
-                  <span className="text-gray-400">Nobody yet</span>
-                )}
-              </button>
-            </PersonPicker>
-          </Field>
           <Field icon={Users} label="Helpers">
             <PeoplePicker
               people={people}
@@ -538,25 +566,11 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               </button>
             </PeoplePicker>
           </Field>
-          <Field icon={Flag} label="Priority">
-            <PriorityPicker value={task.priority} onChange={(priority) => patch.mutate({ priority })}>
-              <button type="button" className={fieldButton}>
-                <PriorityLabel priority={task.priority} />
-              </button>
-            </PriorityPicker>
-          </Field>
-          <Field icon={CalendarDays} label="Due">
-            <DuePicker value={task.dueDate} onChange={(dueDate) => patch.mutate({ dueDate })}>
-              <button type="button" className={fieldButton}>
-                <DueLabel date={task.dueDate} closed={closed} />
-              </button>
-            </DuePicker>
-          </Field>
           <Field icon={Tag} label="Labels">
             <Labels labels={task.labels} onChange={(labels) => patch.mutate({ labels })} />
           </Field>
           {task.links.length > 0 && (
-            <Field icon={Link2} label="Linked">
+            <Field icon={Link2} label="Linked" wide>
               {task.links.map((link, index) => (
                 <LinkChip key={`${link.kind}:${link.ref}:${index}`} link={link} />
               ))}

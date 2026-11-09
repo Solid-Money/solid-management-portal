@@ -74,11 +74,12 @@ function Card({
   onOpen: () => void;
 }) {
   const closed = row.status === "done" || row.status === "cancelled";
+  const carried = row.carriedOver > 0 && !closed;
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={`T-${row.number}: ${row.title}`}
+      aria-label={row.title}
       draggable={draggable}
       onDragStart={(event) => {
         event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: row.id, from: "sprint" }));
@@ -97,31 +98,37 @@ function Card({
         draggable && "active:cursor-grabbing",
       )}
     >
-      <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-        <span className="font-mono">T-{row.number}</span>
-        {row.hasNew && <span className="size-1.5 rounded-full bg-indigo-600" title="New since you last looked" />}
-        {row.carriedOver > 0 && !closed && (
-          <span
-            className="rounded bg-amber-50 px-1 py-px font-medium text-amber-700"
-            title="Sprints that ended with it still open"
-          >
-            Carried over{row.carriedOver > 1 ? ` ×${row.carriedOver}` : ""}
-          </span>
-        )}
-        {row.priority && (
-          <span className="ml-auto">
-            <PriorityLabel priority={row.priority} />
-          </span>
-        )}
-      </div>
+      {(carried || row.priority) && (
+        <div className="mb-1 flex items-center gap-1.5 text-[11px] text-gray-400">
+          {carried && (
+            <span
+              className="rounded bg-amber-50 px-1 py-px font-medium text-amber-700"
+              title="Sprints that ended with it still open"
+            >
+              Carried over{row.carriedOver > 1 ? ` ×${row.carriedOver}` : ""}
+            </span>
+          )}
+          {row.priority && (
+            <span className="ml-auto">
+              <PriorityLabel priority={row.priority} />
+            </span>
+          )}
+        </div>
+      )}
       <p
         className={cn(
-          "mt-1 line-clamp-2 text-sm leading-snug text-gray-900",
+          "line-clamp-2 text-sm leading-snug text-gray-900",
           row.hasNew && "font-semibold",
           closed && "text-gray-500",
           row.status === "cancelled" && "line-through",
         )}
       >
+        {row.hasNew && (
+          <span
+            className="mr-1.5 inline-block size-1.5 rounded-full bg-indigo-600 align-middle"
+            title="New since you last looked"
+          />
+        )}
         {row.title}
       </p>
       <div className="mt-2 flex min-w-0 items-center gap-1.5">
@@ -416,7 +423,6 @@ export default function SprintBoard({
                       onClick={() => onOpen(row.id)}
                       className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
                     >
-                      <span className="shrink-0 font-mono text-xs text-gray-400">T-{row.number}</span>
                       <span className="truncate text-sm text-gray-800">{row.title}</span>
                       {board && (
                         <span className="hidden shrink-0 rounded border border-gray-200 px-1.5 py-px text-[11px] text-gray-500 sm:inline">

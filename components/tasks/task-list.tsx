@@ -88,7 +88,6 @@ function Row({
             className={cn("h-2 w-2 shrink-0 rounded-full", row.hasNew ? "bg-indigo-600" : "bg-transparent")}
             title={row.hasNew ? "New since you last looked" : undefined}
           />
-          <span className="shrink-0 font-mono text-xs text-gray-400">T-{row.number}</span>
           <span
             className={cn(
               "truncate text-sm",
