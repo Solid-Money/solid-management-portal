@@ -29,6 +29,7 @@ import {
   TokenCatalogue,
   TokenLookup,
   KycResetEligibility,
+  UserRainSunsetState,
   KycResetResult,
   VirtualAccountOnboardingRetryResult,
   VirtualAccountOnboardingState,
@@ -589,6 +590,15 @@ export const recoverUserAccount = (userId: string, reason: string) =>
  * new one, and what is in the way when it cannot. Read-only — it also carries
  * the provider's reason codes, so the card can show why they were declined.
  */
+/**
+ * Rain sunset for one user: whether they are affected, whether they can move
+ * to Wirex, and how far their move got. Read-only.
+ */
+export const getUserRainSunset = (userId: string) =>
+  api.get<{ data: UserRainSunsetState }>(
+    `/admin/v1/users/${userId}/rain-sunset`,
+  );
+
 export const getKycResetEligibility = (userId: string) =>
   api.get<{ data: KycResetEligibility }>(
     `/admin/v1/users/${userId}/kyc/reset-eligibility`,
