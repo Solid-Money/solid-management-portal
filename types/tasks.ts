@@ -23,6 +23,13 @@ export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 export const TASK_VIEWS = ["open", "mine", "mentions", "support", "radar", "done"] as const;
 export type TaskListView = (typeof TASK_VIEWS)[number];
 
+/**
+ * Support work is on the Support and Radar boards; product work is every
+ * other board and no board.
+ */
+export const TASK_AREAS = ["product", "support"] as const;
+export type TaskArea = (typeof TASK_AREAS)[number];
+
 export type TaskSourceKind = "manual" | "support" | "radar" | "claude";
 export type TaskVisibility = "everyone" | "restricted";
 export type TaskLinkKind = "conversation" | "user" | "task" | "url";
@@ -69,7 +76,7 @@ export interface TaskAuthor {
 }
 
 export interface TaskActivity {
-  field: "status" | "owner" | "priority" | "due" | "title" | "created" | "board";
+  field: "status" | "owner" | "priority" | "due" | "title" | "created" | "board" | "sprint";
   from: string | null;
   to: string | null;
 }
@@ -104,6 +111,10 @@ export interface TaskRow {
   group: string | null;
   /** The board's key; null when on no board. */
   board: string | null;
+  /** Its sprint's Monday (`YYYY-MM-DD`); null in the backlog. */
+  sprint: string | null;
+  /** Sprints that ended with it open, carrying it into the next. */
+  carriedOver: number;
   source: { kind: TaskSourceKind; label: string | null };
   createdBy: TaskAuthor;
   visibility: TaskVisibility;
@@ -149,6 +160,28 @@ export interface TaskListFilters {
   q?: string;
   /** A board's key, or "none" for tasks on no board. Every board when absent. */
   board?: string;
+  /** Product or support work; both when absent. */
+  area?: TaskArea;
+}
+
+/** A week, Monday to Sunday (UTC), named by its Monday. */
+export interface TaskSprint {
+  start: string;
+  end: string;
+  /** "Nov 9–15". */
+  label: string;
+  when: "past" | "current" | "future";
+}
+
+export interface TaskSprintPage {
+  sprint: TaskSprint;
+  previous: TaskSprint;
+  next: TaskSprint;
+  /** Its tasks, open and closed. */
+  rows: TaskRow[];
+  /** Open product tasks in no sprint, most urgent first; empty when the sprint is over. */
+  backlog: TaskRow[];
+  backlogHasMore: boolean;
 }
 
 /** Who an escalated support case waits on. */
@@ -234,6 +267,8 @@ export interface TaskCreateInput {
   labels?: string[];
   group?: string;
   board?: string;
+  /** A day in the sprint (this one or later); the backlog when absent. */
+  sprint?: string;
   visibility?: TaskVisibility;
 }
 
@@ -248,6 +283,8 @@ export interface TaskPatchInput {
   labels?: string[];
   group?: string | null;
   board?: string | null;
+  /** A day in the sprint (this one or later); null puts it back in the backlog. */
+  sprint?: string | null;
   visibility?: TaskVisibility;
 }
 

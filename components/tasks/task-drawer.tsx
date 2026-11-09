@@ -16,6 +16,7 @@ import {
   Pencil,
   Plus,
   Tag,
+  Timer,
   Trash2,
   User,
   Users,
@@ -50,8 +51,10 @@ import {
   PeoplePicker,
   PersonPicker,
   PriorityPicker,
+  SprintPicker,
   StatusPicker,
 } from "@/components/tasks/task-pickers";
+import { sprintLabel, sprintStart } from "@/lib/task-format";
 import {
   Avatar,
   BotAvatar,
@@ -465,6 +468,28 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
                 {boardName ? <span className="truncate">{boardName}</span> : <span className="text-gray-400">No board</span>}
               </button>
             </BoardPicker>
+          </Field>
+          <Field icon={Timer} label="Sprint">
+            <SprintPicker value={task.sprint} onChange={(sprint) => patch.mutate({ sprint })}>
+              <button type="button" className={fieldButton}>
+                {task.sprint ? (
+                  <span className="truncate">
+                    {task.sprint === sprintStart() ? "This sprint" : "Sprint"}{" "}
+                    <span className="text-gray-500">· {sprintLabel(task.sprint)}</span>
+                  </span>
+                ) : (
+                  <span className="text-gray-400">Backlog</span>
+                )}
+              </button>
+            </SprintPicker>
+            {task.carriedOver > 0 && !closed && (
+              <span
+                className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
+                title="Sprints that ended with it still open"
+              >
+                Carried over{task.carriedOver > 1 ? ` ×${task.carriedOver}` : ""}
+              </span>
+            )}
           </Field>
           <Field icon={CircleDot} label="Status">
             <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>

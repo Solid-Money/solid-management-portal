@@ -16,6 +16,7 @@ import {
   getTaskFeed,
   getTaskNotifications,
   getTaskPeople,
+  getTaskSprint,
   getTasks,
   markTaskNotificationsRead,
   patchTask,
@@ -30,6 +31,7 @@ export const TASK_KEYS = {
   boards: ["tasks", "boards"] as const,
   partners: ["tasks", "partners"] as const,
   list: (filters: TaskListFilters) => ["tasks", "list", filters] as const,
+  sprint: (start: string | null) => ["tasks", "sprint", start ?? "current"] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
   feed: ["tasks", "feed"] as const,
@@ -81,6 +83,16 @@ export function useTaskBoards() {
   });
 }
 
+/** A week's sprint and the backlog to plan it from (this week's when `start` is null). */
+export function useTaskSprint(start: string | null) {
+  return useQuery({
+    queryKey: TASK_KEYS.sprint(start),
+    queryFn: () => getTaskSprint(start ?? undefined),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+  });
+}
+
 export function useTaskList(filters: TaskListFilters) {
   return useInfiniteQuery({
     queryKey: TASK_KEYS.list(filters),
@@ -116,6 +128,7 @@ export function usePatchTask(id: string) {
     onSuccess: (task: TaskDetail) => {
       queryClient.setQueryData(TASK_KEYS.task(id), task);
       void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
     },
@@ -129,6 +142,7 @@ export function useRefreshTask() {
     if (task) queryClient.setQueryData(TASK_KEYS.task(id), task);
     else void queryClient.invalidateQueries({ queryKey: TASK_KEYS.task(id) });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
+    void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
   };

@@ -11,6 +11,7 @@ import type {
   TaskPatchInput,
   TaskPerson,
   TaskReaction,
+  TaskSprintPage,
   TaskUpdate,
   TaskUpload,
   TaskBodyInput,
@@ -36,10 +37,15 @@ export const getTasks = async (filters: TaskListFilters, page = 0) =>
         ...(filters.label ? { label: filters.label } : {}),
         ...(filters.q ? { q: filters.q } : {}),
         ...(filters.board ? { board: filters.board } : {}),
+        ...(filters.area ? { area: filters.area } : {}),
         ...(page ? { page } : {}),
       },
     })
   ).data;
+
+/** A week's sprint (any day in it; this week's when absent) and the backlog. */
+export const getTaskSprint = async (start?: string) =>
+  (await api.get<TaskSprintPage>(`${base}/sprint`, { params: start ? { start } : {} })).data;
 
 /** Polled for the nav badge: a failure just leaves the badge off. */
 export const getTaskCounts = async () =>

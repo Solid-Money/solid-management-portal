@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
+import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -11,6 +12,7 @@ import {
   mentionNames,
   personName,
   splitMentions,
+  splitRich,
 } from "@/lib/task-format";
 import type {
   TaskAuthor,
@@ -227,10 +229,30 @@ export function DueLabel({ date, closed }: { date: string | null; closed?: boole
   return <span className="whitespace-nowrap text-xs text-gray-700">{formatDue(date)}</span>;
 }
 
+function Mentions({ text, names }: { text: string; names: string[] }) {
+  return (
+    <>
+      {splitMentions(text, names).map((part, index) =>
+        part.mention ? (
+          <span key={index} className="font-semibold text-indigo-700">
+            {part.text}
+          </span>
+        ) : (
+          <Fragment key={index}>{part.text}</Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+const LINK_CLASS = "font-medium text-indigo-700 underline decoration-indigo-200 underline-offset-2 hover:decoration-indigo-500";
+
 /**
- * Text with @mentions picked out. Mentions are stored as emails; the text
- * holds `@Name` as typed, so a mention is highlighted wherever that name
- * appears after an @.
+ * Text with @mentions picked out, `**bold**` headings, and links: Solid AI
+ * and the radar write `[Open the chat](/support?c=…)`; a pasted https
+ * address is a link too. Mentions are stored as emails; the text holds
+ * `@Name` as typed, so a mention is highlighted wherever that name appears
+ * after an @.
  */
 export function MentionText({
   body,
@@ -241,17 +263,28 @@ export function MentionText({
   mentions: string[];
   people?: TaskPerson[];
 }) {
+  const names = mentionNames(mentions, people);
   return (
     <>
-      {splitMentions(body, mentionNames(mentions, people)).map((part, index) =>
-        part.mention ? (
-          <span key={index} className="font-semibold text-indigo-700">
-            {part.text}
-          </span>
-        ) : (
-          <Fragment key={index}>{part.text}</Fragment>
-        ),
-      )}
+      {splitRich(body).map((part, index) => {
+        if (part.kind === "bold")
+          return (
+            <strong key={index} className="font-semibold text-gray-900">
+              <Mentions text={part.text} names={names} />
+            </strong>
+          );
+        if (part.kind === "link")
+          return part.internal ? (
+            <Link key={index} href={part.href} className={LINK_CLASS}>
+              {part.text}
+            </Link>
+          ) : (
+            <a key={index} href={part.href} target="_blank" rel="noreferrer" className={cn(LINK_CLASS, "break-all")}>
+              {part.text}
+            </a>
+          );
+        return <Mentions key={index} text={part.text} names={names} />;
+      })}
     </>
   );
 }
