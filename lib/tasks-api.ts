@@ -54,7 +54,8 @@ export const getTaskCounts = async () =>
 
 /** Escalated support cases, by the partner (or team) they wait on. */
 export const getTaskPartners = async () =>
-  (await api.get<TaskPartners>(`${base}/partners`)).data;
+  // Polled, and the tab shows its own error with a retry: no toast each minute.
+  (await api.get<TaskPartners>(`${base}/partners`, { quietErrors: true })).data;
 
 /** The partner's ticket and the follow-up date: not an escalation again. */
 export const updateEscalation = async (

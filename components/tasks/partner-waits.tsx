@@ -80,12 +80,16 @@ function RefEditor({ value, onSave }: { value: string | null; onSave: (ref: stri
   const [draft, setDraft] = useState(value ?? "");
   const [saving, setSaving] = useState(false);
   const save = async () => {
+    // Enter then blur would save twice.
+    if (saving) return;
     const next = draft.trim() || null;
     if (next === value) return setEditing(false);
     setSaving(true);
     try {
       await onSave(next);
       setEditing(false);
+    } catch {
+      // The error is already shown; keep the editor open to try again.
     } finally {
       setSaving(false);
     }
@@ -278,7 +282,8 @@ export default function PartnerWaits() {
         <Loader2 className="size-6 animate-spin text-indigo-600" />
       </div>
     );
-  if (isError)
+  // A failed background refresh keeps the list it has (and any open edit).
+  if (isError && !data)
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
         Couldn&apos;t load escalations.{" "}
