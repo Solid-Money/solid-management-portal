@@ -416,8 +416,10 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
     }
   };
 
+  // One scroll for the whole task: the fields go up with the description and
+  // updates instead of staying pinned and leaving a small window below.
   return (
-    <>
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="border-b border-gray-200 px-6 pb-4 pt-5">
         <div className="mb-2 flex items-center gap-2 pr-8 text-xs text-gray-500">
           <span className="shrink-0 whitespace-nowrap font-mono font-medium text-gray-600">T-{task.number}</span>
@@ -563,7 +565,7 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
         </div>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+      <div className="space-y-6 px-6 py-5">
         <Description
           task={task}
           people={people}
@@ -602,7 +604,7 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
           </div>
         </section>
       </div>
-    </>
+    </div>
   );
 }
 
