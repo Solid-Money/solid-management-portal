@@ -163,9 +163,12 @@ function TasksScreen() {
       post: null,
     });
 
-  // From the Sprint tab, into the week shown, unless that week is over.
-  const newTask = () =>
-    setCreating({ sprint: tab === "sprint" && sprint && sprint >= sprintStart() ? sprint : null });
+  // From the Sprint tab, into the week shown (this week's when none is in
+  // the URL), unless that week is over.
+  const newTask = () => {
+    const shown = sprint ?? sprintStart();
+    setCreating({ sprint: tab === "sprint" && shown >= sprintStart() ? shown : null });
+  };
 
   return (
     <div className="space-y-5">
