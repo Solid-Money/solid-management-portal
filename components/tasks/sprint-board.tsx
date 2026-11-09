@@ -179,7 +179,9 @@ export default function SprintBoard({
   const [search, setSearch] = useState("");
   const key = TASK_KEYS.sprint(start);
   // The board brings the most urgent 200; past that, a search asks the API
-  // for the rest of the open product tasks.
+  // for the rest of the open product tasks. The open list has no pages: it
+  // returns up to 1,000 matches and says when there are more, which the
+  // backlog then says too.
   const term = useDeferredValue(search.trim());
   const searchAll = !!data?.backlogHasMore && data.sprint.when !== "past" && term.length >= 2;
   const { data: found, isFetching: searching } = useQuery({
@@ -440,6 +442,11 @@ export default function SprintBoard({
                 );
               })}
             </ul>
+          )}
+          {searchAll && found?.hasMore && (
+            <p className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
+              Over 1,000 open tasks match, so not all are listed: type more of the title, or its T-number.
+            </p>
           )}
         </section>
       )}
