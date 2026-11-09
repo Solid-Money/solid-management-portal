@@ -12,6 +12,7 @@ import {
   spendAgainstBar,
   spendBreakdown,
 } from "@/lib/referral";
+import { formatUtcDay } from "@/lib/referral-v4";
 import { formatDateTime, formatUsd } from "@/lib/utils";
 import { AdminReferralRewardRow, AdminUserReferrals } from "@/types";
 import ReevaluateReferralDialog from "@/components/user/reevaluate-referral-dialog";
@@ -140,11 +141,12 @@ function ClawbackLines({ row }: { row: AdminReferralRewardRow }) {
             debt.status === "open" ? "text-amber-700" : "text-gray-500"
           }`}
         >
-          Owed back by the {debt.side}: {formatUsd(debt.amountUsd)} ·{" "}
+          {debt.status === "open" ? "Owed back by" : "Clawback debt for"} the{" "}
+          {debt.side}: {formatUsd(debt.amountUsd)} ·{" "}
           {formatUsd(debt.recoveredUsd)} recovered ·{" "}
           {CLAWBACK_STATUS[debt.status] ?? debt.status}
           {debt.status === "open"
-            ? ` · written off ${shortDate(debt.writeOffAt)} if not recovered`
+            ? ` · written off ${formatUtcDay(debt.writeOffAt)} if not recovered`
             : ""}
         </p>
       ))}

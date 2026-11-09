@@ -134,14 +134,14 @@ export function RewardsReferralsV4View() {
         <AnalyticsKpiCard
           title="Open debt"
           value={debtUsd((block) => block.openUsd)}
-          scope="Still owed from reversed bonuses — recovered from future bonuses and spend share"
+          scope="Still owed from reversed bonuses and paid cashback rewards — recovered from later bonuses, spend share and cashback payouts"
           source="database"
           invertTrendColor
         />
         <AnalyticsKpiCard
           title="Debt recovered"
           value={debtUsd((block) => block.recoveredUsd)}
-          scope="All time, kept back from later bonuses and spend share"
+          scope="All time, kept back from later bonuses, spend share and cashback payouts"
           source="database"
         />
         <AnalyticsKpiCard
@@ -159,7 +159,7 @@ export function RewardsReferralsV4View() {
           invertTrendColor
         />
         <AnalyticsKpiCard
-          title="Bonuses reversed"
+          title="Rewards reversed"
           value={
             debts === undefined
               ? undefined
@@ -167,7 +167,7 @@ export function RewardsReferralsV4View() {
                 ? formatNumber(debts.reversedBonuses, 0, 0)
                 : null
           }
-          scope="All time — credited spend bonuses refunded below the bar"
+          scope="All time — credited spend bonuses, and paid cashback reward legs, refunded below the bar"
           source="database"
           invertTrendColor
         />

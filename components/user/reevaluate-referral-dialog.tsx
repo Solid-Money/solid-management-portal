@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, RefreshCw, XCircle } from "lucide-react";
@@ -333,6 +334,10 @@ function ReevaluationOutcome({
  * What reinstating a reward reversed after payout did to the debts that
  * reversal booked. A debt left open would be taken from the user's next
  * payouts although nothing is owed, so a failure is said loudly.
+ *
+ * The debts belong to the referrer, the friend or both — not necessarily the
+ * user whose page the dialog was opened from — so every instruction names
+ * and links the user it is about.
  */
 function ClawbackDebtsNotice({
   result,
@@ -341,6 +346,23 @@ function ClawbackDebtsNotice({
 }) {
   const debts = result.clawbackDebts;
   if (!debts) return null;
+
+  const userLink = (userId: string) => (
+    <Link
+      href={`/users/${userId}`}
+      className="font-medium underline underline-offset-2"
+    >
+      {userId === result.referrerId
+        ? "the referrer"
+        : userId === result.referredUserId
+          ? "the friend"
+          : userId}
+    </Link>
+  );
+  const recoveries = (debts.recoveries ?? []).filter(
+    (recovery) => recovery.usd > 0,
+  );
+
   return (
     <div className="space-y-1 text-xs">
       {debts.cancelled > 0 && (
@@ -350,17 +372,28 @@ function ClawbackDebtsNotice({
             : `Its ${debts.cancelled} clawback debts were cancelled.`}
         </p>
       )}
-      {debts.recoveredUsd > 0 && (
-        <p className="text-amber-700">
-          {formatUsd(debts.recoveredUsd)} had already been taken from later
-          payouts to repay them. Nothing was owed, so pay it back to the user.
-        </p>
-      )}
+      {recoveries.length > 0
+        ? recoveries.map((recovery) => (
+            <p key={recovery.debtId} className="text-amber-700">
+              {formatUsd(recovery.usd)} had already been taken from{" "}
+              {userLink(recovery.userId)}&apos;s later payouts. Nothing was
+              owed, so pay it back to them.
+            </p>
+          ))
+        : debts.recoveredUsd > 0 && (
+            <p className="text-amber-700">
+              {formatUsd(debts.recoveredUsd)} had already been taken from later
+              payouts to {userLink(result.referrerId)} or{" "}
+              {userLink(result.referredUserId)}. Nothing was owed, so pay it
+              back to whoever it was taken from.
+            </p>
+          )}
       {debts.needsManualCancellation && (
         <p className="font-medium text-red-700">
-          Some clawback debts could not be cancelled. Write them off under
-          Referral debts on this user&apos;s page, or they will be taken from
-          their next referral payouts.
+          Some clawback debts could not be cancelled. Write off any still open
+          under Referral debts on {userLink(result.referrerId)}&apos;s and{" "}
+          {userLink(result.referredUserId)}&apos;s pages, or they will be taken
+          from their next referral payouts.
         </p>
       )}
     </div>

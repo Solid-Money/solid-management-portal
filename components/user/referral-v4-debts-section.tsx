@@ -133,7 +133,7 @@ export default function ReferralV4DebtsSection({
               <thead className="sticky top-0 z-10 bg-gray-50 text-gray-500">
                 <tr>
                   <th className="w-6 px-2 py-2" />
-                  <th className="px-3 py-2 text-left font-medium">Bonus</th>
+                  <th className="px-3 py-2 text-left font-medium">Reward</th>
                   <th className="px-3 py-2 text-left font-medium">Side</th>
                   <th className="px-3 py-2 text-left font-medium">Friend</th>
                   <th className="px-3 py-2 text-right font-medium">Amount</th>

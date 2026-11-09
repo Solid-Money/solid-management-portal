@@ -2661,6 +2661,8 @@ export interface ReferralReevaluationResult {
     cancelled: number;
     /** Already taken from later payouts: support has to pay it back. */
     recoveredUsd: number;
+    /** Whom each recovered amount was taken from. Absent on older backends. */
+    recoveries?: Array<{ userId: string; debtId: string; usd: number }>;
     /** Some may still be open: cancel them by hand under Referral debts. */
     needsManualCancellation: boolean;
   };
