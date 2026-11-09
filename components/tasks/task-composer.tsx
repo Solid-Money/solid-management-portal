@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EditorContent, mergeAttributes, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
@@ -409,14 +409,13 @@ export default function TaskComposer({
   const box = useRef<HTMLDivElement>(null);
   const imagePicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
+  // The editor's handlers read the latest props and state through these
+  // refs; they're set after each commit (below), not during render.
   const peopleRef = useRef(people);
-  peopleRef.current = people;
   const claudeRef = useRef(askClaude);
-  claudeRef.current = askClaude;
   const mentionKeys = useRef<(props: SuggestionKeyDownProps) => boolean>(() => false);
   const sendRef = useRef<() => void>(() => undefined);
   const cancelRef = useRef(onCancel);
-  cancelRef.current = onCancel;
   const addRef = useRef<(incoming: File[], inline: boolean) => void>(() => undefined);
   /** The @mention list is showing: Escape closes it, not the edit. */
   const listOpen = useRef(false);
@@ -589,7 +588,6 @@ export default function TaskComposer({
     },
     [allowAttachments, editor, files.length, images.length],
   );
-  addRef.current = addFiles;
 
   const canSend = !empty || attachmentIds.length > 0;
   const send = async () => {
@@ -606,14 +604,12 @@ export default function TaskComposer({
       setSending(false);
     }
   };
-  sendRef.current = () => void send();
 
   // The @mention list: arrows move, Enter or Tab picks, Escape closes.
   const mentionLabel = (person: TaskPerson) =>
     person.email === CLAUDE_MENTION_ID ? "Claude" : personName(person.email, people);
   const matches = mention?.items ?? [];
-  listOpen.current = Boolean(mention && matches.length);
-  mentionKeys.current = ({ event }) => {
+  const handleMentionKeys = ({ event }: SuggestionKeyDownProps) => {
     if (!mention || !matches.length) return false;
     if (event.key === "ArrowDown") {
       setActive((i) => (i + 1) % matches.length);
@@ -634,6 +630,17 @@ export default function TaskComposer({
     }
     return false;
   };
+
+  // After each commit, so a render React throws away never reaches them.
+  useLayoutEffect(() => {
+    peopleRef.current = people;
+    claudeRef.current = askClaude;
+    cancelRef.current = onCancel;
+    addRef.current = addFiles;
+    sendRef.current = () => void send();
+    listOpen.current = Boolean(mention && matches.length);
+    mentionKeys.current = handleMentionKeys;
+  });
 
   // Under the @, inside the composer; above it when the window has no room below.
   const listStyle = useMemo(() => {
