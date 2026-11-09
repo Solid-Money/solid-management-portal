@@ -3580,8 +3580,84 @@ export interface RainRtfConfig {
   chains: RainRtfResolvedChain[];
 }
 
+/**
+ * Rain sunset: no new Rain cards or accounts, and the move of Rain users to
+ * Wirex. Same layered settings as RTF, so each row reports every layer.
+ */
+export type RainSunsetSetting = RainRtfSetting;
+
+export interface RainSunsetConfig {
+  settings: RainSunsetSetting[];
+  /** What the four settings resolve to right now. */
+  resolved: {
+    onboardingClosed: boolean;
+    migrationEnabled: boolean;
+    noticeEnabled: boolean;
+    /** YYYY-MM-DD, or null while no closing date is announced. */
+    closesAt: string | null;
+  };
+  /** How far the sunset has got, across every user. */
+  summary: {
+    /** Rain cards still held: active, frozen or pending, not retired. */
+    rainCardsHeld: number;
+    /** Rain cards retired because their holder moved to Wirex. */
+    rainCardsRetired: number;
+    /** Retired cards Rain has not yet confirmed cancelled. */
+    rainCancellationsPending: number;
+    /** Users who started a Sumsub check for their move to Wirex. */
+    migrationsStarted: number;
+    /** Of those, how many Wirex approved. */
+    migrationsVerified: number;
+  };
+}
+
 export interface GeneralConfig {
   rainRtf: RainRtfConfig;
+  rainSunset: RainSunsetConfig;
+}
+
+/**
+ * An edit to the Rain sunset settings. Absent leaves a setting as it is;
+ * `null` (or an empty date) clears it and hands it back to the environment.
+ */
+export interface UpdateRainSunsetConfig {
+  onboardingClosed?: boolean | null;
+  migrationEnabled?: boolean | null;
+  noticeEnabled?: boolean | null;
+  /** YYYY-MM-DD, or "" to clear. */
+  closesAt?: string | null;
+}
+
+/** One user's Rain sunset, for the user page's card tab. */
+export interface UserRainSunsetState {
+  /** Holds a Rain card, or a Rain verification that can no longer lead to one. */
+  affected: boolean;
+  /** Can move to Wirex now (Wirex serves their country, move open). */
+  canMigrate: boolean;
+  country: string | null;
+  countryServedByWirex: boolean;
+  hasRainCard: boolean;
+  hasWirexCard: boolean;
+  /** Moved: their Rain card and Rain account were retired. */
+  retired: boolean;
+  retiredAt: string | null;
+  /** Their Sumsub check for the move, once started. */
+  migration: {
+    startedAt: string | null;
+    kycStatus: string | null;
+    sumsubReviewStatus: string | null;
+    sumsubReviewAnswer: string | null;
+    wirexUserId: string | null;
+    wirexVerificationStatus: string | null;
+  } | null;
+  rainCards: Array<{
+    cardId: string;
+    status: string;
+    retiredAt: string | null;
+    cancelledAt: string | null;
+    /** Last error cancelling at Rain; the sweep retries every 30 minutes. */
+    cancelError: string | null;
+  }>;
 }
 
 /**

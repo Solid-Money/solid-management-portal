@@ -30,6 +30,7 @@ import UserErrorsCard from "@/components/user/user-errors-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserSupportCard from "@/components/user/user-support-card";
 import UserKycCard from "@/components/user/user-kyc-card";
+import UserRainSunsetCard from "@/components/user/user-rain-sunset-card";
 import UserVirtualAccountOnboardingCard from "@/components/user/user-virtual-account-onboarding-card";
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
@@ -307,6 +308,12 @@ export default function UserDetailPage({
               exist, and the reason codes here are what answer them. */}
           <SectionAnchor id="user-kyc">
             <UserKycCard userId={id} username={displayName} />
+          </SectionAnchor>
+          {/* Rain sunset: "my card is closing, what do I do?" — whether this
+              user can move to Wirex, and how far the move got. Renders
+              nothing for a user the sunset does not touch. */}
+          <SectionAnchor id="user-rain-sunset">
+            <UserRainSunsetCard userId={id} />
           </SectionAnchor>
           {/* The USD virtual account has its own verification and its own Rain
               review, so it gets stuck in places the card's KYC card does not
