@@ -40,7 +40,7 @@ export default function TeamFeed({ highlight }: { highlight: string | null }) {
     <div className="mx-auto max-w-3xl space-y-4">
       <TaskComposer
         people={people}
-        placeholder="Post to the team… @ to mention, paste an image"
+        placeholder="Post to the team… @ to mention, paste an image or a table"
         submitLabel="Post"
         onSubmit={async (input) => {
           await postToFeed(input);

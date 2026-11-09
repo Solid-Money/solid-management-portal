@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, FileText, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Download, Eye, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { fileSize, imageUrls, inlineKeys, renderableHtml } from "@/lib/task-rich";
 import {
   deleteFeedPost,
   deleteTaskUpdate,
@@ -37,6 +38,7 @@ import {
   TASK_REACTIONS,
   type TaskActivity,
   type TaskAttachment,
+  type TaskBodyFormat,
   type TaskPerson,
   type TaskPriority,
   type TaskBodyInput,
@@ -48,7 +50,7 @@ import {
 /** Where an update lives: a task's feed, or the Team feed. */
 export interface UpdateApi {
   react: (updateId: string, emoji: TaskReaction) => Promise<unknown>;
-  edit: (updateId: string, input: { body: string; mentions: string[] }) => Promise<unknown>;
+  edit: (updateId: string, input: { body: string; format: TaskBodyFormat; mentions: string[] }) => Promise<unknown>;
   remove: (updateId: string) => Promise<unknown>;
   reply: (parentId: string, input: Required<TaskBodyInput>) => Promise<unknown>;
 }
@@ -69,11 +71,22 @@ export const feedUpdateApi: UpdateApi = {
   reply: (parentId, input) => postToFeed({ ...input, parentId }),
 };
 
-/** Images inside the message, at a readable size; other files as chips. */
-export function Attachments({ attachments }: { attachments: TaskAttachment[] }) {
-  if (!attachments.length) return null;
-  const images = attachments.filter((a) => a.mime.startsWith("image/"));
-  const others = attachments.filter((a) => !a.mime.startsWith("image/"));
+/**
+ * The message's files: images at a readable size (those already shown inside
+ * rich text are left out), any other file as a card that downloads it.
+ */
+export function Attachments({
+  attachments,
+  inline,
+}: {
+  attachments: TaskAttachment[];
+  /** Keys of the images shown inside the text. */
+  inline?: Set<string>;
+}) {
+  const shown = inline ? attachments.filter((a) => !inline.has(a.key)) : attachments;
+  if (!shown.length) return null;
+  const images = shown.filter((a) => a.mime.startsWith("image/"));
+  const others = shown.filter((a) => !a.mime.startsWith("image/"));
   return (
     <div className="mt-2 space-y-2">
       {images.length > 0 && (
@@ -106,20 +119,82 @@ export function Attachments({ attachments }: { attachments: TaskAttachment[] }) 
           )}
         </div>
       )}
-      {others.map((file) => (
-        <a
-          key={file.key}
-          href={file.url ?? undefined}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-        >
-          <FileText className="size-3.5 shrink-0 text-gray-400" />
-          <span className="truncate">{file.fileName ?? "File"}</span>
-        </a>
-      ))}
+      {others.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {others.map((file) => (
+            <a
+              key={file.key}
+              href={file.url ?? undefined}
+              target="_blank"
+              rel="noreferrer"
+              title={file.url ? `Download ${file.fileName ?? "the file"}` : "The link expired: reopen the task"}
+              className="group/file inline-flex h-11 max-w-full items-center gap-2.5 rounded-lg border border-gray-200 bg-white pl-2.5 pr-3 text-left hover:border-gray-300 hover:bg-gray-50"
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-[10px] font-semibold uppercase text-indigo-700">
+                {fileExtension(file)}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-medium text-gray-800">{file.fileName ?? "File"}</span>
+                <span className="block text-[11px] text-gray-400">{fileSize(file.size)}</span>
+              </span>
+              <Download className="size-3.5 shrink-0 text-gray-400 group-hover/file:text-gray-700" />
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+/** "PDF", "XLSX", "ZIP"…: from the name, at most four letters. */
+function fileExtension(file: TaskAttachment): string {
+  if (file.mime === "application/pdf") return "PDF";
+  const ext = /\.([a-z0-9]{1,4})$/i.exec(file.fileName ?? "")?.[1];
+  return ext ? ext.toUpperCase() : "FILE";
+}
+
+/**
+ * The words of a description, update or post: rich text from the editor,
+ * or plain text (and Solid AI's) with @mentions, **bold** and links.
+ */
+export function TaskText({
+  body,
+  format,
+  mentions,
+  attachments,
+  people,
+  className,
+}: {
+  body: string;
+  format: TaskBodyFormat;
+  mentions: string[];
+  attachments: TaskAttachment[];
+  people: TaskPerson[];
+  className?: string;
+}) {
+  const html = useMemo(
+    () => (format === "html" ? renderableHtml(body, imageUrls(attachments)) : ""),
+    [attachments, body, format],
+  );
+  if (!body) return null;
+  if (format === "html")
+    return (
+      <div
+        className={cn("task-rich break-words text-sm leading-relaxed text-gray-800", className)}
+        // Cleaned by the server and again here (renderableHtml).
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  return (
+    <p className={cn("whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800", className)}>
+      <MentionText body={body} mentions={mentions} people={people} />
+    </p>
+  );
+}
+
+/** The images a body shows inside its text: not listed again below it. */
+export function inlineImages(body: string, format: TaskBodyFormat): Set<string> | undefined {
+  return format === "html" ? inlineKeys(body) : undefined;
 }
 
 function activityValue(activity: TaskActivity, value: string | null, people: TaskPerson[]): string {
@@ -319,26 +394,34 @@ export default function TaskUpdateCard({
             <TaskComposer
               className="mt-2"
               people={people}
-              initial={{ body: update.body, mentions: update.mentions }}
+              initial={{
+                body: update.body,
+                format: update.format,
+                mentions: update.mentions,
+                attachments: update.attachments,
+              }}
               allowAttachments={false}
               autoFocus
               minRows={2}
               submitLabel="Save"
               onCancel={() => setEditing(false)}
-              onSubmit={async ({ body, mentions }) => {
-                await api.edit(update.id, { body, mentions });
+              onSubmit={async ({ body, format, mentions }) => {
+                await api.edit(update.id, { body, format, mentions });
                 setEditing(false);
                 onChanged();
               }}
             />
           ) : (
             <>
-              {update.body && (
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800">
-                  <MentionText body={update.body} mentions={update.mentions} people={people} />
-                </p>
-              )}
-              <Attachments attachments={update.attachments} />
+              <TaskText
+                className="mt-1"
+                body={update.body}
+                format={update.format}
+                mentions={update.mentions}
+                attachments={update.attachments}
+                people={people}
+              />
+              <Attachments attachments={update.attachments} inline={inlineImages(update.body, update.format)} />
               <Reactions update={update} me={me} people={people} onReact={(emoji) => void react(emoji)} />
             </>
           )}

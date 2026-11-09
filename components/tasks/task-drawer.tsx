@@ -44,7 +44,12 @@ import {
 } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import TaskComposer from "@/components/tasks/task-composer";
-import TaskUpdateCard, { Attachments, taskUpdateApi } from "@/components/tasks/task-update-card";
+import TaskUpdateCard, {
+  Attachments,
+  TaskText,
+  inlineImages,
+  taskUpdateApi,
+} from "@/components/tasks/task-update-card";
 import {
   BoardPicker,
   DuePicker,
@@ -59,14 +64,13 @@ import {
   Avatar,
   BotAvatar,
   DueLabel,
-  MentionText,
   PriorityLabel,
   StatusPill,
   authorName,
   formatWhen,
   personName,
 } from "@/components/tasks/task-format";
-import type { TaskDetail, TaskLink, TaskPerson } from "@/types/tasks";
+import type { TaskBodyInput, TaskDetail, TaskLink, TaskPerson } from "@/types/tasks";
 
 /** A label and its value: two cells, so the grid fits two fields a row from `sm`. */
 function Field({
@@ -350,18 +354,18 @@ function Description({
 }: {
   task: TaskDetail;
   people: TaskPerson[];
-  onSave: (input: { body: string; mentions: string[]; attachmentIds: string[] }) => Promise<unknown>;
+  onSave: (input: Required<TaskBodyInput>) => Promise<unknown>;
 }) {
   const [editing, setEditing] = useState(false);
-  const { body, mentions, attachments } = task.description;
+  const { body, format, mentions, attachments } = task.description;
   const empty = !body && !attachments.length;
 
   if (editing)
     return (
       <TaskComposer
         people={people}
-        initial={{ body, mentions }}
-        placeholder="What needs to happen, and why… @ to mention, paste an image"
+        initial={{ body, format, mentions, attachments }}
+        placeholder="What needs to happen, and why… @ to mention, paste an image or a table"
         submitLabel="Save"
         autoFocus
         minRows={4}
@@ -399,12 +403,15 @@ function Description({
           >
             <Pencil />
           </Button>
-          {body && (
-            <p className="whitespace-pre-wrap break-words pr-6 text-sm leading-relaxed text-gray-800">
-              <MentionText body={body} mentions={mentions} people={people} />
-            </p>
-          )}
-          <Attachments attachments={attachments} />
+          <TaskText
+            className="pr-6"
+            body={body}
+            format={format}
+            mentions={mentions}
+            attachments={attachments}
+            people={people}
+          />
+          <Attachments attachments={attachments} inline={inlineImages(body, format)} />
         </>
       )}
     </div>

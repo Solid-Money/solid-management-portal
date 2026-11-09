@@ -77,7 +77,13 @@ export default function NewTaskDialog({
   const [saving, setSaving] = useState(false);
   // Remount the composer to clear it after a task is created.
   const [round, setRound] = useState(0);
-  const description = useRef<ComposerValue>({ body: "", mentions: [], attachmentIds: [], uploading: false });
+  const description = useRef<ComposerValue>({
+    body: "",
+    format: "html",
+    mentions: [],
+    attachmentIds: [],
+    uploading: false,
+  });
   const [uploading, setUploading] = useState(false);
 
   const reset = () => {
@@ -94,7 +100,7 @@ export default function NewTaskDialog({
     if (!title.trim() || saving || uploading) return;
     setSaving(true);
     try {
-      const { body, mentions, attachmentIds } = description.current;
+      const { body, format, mentions, attachmentIds } = description.current;
       const task = await createTask({
         title: title.trim(),
         status,
@@ -105,7 +111,7 @@ export default function NewTaskDialog({
         ...(board ? { board } : {}),
         ...(sprint ? { sprint } : {}),
         ...(body.trim() || attachmentIds.length
-          ? { description: { body: body.trim(), mentions, attachmentIds } }
+          ? { description: { body, format, mentions, attachmentIds } }
           : {}),
       });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });

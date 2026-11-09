@@ -323,3 +323,132 @@ main [id][tabindex="-1"]:focus {
 .section-flash {
   animation: section-flash 2s ease-in-out;
 }
+
+/*
+ * Rich task text (descriptions, updates, Team feed), shown and edited:
+ * sizes, lists, quotes, links, tables, inline images and @mentions.
+ */
+.task-rich > * + * {
+  margin-top: 0.5em;
+}
+.task-rich h1 {
+  font-size: 1.375rem;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  margin-top: 0.9em;
+}
+.task-rich h2 {
+  font-size: 1.125rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--color-gray-900);
+  margin-top: 0.8em;
+}
+.task-rich h3 {
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--color-gray-900);
+  margin-top: 0.7em;
+}
+.task-rich > :first-child {
+  margin-top: 0;
+}
+.task-rich strong {
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+.task-rich ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.task-rich ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.task-rich li + li {
+  margin-top: 0.15em;
+}
+.task-rich li > p {
+  margin: 0;
+}
+.task-rich blockquote {
+  border-left: 3px solid var(--color-gray-200);
+  padding-left: 0.75em;
+  color: var(--color-gray-600);
+}
+.task-rich code {
+  border-radius: 0.25rem;
+  background: var(--color-gray-100);
+  padding: 0.05em 0.3em;
+  font-size: 0.85em;
+}
+.task-rich a {
+  color: var(--color-indigo-700);
+  text-decoration: underline;
+  text-decoration-color: var(--color-indigo-200);
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+.task-rich a:hover {
+  text-decoration-color: var(--color-indigo-500);
+}
+.task-rich hr {
+  border-color: var(--color-gray-200);
+  margin: 1em 0;
+}
+.task-rich table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin-top: 0.75em;
+  font-size: 0.8125rem;
+}
+.task-rich th,
+.task-rich td {
+  border: 1px solid var(--color-gray-200);
+  padding: 0.4em 0.7em;
+  text-align: left;
+  vertical-align: top;
+  min-width: 4em;
+}
+.task-rich th {
+  background: var(--color-gray-50);
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+.task-rich th > p,
+.task-rich td > p {
+  margin: 0;
+}
+.task-rich img {
+  max-width: 100%;
+  max-height: 28rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-gray-200);
+}
+.task-rich span[data-type="mention"] {
+  font-weight: 600;
+  color: var(--color-indigo-700);
+}
+/* The editor: placeholder, selected cells and images. */
+.task-rich p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-gray-400);
+}
+.task-rich .selectedCell {
+  background: var(--color-indigo-50);
+}
+.task-rich img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-indigo-400);
+}
+.task-rich.ProseMirror table {
+  display: table;
+  width: 100%;
+}

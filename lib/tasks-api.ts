@@ -15,6 +15,7 @@ import type {
   TaskUpdate,
   TaskUpload,
   TaskBodyInput,
+  TaskBodyFormat,
 } from "@/types/tasks";
 
 /**
@@ -104,7 +105,7 @@ export const postTaskUpdate = async (
 export const editTaskUpdate = async (
   id: string,
   updateId: string,
-  input: { body: string; mentions?: string[] },
+  input: { body: string; format?: TaskBodyFormat; mentions?: string[] },
 ) => (await api.patch<TaskUpdate>(`${base}/${id}/updates/${updateId}`, input)).data;
 
 export const deleteTaskUpdate = async (id: string, updateId: string) =>
@@ -151,7 +152,7 @@ export const getTaskFeed = async (before?: string) =>
 export const postToFeed = async (input: TaskBodyInput & { parentId?: string }) =>
   (await api.post<TaskUpdate>(`${base}/feed`, input)).data;
 
-export const editFeedPost = async (postId: string, input: { body: string; mentions?: string[] }) =>
+export const editFeedPost = async (postId: string, input: { body: string; format?: TaskBodyFormat; mentions?: string[] }) =>
   (await api.patch<TaskUpdate>(`${base}/feed/${postId}`, input)).data;
 
 export const deleteFeedPost = async (postId: string) =>

@@ -43,6 +43,9 @@ export interface TaskPerson {
   name: string | null;
 }
 
+/** `html` from the rich editor; `text` for plain text and what Solid AI and the radar write. */
+export type TaskBodyFormat = "text" | "html";
+
 export interface TaskAttachment {
   key: string;
   mime: string;
@@ -87,6 +90,7 @@ export interface TaskUpdate {
   parentId: string | null;
   author: TaskAuthor;
   body: string;
+  format: TaskBodyFormat;
   mentions: string[];
   attachments: TaskAttachment[];
   activity: TaskActivity | null;
@@ -127,7 +131,7 @@ export interface TaskRow {
 }
 
 export interface TaskDetail extends TaskRow {
-  description: { body: string; mentions: string[]; attachments: TaskAttachment[] };
+  description: { body: string; format: TaskBodyFormat; mentions: string[]; attachments: TaskAttachment[] };
   checklist: TaskChecklistItem[];
   links: TaskLink[];
   followerEmails: string[];
@@ -252,6 +256,8 @@ export interface TaskBoards {
 
 export interface TaskBodyInput {
   body: string;
+  /** `html` from the rich editor. */
+  format?: TaskBodyFormat;
   mentions?: string[];
   attachmentIds?: string[];
 }
