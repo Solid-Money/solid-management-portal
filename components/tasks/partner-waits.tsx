@@ -78,12 +78,15 @@ function FollowUpPicker({
 function RefEditor({ value, onSave }: { value: string | null; onSave: (ref: string | null) => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
+  // The ref when editing began: an unchanged draft is never saved, so a ref
+  // someone else set in the meantime (a refresh brought it) is kept.
+  const [started, setStarted] = useState<string | null>(value);
   const [saving, setSaving] = useState(false);
   const save = async () => {
     // Enter then blur would save twice.
     if (saving) return;
     const next = draft.trim() || null;
-    if (next === value) return setEditing(false);
+    if (next === started || next === value) return setEditing(false);
     setSaving(true);
     try {
       await onSave(next);
@@ -126,6 +129,7 @@ function RefEditor({ value, onSave }: { value: string | null; onSave: (ref: stri
       type="button"
       onClick={() => {
         setDraft(value ?? "");
+        setStarted(value);
         setEditing(true);
       }}
       className={cn(
@@ -272,7 +276,7 @@ function Group({ group, onChanged }: { group: TaskPartnerGroup; onChanged: () =>
  */
 export default function PartnerWaits() {
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, refetch } = useTaskPartners(true);
+  const { data, isLoading, isError, isFetching, refetch } = useTaskPartners(true);
   const refresh = () => void queryClient.invalidateQueries({ queryKey: TASK_KEYS.partners });
   const overdue = data?.groups.reduce((sum, group) => sum + group.overdue, 0) ?? 0;
 
@@ -306,6 +310,19 @@ export default function PartnerWaits() {
         {overdue > 0 && <span className="font-medium text-red-700"> · {overdue} past their follow-up</span>}. Past
         their follow-up, cases are back in the inbox too; give one a new date once you&apos;ve chased the partner.
       </p>
+      {isError && (
+        <p className="flex flex-wrap items-center gap-x-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Couldn&apos;t refresh: this list may be out of date.
+          <button
+            type="button"
+            disabled={isFetching}
+            className="cursor-pointer font-medium underline disabled:opacity-50"
+            onClick={() => void refetch()}
+          >
+            {isFetching ? "Trying…" : "Try again"}
+          </button>
+        </p>
+      )}
       {data.partnersUnavailable && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Couldn&apos;t check which card issuer or KYC provider some customers are with, so they&apos;re under
