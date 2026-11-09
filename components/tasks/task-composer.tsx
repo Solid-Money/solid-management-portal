@@ -37,7 +37,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { uploadTaskFile } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
-import { Avatar, BotAvatar, personName } from "@/components/tasks/task-format";
+import { Avatar, BotAvatar, firstName, personName } from "@/components/tasks/task-format";
 import { CLAUDE_MENTION_ID, bodyToHtml, fileSize, imageUrls, withImageSources } from "@/lib/task-rich";
 import { visibleBounds } from "@/lib/textarea-caret";
 import type { TaskAttachment, TaskBodyFormat, TaskBodyInput, TaskPerson, TaskUpload } from "@/types/tasks";
@@ -80,9 +80,16 @@ const TaskImage = Image.extend({
   },
 });
 
-/** Pasted pictures from other sites can't be kept (only uploaded ones): leave them out. */
-function withoutForeignImages(html: string): string {
-  return html.replace(/<img\b(?![^>]*\bdata-key=)[^>]*>/gi, "");
+/**
+ * Only images attached to this text can be kept: uploaded here, or already
+ * on the text being edited. Pictures from other sites, and images copied
+ * from another task, are left out (they'd vanish on save).
+ */
+function withoutForeignImages(html: string, keys: Set<string>): string {
+  return html.replace(/<img\b[^>]*>/gi, (img) => {
+    const key = /\bdata-key="([^"]*)"/i.exec(img)?.[1];
+    return key && keys.has(key) ? img : "";
+  });
 }
 
 /**
@@ -90,9 +97,9 @@ function withoutForeignImages(html: string): string {
  * next to its HTML. When the HTML still has text or a table once foreign
  * images are gone, that is what was copied, not the picture.
  */
-function hasRichContent(html: string): boolean {
+function hasRichContent(html: string, keys: Set<string>): boolean {
   if (!html.trim() || typeof DOMParser === "undefined") return false;
-  const doc = new DOMParser().parseFromString(withoutForeignImages(html), "text/html");
+  const doc = new DOMParser().parseFromString(withoutForeignImages(html, keys), "text/html");
   return Boolean(doc.body.textContent?.trim() || doc.body.querySelector("table, img"));
 }
 
@@ -419,6 +426,8 @@ export default function TaskComposer({
   const addRef = useRef<(incoming: File[], inline: boolean) => void>(() => undefined);
   /** The @mention list is showing: Escape closes it, not the edit. */
   const listOpen = useRef(false);
+  /** Storage keys of the images this text may show (see withoutForeignImages). */
+  const knownKeys = useRef(new Set<string>());
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -485,18 +494,30 @@ export default function TaskComposer({
       }),
     ],
     content: initial
-      ? withImageSources(bodyToHtml(initial.body, initial.format), imageUrls(initial.attachments ?? []))
+      ? withImageSources(
+          // Plain text keeps its @mentions as mentions, so saving keeps them.
+          bodyToHtml(
+            initial.body,
+            initial.format,
+            initial.mentions.map((email) => ({
+              id: email,
+              label: personName(email, people),
+              names: [personName(email, people), firstName(email, people)],
+            })),
+          ),
+          imageUrls(initial.attachments ?? []),
+        )
       : "",
     editorProps: {
       attributes: {
         class: "task-rich max-w-none px-3 py-2.5 text-sm leading-relaxed text-gray-900 outline-none",
         style: `min-height: ${Math.max(2, minRows) * 1.6 + 1.25}rem`,
       },
-      transformPastedHTML: withoutForeignImages,
+      transformPastedHTML: (pasted) => withoutForeignImages(pasted, knownKeys.current),
       handlePaste: (_view, event) => {
         const pasted = Array.from(event.clipboardData?.files ?? []);
         if (!pasted.length || !allowAttachments) return false;
-        if (hasRichContent(event.clipboardData?.getData("text/html") ?? "")) return false;
+        if (hasRichContent(event.clipboardData?.getData("text/html") ?? "", knownKeys.current)) return false;
         event.preventDefault();
         addRef.current(pasted, true);
         return true;
@@ -640,6 +661,10 @@ export default function TaskComposer({
     sendRef.current = () => void send();
     listOpen.current = Boolean(mention && matches.length);
     mentionKeys.current = handleMentionKeys;
+    knownKeys.current = new Set([
+      ...images.map((image) => image.key),
+      ...(initial?.attachments ?? []).filter((a) => a.mime.startsWith("image/")).map((a) => a.key),
+    ]);
   });
 
   // Under the @, inside the composer; above it when the window has no room below.

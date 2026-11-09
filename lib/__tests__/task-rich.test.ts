@@ -72,3 +72,23 @@ describe("Claude in a task", () => {
     expect(claudeLookingIn(undefined)).toBe(false);
   });
 });
+
+describe("plain text opened in the editor", () => {
+  const luka = { id: "luka@fuse.io", label: "Luka Gourinchas", names: ["Luka Gourinchas", "Luka"] };
+  const amp = { id: "a@fuse.io", label: "A&B", names: ["A&B"] };
+
+  it("keeps its @mentions as mentions, by full or first name", () => {
+    expect(textToHtml("@Luka Gourinchas can you check? cc @Luka", [luka])).toBe(
+      '<p><span data-type="mention" data-id="luka@fuse.io" data-label="Luka Gourinchas">@Luka Gourinchas</span> can you check? cc ' +
+        '<span data-type="mention" data-id="luka@fuse.io" data-label="Luka Gourinchas">@Luka Gourinchas</span></p>',
+    );
+    // A name with characters HTML escapes still matches, and stays escaped.
+    expect(textToHtml("hi @A&B", [amp])).toBe(
+      '<p>hi <span data-type="mention" data-id="a@fuse.io" data-label="A&amp;B">@A&amp;B</span></p>',
+    );
+    // No mentions given: the text is unchanged.
+    expect(textToHtml("@Luka hi")).toBe("<p>@Luka hi</p>");
+    expect(bodyToHtml("@Luka hi", "text", [luka])).toContain('data-id="luka@fuse.io"');
+    expect(bodyToHtml("<p>x</p>", "html", [luka])).toBe("<p>x</p>");
+  });
+});

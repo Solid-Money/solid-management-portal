@@ -16,6 +16,21 @@ const TAGS = [
 ];
 const ATTRS = ["href", "target", "rel", "colspan", "rowspan", "data-key", "data-type", "data-id", "data-label", "alt", "start", "src"];
 
+/** Someone plain text mentions: who, and the names it may call them by. */
+export interface TextMention {
+  id: string;
+  label: string;
+  names: string[];
+}
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function unescapeHtml(text: string): string {
+  return text.replace(/&quot;/g, '"').replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&amp;/g, "&");
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -28,13 +43,28 @@ function escapeHtml(text: string): string {
  * Plain text (with Solid AI's `**bold**` and `[label](link)`) as editor HTML,
  * so an old description opens in the editor looking as it did.
  */
-export function textToHtml(text: string): string {
+export function textToHtml(text: string, mentions: TextMention[] = []): string {
   if (!text.trim()) return "";
+  // `@Name` as typed, for each person the text mentions, longest name first.
+  const byName = new Map<string, TextMention>();
+  for (const mention of mentions)
+    for (const name of mention.names) if (name && !byName.has(name)) byName.set(name, mention);
+  const names = [...byName.keys()].sort((a, b) => b.length - a.length);
+  const tagged = names.length
+    ? new RegExp(`@(${names.map((name) => escapeRegex(escapeHtml(name))).join("|")})`, "g")
+    : null;
   return text
     .trim()
     .split(/\n{2,}/)
     .map((block) => {
-      const inline = escapeHtml(block)
+      const escaped = escapeHtml(block);
+      const withMentions = tagged
+        ? escaped.replace(tagged, (_all, name: string) => {
+            const mention = byName.get(unescapeHtml(name))!;
+            return `<span data-type="mention" data-id="${escapeHtml(mention.id)}" data-label="${escapeHtml(mention.label)}">@${escapeHtml(mention.label)}</span>`;
+          })
+        : escaped;
+      const inline = withMentions
         .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
         .replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|\/)[^)\s]*)\)/g, '<a href="$2">$1</a>')
         .replace(/\n/g, "<br>");
@@ -44,8 +74,8 @@ export function textToHtml(text: string): string {
 }
 
 /** The editor's HTML for a body, whichever way it was written. */
-export function bodyToHtml(body: string, format: TaskBodyFormat | undefined): string {
-  return format === "html" ? body : textToHtml(body);
+export function bodyToHtml(body: string, format: TaskBodyFormat | undefined, mentions: TextMention[] = []): string {
+  return format === "html" ? body : textToHtml(body, mentions);
 }
 
 /** Signed links for inline images: by key, from the files attached to the same text. */

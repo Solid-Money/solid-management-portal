@@ -83,7 +83,10 @@ export function Attachments({
   /** Keys of the images shown inside the text. */
   inline?: Set<string>;
 }) {
-  const shown = inline ? attachments.filter((a) => !inline.has(a.key)) : attachments;
+  // An inline image with no link can't show in the text: its fallback shows here.
+  const shown = inline
+    ? attachments.filter((a) => !inline.has(a.key) || (a.mime.startsWith("image/") && !a.url))
+    : attachments;
   if (!shown.length) return null;
   const images = shown.filter((a) => a.mime.startsWith("image/"));
   const others = shown.filter((a) => !a.mime.startsWith("image/"));
