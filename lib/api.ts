@@ -29,6 +29,7 @@ import {
   TokenCatalogue,
   TokenLookup,
   KycResetEligibility,
+  UserRainSunsetState,
   KycResetResult,
   VirtualAccountOnboardingRetryResult,
   VirtualAccountOnboardingState,
@@ -582,6 +583,15 @@ export const recoverUserAccount = (userId: string, reason: string) =>
   api.post<{ data: RecoverAccountResult }>(
     `/admin/v1/users/${userId}/account/recover`,
     { reason },
+  );
+
+/**
+ * Rain sunset for one user: whether they are affected, whether they can move
+ * to Wirex, and how far their move got. Read-only.
+ */
+export const getUserRainSunset = (userId: string) =>
+  api.get<{ data: UserRainSunsetState }>(
+    `/admin/v1/users/${userId}/rain-sunset`,
   );
 
 /**
