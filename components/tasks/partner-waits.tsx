@@ -296,11 +296,28 @@ export default function PartnerWaits() {
         </button>
       </div>
     );
+  // A failed refresh keeps what was loaded, with a warning (empty or not).
+  const staleWarning = isError ? (
+    <p className="flex flex-wrap items-center gap-x-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      Couldn&apos;t refresh: this list may be out of date.
+      <button
+        type="button"
+        disabled={isFetching}
+        className="cursor-pointer font-medium underline disabled:opacity-50"
+        onClick={() => void refetch()}
+      >
+        {isFetching ? "Trying…" : "Try again"}
+      </button>
+    </p>
+  ) : null;
   if (!data?.total)
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-gray-200 px-4 py-16 text-center text-sm text-gray-500">
-        <Handshake className="size-8 text-gray-300" />
-        Nothing is waiting on a partner.
+      <div className="space-y-3">
+        {staleWarning}
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-gray-200 px-4 py-16 text-center text-sm text-gray-500">
+          <Handshake className="size-8 text-gray-300" />
+          Nothing is waiting on a partner.
+        </div>
       </div>
     );
   return (
@@ -310,19 +327,7 @@ export default function PartnerWaits() {
         {overdue > 0 && <span className="font-medium text-red-700"> · {overdue} past their follow-up</span>}. Past
         their follow-up, cases are back in the inbox too; give one a new date once you&apos;ve chased the partner.
       </p>
-      {isError && (
-        <p className="flex flex-wrap items-center gap-x-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Couldn&apos;t refresh: this list may be out of date.
-          <button
-            type="button"
-            disabled={isFetching}
-            className="cursor-pointer font-medium underline disabled:opacity-50"
-            onClick={() => void refetch()}
-          >
-            {isFetching ? "Trying…" : "Try again"}
-          </button>
-        </p>
-      )}
+      {staleWarning}
       {data.partnersUnavailable && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Couldn&apos;t check which card issuer or KYC provider some customers are with, so they&apos;re under
