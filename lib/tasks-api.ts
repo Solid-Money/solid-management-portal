@@ -1,6 +1,7 @@
 import api from "@/lib/api";
 import type {
   TaskBoards,
+  TaskPartners,
   TaskCreateInput,
   TaskDetail,
   TaskFeedPage,
@@ -48,6 +49,19 @@ export const getTaskCounts = async () =>
       quietErrors: true,
     })
   ).data.counts;
+
+// ---- Partners ----------------------------------------------------------------
+
+/** Escalated support cases, by the partner (or team) they wait on. */
+export const getTaskPartners = async () =>
+  // Polled, and the tab shows its own error with a retry: no toast each minute.
+  (await api.get<TaskPartners>(`${base}/partners`, { quietErrors: true })).data;
+
+/** The partner's ticket and the follow-up date: not an escalation again. */
+export const updateEscalation = async (
+  caseId: string,
+  input: { externalRef?: string | null; followUpAt?: string },
+) => (await api.patch<unknown>(`/admin/v1/support/cases/${encodeURIComponent(caseId)}/escalation`, input)).data;
 
 // ---- Boards ------------------------------------------------------------------
 

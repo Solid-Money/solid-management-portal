@@ -151,6 +151,55 @@ export interface TaskListFilters {
   board?: string;
 }
 
+/** Who an escalated support case waits on. */
+export type TaskPartner =
+  | "wirex"
+  | "rain"
+  | "sumsub"
+  | "didit"
+  | "persona"
+  | "card_issuer"
+  | "kyc_provider"
+  | "on_ramp"
+  | "engineering"
+  | "other";
+
+export interface TaskPartnerCase {
+  caseId: string;
+  conversationId: string;
+  caseNumber: number;
+  userId: string | null;
+  customer: string | null;
+  intent: string | null;
+  target: string;
+  /** The partner's own id for the customer (Wirex user id, Rain consumer id). */
+  partnerId: string | null;
+  reason: string;
+  externalRef: string | null;
+  followUpAt: string;
+  escalatedAt: string;
+  escalatedBy: string;
+  assigneeEmail: string | null;
+  customerWroteSince: boolean;
+  /** The follow-up passed and it went back to the inbox: chase the partner. */
+  backInInbox: boolean;
+  task: { id: string; number: number } | null;
+}
+
+export interface TaskPartnerGroup {
+  partner: TaskPartner;
+  label: string;
+  cases: TaskPartnerCase[];
+  overdue: number;
+}
+
+export interface TaskPartners {
+  groups: TaskPartnerGroup[];
+  total: number;
+  /** Who some customers are with couldn't be read; they're under "unknown". */
+  partnersUnavailable?: boolean;
+}
+
 export interface TaskBoard {
   key: string;
   name: string;

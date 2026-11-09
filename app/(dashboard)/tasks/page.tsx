@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ListTodo, Loader2, MessagesSquare, Plus } from "lucide-react";
+import { Handshake, ListTodo, Loader2, MessagesSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTaskCounts } from "@/hooks/use-tasks";
 import NewTaskDialog from "@/components/tasks/new-task-dialog";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
 import TaskList from "@/components/tasks/task-list";
 import BoardTabs from "@/components/tasks/board-tabs";
+import PartnerWaits from "@/components/tasks/partner-waits";
 import {
   TASK_PRIORITIES,
   TASK_VIEWS,
@@ -30,7 +31,7 @@ function isPriority(value: string | null): value is TaskPriority {
 /**
  * The team's tasks, on boards (Features, Bugs, Support, …), by hand or opened
  * by Solid AI and the radar, and the Team feed beside them. The tab, board,
- * view, filters and the open task live in the URL (`?tab=feed&post=`,
+ * view, filters and the open task live in the URL (`?tab=feed&post=`, `?tab=partners`,
  * `?board=&view=&owner=&priority=&label=&q=&task=`), so any task or post is a link.
  */
 function TasksScreen() {
@@ -38,7 +39,8 @@ function TasksScreen() {
   const pathname = usePathname();
   const params = useSearchParams();
   const [creating, setCreating] = useState(false);
-  const tab = params.get("tab") === "feed" ? "feed" : "tasks";
+  const rawTab = params.get("tab");
+  const tab = rawTab === "feed" || rawTab === "partners" ? rawTab : "tasks";
   const { data: counts } = useTaskCounts();
 
   const rawView = params.get("view");
@@ -94,13 +96,14 @@ function TasksScreen() {
         {(
           [
             { key: "tasks", label: "Tasks", icon: ListTodo },
+            { key: "partners", label: "Partners", icon: Handshake },
             { key: "feed", label: "Team feed", icon: MessagesSquare },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             type="button"
-            onClick={() => update({ tab: key === "feed" ? "feed" : null, post: null })}
+            onClick={() => update({ tab: key === "tasks" ? null : key, post: null })}
             className={cn(
               "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
               tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900",
@@ -114,6 +117,8 @@ function TasksScreen() {
 
       {tab === "feed" ? (
         <TeamFeed highlight={params.get("post")} />
+      ) : tab === "partners" ? (
+        <PartnerWaits />
       ) : (
         <>
           <BoardTabs
