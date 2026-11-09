@@ -120,6 +120,7 @@ export default function ReevaluateReferralDialog({
             <ReevaluationOutcome
               result={result}
               friendLabel={friendLabel}
+              friendUsername={reward.username}
               onDone={close}
             />
           ) : (
@@ -225,10 +226,13 @@ export default function ReevaluateReferralDialog({
 function ReevaluationOutcome({
   result,
   friendLabel,
+  friendUsername,
   onDone,
 }: {
   result: ReferralReevaluationResult;
   friendLabel: string;
+  /** The referred friend's username, when the row knows it. */
+  friendUsername?: string;
   onDone: () => void;
 }) {
   const reinstated =
@@ -314,7 +318,7 @@ function ReevaluationOutcome({
         </div>
       </dl>
 
-      <ClawbackDebtsNotice result={result} />
+      <ClawbackDebtsNotice result={result} friendUsername={friendUsername} />
 
       <p className="text-xs text-gray-500">
         Recorded on {friendLabel}&apos;s audit trail
@@ -341,8 +345,10 @@ function ReevaluationOutcome({
  */
 function ClawbackDebtsNotice({
   result,
+  friendUsername,
 }: {
   result: ReferralReevaluationResult;
+  friendUsername?: string;
 }) {
   const debts = result.clawbackDebts;
   if (!debts) return null;
@@ -390,10 +396,15 @@ function ClawbackDebtsNotice({
           )}
       {debts.needsManualCancellation && (
         <p className="font-medium text-red-700">
-          Some clawback debts could not be cancelled. Write off any still open
-          under Referral debts on {userLink(result.referrerId)}&apos;s and{" "}
-          {userLink(result.referredUserId)}&apos;s pages, or they will be taken
-          from their next referral payouts.
+          Some clawback debts could not be cancelled, and would be taken from
+          the next referral payouts. Under Referral debts on{" "}
+          {userLink(result.referrerId)}&apos;s and{" "}
+          {userLink(result.referredUserId)}&apos;s pages, write off only open{" "}
+          &ldquo;Cashback (legacy)&rdquo; debts for{" "}
+          {friendUsername ? `friend ${friendUsername}` : "this referral's friend"}
+          {" "}— any other debt listed there belongs to a different reward. If
+          those lists do not load either, try again later rather than write
+          anything off.
         </p>
       )}
     </div>
