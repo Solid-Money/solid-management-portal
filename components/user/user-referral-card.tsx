@@ -70,11 +70,22 @@ function StatusCell({ row }: { row: AdminReferralRewardRow }) {
             : "Referrer's share withheld — only the friend's share will pay"}
         </p>
       )}
-      {row.reviewApprovedAt && row.status !== "reversed" && (
-        <p className="text-[11px] text-emerald-700">
-          Approved by {row.reviewApprovedBy ?? "an admin"} ·{" "}
-          {shortDate(row.reviewApprovedAt)}
+      {row.spendCheckWaivedAt && row.status !== "reversed" ? (
+        <p
+          className="text-[11px] text-emerald-700"
+          title={row.spendCheckWaivedReason}
+        >
+          Goodwill approval by {row.spendCheckWaivedBy ?? "an admin"} ·{" "}
+          {shortDate(row.spendCheckWaivedAt)} — pays without the spend checks
         </p>
+      ) : (
+        row.reviewApprovedAt &&
+        row.status !== "reversed" && (
+          <p className="text-[11px] text-emerald-700">
+            Approved by {row.reviewApprovedBy ?? "an admin"} ·{" "}
+            {shortDate(row.reviewApprovedAt)}
+          </p>
+        )
       )}
       {row.reinstatedAt && (
         <p className="text-[11px] text-emerald-700">

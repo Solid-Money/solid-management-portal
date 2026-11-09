@@ -10,6 +10,7 @@ import { referralStatus } from "@/lib/referral";
 import type {
   ReferralDecisionAction,
   ReferralDecisionResult,
+  ReferralGoodwillTerms,
 } from "@/types/referral-review";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,11 @@ export const DECISIONS: Record<
     description:
       "The friend is paid and the referrer never is — even if the referrer is blocked in void mode. A friend still working toward the bar is paid alone once they clear it.",
   },
+  approve_goodwill: {
+    label: "Goodwill approve",
+    description:
+      "For an exception that has been signed off. Pays both sides even though the friend's spend doesn't clear the bar: the payout skips the spend checks (bar, refunds, purchase after qualifying). A closed account, a suspected self-referral or a void block still stop it. Works on held, qualified, reversed and expired rewards; an expired one waits the usual payout delay from today.",
+  },
   hold: {
     label: "Hold",
     description:
@@ -51,6 +57,25 @@ export const DECISIONS: Record<
     destructive: true,
   },
 };
+
+/** The two things a goodwill approval can pay — no typed-in amounts. */
+const GOODWILL_TERMS: {
+  value: ReferralGoodwillTerms;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "keep",
+    label: "Keep the reward's terms",
+    description:
+      "What it qualified on (e.g. $25 each in soFUSE). A friend who never qualified gets the terms their referral was made on.",
+  },
+  {
+    value: "original",
+    label: "Original terms",
+    description: "$75 bar, $15 each in soUSD.",
+  },
+];
 
 interface DecisionDialogProps {
   action: ReferralDecisionAction | null;
@@ -75,14 +100,17 @@ export function DecisionDialog({
   onDecided,
 }: DecisionDialogProps) {
   const [reason, setReason] = useState("");
+  const [terms, setTerms] = useState<ReferralGoodwillTerms>("keep");
   const [result, setResult] = useState<ReferralDecisionResult | null>(null);
   const decision = useReferralDecision();
   const meta = action ? DECISIONS[action] : null;
+  const goodwill = action === "approve_goodwill";
   const trimmed = reason.trim();
 
   const close = () => {
     if (decision.isPending) return;
     setReason("");
+    setTerms("keep");
     setResult(null);
     onClose();
   };
@@ -90,7 +118,7 @@ export function DecisionDialog({
   const submit = () => {
     if (!action || !trimmed) return;
     decision.mutate(
-      { action, users, reason: trimmed },
+      { action, users, reason: trimmed, ...(goodwill && { terms }) },
       {
         onSuccess: (data) => {
           setResult(data);
@@ -140,14 +168,55 @@ export function DecisionDialog({
               {(labels ?? users).join(", ")}
             </p>
 
+            {goodwill && (
+              <fieldset className="space-y-1.5">
+                <legend className="text-sm font-medium text-gray-900">
+                  Pay on
+                </legend>
+                {GOODWILL_TERMS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm ${
+                      terms === option.value
+                        ? "border-indigo-600 bg-indigo-50"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="referral-goodwill-terms"
+                      value={option.value}
+                      checked={terms === option.value}
+                      onChange={() => setTerms(option.value)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block font-medium text-gray-900">
+                        {option.label}
+                      </span>
+                      <span className="block text-xs text-gray-500">
+                        {option.description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            )}
+
             <div className="space-y-1.5">
-              <Label htmlFor="referral-decision-reason">Reason</Label>
+              <Label htmlFor="referral-decision-reason">
+                {goodwill ? "Who approved it" : "Reason"}
+              </Label>
               <Textarea
                 id="referral-decision-reason"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 maxLength={500}
-                placeholder="The ticket, the finding, or who asked — it goes on each user's audit trail"
+                placeholder={
+                  goodwill
+                    ? "e.g. Approved by Eli on Nov 10 — Intercom link. It goes on each user's audit trail"
+                    : "The ticket, the finding, or who asked — it goes on each user's audit trail"
+                }
                 rows={3}
               />
             </div>

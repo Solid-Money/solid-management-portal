@@ -12,6 +12,7 @@ import type {
   ReferralBlockResult,
   ReferralDecisionAction,
   ReferralDecisionResult,
+  ReferralGoodwillTerms,
   ReferralRecheckRun,
   ReferralReviewPage,
   ReferralReviewQuery,
@@ -40,6 +41,7 @@ const DECISION_PATH: Record<ReferralDecisionAction, string> = {
   hold: "hold",
   approve: "approve",
   approve_friend_only: "approve-friend-only",
+  approve_goodwill: "approve-goodwill",
   reject: "reject",
 };
 
@@ -63,19 +65,31 @@ export function useReferralReviewPage(query: ReferralReviewQuery) {
   });
 }
 
-/** Hold, approve, approve for the friend only, or reject — one user or many. */
+/**
+ * Hold, approve, approve for the friend only, approve as goodwill, or reject —
+ * one user or many. `terms` is read only by a goodwill approval.
+ */
 export function useReferralDecision() {
   const queryClient = useQueryClient();
   return useMutation<
     ReferralDecisionResult,
     Error,
-    { action: ReferralDecisionAction; users: string[]; reason: string }
+    {
+      action: ReferralDecisionAction;
+      users: string[];
+      reason: string;
+      terms?: ReferralGoodwillTerms;
+    }
   >({
-    mutationFn: async ({ action, users, reason }) =>
+    mutationFn: async ({ action, users, reason, terms }) =>
       (
         await api.post<ReferralDecisionResult>(
           `${BASE}/${DECISION_PATH[action]}`,
-          { users, reason },
+          {
+            users,
+            reason,
+            ...(action === "approve_goodwill" && terms && { terms }),
+          },
         )
       ).data,
     onSettled: () => invalidateAfterDecision(queryClient),
