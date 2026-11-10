@@ -38,14 +38,15 @@ import {
   type ChipTone,
 } from "@/components/overview/overview-ui";
 import { Tile } from "@/components/overview/kpi-tiles";
+import { TiersSection } from "@/components/overview/customers-tiers";
 
 const LADDER_LIGHT = "#c7cbf5";
 const LADDER_MID = "#8b8fea";
 const LADDER_DEEP = "#25259a";
 
 /**
- * The Overview's Good customers tab: who holds a card, who uses it, and who
- * uses it enough to keep using it. Always the 28 days to the range's last
+ * The Overview's Customers tab (once "Good customers"): who holds a card, who
+ * uses it, who uses it enough to keep using it, and who holds Prime or Ultra. Always the 28 days to the range's last
  * day, counted per person, whatever the range's length.
  */
 export function GoodCustomersTab({ from, to }: { from: string; to: string }) {
@@ -54,7 +55,7 @@ export function GoodCustomersTab({ from, to }: { from: string; to: string }) {
   if (error && !data) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-        Good customers could not load: {describeApiError(error)}.{" "}
+        Customers could not load: {describeApiError(error)}.{" "}
         <button type="button" onClick={() => void refetch()} className="font-medium underline">
           Try again
         </button>
@@ -104,6 +105,7 @@ export function GoodCustomersView({ data }: { data: GoodCustomersResponse }) {
         </div>
         <LadderCard data={data} />
       </div>
+      <TiersSection data={data} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CohortsCard data={data} />
         <GuardrailsCard data={data} />
@@ -113,8 +115,11 @@ export function GoodCustomersView({ data }: { data: GoodCustomersResponse }) {
         together. Real customer = holds a card and has put in their own money or made a settled
         purchase. Qualified = {d.minSpendDays}+ spend days and ${d.minSpendUsd}+ in the trailing{" "}
         {d.windowDays} days. High-value = qualified plus ${d.highValueSpendUsd}+ spend, $
-        {d.highValueMoneyInUsd}+ of their own money in, or active Prime. Revenue is fees plus
-        Prime, as on the Revenue tile; treasury interest and partner card markups are not included.
+        {d.highValueMoneyInUsd}+ of their own money in, or active Prime. Tier = Prime or Ultra at the
+        range end, by the best route a person holds: a paid Prime subscription, FUSE locked for a
+        year, a free trial, or the legacy FUSE route kept from before tiers v3. Bought = subscription
+        or lock. Revenue is fees plus Prime, as on the Revenue tile; treasury interest and partner
+        card markups are not included.
       </p>
     </div>
   );

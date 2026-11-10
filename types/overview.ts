@@ -286,6 +286,83 @@ export interface GoodCustomersRetention {
   otherSpenders: { people: number; spentAgain: number };
 }
 
+/** How a member holds their tier, counted once each, in this order. */
+export type GoodCustomersTierRoute = "paid" | "lock" | "trial" | "legacy";
+
+export interface GoodCustomersRouteCounts {
+  paid: number;
+  lock: number;
+  trial: number;
+  legacy: number;
+}
+
+export interface GoodCustomersTierRow {
+  tier: "ultra" | "prime" | "core";
+  cardholders: number;
+  byRoute: GoodCustomersRouteCounts;
+  spenders: number;
+  qualified: number;
+  spendUsd: number;
+}
+
+export interface GoodCustomersRouteRow {
+  route: GoodCustomersTierRoute | "core";
+  cardholders: number;
+  spenders: number;
+  qualified: number;
+  spendUsd: number;
+}
+
+export interface GoodCustomersBuyersWeek {
+  /** The week's last day, inclusive. */
+  date: string;
+  paid: number;
+  lock: number;
+}
+
+/**
+ * The Tiers section. `source` = "snapshot" when the day's tiers were resolved
+ * live that night; "records" when they come from stored records, which can
+ * still count a legacy member who has sold the FUSE that kept their tier.
+ */
+export interface GoodCustomersTiers {
+  source: "snapshot" | "records";
+  members: {
+    prime: number;
+    ultra: number;
+    withCard: number;
+    byRoute: GoodCustomersRouteCounts;
+  };
+  bought: {
+    total: number;
+    paid: number;
+    lockPrime: number;
+    lockUltra: number;
+    lastWeek: number;
+    primeAnnualUsd: number;
+  };
+  /** Ultra, Prime, Core. */
+  table: GoodCustomersTierRow[];
+  /** paid, lock, legacy, trial, core. */
+  routes: GoodCustomersRouteRow[];
+  /** 13 weeks, oldest first. */
+  weeklyBuyers: GoodCustomersBuyersWeek[];
+  trials: {
+    gifted: number;
+    accepted: number;
+    onTrial: number;
+    ended: number;
+    endedThenBought: number;
+    since: string | null;
+  };
+  legacy: {
+    members: number;
+    spenders: number;
+    spendUsd: number;
+    endsOn: string | null;
+  };
+}
+
 export interface GoodCustomersResponse {
   /** The window's last day, inclusive. */
   asOf: string;
@@ -306,6 +383,11 @@ export interface GoodCustomersResponse {
   allCustomers90: { cashbackUsd: number; primeUsd: number };
   referralBar: { spendUsd: number; bunched: number } | null;
   cohorts: GoodCustomersCohort[];
+  /**
+   * Prime and Ultra members (the Tiers section). Null when the backend could
+   * not read them; missing from a backend that predates the section.
+   */
+  tiers?: GoodCustomersTiers | null;
   feeRevenueUsd90: number | null;
   generatedAt: string;
 }
