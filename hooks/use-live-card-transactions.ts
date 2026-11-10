@@ -117,6 +117,7 @@ export function useLiveCardTransactions(enabled: boolean): void {
       void queryClient.invalidateQueries({ queryKey: ["tasks", "counts"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "boards"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
       for (const id of changedTasks) {
         void queryClient.invalidateQueries({ queryKey: ["tasks", "task", id] });
       }

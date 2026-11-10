@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   CalendarDays,
@@ -12,9 +13,12 @@ import {
   Link2,
   Loader2,
   Lock,
+  Megaphone,
   MessageSquare,
+  Paperclip,
   Pencil,
   Plus,
+  Rocket,
   Tag,
   Timer,
   Trash2,
@@ -26,11 +30,21 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-provider";
 import {
   isTaskId,
   usePatchTask,
   useRefreshTask,
+  TASK_KEYS,
+  useMarketing,
   useTask,
   useTaskBoards,
   useTaskPeople,
@@ -38,6 +52,7 @@ import {
 import {
   addChecklistItem,
   deleteChecklistItem,
+  deleteTask,
   followTask,
   patchChecklistItem,
   postTaskUpdate,
@@ -70,7 +85,25 @@ import {
   formatWhen,
   personName,
 } from "@/components/tasks/task-format";
-import type { TaskBodyInput, TaskDetail, TaskLink, TaskPerson, TaskUpdate } from "@/types/tasks";
+import type {
+  TaskBodyInput,
+  TaskDetail,
+  TaskLink,
+  TaskMarketingInput,
+  TaskPerson,
+  TaskUpdate,
+} from "@/types/tasks";
+import {
+  CAMPAIGN_SWATCH,
+  CampaignPicker,
+  ChannelChip,
+  ChannelPicker,
+  PublishPicker,
+  StagePicker,
+  StagePill,
+} from "@/components/tasks/marketing-format";
+import { ApprovalBox, AssetField, BriefEditor, LaunchPicker } from "@/components/tasks/marketing-piece";
+import { launchesFor, publishLabel } from "@/lib/task-marketing";
 
 /** A label and its value: two cells, so the grid fits two fields a row from `sm`. */
 function Field({
@@ -423,7 +456,73 @@ function Description({
   );
 }
 
-function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]; me: string }) {
+/** Delete, after asking: only for the person who opened the task. */
+function DeleteTask({ task, onDeleted }: { task: TaskDetail; onDeleted: () => void }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await deleteTask(task.id);
+      queryClient.removeQueries({ queryKey: TASK_KEYS.task(task.id) });
+      void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });
+      toast.success("Task deleted");
+      setOpen(false);
+      onDeleted();
+    } catch {
+      // The API layer shows the error.
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="xs"
+        aria-label="Delete task"
+        title="Delete task"
+        className="text-gray-500 hover:text-red-700"
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 />
+      </Button>
+      <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this task?</DialogTitle>
+            <DialogDescription>
+              &ldquo;{task.title}&rdquo; and its updates go away for everyone. To keep it, set it to Done or
+              Cancelled instead.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>
+              Keep it
+            </Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" disabled={busy} onClick={() => void remove()}>
+              {busy && <Loader2 className="animate-spin" />}
+              Delete task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function TaskBody({
+  task,
+  people,
+  me,
+  onDeleted,
+}: {
+  task: TaskDetail;
+  people: TaskPerson[];
+  me: string;
+  onDeleted: () => void;
+}) {
   const patch = usePatchTask(task.id);
   const refresh = useRefreshTask();
   const { data: boardList } = useTaskBoards();
@@ -432,6 +531,18 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
   const [following, setFollowing] = useState<boolean | null>(null);
   const isFollowing = following ?? task.following;
   const closed = task.status === "done" || task.status === "cancelled";
+
+  // A marketing piece: stage, channel, publish, campaign, launch, asset.
+  const piece = task.marketing;
+  const { data: marketing } = useMarketing(null, !!piece);
+  const campaigns = marketing?.campaigns ?? [];
+  const campaign = piece?.campaignId ? campaigns.find((c) => c.id === piece.campaignId) : null;
+  const launches = launchesFor(marketing?.pieces ?? [], piece?.campaignId ?? null, {
+    id: task.id,
+    parentId: piece?.parentId,
+  });
+  const parent = piece?.parentId ? marketing?.pieces.find((p) => p.id === piece.parentId) : null;
+  const patchPiece = (input: TaskMarketingInput) => patch.mutateAsync({ marketing: input });
 
   const copyLink = async () => {
     try {
@@ -453,13 +564,21 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               <Lock className="size-3" /> Private
             </span>
           )}
-          {task.source.kind !== "manual" && (
-            <span className="hidden min-w-0 items-center gap-1.5 truncate sm:inline-flex">
+          {/* Who opened it and when: a person, Solid AI, the radar or Claude. */}
+          <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+            {task.source.kind !== "manual" || task.createdBy.bot || !task.createdBy.email ? (
               <BotAvatar size={16} />
+            ) : (
+              <Avatar email={task.createdBy.email} people={people} size={16} />
+            )}
+            <span className="truncate">
               Opened by {authorName(task.createdBy, people)}
-              {task.source.label && <span className="text-gray-400">· {task.source.label}</span>}
+              {task.source.kind !== "manual" && task.source.label && (
+                <span className="text-gray-400"> · {task.source.label}</span>
+              )}
+              <span className="text-gray-400"> · {formatWhen(task.createdAt)}</span>
             </span>
-          )}
+          </span>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <Button variant="ghost" size="xs" onClick={() => void copyLink()}>
               <Link2 /> <span className="hidden sm:inline">Copy link</span>
@@ -482,6 +601,10 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               <Bell className={cn(isFollowing && "fill-indigo-100")} />
               {isFollowing ? "Following" : "Follow"}
             </Button>
+            {/* Solid AI's and the radar's tasks are cancelled, not deleted. */}
+            {!task.createdBy.bot && !!me && task.createdBy.email?.toLowerCase() === me.toLowerCase() && (
+              <DeleteTask task={task} onDeleted={onDeleted} />
+            )}
           </div>
         </div>
 
@@ -489,14 +612,25 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
         <SheetDescription className="sr-only">Task T-{task.number}</SheetDescription>
 
         <div className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 sm:grid-cols-[5rem_minmax(0,1fr)_5rem_minmax(0,1fr)]">
-          <Field icon={CircleDot} label="Status">
-            <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>
-              <button type="button" className="cursor-pointer">
-                <StatusPill status={task.status} />
-              </button>
-            </StatusPicker>
-            {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
-          </Field>
+          {piece ? (
+            <Field icon={CircleDot} label="Status">
+              <StagePicker value={piece.stage} onChange={(stage) => void patchPiece({ stage })}>
+                <button type="button" className="cursor-pointer">
+                  <StagePill stage={piece.stage} cancelled={task.status === "cancelled"} />
+                </button>
+              </StagePicker>
+              {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
+            </Field>
+          ) : (
+            <Field icon={CircleDot} label="Status">
+              <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>
+                <button type="button" className="cursor-pointer">
+                  <StatusPill status={task.status} />
+                </button>
+              </StatusPicker>
+              {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
+            </Field>
+          )}
           <Field icon={User} label="Owner">
             <PersonPicker
               people={people}
@@ -515,20 +649,48 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               </button>
             </PersonPicker>
           </Field>
-          <Field icon={Flag} label="Priority">
-            <PriorityPicker value={task.priority} onChange={(priority) => patch.mutate({ priority })}>
-              <button type="button" className={fieldButton}>
-                <PriorityLabel priority={task.priority} />
-              </button>
-            </PriorityPicker>
-          </Field>
-          <Field icon={CalendarDays} label="Due">
-            <DuePicker value={task.dueDate} onChange={(dueDate) => patch.mutate({ dueDate })}>
-              <button type="button" className={fieldButton}>
-                <DueLabel date={task.dueDate} closed={closed} />
-              </button>
-            </DuePicker>
-          </Field>
+          {piece ? (
+            <Field icon={Megaphone} label="Channel">
+              <ChannelPicker value={piece.channel} onChange={(channel) => void patchPiece({ channel })}>
+                <button type="button" className={fieldButton}>
+                  {piece.channel ? <ChannelChip channel={piece.channel} /> : <span className="text-gray-400">Add</span>}
+                </button>
+              </ChannelPicker>
+            </Field>
+          ) : (
+            <Field icon={Flag} label="Priority">
+              <PriorityPicker value={task.priority} onChange={(priority) => patch.mutate({ priority })}>
+                <button type="button" className={fieldButton}>
+                  <PriorityLabel priority={task.priority} />
+                </button>
+              </PriorityPicker>
+            </Field>
+          )}
+          {piece ? (
+            <Field icon={CalendarDays} label="Publish">
+              <PublishPicker
+                on={piece.publishOn}
+                time={piece.publishTime}
+                onChange={({ on, time }) => void patchPiece({ publishOn: on, publishTime: time })}
+              >
+                <button type="button" className={fieldButton}>
+                  {piece.publishOn ? (
+                    <span className="truncate">{publishLabel(piece.publishOn, piece.publishTime)}</span>
+                  ) : (
+                    <span className="text-gray-400">Add a date</span>
+                  )}
+                </button>
+              </PublishPicker>
+            </Field>
+          ) : (
+            <Field icon={CalendarDays} label="Due">
+              <DuePicker value={task.dueDate} onChange={(dueDate) => patch.mutate({ dueDate })}>
+                <button type="button" className={fieldButton}>
+                  <DueLabel date={task.dueDate} closed={closed} />
+                </button>
+              </DuePicker>
+            </Field>
+          )}
           <Field icon={LayoutGrid} label="Board">
             <BoardPicker boards={boards} value={task.board} onChange={(board) => patch.mutate({ board })}>
               <button type="button" className={fieldButton}>
@@ -536,28 +698,54 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               </button>
             </BoardPicker>
           </Field>
-          <Field icon={Timer} label="Sprint">
-            <SprintPicker value={task.sprint} onChange={(sprint) => patch.mutate({ sprint })}>
-              <button type="button" className={fieldButton}>
-                {task.sprint ? (
-                  <span className="truncate">
-                    {task.sprint === sprintStart() ? "This sprint" : "Sprint"}{" "}
-                    <span className="text-gray-500">· {sprintLabel(task.sprint)}</span>
-                  </span>
-                ) : (
-                  <span className="text-gray-400">Backlog</span>
-                )}
-              </button>
-            </SprintPicker>
-            {task.carriedOver > 0 && !closed && (
-              <span
-                className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
-                title="Sprints that ended with it still open"
+          {piece ? (
+            <Field icon={LayoutGrid} label="Campaign">
+              <CampaignPicker
+                campaigns={campaigns}
+                value={piece.campaignId}
+                onChange={(campaignId) =>
+                  // A launch is in one campaign: moving the piece leaves it.
+                  void patchPiece(
+                    campaignId !== piece.campaignId && piece.parentId ? { campaignId, parentId: null } : { campaignId },
+                  )
+                }
               >
-                Carried over{task.carriedOver > 1 ? ` ×${task.carriedOver}` : ""}
-              </span>
-            )}
-          </Field>
+                <button type="button" className={fieldButton}>
+                  {campaign ? (
+                    <>
+                      <span className={cn("size-2.5 shrink-0 rounded-[3px]", CAMPAIGN_SWATCH[campaign.color])} />
+                      <span className="truncate">{campaign.name}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400">No campaign</span>
+                  )}
+                </button>
+              </CampaignPicker>
+            </Field>
+          ) : (
+            <Field icon={Timer} label="Sprint">
+              <SprintPicker value={task.sprint} onChange={(sprint) => patch.mutate({ sprint })}>
+                <button type="button" className={fieldButton}>
+                  {task.sprint ? (
+                    <span className="truncate">
+                      {task.sprint === sprintStart() ? "This sprint" : "Sprint"}{" "}
+                      <span className="text-gray-500">· {sprintLabel(task.sprint)}</span>
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">Backlog</span>
+                  )}
+                </button>
+              </SprintPicker>
+              {task.carriedOver > 0 && !closed && (
+                <span
+                  className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
+                  title="Sprints that ended with it still open"
+                >
+                  Carried over{task.carriedOver > 1 ? ` ×${task.carriedOver}` : ""}
+                </span>
+              )}
+            </Field>
+          )}
           <Field icon={Users} label="Helpers">
             <PeoplePicker
               people={people}
@@ -580,6 +768,27 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
           <Field icon={Tag} label="Labels">
             <Labels labels={task.labels} onChange={(labels) => patch.mutate({ labels })} />
           </Field>
+          {piece && (
+            <>
+              {/* A launch has pieces under it; it isn't under one. */}
+              {piece.channel !== "launch" && (
+                <Field icon={Rocket} label="Launch">
+                  <LaunchPicker launches={launches} value={piece.parentId} onChange={(parentId) => void patchPiece({ parentId })}>
+                    <button type="button" className={fieldButton}>
+                      {parent ? (
+                        <span className="truncate">{parent.title}</span>
+                      ) : (
+                        <span className="text-gray-400">{piece.parentId ? "A launch" : "None"}</span>
+                      )}
+                    </button>
+                  </LaunchPicker>
+                </Field>
+              )}
+              <Field icon={Paperclip} label="Asset">
+                <AssetField url={piece.assetUrl} onSave={(assetUrl) => patchPiece({ assetUrl })} />
+              </Field>
+            </>
+          )}
           {task.links.length > 0 && (
             <Field icon={Link2} label="Linked" wide>
               {task.links.map((link, index) => (
@@ -591,6 +800,12 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
       </div>
 
       <div className="space-y-6 px-6 py-5">
+        {piece && (
+          <>
+            <ApprovalBox task={task} people={people} me={me} onSave={patchPiece} onChanged={(next) => refresh(task.id, next)} />
+            <BriefEditor brief={piece.brief} onSave={(brief) => patchPiece({ brief })} />
+          </>
+        )}
         <Description
           task={task}
           people={people}
@@ -653,7 +868,7 @@ export default function TaskDrawer({ taskId, onClose }: { taskId: string | null;
     <Sheet open={!!taskId} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="gap-0 p-0 sm:max-w-2xl">
         {task ? (
-          <TaskBody key={task.id} task={task} people={people} me={me} />
+          <TaskBody key={task.id} task={task} people={people} me={me} onDeleted={onClose} />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-gray-500">
             <SheetTitle className="sr-only">Task</SheetTitle>

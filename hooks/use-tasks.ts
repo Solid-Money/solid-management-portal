@@ -15,6 +15,7 @@ import {
   getTaskPartners,
   getTaskNotifications,
   getTaskPeople,
+  getMarketing,
   getTaskSprint,
   getTasks,
   markTaskNotificationsRead,
@@ -34,6 +35,8 @@ export const TASK_KEYS = {
   sprint: (start: string | null) => ["tasks", "sprint", start ?? "current"] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
+  marketing: (range: { from: string; to: string } | null) =>
+    ["tasks", "marketing", range ? `${range.from}..${range.to}` : "live"] as const,
 };
 
 /** Admins who can own a task or be @mentioned. */
@@ -131,9 +134,24 @@ export function usePatchTask(id: string) {
       queryClient.setQueryData(TASK_KEYS.task(id), task);
       void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
     },
+  });
+}
+
+/** The Marketing tab: live campaigns and their pieces, or one week's pieces. */
+export function useMarketing(range: { from: string; to: string } | null, enabled = true) {
+  return useQuery({
+    queryKey: TASK_KEYS.marketing(range),
+    queryFn: () => getMarketing(range ?? undefined),
+    enabled,
+    // Week to week, the last week stays up while the next loads; never the
+    // campaign view as a stand-in for a week, or the other way round.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery && (previousQuery.queryKey[2] === "live") === (range === null) ? previous : undefined,
+    refetchInterval: 60_000,
   });
 }
 
@@ -145,6 +163,7 @@ export function useRefreshTask() {
     else void queryClient.invalidateQueries({ queryKey: TASK_KEYS.task(id) });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
+    void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
   };

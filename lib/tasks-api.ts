@@ -15,6 +15,10 @@ import type {
   TaskUpload,
   TaskBodyInput,
   TaskBodyFormat,
+  TaskCampaign,
+  TaskCampaignColor,
+  TaskCampaignInput,
+  TaskMarketingOverview,
 } from "@/types/tasks";
 
 /**
@@ -93,6 +97,10 @@ export const createTask = async (input: TaskCreateInput) =>
 export const patchTask = async (id: string, input: TaskPatchInput) =>
   (await api.patch<TaskDetail>(`${base}/${id}`, input)).data;
 
+/** Only the person who opened it can; the backend keeps a copy aside. */
+export const deleteTask = async (id: string) =>
+  (await api.delete<{ deleted: true }>(`${base}/${id}`)).data;
+
 export const followTask = async (id: string, follow: boolean) =>
   (await api.post<{ following: boolean }>(`${base}/${id}/follow`, { follow })).data;
 
@@ -142,3 +150,23 @@ export const getTaskNotifications = async () =>
 
 export const markTaskNotificationsRead = async (input: { ids?: string[]; all?: boolean }) =>
   (await api.post<{ unread: number }>(`${base}/notifications/read`, input)).data;
+
+// ---- Marketing --------------------------------------------------------------
+
+/** The live campaigns and their pieces, or the pieces going out between two days. */
+export const getMarketing = async (range?: { from: string; to: string }) =>
+  (await api.get<TaskMarketingOverview>(`${base}/marketing`, { params: range ?? {} })).data;
+
+export const createCampaign = async (input: {
+  name: string;
+  startOn?: string;
+  endOn?: string;
+  color?: TaskCampaignColor;
+}) => (await api.post<TaskCampaign>(`${base}/campaigns`, input)).data;
+
+export const patchCampaign = async (id: string, input: TaskCampaignInput) =>
+  (await api.patch<TaskCampaign>(`${base}/campaigns/${id}`, input)).data;
+
+/** `request` asks the piece's approvers; `approve` signs it off. */
+export const taskApproval = async (id: string, action: "request" | "approve") =>
+  (await api.post<TaskDetail>(`${base}/${id}/approval`, { action })).data;

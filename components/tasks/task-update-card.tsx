@@ -196,10 +196,27 @@ function activityValue(activity: TaskActivity, value: string | null, people: Tas
     case "due":
       return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDue(value) : value;
     case "board":
+    case "stage":
+    case "channel":
+    case "publish":
+      // Marketing values come as labels ("Waiting approval", "Oct 27, 14:00").
       return value;
     default:
       return `“${value}”`;
   }
+}
+
+/** What a field is called in "changed … from … to …". */
+const FIELD_NAMES: Partial<Record<TaskActivity["field"], string>> = {
+  due: "the due date",
+  stage: "the status",
+  channel: "the channel",
+  publish: "the publish date",
+};
+
+function campaignChange(activity: TaskActivity): string {
+  if (!activity.to) return `took it out of the “${activity.from ?? ""}” campaign`;
+  return `moved it to the “${activity.to}” campaign`;
 }
 
 function sprintChange(activity: TaskActivity, automatic: boolean): string {
@@ -229,7 +246,13 @@ function ActivityLine({ update, people }: { update: TaskUpdate; people: TaskPers
           ? activity.to
             ? `moved it to ${activity.to}`
             : `took it off ${activity.from ?? "its board"}`
-          : `changed ${activity.field === "due" ? "the due date" : activity.field} from ${activityValue(
+          : activity.field === "campaign"
+            ? campaignChange(activity)
+            : activity.field === "publish" && !activity.from
+              ? `set it to go out ${activity.to ?? ""}`
+              : activity.field === "publish" && !activity.to
+                ? "cleared the publish date"
+                : `changed ${FIELD_NAMES[activity.field] ?? activity.field} from ${activityValue(
             activity,
             activity.from,
             people,
