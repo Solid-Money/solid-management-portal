@@ -700,7 +700,16 @@ function TaskBody({
           </Field>
           {piece ? (
             <Field icon={LayoutGrid} label="Campaign">
-              <CampaignPicker campaigns={campaigns} value={piece.campaignId} onChange={(campaignId) => void patchPiece({ campaignId })}>
+              <CampaignPicker
+                campaigns={campaigns}
+                value={piece.campaignId}
+                onChange={(campaignId) =>
+                  // A launch is in one campaign: moving the piece leaves it.
+                  void patchPiece(
+                    campaignId !== piece.campaignId && piece.parentId ? { campaignId, parentId: null } : { campaignId },
+                  )
+                }
+              >
                 <button type="button" className={fieldButton}>
                   {campaign ? (
                     <>
