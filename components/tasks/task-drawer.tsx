@@ -487,13 +487,21 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               <Lock className="size-3" /> Private
             </span>
           )}
-          {task.source.kind !== "manual" && (
-            <span className="hidden min-w-0 items-center gap-1.5 truncate sm:inline-flex">
+          {/* Who opened it and when: a person, Solid AI, the radar or Claude. */}
+          <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+            {task.source.kind !== "manual" || task.createdBy.bot || !task.createdBy.email ? (
               <BotAvatar size={16} />
+            ) : (
+              <Avatar email={task.createdBy.email} people={people} size={16} />
+            )}
+            <span className="truncate">
               Opened by {authorName(task.createdBy, people)}
-              {task.source.label && <span className="text-gray-400">· {task.source.label}</span>}
+              {task.source.kind !== "manual" && task.source.label && (
+                <span className="text-gray-400"> · {task.source.label}</span>
+              )}
+              <span className="text-gray-400"> · {formatWhen(task.createdAt)}</span>
             </span>
-          )}
+          </span>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <Button variant="ghost" size="xs" onClick={() => void copyLink()}>
               <Link2 /> <span className="hidden sm:inline">Copy link</span>
