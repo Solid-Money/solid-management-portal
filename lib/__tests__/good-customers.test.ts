@@ -241,7 +241,8 @@ describe("Tiers section", () => {
     expect(rows[4].detail).toContain("60 of the 103 spent $56.6K in the last 28 days");
     expect(rows[5]).toMatchObject({
       title: "Free trials that led to a purchase",
-      detail: "11 of 531 ended trials. 688 gifted trials were never accepted",
+      detail:
+        "11 of 531 people whose trial ended bought a tier after accepting it. 688 gifted trials were never accepted",
       value: "2%",
       status: "watch",
     });

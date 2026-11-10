@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  GUARDRAIL_LIMITS,
   buyerTotals,
   buyersBars,
   buyersTrend,
@@ -173,12 +174,12 @@ function TierTiles({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodCu
         value={formatRatio(toPaid)}
         chip={
           trials.ended > 0 ? (
-            <Chip tone={toPaid !== null && toPaid < 0.1 ? "bad" : "neutral"}>
+            <Chip tone={toPaid !== null && toPaid < GUARDRAIL_LIMITS.trialToPaid ? "bad" : "neutral"}>
               {formatCount(trials.endedThenBought)} of {formatCount(trials.ended)}
             </Chip>
           ) : null
         }
-        context={`People whose free trial ended and who then bought a tier. ${formatCount(
+        context={`Of the people whose free trial has ended, those who bought a tier after accepting it. ${formatCount(
           neverAccepted,
         )} gifted trials were never accepted`}
       >
@@ -499,7 +500,7 @@ function TrialsCard({ tiers }: { tiers: GoodCustomersTiers }) {
     { label: "Gifted", value: trials.gifted, note: null },
     { label: "Accepted in the app", value: trials.accepted, note: share(trials.accepted, trials.gifted) },
     { label: "Trial ended", value: trials.ended, note: null },
-    { label: "Then bought a tier", value: trials.endedThenBought, note: share(trials.endedThenBought, trials.ended) },
+    { label: "Bought after accepting", value: trials.endedThenBought, note: share(trials.endedThenBought, trials.ended) },
   ];
   const trialRow = tiers.routes.find((row) => row.route === "trial");
   const coreRow = tiers.routes.find((row) => row.route === "core");
@@ -541,17 +542,19 @@ function TrialsCard({ tiers }: { tiers: GoodCustomersTiers }) {
       </p>
       {trialRate !== null && coreRate !== null && toPaid !== null ? (
         <Insight
-          tone="warn"
+          tone={toPaid < GUARDRAIL_LIMITS.trialToPaid ? "warn" : "good"}
           lead={
-            trialRate > coreRate && toPaid < 0.1
+            trialRate > coreRate && toPaid < GUARDRAIL_LIMITS.trialToPaid
               ? "Trials lift usage, not purchases."
-              : toPaid < 0.1
+              : toPaid < GUARDRAIL_LIMITS.trialToPaid
                 ? "Few trials lead to a purchase."
                 : "Trials are turning into purchases."
           }
           rest={`${formatRatio(trialRate)} of trial spenders qualify, against ${formatRatio(
             coreRate,
-          )} on Core, ${toPaid < 0.1 ? "but only" : "and"} ${formatRatio(toPaid)} of ended trials led to a purchase.`}
+          )} on Core, ${toPaid < GUARDRAIL_LIMITS.trialToPaid ? "but only" : "and"} ${formatRatio(
+            toPaid,
+          )} of people whose trial ended bought a tier after accepting it.`}
         />
       ) : null}
     </OverviewCard>

@@ -313,7 +313,9 @@ export function guardrails(data: GoodCustomersResponse): Guardrail[] {
     rows.push({
       key: "trial-to-paid",
       title: "Free trials that led to a purchase",
-      detail: `${count.format(tiers.trials.endedThenBought)} of ${count.format(tiers.trials.ended)} ended trials. ${count.format(
+      detail: `${count.format(tiers.trials.endedThenBought)} of ${count.format(
+        tiers.trials.ended,
+      )} people whose trial ended bought a tier after accepting it. ${count.format(
         neverAccepted,
       )} gifted trials were never accepted`,
       value: pct(toPaid),
