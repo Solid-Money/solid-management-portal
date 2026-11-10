@@ -5,7 +5,13 @@ import { X, Plus, Trash2, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { WhatsNew, WhatsNewStep } from "@/types";
+import WhatsNewSingleForm from "@/components/whats-new-single-form";
+import {
+  singleFormErrors,
+  singlePayload,
+  type SingleFormState,
+} from "@/lib/whats-new";
+import { WhatsNew, WhatsNewFormat, WhatsNewStep } from "@/types";
 
 interface WhatsNewModalProps {
   popup?: WhatsNew | null;
@@ -13,15 +19,38 @@ interface WhatsNewModalProps {
   onSuccess: () => void;
 }
 
+const FORMAT_OPTIONS: { value: WhatsNewFormat; label: string }[] = [
+  { value: "single", label: "Single image or video" },
+  { value: "carousel", label: "Steps (carousel)" },
+];
+
 export default function WhatsNewModal({
   popup,
   onClose,
   onSuccess,
 }: WhatsNewModalProps) {
+  // New popups start as a single; saved ones keep theirs. Popups saved before
+  // `format` existed are carousels.
+  const [format, setFormat] = useState<WhatsNewFormat>(
+    popup ? popup.format ?? "carousel" : "single"
+  );
+  const [single, setSingle] = useState<SingleFormState>(() => ({
+    name: popup?.name ?? "",
+    presentation: popup?.presentation ?? "popup",
+    media: popup?.media ?? null,
+    link: popup?.link ?? "",
+    isActive: popup?.isActive ?? false,
+    showOnLoad: popup?.showOnLoad ?? true,
+  }));
+  const [singleUploading, setSingleUploading] = useState(false);
   const [isActive, setIsActive] = useState(popup?.isActive ?? false);
   const [showOnLoad, setShowOnLoad] = useState(popup?.showOnLoad ?? true);
+  // A single keeps no steps, so switching one to a carousel starts with a
+  // blank step rather than none.
   const [steps, setSteps] = useState<WhatsNewStep[]>(
-    popup?.steps || [{ imageUrl: "", title: "", text: "", buttonLabel: "", buttonLink: "" }]
+    popup?.steps?.length
+      ? popup.steps
+      : [{ imageUrl: "", title: "", text: "", buttonLabel: "", buttonLink: "" }]
   );
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -69,9 +98,40 @@ export default function WhatsNewModal({
     }
   };
 
+  const saveSingle = async () => {
+    const errors = singleFormErrors(single);
+    if (errors.length > 0) {
+      setShowErrors(true);
+      toast.error(errors[0]);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const data = singlePayload({ ...single, isActive, showOnLoad });
+      if (popup) {
+        await api.patch(`/admin/v1/whats-new/${popup._id}`, data);
+      } else {
+        await api.post("/admin/v1/whats-new", data);
+      }
+      onSuccess();
+      toast.success(`Popup ${popup ? "updated" : "created"} successfully!`);
+    } catch (error) {
+      console.error("Save failed:", error);
+      toast.error("Failed to save popup.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setShowErrors(false);
+
+    if (format === "single") {
+      await saveSingle();
+      return;
+    }
 
     if (steps.length === 0) {
       toast.error("Please add at least one step.");
@@ -96,6 +156,7 @@ export default function WhatsNewModal({
     try {
       setSaving(true);
       const data = {
+        format: "carousel" as const,
         steps,
         isActive,
         showOnLoad,
@@ -118,7 +179,11 @@ export default function WhatsNewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div
+        className={`bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col ${
+          format === "single" ? "max-w-5xl" : "max-w-4xl"
+        }`}
+      >
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
           <h2 className="text-xl font-bold text-gray-900">
             {popup ? "Edit Popup" : "Create New Popup"}
@@ -135,6 +200,35 @@ export default function WhatsNewModal({
           onSubmit={handleSubmit}
           className="flex-1 overflow-y-auto p-6 space-y-8"
         >
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-gray-700">Format</span>
+            <div
+              role="radiogroup"
+              aria-label="Format"
+              className="flex w-fit rounded-md border border-gray-300 p-0.5"
+            >
+              {FORMAT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={format === option.value}
+                  onClick={() => {
+                    setShowErrors(false);
+                    setFormat(option.value);
+                  }}
+                  className={`cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                    format === option.value
+                      ? "bg-indigo-600 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex space-x-8 bg-indigo-50 p-4 rounded-lg">
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
@@ -160,179 +254,190 @@ export default function WhatsNewModal({
             </label>
           </div>
 
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">Steps</h3>
-              <button
-                type="button"
-                onClick={handleAddStep}
-                className="inline-flex items-center px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors cursor-pointer"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Step
-              </button>
-            </div>
-
-            {steps.map((step, index) => (
-              <div
-                key={index}
-                className="p-6 border border-gray-200 rounded-xl space-y-4 relative bg-white shadow-sm"
-              >
+          {format === "single" ? (
+            <WhatsNewSingleForm
+              form={single}
+              onChange={(next) =>
+                setSingle((current) => ({ ...current, ...next }))
+              }
+              showErrors={showErrors}
+              onUploadingChange={setSingleUploading}
+            />
+          ) : (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900">Steps</h3>
                 <button
                   type="button"
-                  onClick={() => handleRemoveStep(index)}
-                  className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                  onClick={handleAddStep}
+                  className="inline-flex items-center px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors cursor-pointer"
                 >
-                  <Trash2 className="h-5 w-5" />
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Step
                 </button>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Step Image
-                    </label>
-                    <div
-                      className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 h-40 bg-gray-50 overflow-hidden relative group transition-colors ${
-                        showErrors && !step.imageUrl
-                          ? "border-red-300 bg-red-50"
-                          : "border-gray-300"
-                      }`}
-                    >
-                      {step.imageUrl ? (
-                        <>
-                          <Image
-                            src={step.imageUrl}
-                            alt="Preview"
-                            fill
-                            className="object-cover rounded"
+              {steps.map((step, index) => (
+                <div
+                  key={index}
+                  className="p-6 border border-gray-200 rounded-xl space-y-4 relative bg-white shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveStep(index)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Step Image
+                      </label>
+                      <div
+                        className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 h-40 bg-gray-50 overflow-hidden relative group transition-colors ${
+                          showErrors && !step.imageUrl
+                            ? "border-red-300 bg-red-50"
+                            : "border-gray-300"
+                        }`}
+                      >
+                        {step.imageUrl ? (
+                          <>
+                            <Image
+                              src={step.imageUrl}
+                              alt="Preview"
+                              fill
+                              className="object-cover rounded"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUploadingIndex(index);
+                                  fileInputRef.current?.click();
+                                }}
+                                className="p-2 bg-white rounded-full text-gray-900 cursor-pointer"
+                              >
+                                <Upload className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUploadingIndex(index);
+                              fileInputRef.current?.click();
+                            }}
+                            className="flex flex-col items-center space-y-2 text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                          >
+                            {uploadingIndex === index ? (
+                              <Loader2 className="h-8 w-8 animate-spin" />
+                            ) : (
+                              <>
+                                <Upload className="h-8 w-8" />
+                                <span className="text-xs">Upload Banner</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-700">
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={step.title}
+                          onChange={(e) =>
+                            handleStepChange(index, "title", e.target.value)
+                          }
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${
+                            showErrors && !step.title.trim()
+                              ? "border-red-300 bg-red-50"
+                              : "border-gray-300"
+                          }`}
+                          placeholder="Step title"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-700">
+                          Description
+                        </label>
+                        <textarea
+                          value={step.text}
+                          onChange={(e) =>
+                            handleStepChange(index, "text", e.target.value)
+                          }
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 h-24 ${
+                            showErrors && !step.text.trim()
+                              ? "border-red-300 bg-red-50"
+                              : "border-gray-300"
+                          }`}
+                          placeholder="What's new in this update?"
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-gray-700">
+                            Button Label{" "}
+                            <span className="font-normal text-gray-400">
+                              (optional)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            value={step.buttonLabel ?? ""}
+                            onChange={(e) =>
+                              handleStepChange(
+                                index,
+                                "buttonLabel",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="e.g. Check your tier"
                           />
-                          <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setUploadingIndex(index);
-                                fileInputRef.current?.click();
-                              }}
-                              className="p-2 bg-white rounded-full text-gray-900 cursor-pointer"
-                            >
-                              <Upload className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUploadingIndex(index);
-                            fileInputRef.current?.click();
-                          }}
-                          className="flex flex-col items-center space-y-2 text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer"
-                        >
-                          {uploadingIndex === index ? (
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                          ) : (
-                            <>
-                              <Upload className="h-8 w-8" />
-                              <span className="text-xs">Upload Banner</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2 space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">
-                        Title
-                      </label>
-                      <input
-                        type="text"
-                        value={step.title}
-                        onChange={(e) =>
-                          handleStepChange(index, "title", e.target.value)
-                        }
-                        className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${
-                          showErrors && !step.title.trim()
-                            ? "border-red-300 bg-red-50"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="Step title"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">
-                        Description
-                      </label>
-                      <textarea
-                        value={step.text}
-                        onChange={(e) =>
-                          handleStepChange(index, "text", e.target.value)
-                        }
-                        className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 h-24 ${
-                          showErrors && !step.text.trim()
-                            ? "border-red-300 bg-red-50"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="What's new in this update?"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">
-                          Button Label{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={step.buttonLabel ?? ""}
-                          onChange={(e) =>
-                            handleStepChange(
-                              index,
-                              "buttonLabel",
-                              e.target.value
-                            )
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="e.g. Check your tier"
-                        />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-gray-700">
+                            Button Link{" "}
+                            <span className="font-normal text-gray-400">
+                              (optional)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            value={step.buttonLink ?? ""}
+                            onChange={(e) =>
+                              handleStepChange(
+                                index,
+                                "buttonLink",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="https://... or /rewards"
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">
-                          Button Link{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={step.buttonLink ?? ""}
-                          onChange={(e) =>
-                            handleStepChange(
-                              index,
-                              "buttonLink",
-                              e.target.value
-                            )
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="https://... or /rewards"
-                        />
-                      </div>
+                      <p className="text-xs text-gray-500">
+                        Add both a label and a link to show a call-to-action
+                        button below the description. Links can be an external
+                        URL (https://...) or an in-app route (e.g. /rewards).
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      Add both a label and a link to show a call-to-action
-                      button below the description. Links can be an external
-                      URL (https://...) or an in-app route (e.g. /rewards).
-                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </form>
 
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3">
@@ -346,7 +451,7 @@ export default function WhatsNewModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={saving || uploadingIndex !== null}
+            disabled={saving || uploadingIndex !== null || singleUploading}
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {saving ? (

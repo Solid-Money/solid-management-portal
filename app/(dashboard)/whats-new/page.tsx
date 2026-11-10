@@ -2,12 +2,18 @@
 
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
-import { Plus, Trash2, Edit2 } from "lucide-react";
+import { Plus, Trash2, Edit2, ImageIcon } from "lucide-react";
 import WhatsNewModal from "@/components/whats-new-modal";
 import { WhatsNew } from "@/types";
 import { toast } from "sonner";
 import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { useAuth } from "@/components/auth-provider";
+import {
+  isSinglePopup,
+  whatsNewBadge,
+  whatsNewDisplayName,
+  whatsNewThumbnail,
+} from "@/lib/whats-new";
 
 export default function WhatsNewPage() {
   const { user } = useAuth();
@@ -86,30 +92,49 @@ export default function WhatsNewPage() {
           <ul className="divide-y divide-gray-200">
             {popups.map((popup) => (
               <li key={popup._id} className="hover:bg-gray-50 transition-colors">
-                <div className="px-4 py-4 sm:px-6 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <div className="flex items-center">
-                      <p className="text-sm font-medium text-indigo-600 truncate">
-                        {popup.steps[0]?.title || "No Title"}
-                      </p>
-                      <span
-                        className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          popup.isActive
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {popup.isActive ? "Active" : "Inactive"}
-                      </span>
+                <div className="px-4 py-4 sm:px-6 flex items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="flex h-14 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-100 text-gray-300">
+                      {whatsNewThumbnail(popup) ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- thumbnail of an uploaded asset
+                        <img
+                          src={whatsNewThumbnail(popup)}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="h-5 w-5" />
+                      )}
                     </div>
-                    <div className="mt-1">
-                      <p className="text-xs text-gray-500">
-                        {popup.steps.length} Steps • Created at{" "}
-                        {new Date(popup.createdAt).toLocaleDateString()}
-                      </p>
+                    <div className="flex min-w-0 flex-col">
+                      <div className="flex items-center">
+                        <p className="text-sm font-medium text-indigo-600 truncate">
+                          {whatsNewDisplayName(popup)}
+                        </p>
+                        <span className="ml-2 px-2 inline-flex shrink-0 text-xs leading-5 font-medium rounded-full bg-indigo-50 text-indigo-700">
+                          {whatsNewBadge(popup)}
+                        </span>
+                        <span
+                          className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            popup.isActive
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {popup.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                      <div className="mt-1">
+                        <p className="text-xs text-gray-500">
+                          {isSinglePopup(popup)
+                            ? `${popup.link ? `Opens ${popup.link} • ` : ""}Created at `
+                            : `${popup.steps.length} Steps • Created at `}
+                          {new Date(popup.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex shrink-0 space-x-2">
                     <button
                       onClick={() => handleEdit(popup)}
                       className="p-2 text-gray-400 hover:text-indigo-600 transition-colors cursor-pointer"
