@@ -97,6 +97,10 @@ export const createTask = async (input: TaskCreateInput) =>
 export const patchTask = async (id: string, input: TaskPatchInput) =>
   (await api.patch<TaskDetail>(`${base}/${id}`, input)).data;
 
+/** Only the person who opened it can; the backend keeps a copy aside. */
+export const deleteTask = async (id: string) =>
+  (await api.delete<{ deleted: true }>(`${base}/${id}`)).data;
+
 export const followTask = async (id: string, follow: boolean) =>
   (await api.post<{ following: boolean }>(`${base}/${id}/follow`, { follow })).data;
 

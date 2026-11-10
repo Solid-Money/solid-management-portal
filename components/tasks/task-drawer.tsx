@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   CalendarDays,
@@ -29,11 +30,20 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-provider";
 import {
   isTaskId,
   usePatchTask,
   useRefreshTask,
+  TASK_KEYS,
   useMarketing,
   useTask,
   useTaskBoards,
@@ -42,6 +52,7 @@ import {
 import {
   addChecklistItem,
   deleteChecklistItem,
+  deleteTask,
   followTask,
   patchChecklistItem,
   postTaskUpdate,
@@ -445,7 +456,73 @@ function Description({
   );
 }
 
-function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]; me: string }) {
+/** Delete, after asking: only for the person who opened the task. */
+function DeleteTask({ task, onDeleted }: { task: TaskDetail; onDeleted: () => void }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await deleteTask(task.id);
+      queryClient.removeQueries({ queryKey: TASK_KEYS.task(task.id) });
+      void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });
+      toast.success("Task deleted");
+      setOpen(false);
+      onDeleted();
+    } catch {
+      // The API layer shows the error.
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="xs"
+        aria-label="Delete task"
+        title="Delete task"
+        className="text-gray-500 hover:text-red-700"
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 />
+      </Button>
+      <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this task?</DialogTitle>
+            <DialogDescription>
+              &ldquo;{task.title}&rdquo; and its updates go away for everyone. To keep it, set it to Done or
+              Cancelled instead.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>
+              Keep it
+            </Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" disabled={busy} onClick={() => void remove()}>
+              {busy && <Loader2 className="animate-spin" />}
+              Delete task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function TaskBody({
+  task,
+  people,
+  me,
+  onDeleted,
+}: {
+  task: TaskDetail;
+  people: TaskPerson[];
+  me: string;
+  onDeleted: () => void;
+}) {
   const patch = usePatchTask(task.id);
   const refresh = useRefreshTask();
   const { data: boardList } = useTaskBoards();
@@ -524,6 +601,10 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               <Bell className={cn(isFollowing && "fill-indigo-100")} />
               {isFollowing ? "Following" : "Follow"}
             </Button>
+            {/* Solid AI's and the radar's tasks are cancelled, not deleted. */}
+            {!task.createdBy.bot && !!me && task.createdBy.email === me && (
+              <DeleteTask task={task} onDeleted={onDeleted} />
+            )}
           </div>
         </div>
 
@@ -778,7 +859,7 @@ export default function TaskDrawer({ taskId, onClose }: { taskId: string | null;
     <Sheet open={!!taskId} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="gap-0 p-0 sm:max-w-2xl">
         {task ? (
-          <TaskBody key={task.id} task={task} people={people} me={me} />
+          <TaskBody key={task.id} task={task} people={people} me={me} onDeleted={onClose} />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-gray-500">
             <SheetTitle className="sr-only">Task</SheetTitle>
