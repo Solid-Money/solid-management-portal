@@ -1335,8 +1335,42 @@ export interface WhatsNewStep {
   buttonLink?: string;
 }
 
+/**
+ * `carousel` is the original step popup. `single` is one image or one short
+ * video with no card around it. Popups saved before `format` existed have none
+ * and are carousels.
+ */
+export type WhatsNewFormat = "carousel" | "single";
+
+/** How a single shows on a phone. Desktop always shows a popup. */
+export type WhatsNewPresentation = "popup" | "drawer";
+
+export type WhatsNewMediaType = "image" | "video";
+
+export interface WhatsNewMedia {
+  type: WhatsNewMediaType;
+  url: string;
+  /** Intrinsic pixel size, read in the browser on upload. */
+  width: number;
+  height: number;
+  /** Read out by screen readers. */
+  alt: string;
+  /** Video only, required: shown until the first frame and if it can't play. */
+  posterUrl?: string;
+  durationSec?: number;
+  /** Video only: whether the app offers a sound on/off button. */
+  hasAudio?: boolean;
+}
+
 export interface WhatsNew {
   _id: string;
+  /** Admin-only label, used in the list and in analytics. */
+  name?: string;
+  format?: WhatsNewFormat;
+  presentation?: WhatsNewPresentation;
+  media?: WhatsNewMedia;
+  /** Opened when the media is tapped: `/path` in the app or `https://`. */
+  link?: string;
   steps: WhatsNewStep[];
   isActive: boolean;
   showOnLoad: boolean;
