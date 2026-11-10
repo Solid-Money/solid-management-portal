@@ -53,6 +53,11 @@ const DEFAULT_CONTROL_PERCENT = "10";
 
 interface PushCampaignComposerProps {
   config: PushCampaignDestinations;
+  /**
+   * The settings could not be refreshed. Nothing is sent until they are:
+   * `config` may describe a What's New or an allowlist that has since changed.
+   */
+  settingsStale?: boolean;
   /** Called with the campaign once it has been sent. */
   onSent: (campaign: PushCampaignSummary) => void;
 }
@@ -67,6 +72,7 @@ interface PushCampaignComposerProps {
  */
 export function PushCampaignComposer({
   config,
+  settingsStale = false,
   onSent,
 }: PushCampaignComposerProps) {
   const { destinations, whatsNew, limits, canSend } = config;
@@ -117,7 +123,11 @@ export function PushCampaignComposer({
     name.trim().length <= limits.nameMaxLength &&
     slug.length >= NAME_MIN_LENGTH;
 
-  const sendBlocker = !canSend
+  const staleReason =
+    "Push settings couldn't be refreshed. Retry above before sending.";
+  const sendBlocker = settingsStale
+    ? staleReason
+    : !canSend
     ? "You can prepare a campaign, but sending is limited to named admins."
     : !nameValid
       ? `Name the campaign (${NAME_MIN_LENGTH}–${limits.nameMaxLength} characters, with letters or digits).`
@@ -134,7 +144,9 @@ export function PushCampaignComposer({
                 : null;
 
   const testList = parseTestRecipients(testRecipients);
-  const testBlocker = !canSend
+  const testBlocker = settingsStale
+    ? staleReason
+    : !canSend
     ? "Sending is limited to named admins."
     : !variantsReady
       ? "Finish every variant."
@@ -187,6 +199,11 @@ export function PushCampaignComposer({
 
   const confirmSend = (campaign: CampaignToSend) => {
     setConfirming(null);
+    // The settings went stale while the dialog was open.
+    if (settingsStale) {
+      toast.error(staleReason);
+      return;
+    }
     send.mutate(campaign.input, {
       onSuccess: (sent) => {
         const handedOff = sent.variants.reduce((n, v) => n + v.handedOff, 0);

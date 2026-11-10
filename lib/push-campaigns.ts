@@ -42,15 +42,32 @@ export interface ParsedAudience {
   column?: string;
 }
 
-/** One CSV line's fields, honouring double-quoted fields and `""` escapes. */
-export function splitCsvLine(line: string): string[] {
-  const fields: string[] = [];
+/**
+ * The records of a CSV text, each a list of trimmed fields.
+ *
+ * Quotes are honoured across line breaks: a quoted field may hold a comma, a
+ * `""`-escaped quote or a newline, and still belongs to its own record, so a
+ * multi-line value in one column never shifts the columns after it. Blank
+ * records are dropped.
+ */
+export function parseCsvRecords(text: string): string[][] {
+  const records: string[][] = [];
+  let record: string[] = [];
   let field = "";
   let quoted = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
+  const endField = () => {
+    record.push(field.trim());
+    field = "";
+  };
+  const endRecord = () => {
+    endField();
+    if (record.some((f) => f !== "")) records.push(record);
+    record = [];
+  };
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
     if (quoted) {
-      if (char === '"' && line[i + 1] === '"') {
+      if (char === '"' && text[i + 1] === '"') {
         field += '"';
         i++;
       } else if (char === '"') {
@@ -61,34 +78,43 @@ export function splitCsvLine(line: string): string[] {
     } else if (char === '"') {
       quoted = true;
     } else if (char === ",") {
-      fields.push(field);
-      field = "";
+      endField();
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      endRecord();
     } else {
       field += char;
     }
   }
-  fields.push(field);
-  return fields.map((f) => f.trim());
+  endRecord();
+  return records;
+}
+
+/** One CSV line's fields, honouring double-quoted fields and `""` escapes. */
+export function splitCsvLine(line: string): string[] {
+  return parseCsvRecords(line)[0] ?? [""];
 }
 
 /**
  * The user ids in a pasted list or an uploaded CSV.
  *
- * A CSV whose first line names a user id column (`user_id`, as an Amplitude
+ * A CSV whose first record names a user id column (`user_id`, as an Amplitude
  * cohort export writes it, or `id`, `_id`, `userId`) is read from that column
- * only, so the export's other columns are not mistaken for bad ids. Anything
- * else is read as a list split on whitespace, commas and semicolons.
+ * only, so the export's other columns are not mistaken for bad ids. Records,
+ * not lines, are read, so a quoted value with a line break in an earlier column
+ * cannot cost a row its id. Anything else is read as a list split on
+ * whitespace, commas and semicolons.
  */
 export function parseAudience(text: string): ParsedAudience {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim());
-  const header = lines.length > 0 ? splitCsvLine(lines[0]) : [];
+  const records = parseCsvRecords(text);
+  const header = records[0] ?? [];
   const column = header.findIndex((name) =>
     USER_ID_HEADERS.has(name.toLowerCase()),
   );
 
   const fromColumn = column >= 0;
   const tokens = fromColumn
-    ? lines.slice(1).map((line) => splitCsvLine(line)[column] ?? "")
+    ? records.slice(1).map((record) => record[column] ?? "")
     : text.split(/[\s,;"']+/);
 
   const seen = new Set<string>();

@@ -7,6 +7,7 @@ import {
   expectedSplit,
   groupDestinations,
   parseAudience,
+  parseCsvRecords,
   parseTestRecipients,
   sameIds,
   splitCsvLine,
@@ -84,6 +85,22 @@ describe("parseAudience", () => {
     });
   });
 
+  it("keeps a row's id when an earlier quoted column spans lines", () => {
+    const csv = [
+      "note,user_id,country",
+      `"first line\nsecond line, with a comma",${A},DE`,
+      `plain,${B},FR`,
+    ].join("\n");
+
+    expect(parseAudience(csv)).toEqual({
+      ids: [A, B],
+      invalid: [],
+      duplicates: 0,
+      source: "column",
+      column: "user_id",
+    });
+  });
+
   it("reads a headerless one-column file as a list", () => {
     expect(parseAudience(`${A}\n${B}\n`).ids).toEqual([A, B]);
   });
@@ -96,6 +113,15 @@ describe("parseAudience", () => {
 describe("splitCsvLine", () => {
   it("keeps commas and escaped quotes inside a quoted field", () => {
     expect(splitCsvLine('a,"b, c","say ""hi"""')).toEqual(["a", "b, c", 'say "hi"']);
+  });
+});
+
+describe("parseCsvRecords", () => {
+  it("splits records on line breaks outside quotes only", () => {
+    expect(parseCsvRecords('a,"b\r\nc"\r\n\r\nd,"say ""hi"""\n')).toEqual([
+      ["a", "b\r\nc"],
+      ["d", 'say "hi"'],
+    ]);
   });
 });
 
