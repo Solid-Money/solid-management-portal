@@ -84,6 +84,9 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
     edits.closesAt ?? settingFor(SETTING.CLOSES_AT)?.stored ?? "";
 
   const hasChanges = Object.keys(edits).length > 0;
+  // While a save is in flight its success handler clears the edits, so no
+  // control may take a newer edit that would be lost with them.
+  const saving = update.isPending;
 
   const commit = () => {
     update.mutate(edits, {
@@ -195,10 +198,11 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
                         type="button"
                         aria-label={setting.label}
                         aria-pressed={on}
+                        disabled={saving}
                         onClick={() =>
                           setEdits((prev) => ({ ...prev, [spec.field]: !on }))
                         }
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                           on ? "bg-indigo-600" : "bg-gray-300"
                         }`}
                       >
@@ -215,13 +219,14 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
                     type="date"
                     aria-label={setting.label}
                     value={dateValue()}
+                    disabled={saving}
                     onChange={(event) =>
                       setEdits((prev) => ({
                         ...prev,
                         closesAt: event.target.value,
                       }))
                     }
-                    className="w-44 rounded border border-gray-300 px-2 py-1.5 text-xs focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="w-44 rounded border border-gray-300 px-2 py-1.5 text-xs focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 )}
 
@@ -229,8 +234,9 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
                   <button
                     type="button"
                     title="Clear this and fall back to the environment"
+                    disabled={saving}
                     onClick={() => reset(spec.field, spec.kind === "switch")}
-                    className="cursor-pointer rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                    className="cursor-pointer rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                   </button>
@@ -247,8 +253,9 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
         {hasChanges ? (
           <button
             type="button"
+            disabled={saving}
             onClick={() => setEdits({})}
-            className="cursor-pointer text-sm text-gray-500 transition-colors hover:text-gray-700"
+            className="cursor-pointer text-sm text-gray-500 transition-colors hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Discard changes
           </button>
@@ -256,10 +263,10 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
         <button
           type="button"
           onClick={save}
-          disabled={update.isPending || !hasChanges}
+          disabled={saving || !hasChanges}
           className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {update.isPending ? (
+          {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           ) : (
             <Save className="h-4 w-4" aria-hidden />

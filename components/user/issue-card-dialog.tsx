@@ -292,6 +292,8 @@ function IssueCardForm({
         "user-card-audit-history",
         "user-balances",
         "user-card-issuance-context",
+        // The Rain sunset card reports the Rain card's retirement/cancellation.
+        "user-rain-sunset",
       ]) {
         void queryClient.invalidateQueries({ queryKey: [key, userId] });
       }
@@ -666,6 +668,8 @@ function CancelCardOnlyForm({
         "user-card-audit-history",
         "user-balances",
         "user-card-issuance-context",
+        // The Rain sunset card reports the Rain card's retirement/cancellation.
+        "user-rain-sunset",
       ]) {
         void queryClient.invalidateQueries({ queryKey: [key, userId] });
       }
