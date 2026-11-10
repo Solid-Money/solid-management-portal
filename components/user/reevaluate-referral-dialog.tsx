@@ -26,6 +26,23 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+/** Referrals made before this keep the original $75 / $15 terms (backend `LEGACY_REFERRAL_BAR`). */
+const ORIGINAL_TERMS_BEFORE = Date.parse("2026-09-08T00:00:00Z");
+
+/**
+ * Whether re-evaluating this reward can fall back to the original terms: the
+ * friend was referred before they changed, and the bar it holds is stricter
+ * than $75 (the backend measures against $75 / 3 merchants when it is missed).
+ */
+const onOriginalTermsIfShort = (reward: AdminReferralRewardRow): boolean => {
+  const signupMs = Date.parse(reward.signupAt);
+  return (
+    Number.isFinite(signupMs) &&
+    signupMs < ORIGINAL_TERMS_BEFORE &&
+    reward.spendTargetUsd > 75
+  );
+};
+
 interface ReevaluateReferralDialogProps {
   /** The reward to re-evaluate — keyed on the referred friend. */
   reward: AdminReferralRewardRow;
@@ -170,6 +187,14 @@ export default function ReevaluateReferralDialog({
                       and the next payout sweep (02:00 UTC) pays both sides.
                       Nothing is sent from here.
                     </li>
+                    {onOriginalTermsIfShort(reward) && (
+                      <li>
+                        Referred before Sep 8, 2026: if they miss that but
+                        still clear $75 across 3 merchants, the reward goes
+                        back on the original terms instead, $15 each side in
+                        soUSD.
+                      </li>
+                    )}
                   </>
                 )}
                 <li>

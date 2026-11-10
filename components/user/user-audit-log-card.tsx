@@ -62,6 +62,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Referral reward rejected",
       variant: "danger",
     },
+    referral_reward_goodwill_approved: {
+      label: "Referral reward approved as goodwill",
+      variant: "success",
+    },
     referral_reward_rechecked: {
       label: "Referral reward re-checked",
       variant: "warning",
@@ -272,6 +276,31 @@ function detailFor(entry: AdminAuditEntry): string | null {
     const parts = [
       from && to ? `${from} → ${to}` : null,
       entry.metadata?.friendOnly === true ? "friend paid only" : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "referral_reward_goodwill_approved") {
+    const from = stringField(entry, "previousStatus");
+    const to = stringField(entry, "status");
+    const bar = entry.metadata?.spendTargetUsd;
+    const previousBar = entry.metadata?.previousSpendTargetUsd;
+    const referrer = entry.metadata?.referrerRewardUsd;
+    const friend = entry.metadata?.newUserRewardUsd;
+    const token = stringField(entry, "payoutToken");
+    const parts = [
+      from && to ? `${from} → ${to}` : null,
+      entry.metadata?.originalTerms === true ? "original terms" : null,
+      typeof bar === "number"
+        ? typeof previousBar === "number" && previousBar !== bar
+          ? `bar ${formatUsd(previousBar, 0)} → ${formatUsd(bar, 0)}`
+          : `bar ${formatUsd(bar, 0)}`
+        : null,
+      typeof referrer === "number" && typeof friend === "number"
+        ? `${formatUsd(referrer, 0)} + ${formatUsd(friend, 0)}${
+            token ? ` in ${token}` : ""
+          }`
+        : null,
     ].filter(Boolean);
     return parts.length ? parts.join(" · ") : null;
   }

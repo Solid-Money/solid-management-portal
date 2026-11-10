@@ -2581,6 +2581,11 @@ export interface AdminReferralRewardRow {
   /** An admin approved it out of (or ahead of) review. */
   reviewApprovedAt?: string;
   reviewApprovedBy?: string;
+  /** Approved as a goodwill exception: pays without the spend checks. */
+  spendCheckWaivedAt?: string;
+  spendCheckWaivedBy?: string;
+  /** Who decided it, as the admin wrote it. */
+  spendCheckWaivedReason?: string;
   /** The referrer's share is withheld: the friend is paid, the referrer is not. */
   referrerLegWithheld?: boolean;
   /** An admin re-evaluated it and put it back on track. */
