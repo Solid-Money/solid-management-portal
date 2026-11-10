@@ -107,7 +107,7 @@ export function AudienceCard({
             id="push-audience"
             value={raw}
             onChange={(e) => onRawChange(e.target.value)}
-            placeholder={"688b65a758350ee917f73832\n68b80a7b287d8e0a27034010"}
+            placeholder={"000000000000000000000001\n000000000000000000000002"}
             className="h-36 font-mono text-xs"
             disabled={disabled}
           />

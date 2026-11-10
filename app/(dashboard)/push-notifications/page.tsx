@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { BellRing, Eye, Loader2 } from "lucide-react";
 
 import { CampaignHistory } from "@/components/push-campaigns/campaign-history";
@@ -32,6 +32,7 @@ export default function PushNotificationsPage() {
 
 function PushNotificationsScreen() {
   const [tab, setTab] = useUrlTab(TABS, "compose");
+  const [composerKey, setComposerKey] = useState(0);
   const { data: config, isLoading, error } = usePushCampaignDestinations();
 
   return (
@@ -71,10 +72,21 @@ function PushNotificationsScreen() {
             <TabsTrigger value="compose">Compose</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
-          <TabsContent value="compose">
+          {/* Kept mounted while History is open, so a draft survives a look at
+              past campaigns and a send in flight still reports back. Remounted
+              after a send, so the next campaign starts from a clean form. */}
+          <TabsContent
+            value="compose"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
             <PushCampaignComposer
+              key={composerKey}
               config={config}
-              onSent={() => setTab("history")}
+              onSent={() => {
+                setComposerKey((key) => key + 1);
+                setTab("history");
+              }}
             />
           </TabsContent>
           <TabsContent value="history">

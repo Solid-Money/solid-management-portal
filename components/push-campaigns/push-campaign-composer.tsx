@@ -191,13 +191,8 @@ export function PushCampaignComposer({
       onSuccess: (sent) => {
         const handedOff = sent.variants.reduce((n, v) => n + v.handedOff, 0);
         toast.success(`“${sent.name}” sent to ${count(handedOff)} people`);
-        // Start the next one clean: a sent audience left checked is one
-        // rename away from being pushed twice.
-        setRaw("");
-        setChecked(null);
-        setName("");
-        setReason("");
-        setTestResult(null);
+        // The page remounts this form, so the next campaign starts clean: a
+        // sent audience left checked is one rename away from being pushed twice.
         onSent(sent);
       },
     });
@@ -326,7 +321,7 @@ export function PushCampaignComposer({
             <Input
               value={testRecipients}
               onChange={(e) => setTestRecipients(e.target.value)}
-              placeholder="mark, 6ac4df9322b1a60a4458ab80"
+              placeholder="your_username, 000000000000000000000001"
               className="max-w-md"
               aria-label="Test recipients"
               disabled={sendTest.isPending}

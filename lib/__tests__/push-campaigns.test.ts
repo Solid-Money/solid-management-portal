@@ -15,8 +15,8 @@ import {
 } from "@/lib/push-campaigns";
 import type { PushDestination } from "@/types/push-campaigns";
 
-const A = "6ac4df9322b1a60a4458ab80";
-const B = "688b65a758350ee917f73832";
+const A = "000000000000000000000a01";
+const B = "000000000000000000000b02";
 
 const destinations: PushDestination[] = [
   { id: "home", label: "Home", description: "", path: "/", group: "Home" },
@@ -49,10 +49,10 @@ const limits = { titleMaxLength: 80, bodyMaxLength: 240 };
 
 describe("parseAudience", () => {
   it("reads a pasted list, deduping and setting aside what is not an id", () => {
-    const parsed = parseAudience(`${A}\n${B.toUpperCase()}, ${A}; mark\n\n`);
+    const parsed = parseAudience(`${A}\n${B.toUpperCase()}, ${A}; tester\n\n`);
     expect(parsed).toMatchObject({
       ids: [A, B],
-      invalid: ["mark"],
+      invalid: ["tester"],
       duplicates: 1,
       source: "list",
     });
@@ -241,6 +241,6 @@ describe("toVariantInput", () => {
 
 describe("parseTestRecipients", () => {
   it("accepts ids and usernames, with or without @", () => {
-    expect(parseTestRecipients(`@mark, ${A}\nmark luka`)).toEqual(["mark", A, "luka"]);
+    expect(parseTestRecipients(`@tester, ${A}\ntester tester2`)).toEqual(["tester", A, "tester2"]);
   });
 });
