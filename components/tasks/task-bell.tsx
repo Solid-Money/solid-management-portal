@@ -22,7 +22,8 @@ const WHAT: Record<TaskNotification["kind"], string> = {
 
 function where(item: TaskNotification): string {
   if (item.taskNumber === null) return "Team feed";
-  return `T-${item.taskNumber}${item.taskTitle ? ` · ${item.taskTitle}` : ""}`;
+  // Tasks go by their title: the team doesn't see task numbers.
+  return item.taskTitle || "A task";
 }
 
 /**

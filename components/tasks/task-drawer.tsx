@@ -443,7 +443,6 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="border-b border-gray-200 px-6 pb-4 pt-5">
         <div className="mb-2 flex items-center gap-2 pr-8 text-xs text-gray-500">
-          <span className="shrink-0 whitespace-nowrap font-mono font-medium text-gray-600">T-{task.number}</span>
           {task.visibility === "restricted" && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5">
               <Lock className="size-3" /> Private
