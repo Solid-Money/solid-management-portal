@@ -15,6 +15,7 @@ import BoardTabs, { Pill } from "@/components/tasks/board-tabs";
 import PartnerWaits from "@/components/tasks/partner-waits";
 import SprintBoard from "@/components/tasks/sprint-board";
 import { sprintStart } from "@/lib/task-format";
+import { weekStart } from "@/lib/task-marketing";
 import {
   TASK_CHANNELS,
   TASK_PRIORITIES,
@@ -147,7 +148,8 @@ function TasksScreen() {
   // Marketing: `?view=calendar&week=` (a Monday), and its own filters.
   const marketingView: MarketingView = rawView === "calendar" ? "calendar" : "campaign";
   const rawWeek = params.get("week");
-  const week = rawWeek && DAY.test(rawWeek) && !Number.isNaN(Date.parse(rawWeek)) ? rawWeek : null;
+  // Any day of a week opens that week (its Monday).
+  const week = rawWeek && DAY.test(rawWeek) && !Number.isNaN(Date.parse(rawWeek)) ? weekStart(rawWeek) : null;
   const rawChannel = params.get("channel");
   const rawStage = params.get("stage");
 

@@ -147,7 +147,10 @@ export function useMarketing(range: { from: string; to: string } | null, enabled
     queryKey: TASK_KEYS.marketing(range),
     queryFn: () => getMarketing(range ?? undefined),
     enabled,
-    placeholderData: keepPreviousData,
+    // Week to week, the last week stays up while the next loads; never the
+    // campaign view as a stand-in for a week, or the other way round.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery && (previousQuery.queryKey[2] === "live") === (range === null) ? previous : undefined,
     refetchInterval: 60_000,
   });
 }
