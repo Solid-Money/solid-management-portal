@@ -41,11 +41,9 @@ export default function TaskBell() {
   const go = (item: TaskNotification) => {
     setOpen(false);
     if (!item.read) markRead.mutate({ ids: [item.id] });
-    router.push(
-      item.taskId
-        ? `/tasks?task=${item.taskId}`
-        : `/tasks?tab=feed${item.updateId ? `&post=${item.updateId}` : ""}`,
-    );
+    // Old Team feed mentions have no task, and the feed is gone: reading
+    // one here is all there is to do.
+    if (item.taskId) router.push(`/tasks?task=${item.taskId}`);
   };
 
   return (
