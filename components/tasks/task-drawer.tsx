@@ -12,9 +12,12 @@ import {
   Link2,
   Loader2,
   Lock,
+  Megaphone,
   MessageSquare,
+  Paperclip,
   Pencil,
   Plus,
+  Rocket,
   Tag,
   Timer,
   Trash2,
@@ -31,6 +34,7 @@ import {
   isTaskId,
   usePatchTask,
   useRefreshTask,
+  useMarketing,
   useTask,
   useTaskBoards,
   useTaskPeople,
@@ -70,7 +74,25 @@ import {
   formatWhen,
   personName,
 } from "@/components/tasks/task-format";
-import type { TaskBodyInput, TaskDetail, TaskLink, TaskPerson, TaskUpdate } from "@/types/tasks";
+import type {
+  TaskBodyInput,
+  TaskDetail,
+  TaskLink,
+  TaskMarketingInput,
+  TaskPerson,
+  TaskUpdate,
+} from "@/types/tasks";
+import {
+  CAMPAIGN_SWATCH,
+  CampaignPicker,
+  ChannelChip,
+  ChannelPicker,
+  PublishPicker,
+  StagePicker,
+  StagePill,
+} from "@/components/tasks/marketing-format";
+import { ApprovalBox, AssetField, BriefEditor, LaunchPicker } from "@/components/tasks/marketing-piece";
+import { launchesFor, publishLabel } from "@/lib/task-marketing";
 
 /** A label and its value: two cells, so the grid fits two fields a row from `sm`. */
 function Field({
@@ -433,6 +455,18 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
   const isFollowing = following ?? task.following;
   const closed = task.status === "done" || task.status === "cancelled";
 
+  // A marketing piece: stage, channel, publish, campaign, launch, asset.
+  const piece = task.marketing;
+  const { data: marketing } = useMarketing(null, !!piece);
+  const campaigns = marketing?.campaigns ?? [];
+  const campaign = piece?.campaignId ? campaigns.find((c) => c.id === piece.campaignId) : null;
+  const launches = launchesFor(marketing?.pieces ?? [], piece?.campaignId ?? null, {
+    id: task.id,
+    parentId: piece?.parentId,
+  });
+  const parent = piece?.parentId ? marketing?.pieces.find((p) => p.id === piece.parentId) : null;
+  const patchPiece = (input: TaskMarketingInput) => patch.mutateAsync({ marketing: input });
+
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/tasks?task=${task.id}`);
@@ -489,14 +523,25 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
         <SheetDescription className="sr-only">Task T-{task.number}</SheetDescription>
 
         <div className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 sm:grid-cols-[5rem_minmax(0,1fr)_5rem_minmax(0,1fr)]">
-          <Field icon={CircleDot} label="Status">
-            <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>
-              <button type="button" className="cursor-pointer">
-                <StatusPill status={task.status} />
-              </button>
-            </StatusPicker>
-            {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
-          </Field>
+          {piece ? (
+            <Field icon={CircleDot} label="Status">
+              <StagePicker value={piece.stage} onChange={(stage) => void patchPiece({ stage })}>
+                <button type="button" className="cursor-pointer">
+                  <StagePill stage={piece.stage} cancelled={task.status === "cancelled"} />
+                </button>
+              </StagePicker>
+              {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
+            </Field>
+          ) : (
+            <Field icon={CircleDot} label="Status">
+              <StatusPicker value={task.status} onChange={(status) => patch.mutate({ status })}>
+                <button type="button" className="cursor-pointer">
+                  <StatusPill status={task.status} />
+                </button>
+              </StatusPicker>
+              {patch.isPending && <Loader2 className="size-3.5 animate-spin text-gray-400" />}
+            </Field>
+          )}
           <Field icon={User} label="Owner">
             <PersonPicker
               people={people}
@@ -515,20 +560,48 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               </button>
             </PersonPicker>
           </Field>
-          <Field icon={Flag} label="Priority">
-            <PriorityPicker value={task.priority} onChange={(priority) => patch.mutate({ priority })}>
-              <button type="button" className={fieldButton}>
-                <PriorityLabel priority={task.priority} />
-              </button>
-            </PriorityPicker>
-          </Field>
-          <Field icon={CalendarDays} label="Due">
-            <DuePicker value={task.dueDate} onChange={(dueDate) => patch.mutate({ dueDate })}>
-              <button type="button" className={fieldButton}>
-                <DueLabel date={task.dueDate} closed={closed} />
-              </button>
-            </DuePicker>
-          </Field>
+          {piece ? (
+            <Field icon={Megaphone} label="Channel">
+              <ChannelPicker value={piece.channel} onChange={(channel) => void patchPiece({ channel })}>
+                <button type="button" className={fieldButton}>
+                  {piece.channel ? <ChannelChip channel={piece.channel} /> : <span className="text-gray-400">Add</span>}
+                </button>
+              </ChannelPicker>
+            </Field>
+          ) : (
+            <Field icon={Flag} label="Priority">
+              <PriorityPicker value={task.priority} onChange={(priority) => patch.mutate({ priority })}>
+                <button type="button" className={fieldButton}>
+                  <PriorityLabel priority={task.priority} />
+                </button>
+              </PriorityPicker>
+            </Field>
+          )}
+          {piece ? (
+            <Field icon={CalendarDays} label="Publish">
+              <PublishPicker
+                on={piece.publishOn}
+                time={piece.publishTime}
+                onChange={({ on, time }) => void patchPiece({ publishOn: on, publishTime: time })}
+              >
+                <button type="button" className={fieldButton}>
+                  {piece.publishOn ? (
+                    <span className="truncate">{publishLabel(piece.publishOn, piece.publishTime)}</span>
+                  ) : (
+                    <span className="text-gray-400">Add a date</span>
+                  )}
+                </button>
+              </PublishPicker>
+            </Field>
+          ) : (
+            <Field icon={CalendarDays} label="Due">
+              <DuePicker value={task.dueDate} onChange={(dueDate) => patch.mutate({ dueDate })}>
+                <button type="button" className={fieldButton}>
+                  <DueLabel date={task.dueDate} closed={closed} />
+                </button>
+              </DuePicker>
+            </Field>
+          )}
           <Field icon={LayoutGrid} label="Board">
             <BoardPicker boards={boards} value={task.board} onChange={(board) => patch.mutate({ board })}>
               <button type="button" className={fieldButton}>
@@ -536,28 +609,45 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
               </button>
             </BoardPicker>
           </Field>
-          <Field icon={Timer} label="Sprint">
-            <SprintPicker value={task.sprint} onChange={(sprint) => patch.mutate({ sprint })}>
-              <button type="button" className={fieldButton}>
-                {task.sprint ? (
-                  <span className="truncate">
-                    {task.sprint === sprintStart() ? "This sprint" : "Sprint"}{" "}
-                    <span className="text-gray-500">· {sprintLabel(task.sprint)}</span>
-                  </span>
-                ) : (
-                  <span className="text-gray-400">Backlog</span>
-                )}
-              </button>
-            </SprintPicker>
-            {task.carriedOver > 0 && !closed && (
-              <span
-                className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
-                title="Sprints that ended with it still open"
-              >
-                Carried over{task.carriedOver > 1 ? ` ×${task.carriedOver}` : ""}
-              </span>
-            )}
-          </Field>
+          {piece ? (
+            <Field icon={LayoutGrid} label="Campaign">
+              <CampaignPicker campaigns={campaigns} value={piece.campaignId} onChange={(campaignId) => void patchPiece({ campaignId })}>
+                <button type="button" className={fieldButton}>
+                  {campaign ? (
+                    <>
+                      <span className={cn("size-2.5 shrink-0 rounded-[3px]", CAMPAIGN_SWATCH[campaign.color])} />
+                      <span className="truncate">{campaign.name}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400">No campaign</span>
+                  )}
+                </button>
+              </CampaignPicker>
+            </Field>
+          ) : (
+            <Field icon={Timer} label="Sprint">
+              <SprintPicker value={task.sprint} onChange={(sprint) => patch.mutate({ sprint })}>
+                <button type="button" className={fieldButton}>
+                  {task.sprint ? (
+                    <span className="truncate">
+                      {task.sprint === sprintStart() ? "This sprint" : "Sprint"}{" "}
+                      <span className="text-gray-500">· {sprintLabel(task.sprint)}</span>
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">Backlog</span>
+                  )}
+                </button>
+              </SprintPicker>
+              {task.carriedOver > 0 && !closed && (
+                <span
+                  className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
+                  title="Sprints that ended with it still open"
+                >
+                  Carried over{task.carriedOver > 1 ? ` ×${task.carriedOver}` : ""}
+                </span>
+              )}
+            </Field>
+          )}
           <Field icon={Users} label="Helpers">
             <PeoplePicker
               people={people}
@@ -580,6 +670,27 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
           <Field icon={Tag} label="Labels">
             <Labels labels={task.labels} onChange={(labels) => patch.mutate({ labels })} />
           </Field>
+          {piece && (
+            <>
+              {/* A launch has pieces under it; it isn't under one. */}
+              {piece.channel !== "launch" && (
+                <Field icon={Rocket} label="Launch">
+                  <LaunchPicker launches={launches} value={piece.parentId} onChange={(parentId) => void patchPiece({ parentId })}>
+                    <button type="button" className={fieldButton}>
+                      {parent ? (
+                        <span className="truncate">{parent.title}</span>
+                      ) : (
+                        <span className="text-gray-400">{piece.parentId ? "A launch" : "None"}</span>
+                      )}
+                    </button>
+                  </LaunchPicker>
+                </Field>
+              )}
+              <Field icon={Paperclip} label="Asset">
+                <AssetField url={piece.assetUrl} onSave={(assetUrl) => patchPiece({ assetUrl })} />
+              </Field>
+            </>
+          )}
           {task.links.length > 0 && (
             <Field icon={Link2} label="Linked" wide>
               {task.links.map((link, index) => (
@@ -591,6 +702,12 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
       </div>
 
       <div className="space-y-6 px-6 py-5">
+        {piece && (
+          <>
+            <ApprovalBox task={task} people={people} me={me} onSave={patchPiece} onChanged={(next) => refresh(task.id, next)} />
+            <BriefEditor brief={piece.brief} onSave={(brief) => patchPiece({ brief })} />
+          </>
+        )}
         <Description
           task={task}
           people={people}

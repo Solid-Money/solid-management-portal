@@ -27,7 +27,7 @@ export type TaskListView = (typeof TASK_VIEWS)[number];
  * Support work is on the Support and Radar boards; product work is every
  * other board and no board.
  */
-export const TASK_AREAS = ["product", "support"] as const;
+export const TASK_AREAS = ["product", "support", "marketing"] as const;
 export type TaskArea = (typeof TASK_AREAS)[number];
 
 export type TaskSourceKind = "manual" | "support" | "radar" | "claude";
@@ -79,7 +79,19 @@ export interface TaskAuthor {
 }
 
 export interface TaskActivity {
-  field: "status" | "owner" | "priority" | "due" | "title" | "created" | "board" | "sprint";
+  field:
+    | "status"
+    | "owner"
+    | "priority"
+    | "due"
+    | "title"
+    | "created"
+    | "board"
+    | "sprint"
+    | "stage"
+    | "channel"
+    | "publish"
+    | "campaign";
   from: string | null;
   to: string | null;
 }
@@ -128,6 +140,101 @@ export interface TaskRow {
   lastUpdateAt: string | null;
   createdAt: string;
   closedAt: string | null;
+  /** On the Marketing board: the piece's channel, stage, brief…; else null. */
+  marketing: TaskMarketing | null;
+}
+
+// ---- Marketing --------------------------------------------------------------
+
+/** Where a piece goes out (monday's Type). */
+export const TASK_CHANNELS = [
+  "x_post",
+  "x_thread",
+  "telegram",
+  "email",
+  "push",
+  "in_app",
+  "blog",
+  "support_article",
+  "video",
+  "launch",
+  "other",
+] as const;
+export type TaskChannel = (typeof TASK_CHANNELS)[number];
+
+/** A piece's stage (monday's statuses); it sets the task's status. */
+export const TASK_STAGES = [
+  "coming",
+  "in_progress",
+  "waiting_approval",
+  "approved",
+  "scheduled",
+  "pending_launch",
+  "posted",
+  "stuck",
+] as const;
+export type TaskStage = (typeof TASK_STAGES)[number];
+
+export const TASK_CAMPAIGN_COLORS = ["indigo", "amber", "emerald", "sky", "violet", "pink", "orange", "slate"] as const;
+export type TaskCampaignColor = (typeof TASK_CAMPAIGN_COLORS)[number];
+
+export const TASK_BRIEF_FIELDS = ["audience", "objective", "keyMessage", "tone", "format", "visual", "cta"] as const;
+export type TaskBriefField = (typeof TASK_BRIEF_FIELDS)[number];
+export type TaskBrief = Partial<Record<TaskBriefField, string>>;
+
+export interface TaskMarketing {
+  campaignId: string | null;
+  /** The launch it is part of. */
+  parentId: string | null;
+  channel: TaskChannel | null;
+  stage: TaskStage;
+  publishOn: string | null;
+  /** `HH:mm`, Israel time. */
+  publishTime: string | null;
+  assetUrl: string | null;
+  brief: TaskBrief;
+  approvers: string[];
+  approvalRequestedAt: string | null;
+  approvalRequestedBy: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+}
+
+export interface TaskCampaign {
+  id: string;
+  name: string;
+  startOn: string | null;
+  endOn: string | null;
+  color: TaskCampaignColor;
+  archived: boolean;
+  createdAt: string;
+}
+
+export interface TaskMarketingOverview {
+  campaigns: TaskCampaign[];
+  pieces: TaskRow[];
+  truncated: boolean;
+}
+
+/** A piece's fields to set; left out stays, null clears. */
+export interface TaskMarketingInput {
+  campaignId?: string | null;
+  parentId?: string | null;
+  channel?: TaskChannel | null;
+  stage?: TaskStage;
+  publishOn?: string | null;
+  publishTime?: string | null;
+  assetUrl?: string | null;
+  brief?: TaskBrief | null;
+  approvers?: string[];
+}
+
+export interface TaskCampaignInput {
+  name?: string;
+  startOn?: string | null;
+  endOn?: string | null;
+  color?: TaskCampaignColor;
+  archived?: boolean;
 }
 
 export interface TaskDetail extends TaskRow {
@@ -277,6 +384,8 @@ export interface TaskCreateInput {
   /** A day in the sprint (this one or later); the backlog when absent. */
   sprint?: string;
   visibility?: TaskVisibility;
+  /** A marketing piece: puts it on the Marketing board. */
+  marketing?: TaskMarketingInput;
 }
 
 export interface TaskPatchInput {
@@ -293,6 +402,7 @@ export interface TaskPatchInput {
   /** A day in the sprint (this one or later); null puts it back in the backlog. */
   sprint?: string | null;
   visibility?: TaskVisibility;
+  marketing?: TaskMarketingInput;
 }
 
 export interface TaskUpload {

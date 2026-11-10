@@ -2,10 +2,12 @@
 
 import { Suspense, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Headphones, ListTodo, Loader2, Plus, Timer } from "lucide-react";
+import { Headphones, ListTodo, Loader2, Megaphone, Plus, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTaskBoards, useTaskCounts, useTaskSprint } from "@/hooks/use-tasks";
 import NewTaskDialog from "@/components/tasks/new-task-dialog";
+import NewPieceDialog, { type PieceDefaults } from "@/components/tasks/new-piece-dialog";
+import MarketingBoard, { type MarketingView } from "@/components/tasks/marketing-board";
 import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
 import TaskList from "@/components/tasks/task-list";
@@ -14,11 +16,15 @@ import PartnerWaits from "@/components/tasks/partner-waits";
 import SprintBoard from "@/components/tasks/sprint-board";
 import { sprintStart } from "@/lib/task-format";
 import {
+  TASK_CHANNELS,
   TASK_PRIORITIES,
+  TASK_STAGES,
   TASK_VIEWS,
+  type TaskChannel,
   type TaskListFilters,
   type TaskListView,
   type TaskPriority,
+  type TaskStage,
 } from "@/types/tasks";
 
 function isView(value: string | null): value is TaskListView {
@@ -29,7 +35,17 @@ function isPriority(value: string | null): value is TaskPriority {
   return !!value && (TASK_PRIORITIES as readonly string[]).includes(value);
 }
 
-const TABS = ["sprint", "product", "support", "partners"] as const;
+function isChannel(value: string | null): value is TaskChannel {
+  return !!value && (TASK_CHANNELS as readonly string[]).includes(value);
+}
+
+function isStage(value: string | null): value is TaskStage {
+  return !!value && (TASK_STAGES as readonly string[]).includes(value);
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+const TABS = ["sprint", "product", "support", "partners", "marketing"] as const;
 type Tab = (typeof TABS)[number];
 
 /** Support and Radar: escalated chats and radar alerts, kept apart from product work. */
@@ -74,18 +90,20 @@ function SupportTabs({
 }
 
 /**
- * The team's work in three tabs: the Sprint board (this week's tasks by
+ * The team's work in four tabs: the Sprint board (this week's tasks by
  * status, and the backlog to plan from), Product (Features, Bugs, Discussion
- * and the boards the team adds), and Support (escalated chats, radar alerts
- * and cases waiting on partners). The tab, board, sprint,
- * view, filters and the open task live in the URL (`?tab=&board=&sprint=&view=
- * &owner=&priority=&label=&q=&task=`), so any task, board or sprint is a link.
+ * and the boards the team adds), Support (escalated chats, radar alerts
+ * and cases waiting on partners) and Marketing (campaigns and their pieces,
+ * or a week's calendar). The tab, board, sprint, view, filters and the open
+ * task live in the URL (`?tab=&board=&sprint=&view=&owner=&priority=&label=
+ * &q=&channel=&stage=&week=&task=`), so any task, board or sprint is a link.
  */
 function TasksScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [creating, setCreating] = useState<{ sprint: string | null } | null>(null);
+  const [piece, setPiece] = useState<PieceDefaults | null>(null);
   const { data: counts } = useTaskCounts();
 
   const rawView = params.get("view");
@@ -123,9 +141,15 @@ function TasksScreen() {
   // A sprint in the URL is a day (`YYYY-MM-DD`); anything else means this week.
   const rawSprint = params.get("sprint");
   const sprint =
-    rawSprint && /^\d{4}-\d{2}-\d{2}$/.test(rawSprint) && !Number.isNaN(Date.parse(rawSprint))
+    rawSprint && DAY.test(rawSprint) && !Number.isNaN(Date.parse(rawSprint))
       ? rawSprint
       : null;
+  // Marketing: `?view=calendar&week=` (a Monday), and its own filters.
+  const marketingView: MarketingView = rawView === "calendar" ? "calendar" : "campaign";
+  const rawWeek = params.get("week");
+  const week = rawWeek && DAY.test(rawWeek) && !Number.isNaN(Date.parse(rawWeek)) ? rawWeek : null;
+  const rawChannel = params.get("channel");
+  const rawStage = params.get("stage");
 
   const update = useCallback(
     (changes: Record<string, string | null | undefined>) => {
@@ -160,6 +184,9 @@ function TasksScreen() {
       label: null,
       q: null,
       post: null,
+      channel: null,
+      stage: null,
+      week: null,
     });
 
   // The same query the board reads, so while the next week loads (the board
@@ -169,6 +196,7 @@ function TasksScreen() {
   // From the Sprint tab, into the week the board shows (before anything has
   // loaded, the one in the URL, else this week), unless that week is over.
   const newTask = () => {
+    if (tab === "marketing") return setPiece({});
     if (tab !== "sprint") return setCreating({ sprint: null });
     const shown = shownSprint?.sprint;
     if (shown) return setCreating({ sprint: shown.when === "past" ? null : shown.start });
@@ -182,11 +210,11 @@ function TasksScreen() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Tasks</h1>
           <p className="mt-1 text-sm text-gray-500">
-            The sprint, product work, and support work from escalated chats and the radar.
+            The sprint, product work, support work, and what marketing is putting out.
           </p>
         </div>
         <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={newTask}>
-          <Plus /> New task
+          <Plus /> {tab === "marketing" ? "New piece" : "New task"}
         </Button>
       </div>
 
@@ -196,6 +224,7 @@ function TasksScreen() {
             { key: "sprint", label: "Sprint", icon: Timer },
             { key: "product", label: "Product", icon: ListTodo },
             { key: "support", label: "Support", icon: Headphones },
+            { key: "marketing", label: "Marketing", icon: Megaphone },
           ] as const
         ).map(({ key, label, icon: Icon }) => {
           const active = tab === key || (key === "support" && tab === "partners");
@@ -224,6 +253,23 @@ function TasksScreen() {
           selected={open}
           onOpen={(id) => update({ task: id })}
           onNewTask={(start) => setCreating({ sprint: start })}
+        />
+      ) : tab === "marketing" ? (
+        <MarketingBoard
+          view={marketingView}
+          onView={(next) => update({ view: next === "calendar" ? "calendar" : null })}
+          week={week}
+          onWeek={(start) => update({ week: start })}
+          filters={{
+            q: params.get("q"),
+            channel: isChannel(rawChannel) ? rawChannel : null,
+            stage: isStage(rawStage) ? rawStage : null,
+            owner: params.get("owner"),
+          }}
+          onFilters={(next) => update(next)}
+          selected={open}
+          onOpen={(id) => update({ task: id })}
+          onNewPiece={setPiece}
         />
       ) : (
         <>
@@ -257,6 +303,12 @@ function TasksScreen() {
         defaultBoard={tab === "support" ? supportBoard : productBoard && productBoard !== "none" ? productBoard : null}
         defaultSprint={creating?.sprint ?? null}
         onOpenChange={(next) => !next && setCreating(null)}
+        onCreated={(id) => update({ task: id })}
+      />
+      <NewPieceDialog
+        open={piece !== null}
+        defaults={piece}
+        onOpenChange={(next) => !next && setPiece(null)}
         onCreated={(id) => update({ task: id })}
       />
     </div>
