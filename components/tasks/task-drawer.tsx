@@ -602,7 +602,7 @@ function TaskBody({
               {isFollowing ? "Following" : "Follow"}
             </Button>
             {/* Solid AI's and the radar's tasks are cancelled, not deleted. */}
-            {!task.createdBy.bot && !!me && task.createdBy.email === me && (
+            {!task.createdBy.bot && !!me && task.createdBy.email?.toLowerCase() === me.toLowerCase() && (
               <DeleteTask task={task} onDeleted={onDeleted} />
             )}
           </div>
