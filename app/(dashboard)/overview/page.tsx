@@ -29,7 +29,8 @@ const OVERVIEW_TABS = ["summary", "good-customers", "incentives"] as const;
 type OverviewTab = (typeof OVERVIEW_TABS)[number];
 const TAB_LABELS: Record<OverviewTab, string> = {
   summary: "Summary",
-  "good-customers": "Good customers",
+  // The URL keeps "good-customers" so saved links still open the tab.
+  "good-customers": "Customers",
   incentives: "Incentives",
 };
 /** The tab marked "New" until people know it is there. */

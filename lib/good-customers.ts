@@ -1,4 +1,9 @@
-import type { GoodCustomersCohort, GoodCustomersResponse } from "@/types/overview";
+import { dayLabel } from "@/lib/overview-range";
+import type {
+  GoodCustomersCohort,
+  GoodCustomersResponse,
+  GoodCustomersTiers,
+} from "@/types/overview";
 
 /**
  * The Good customers tab's derived numbers and guardrails, kept free of React
@@ -72,6 +77,99 @@ export function isGoodCustomersResponse(value: unknown): value is GoodCustomersR
   );
 }
 
+const ROUTE_KEYS = ["paid", "lock", "trial", "legacy"];
+
+/**
+ * The Tiers section's block, when it has everything the section reads. Checked
+ * apart from the rest, so a backend without it (or a bad one) costs the
+ * section only, never the tab.
+ */
+export function tiersOf(data: GoodCustomersResponse): GoodCustomersTiers | null {
+  const t: unknown = data.tiers;
+  if (!isObject(t)) return null;
+  const members = t.members;
+  const trials = t.trials;
+  const legacy = t.legacy;
+  const ok =
+    (t.source === "snapshot" || t.source === "records") &&
+    hasNumbers(members, ["prime", "ultra", "withCard"]) &&
+    isObject(members) &&
+    hasNumbers(members.byRoute, ROUTE_KEYS) &&
+    hasNumbers(t.bought, ["total", "paid", "lockPrime", "lockUltra", "lastWeek", "primeAnnualUsd"]) &&
+    Array.isArray(t.table) &&
+    t.table.length === 3 &&
+    t.table.every(
+      (row) =>
+        isObject(row) &&
+        typeof row.tier === "string" &&
+        hasNumbers(row, ["cardholders", "spenders", "qualified", "spendUsd"]) &&
+        hasNumbers(row.byRoute, ROUTE_KEYS),
+    ) &&
+    Array.isArray(t.routes) &&
+    t.routes.every(
+      (row) =>
+        isObject(row) &&
+        typeof row.route === "string" &&
+        hasNumbers(row, ["cardholders", "spenders", "qualified", "spendUsd"]),
+    ) &&
+    Array.isArray(t.weeklyBuyers) &&
+    t.weeklyBuyers.every(
+      (week) => isObject(week) && typeof week.date === "string" && hasNumbers(week, ["paid", "lock"]),
+    ) &&
+    hasNumbers(trials, ["gifted", "accepted", "onTrial", "ended", "endedThenBought"]) &&
+    isObject(trials) &&
+    (trials.since === null || typeof trials.since === "string") &&
+    hasNumbers(legacy, ["members", "spenders", "spendUsd"]) &&
+    isObject(legacy) &&
+    (legacy.endsOn === null || typeof legacy.endsOn === "string");
+  return ok ? (t as unknown as GoodCustomersTiers) : null;
+}
+
+/** Spend per spender for a row, or null with no spenders. */
+export function perSpender(row: { spendUsd: number; spenders: number }): number | null {
+  return row.spenders > 0 ? row.spendUsd / row.spenders : null;
+}
+
+/** Members (Ultra and Prime cardholders) taken together. */
+export function memberTotals(tiers: GoodCustomersTiers) {
+  const members = tiers.table.filter((row) => row.tier !== "core");
+  return {
+    cardholders: members.reduce((sum, r) => sum + r.cardholders, 0),
+    spenders: members.reduce((sum, r) => sum + r.spenders, 0),
+    qualified: members.reduce((sum, r) => sum + r.qualified, 0),
+    spendUsd: members.reduce((sum, r) => sum + r.spendUsd, 0),
+  };
+}
+
+/** People who bought a tier (paid or locked FUSE), taken together. */
+export function buyerTotals(tiers: GoodCustomersTiers) {
+  const rows = tiers.routes.filter((row) => row.route === "paid" || row.route === "lock");
+  return {
+    cardholders: rows.reduce((sum, r) => sum + r.cardholders, 0),
+    spenders: rows.reduce((sum, r) => sum + r.spenders, 0),
+    qualified: rows.reduce((sum, r) => sum + r.qualified, 0),
+    spendUsd: rows.reduce((sum, r) => sum + r.spendUsd, 0),
+  };
+}
+
+/** Tier purchases in the last `weeks` weeks and the same number of weeks before. */
+export function buyersTrend(tiers: GoodCustomersTiers, weeks = 4) {
+  const total = (w: { paid: number; lock: number }) => w.paid + w.lock;
+  const list = tiers.weeklyBuyers;
+  const recent = list.slice(-weeks).reduce((sum, w) => sum + total(w), 0);
+  const before = list.slice(-2 * weeks, -weeks).reduce((sum, w) => sum + total(w), 0);
+  return { recent, before, weeks };
+}
+
+/** The weekly buyers chart from the first week anyone bought (all 13 if nobody has). */
+export function buyersBars(tiers: GoodCustomersTiers) {
+  const first = tiers.weeklyBuyers.findIndex((w) => w.paid + w.lock > 0);
+  return tiers.weeklyBuyers.slice(first < 0 ? 0 : first).map((w) => ({
+    ...w,
+    total: w.paid + w.lock,
+  }));
+}
+
 /** `part / whole`, or null when there is nothing to divide by. */
 export function share(part: number, whole: number): number | null {
   return whole > 0 ? part / whole : null;
@@ -120,6 +218,8 @@ export const GUARDRAIL_LIMITS = {
   neverFundedShare: 0.25,
   /** One spender in twenty sitting just above the referral bar. */
   referralBunchedShare: 0.05,
+  /** Fewer than one in ten ended free trials turning into a purchase. */
+  trialToPaid: 0.1,
 };
 
 const usd = (value: number) =>
@@ -193,6 +293,31 @@ export function guardrails(data: GoodCustomersResponse): Guardrail[] {
           : bunched > GUARDRAIL_LIMITS.referralBunchedShare
             ? "watch"
             : "ok",
+    });
+  }
+  const tiers = tiersOf(data);
+  if (tiers && tiers.legacy.endsOn && tiers.legacy.members > 0) {
+    rows.push({
+      key: "legacy-ending",
+      title: `Legacy members whose tier ends ${dayLabel(tiers.legacy.endsOn)}`,
+      detail: `${count.format(tiers.legacy.spenders)} of the ${count.format(
+        tiers.legacy.members,
+      )} spent ${usd(tiers.legacy.spendUsd)} in the last ${data.definition.windowDays} days. Their tier was kept from before tiers v3`,
+      value: count.format(tiers.legacy.members),
+      status: "watch",
+    });
+  }
+  if (tiers && tiers.trials.ended > 0) {
+    const toPaid = share(tiers.trials.endedThenBought, tiers.trials.ended);
+    const neverAccepted = tiers.trials.gifted - tiers.trials.accepted;
+    rows.push({
+      key: "trial-to-paid",
+      title: "Free trials that led to a purchase",
+      detail: `${count.format(tiers.trials.endedThenBought)} of ${count.format(tiers.trials.ended)} ended trials. ${count.format(
+        neverAccepted,
+      )} gifted trials were never accepted`,
+      value: pct(toPaid),
+      status: toPaid === null ? "unknown" : toPaid < GUARDRAIL_LIMITS.trialToPaid ? "watch" : "ok",
     });
   }
   return rows;
