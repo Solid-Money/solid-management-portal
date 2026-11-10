@@ -4,7 +4,6 @@ import type {
   TaskPartners,
   TaskCreateInput,
   TaskDetail,
-  TaskFeedPage,
   TaskNotifications,
   TaskListFilters,
   TaskListPage,
@@ -143,20 +142,3 @@ export const getTaskNotifications = async () =>
 
 export const markTaskNotificationsRead = async (input: { ids?: string[]; all?: boolean }) =>
   (await api.post<{ unread: number }>(`${base}/notifications/read`, input)).data;
-
-// ---- Team feed -------------------------------------------------------------
-
-export const getTaskFeed = async (before?: string) =>
-  (await api.get<TaskFeedPage>(`${base}/feed`, { params: before ? { before } : {} })).data;
-
-export const postToFeed = async (input: TaskBodyInput & { parentId?: string }) =>
-  (await api.post<TaskUpdate>(`${base}/feed`, input)).data;
-
-export const editFeedPost = async (postId: string, input: { body: string; format?: TaskBodyFormat; mentions?: string[] }) =>
-  (await api.patch<TaskUpdate>(`${base}/feed/${postId}`, input)).data;
-
-export const deleteFeedPost = async (postId: string) =>
-  (await api.delete<{ deleted: true }>(`${base}/feed/${postId}`)).data;
-
-export const reactToFeedPost = async (postId: string, emoji: TaskReaction) =>
-  (await api.post<TaskUpdate>(`${base}/feed/${postId}/reactions`, { emoji })).data;

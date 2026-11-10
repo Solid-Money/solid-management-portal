@@ -13,7 +13,6 @@ import {
   getTaskBoards,
   getTaskCounts,
   getTaskPartners,
-  getTaskFeed,
   getTaskNotifications,
   getTaskPeople,
   getTaskSprint,
@@ -35,7 +34,6 @@ export const TASK_KEYS = {
   sprint: (start: string | null) => ["tasks", "sprint", start ?? "current"] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
-  feed: ["tasks", "feed"] as const,
 };
 
 /** Admins who can own a task or be @mentioned. */
@@ -171,18 +169,6 @@ export function useMarkNotificationsRead() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.notifications });
     },
-  });
-}
-
-/** The Team feed, newest first, a page at a time. */
-export function useTaskFeed() {
-  return useInfiniteQuery({
-    queryKey: TASK_KEYS.feed,
-    queryFn: ({ pageParam }) => getTaskFeed(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => (last.hasMore ? last.posts.at(-1)?.id : undefined),
-    // Image links are signed for five minutes.
-    refetchInterval: 4 * 60_000,
   });
 }
 

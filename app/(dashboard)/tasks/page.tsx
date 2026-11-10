@@ -2,11 +2,10 @@
 
 import { Suspense, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Headphones, ListTodo, Loader2, MessagesSquare, Plus, Timer } from "lucide-react";
+import { Headphones, ListTodo, Loader2, Plus, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTaskBoards, useTaskCounts, useTaskSprint } from "@/hooks/use-tasks";
 import NewTaskDialog from "@/components/tasks/new-task-dialog";
-import TeamFeed from "@/components/tasks/team-feed";
 import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
 import TaskList from "@/components/tasks/task-list";
@@ -30,7 +29,7 @@ function isPriority(value: string | null): value is TaskPriority {
   return !!value && (TASK_PRIORITIES as readonly string[]).includes(value);
 }
 
-const TABS = ["sprint", "product", "support", "partners", "feed"] as const;
+const TABS = ["sprint", "product", "support", "partners"] as const;
 type Tab = (typeof TABS)[number];
 
 /** Support and Radar: escalated chats and radar alerts, kept apart from product work. */
@@ -75,10 +74,10 @@ function SupportTabs({
 }
 
 /**
- * The team's work in four tabs: the Sprint board (this week's tasks by
+ * The team's work in three tabs: the Sprint board (this week's tasks by
  * status, and the backlog to plan from), Product (Features, Bugs, Discussion
- * and the boards the team adds), Support (escalated chats, radar alerts and
- * cases waiting on partners), and the Team feed. The tab, board, sprint,
+ * and the boards the team adds), and Support (escalated chats, radar alerts
+ * and cases waiting on partners). The tab, board, sprint,
  * view, filters and the open task live in the URL (`?tab=&board=&sprint=&view=
  * &owner=&priority=&label=&q=&task=`), so any task, board or sprint is a link.
  */
@@ -197,7 +196,6 @@ function TasksScreen() {
             { key: "sprint", label: "Sprint", icon: Timer },
             { key: "product", label: "Product", icon: ListTodo },
             { key: "support", label: "Support", icon: Headphones },
-            { key: "feed", label: "Team feed", icon: MessagesSquare },
           ] as const
         ).map(({ key, label, icon: Icon }) => {
           const active = tab === key || (key === "support" && tab === "partners");
@@ -219,9 +217,7 @@ function TasksScreen() {
         })}
       </div>
 
-      {tab === "feed" ? (
-        <TeamFeed highlight={params.get("post")} />
-      ) : tab === "sprint" ? (
+      {tab === "sprint" ? (
         <SprintBoard
           start={sprint}
           onStart={(start) => update({ sprint: start })}
