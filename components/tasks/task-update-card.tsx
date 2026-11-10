@@ -12,16 +12,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { fileSize, imageUrls, inlineKeys, isClaudeLooking, renderableHtml } from "@/lib/task-rich";
-import {
-  deleteFeedPost,
-  deleteTaskUpdate,
-  editFeedPost,
-  editTaskUpdate,
-  postTaskUpdate,
-  postToFeed,
-  reactToFeedPost,
-  reactToTaskUpdate,
-} from "@/lib/tasks-api";
+import { deleteTaskUpdate, editTaskUpdate, postTaskUpdate, reactToTaskUpdate } from "@/lib/tasks-api";
 import TaskComposer from "@/components/tasks/task-composer";
 import {
   AuthorAvatar,
@@ -47,7 +38,7 @@ import {
   type TaskUpdate,
 } from "@/types/tasks";
 
-/** Where an update lives: a task's feed, or the Team feed. */
+/** The calls an update card makes. */
 export interface UpdateApi {
   react: (updateId: string, emoji: TaskReaction) => Promise<unknown>;
   edit: (updateId: string, input: { body: string; format: TaskBodyFormat; mentions: string[] }) => Promise<unknown>;
@@ -63,13 +54,6 @@ export function taskUpdateApi(taskId: string): UpdateApi {
     reply: (parentId, input) => postTaskUpdate(taskId, { ...input, parentId }),
   };
 }
-
-export const feedUpdateApi: UpdateApi = {
-  react: (postId, emoji) => reactToFeedPost(postId, emoji),
-  edit: (postId, input) => editFeedPost(postId, input),
-  remove: (postId) => deleteFeedPost(postId),
-  reply: (parentId, input) => postToFeed({ ...input, parentId }),
-};
 
 /**
  * The message's files: images at a readable size (those already shown inside

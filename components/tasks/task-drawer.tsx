@@ -70,7 +70,7 @@ import {
   formatWhen,
   personName,
 } from "@/components/tasks/task-format";
-import type { TaskBodyInput, TaskDetail, TaskLink, TaskPerson } from "@/types/tasks";
+import type { TaskBodyInput, TaskDetail, TaskLink, TaskPerson, TaskUpdate } from "@/types/tasks";
 
 /** A label and its value: two cells, so the grid fits two fields a row from `sm`. */
 function Field({
@@ -100,6 +100,11 @@ function Field({
 
 const fieldButton =
   "inline-flex h-7 max-w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-sm text-gray-800 hover:bg-gray-100";
+
+/** Updates in the order they were written: the newest last. */
+function oldestFirst(updates: TaskUpdate[]): TaskUpdate[] {
+  return [...updates].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
 
 function linkHref(link: TaskLink): string | null {
   switch (link.kind) {
@@ -443,7 +448,6 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="border-b border-gray-200 px-6 pb-4 pt-5">
         <div className="mb-2 flex items-center gap-2 pr-8 text-xs text-gray-500">
-          <span className="shrink-0 whitespace-nowrap font-mono font-medium text-gray-600">T-{task.number}</span>
           {task.visibility === "restricted" && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5">
               <Lock className="size-3" /> Private
@@ -601,17 +605,13 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
             <h3 className="text-sm font-semibold text-gray-900">Updates</h3>
             <span className="text-xs text-gray-500">{task.updateCount}</span>
           </div>
-          <TaskComposer
-            people={people}
-            placeholder="Write an update… @ to mention, @Claude to ask AI to look into it"
-            askClaude
-            onSubmit={async (input) => {
-              await postTaskUpdate(task.id, input);
-              refresh(task.id);
-            }}
-          />
-          <div className="mt-4 space-y-3">
-            {task.updates.map((update) => (
+          {/* Like monday: oldest first, the newest at the bottom, and the box
+              to write the next one under it. */}
+          <div className="space-y-3">
+            <p className="pb-1 text-center text-xs text-gray-400">
+              Opened by {authorName(task.createdBy, people)} · {formatWhen(task.createdAt)}
+            </p>
+            {oldestFirst(task.updates).map((update) => (
               <TaskUpdateCard
                 key={update.id}
                 api={taskUpdateApi(task.id)}
@@ -621,10 +621,17 @@ function TaskBody({ task, people, me }: { task: TaskDetail; people: TaskPerson[]
                 onChanged={() => refresh(task.id)}
               />
             ))}
-            <p className="pt-1 text-center text-xs text-gray-400">
-              Opened by {authorName(task.createdBy, people)} · {formatWhen(task.createdAt)}
-            </p>
           </div>
+          <TaskComposer
+            className="mt-4"
+            people={people}
+            placeholder="Write an update… @ to mention, @Claude to ask AI to look into it"
+            askClaude
+            onSubmit={async (input) => {
+              await postTaskUpdate(task.id, input);
+              refresh(task.id);
+            }}
+          />
         </section>
       </div>
     </div>

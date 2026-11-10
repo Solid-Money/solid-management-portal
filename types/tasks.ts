@@ -334,7 +334,3 @@ export interface TaskNotifications {
   unread: number;
 }
 
-export interface TaskFeedPage {
-  posts: TaskUpdate[];
-  hasMore: boolean;
-}

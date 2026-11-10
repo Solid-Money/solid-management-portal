@@ -127,101 +127,105 @@ export default function NewTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
+      {/* Fits the window: a long description scrolls between the header and
+          the buttons, so "Create task" never needs scrolling to. */}
+      <DialogContent className="flex max-h-[90dvh] flex-col gap-0 p-0 sm:max-w-xl">
+        <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
           <DialogTitle>New task</DialogTitle>
           <DialogDescription>People you @mention see it under Mentions.</DialogDescription>
         </DialogHeader>
 
-        <input
-          autoFocus
-          value={title}
-          maxLength={200}
-          placeholder="What needs doing?"
-          onChange={(event) => setTitle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void create();
-            }
-          }}
-          className="w-full border-0 border-b border-gray-200 px-0 py-2 text-lg font-medium text-gray-900 outline-none placeholder:text-gray-400 focus:border-indigo-500"
-        />
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-4 pt-2">
+          <input
+            autoFocus
+            value={title}
+            maxLength={200}
+            placeholder="What needs doing?"
+            onChange={(event) => setTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void create();
+              }
+            }}
+            className="w-full border-0 border-b border-gray-200 px-0 py-2 text-lg font-medium text-gray-900 outline-none placeholder:text-gray-400 focus:border-indigo-500"
+          />
 
-        <div className="flex flex-wrap gap-2">
-          <BoardPicker boards={boards} value={board} onChange={setBoard}>
-            <button type="button" className={chip}>
-              <LayoutGrid className="size-4 text-gray-400" />
-              {boardName ?? "Board"}
-            </button>
-          </BoardPicker>
-          <SprintPicker value={sprint} onChange={setSprint}>
-            <button type="button" className={chip}>
-              <Timer className="size-4 text-gray-400" />
-              {sprint ? sprintLabel(sprint) : "Backlog"}
-            </button>
-          </SprintPicker>
-          <StatusPicker value={status} onChange={setStatus}>
-            <button type="button" className={chip}>
-              <StatusPill status={status} className="h-5" />
-            </button>
-          </StatusPicker>
-          <PersonPicker people={people} value={owner} onChange={setOwner}>
-            <button type="button" className={chip}>
-              {owner ? (
-                <>
-                  <Avatar email={owner} people={people} size={18} />
-                  {personName(owner, people)}
-                </>
-              ) : (
-                <>
-                  <User className="size-4 text-gray-400" /> Owner
-                </>
-              )}
-            </button>
-          </PersonPicker>
-          <PriorityPicker value={priority} onChange={setPriority}>
-            <button type="button" className={chip}>
-              {priority ? (
-                <PriorityLabel priority={priority} />
-              ) : (
-                <>
-                  <Flag className="size-4 text-gray-400" /> Priority
-                </>
-              )}
-            </button>
-          </PriorityPicker>
-          <DuePicker value={due} onChange={setDue}>
-            <button type="button" className={chip}>
-              {due ? (
-                <DueLabel date={due} />
-              ) : (
-                <>
-                  <CalendarDays className="size-4 text-gray-400" /> Due
-                </>
-              )}
-            </button>
-          </DuePicker>
+          <div className="flex flex-wrap gap-2">
+            <BoardPicker boards={boards} value={board} onChange={setBoard}>
+              <button type="button" className={chip}>
+                <LayoutGrid className="size-4 text-gray-400" />
+                {boardName ?? "Board"}
+              </button>
+            </BoardPicker>
+            <SprintPicker value={sprint} onChange={setSprint}>
+              <button type="button" className={chip}>
+                <Timer className="size-4 text-gray-400" />
+                {sprint ? sprintLabel(sprint) : "Backlog"}
+              </button>
+            </SprintPicker>
+            <StatusPicker value={status} onChange={setStatus}>
+              <button type="button" className={chip}>
+                <StatusPill status={status} className="h-5" />
+              </button>
+            </StatusPicker>
+            <PersonPicker people={people} value={owner} onChange={setOwner}>
+              <button type="button" className={chip}>
+                {owner ? (
+                  <>
+                    <Avatar email={owner} people={people} size={18} />
+                    {personName(owner, people)}
+                  </>
+                ) : (
+                  <>
+                    <User className="size-4 text-gray-400" /> Owner
+                  </>
+                )}
+              </button>
+            </PersonPicker>
+            <PriorityPicker value={priority} onChange={setPriority}>
+              <button type="button" className={chip}>
+                {priority ? (
+                  <PriorityLabel priority={priority} />
+                ) : (
+                  <>
+                    <Flag className="size-4 text-gray-400" /> Priority
+                  </>
+                )}
+              </button>
+            </PriorityPicker>
+            <DuePicker value={due} onChange={setDue}>
+              <button type="button" className={chip}>
+                {due ? (
+                  <DueLabel date={due} />
+                ) : (
+                  <>
+                    <CalendarDays className="size-4 text-gray-400" /> Due
+                  </>
+                )}
+              </button>
+            </DuePicker>
+          </div>
+
+          <TaskComposer
+            key={round}
+            people={people}
+            hideSubmit
+            minRows={4}
+            placeholder="Details, links, screenshots… @ to mention"
+            onChange={(value) => {
+              description.current = value;
+              setUploading(value.uploading);
+            }}
+          />
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+            <Checkbox checked={restricted} onCheckedChange={(checked) => setRestricted(checked === true)} />
+            Private: only the owner, helpers, followers and you can see it
+          </label>
         </div>
 
-        <TaskComposer
-          key={round}
-          people={people}
-          hideSubmit
-          minRows={4}
-          placeholder="Details, links, screenshots… @ to mention"
-          onChange={(value) => {
-            description.current = value;
-            setUploading(value.uploading);
-          }}
-        />
-
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
-          <Checkbox checked={restricted} onCheckedChange={(checked) => setRestricted(checked === true)} />
-          Private: only the owner, helpers, followers and you can see it
-        </label>
-
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t border-gray-100 px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

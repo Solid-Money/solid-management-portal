@@ -22,7 +22,8 @@ const WHAT: Record<TaskNotification["kind"], string> = {
 
 function where(item: TaskNotification): string {
   if (item.taskNumber === null) return "Team feed";
-  return `T-${item.taskNumber}${item.taskTitle ? ` · ${item.taskTitle}` : ""}`;
+  // Tasks go by their title: the team doesn't see task numbers.
+  return item.taskTitle || "A task";
 }
 
 /**
@@ -40,11 +41,9 @@ export default function TaskBell() {
   const go = (item: TaskNotification) => {
     setOpen(false);
     if (!item.read) markRead.mutate({ ids: [item.id] });
-    router.push(
-      item.taskId
-        ? `/tasks?task=${item.taskId}`
-        : `/tasks?tab=feed${item.updateId ? `&post=${item.updateId}` : ""}`,
-    );
+    // Old Team feed mentions have no task, and the feed is gone: reading
+    // one here is all there is to do.
+    if (item.taskId) router.push(`/tasks?task=${item.taskId}`);
   };
 
   return (
