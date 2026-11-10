@@ -6,10 +6,7 @@ import { toast } from "sonner";
 
 import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { AnalyticsKpiCard } from "@/components/analytics/kpi-card";
-import {
-  FallbackNote,
-  SourceBadge,
-} from "@/components/config/rain-rtf-config";
+import { FallbackNote, SourceBadge } from "@/components/config/rain-rtf-config";
 import { useUpdateRainSunsetConfig } from "@/hooks/use-general-config";
 import { formatNumber } from "@/lib/utils";
 import type {
@@ -32,8 +29,16 @@ type RowSpec =
   | { name: string; kind: "date"; field: "closesAt" };
 
 const ROWS: RowSpec[] = [
-  { name: SETTING.ONBOARDING_CLOSED, kind: "switch", field: "onboardingClosed" },
-  { name: SETTING.MIGRATION_ENABLED, kind: "switch", field: "migrationEnabled" },
+  {
+    name: SETTING.ONBOARDING_CLOSED,
+    kind: "switch",
+    field: "onboardingClosed",
+  },
+  {
+    name: SETTING.MIGRATION_ENABLED,
+    kind: "switch",
+    field: "migrationEnabled",
+  },
   { name: SETTING.NOTICE_ENABLED, kind: "switch", field: "noticeEnabled" },
   { name: SETTING.CLOSES_AT, kind: "date", field: "closesAt" },
 ];
@@ -97,10 +102,13 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
     }
     // Reopening Rain is the one change here that costs money and contradicts
     // the pause agreed with Rain: every new applicant becomes a paid Rain
-    // application and a $10 card. Worth a second look.
+    // application and a $10 card. Worth a second look — whether it comes from
+    // switching it off or from a reset that hands the setting back to an
+    // environment value of "false", so it is judged on the value that results.
     const reopening =
-      edits.onboardingClosed === false &&
-      savedBool(SETTING.ONBOARDING_CLOSED);
+      edits.onboardingClosed !== undefined &&
+      savedBool(SETTING.ONBOARDING_CLOSED) &&
+      !boolValue(SETTING.ONBOARDING_CLOSED, "onboardingClosed");
     if (reopening) {
       setConfirmingReopen(true);
       return;
@@ -154,9 +162,8 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
         <strong>{resolved.onboardingClosed ? "closed" : "open"}</strong>, move
         to Wirex{" "}
         <strong>{resolved.migrationEnabled ? "open" : "closed"}</strong>,
-        closing notice <strong>{resolved.noticeEnabled ? "on" : "off"}</strong>
-        , closing date{" "}
-        <strong>{resolved.closesAt ?? "not announced"}</strong>.
+        closing notice <strong>{resolved.noticeEnabled ? "on" : "off"}</strong>,
+        closing date <strong>{resolved.closesAt ?? "not announced"}</strong>.
       </p>
 
       <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
@@ -278,9 +285,7 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
                 className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
                 aria-hidden
               />
-              <p>
-                Only reopen Rain if the program has been resumed with Rain.
-              </p>
+              <p>Only reopen Rain if the program has been resumed with Rain.</p>
             </div>
             <p>
               New users in Rain-only countries will be offered a Rain card
