@@ -6,6 +6,7 @@ import {
   quietHours,
   quietLabel,
   radarTasks,
+  refreshFailure,
   tasksHref,
 } from "@/lib/attention-tasks";
 import type { AttentionItemView } from "@/types/radar";
@@ -296,6 +297,36 @@ describe("Needs your attention, as a summary of Tasks", () => {
       "2 closed on their own in the last 24 h: Card declines spiking, No bank transfer deposits for 9 hours",
     );
     expect(closedLine([])).toBeNull();
+  });
+
+  it("keeps a new alert with its task when the alert the task lists just closed", () => {
+    // t4 lists p1, which closed; p9 is the same error, opened since.
+    const closed = { ...paymaster("p1", 26, "escalate"), status: "resolved" };
+    const fresh = paymaster("p9", 4, "escalate", "card");
+    const t4 = task({ id: "t4", radarItemIds: ["p1"] });
+    const summary = cardSummary(
+      [t4],
+      [fresh],
+      [closed as AttentionItemView],
+      NOW,
+    );
+    expect(summary.tasks[0].items.map((i) => i.id)).toEqual(["p9"]);
+    expect(summary.untasked).toEqual([]);
+    // Without the closed one to go by, it would read as an alert in no task.
+    expect(radarTasks([t4], [fresh], NOW)[0].items).toEqual([]);
+  });
+
+  it("says which source failed to refresh and how old the numbers are", () => {
+    expect(
+      refreshFailure(
+        "the radar",
+        "Network Error",
+        Date.parse("2026-11-11T19:12:40Z"),
+      ),
+    ).toBe("Could not refresh the radar (Network Error): showing 19:12 UTC");
+    expect(refreshFailure("Tasks", "Timeout", 0)).toBe(
+      "Could not refresh Tasks (Timeout)",
+    );
   });
 
   it("links to the radar board in Tasks", () => {

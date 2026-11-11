@@ -15,6 +15,7 @@ import {
   cardSummary,
   closedLine,
   quietLabel,
+  refreshFailure,
   tasksHref,
 } from "@/lib/attention-tasks";
 import { personName } from "@/lib/task-format";
@@ -100,6 +101,23 @@ export function AttentionCard() {
       : null;
   const live = radar.data?.summary.liveIncidents ?? 0;
   const error = radar.error ?? taskList.error;
+  // A failed refresh keeps the last good data on screen: say which is behind.
+  const behind = [
+    radar.error && radar.data
+      ? refreshFailure(
+          "the radar",
+          describeApiError(radar.error),
+          radar.dataUpdatedAt,
+        )
+      : null,
+    taskList.error && taskList.data
+      ? refreshFailure(
+          "Tasks",
+          describeApiError(taskList.error),
+          taskList.dataUpdatedAt,
+        )
+      : null,
+  ].filter(Boolean) as string[];
 
   return (
     <OverviewCard className="px-5 pt-4 pb-3">
@@ -146,6 +164,11 @@ export function AttentionCard() {
       ) : null}
       {!summary && !error ? (
         <p className="mt-3 text-[13px] text-gray-400">Loading…</p>
+      ) : null}
+      {summary && behind.length ? (
+        <p role="status" className="mt-2 text-[12px] text-[#b45309]">
+          {behind.join(" · ")}
+        </p>
       ) : null}
 
       {summary ? (

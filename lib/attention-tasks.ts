@@ -123,17 +123,24 @@ const SEVERITY_RANK: Record<string, number> = {
  * The open radar tasks with their open alerts, most urgent first: incidents,
  * then whatever is still happening, then what happened today, each by people
  * hit and severity, then the quietest. An old alert with many accounts (a
- * passkey from last month) waits behind a failure that hit people today. An alert belongs to a task when the task lists it, or when it
- * is about the same problem as one the task lists (older duplicates of an
- * error the radar now keeps in one alert).
+ * passkey from last month) waits behind a failure that hit people today.
+ *
+ * An alert belongs to a task when the task lists it, or when it is about the
+ * same problem as one the task lists (older duplicates of an error the radar
+ * now keeps in one alert). The problem is read from the task's alerts open
+ * or recently closed (`resolved`): when the one it lists has just closed and
+ * a new alert of the same problem opens, the new one is still its task's,
+ * not "no task yet". Only open alerts are shown under it.
  */
 export function radarTasks(
   tasks: TaskRow[],
   items: AttentionItemView[],
   nowIso: string,
+  resolved: AttentionItemView[] = [],
 ): RadarTask[] {
   const open = items.filter((i) => i.status !== "resolved");
-  const byId = new Map(open.map((i) => [i.id, i]));
+  // Open last, so an alert in both lists is read as it is now.
+  const known = new Map([...resolved, ...items].map((i) => [i.id, i] as const));
   const rows = tasks
     .filter((t) => t.source.kind === "radar")
     .map((task) => {
@@ -141,7 +148,7 @@ export function radarTasks(
       // alerts in no task, never hidden.
       const ids = new Set(task.radarItemIds ?? []);
       const listed = [...ids]
-        .map((id) => byId.get(id))
+        .map((id) => known.get(id))
         .filter(Boolean) as AttentionItemView[];
       const keys = new Set(listed.map(problemKey));
       const mine = open.filter((i) => ids.has(i.id) || keys.has(problemKey(i)));
@@ -260,7 +267,7 @@ export function cardSummary(
   resolved: AttentionItemView[],
   nowIso: string,
 ): CardSummary {
-  const rows = radarTasks(tasks, items, nowIso);
+  const rows = radarTasks(tasks, items, nowIso, resolved);
   const inTasks = new Set(rows.flatMap((r) => r.items.map((i) => i.id)));
   const open = items.filter(
     (i) => i.status !== "resolved" && !inTasks.has(i.id),
@@ -302,6 +309,22 @@ export function closedLine(closed: AttentionItemView[]): string | null {
   const names = closed.slice(0, 3).map((i) => i.title);
   const rest = closed.length - names.length;
   return `${closed.length} closed on ${closed.length === 1 ? "its" : "their"} own in the last 24 h: ${names.join(", ")}${rest > 0 ? ` and ${rest} more` : ""}`;
+}
+
+/**
+ * A refresh that failed after an earlier one worked: the card keeps the last
+ * good numbers, so it says which source is behind and since when.
+ * "Could not refresh the radar (Network Error): showing 19:12 UTC"
+ */
+export function refreshFailure(
+  what: string,
+  message: string,
+  updatedAtMs: number,
+): string {
+  const at = updatedAtMs
+    ? new Date(updatedAtMs).toISOString().slice(11, 16)
+    : null;
+  return `Could not refresh ${what} (${message})${at ? `: showing ${at} UTC` : ""}`;
 }
 
 /** The Tasks page, on the radar board, optionally with one task open. */
