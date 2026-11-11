@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react";
 
 import { AntiAbuseConfigEditor } from "@/components/config/anti-abuse-config";
+import { KnownServicesSection } from "@/components/config/known-services";
 import { useAntiAbuseConfig } from "@/hooks/use-anti-abuse";
 
 /**
@@ -42,6 +43,8 @@ export default function AntiAbusePage() {
       ) : null}
 
       {data ? <AntiAbuseConfigEditor config={data} /> : null}
+
+      <KnownServicesSection />
     </div>
   );
 }

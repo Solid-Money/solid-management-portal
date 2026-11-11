@@ -138,6 +138,10 @@ export interface TaskRow {
   hasNew: boolean;
   quietDays: number | null;
   lastUpdateAt: string | null;
+  /** The newest update a person wrote (not a bot); null when none has. Absent from older backends. */
+  lastPersonUpdateAt?: string | null;
+  /** Radar tasks: the radar alerts in it; else empty. Absent from older backends. */
+  radarItemIds?: string[];
   createdAt: string;
   closedAt: string | null;
   /** On the Marketing board: the piece's channel, stage, brief…; else null. */

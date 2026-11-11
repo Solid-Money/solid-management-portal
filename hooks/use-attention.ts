@@ -12,6 +12,7 @@ import {
   ATTENTION_REFRESH_MS,
   type AttentionItemView,
   type AttentionListResponse,
+  type RadarKnownService,
   type RadarNoticeKind,
   type RadarTab,
 } from "@/types/radar";
@@ -105,5 +106,51 @@ export function useFollowUpDraft() {
   >({
     mutationFn: async (id) =>
       (await api.post(`/admin/v1/attention/${id}/follow-up`, {})).data,
+  });
+}
+
+/**
+ * A shared cash-out wallet is a known service (an exchange, a bridge): the
+ * item closes, and the radar leaves the address out from its next check.
+ */
+export function useMarkKnownService() {
+  const queryClient = useQueryClient();
+  return useMutation<AttentionItemView, Error, { id: string; name: string }>({
+    mutationFn: async ({ id, name }) =>
+      (
+        await api.post<AttentionItemView>(
+          `/admin/v1/attention/${id}/known-service`,
+          { name },
+        )
+      ).data,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ATTENTION_QUERY_KEYS.all }),
+  });
+}
+
+/** Config → Anti-abuse: the known services the cash-out check leaves out. */
+export function useKnownServices() {
+  return useQuery<RadarKnownService[]>({
+    queryKey: ATTENTION_QUERY_KEYS.knownServices,
+    queryFn: async () =>
+      (await api.get<RadarKnownService[]>("/admin/v1/attention/known-services"))
+        .data,
+  });
+}
+
+/** Undo: the address is checked again from the radar's next run. */
+export function useRemoveKnownService() {
+  const queryClient = useQueryClient();
+  return useMutation<{ removed: boolean }, Error, string>({
+    mutationFn: async (address) =>
+      (
+        await api.delete<{ removed: boolean }>(
+          `/admin/v1/attention/known-services/${encodeURIComponent(address)}`,
+        )
+      ).data,
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ATTENTION_QUERY_KEYS.knownServices,
+      }),
   });
 }
