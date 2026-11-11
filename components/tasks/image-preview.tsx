@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { ExternalLink, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 export interface PreviewImage {
   src: string;
   name: string | null;
+  /** What opened it: focus goes back there when it closes. */
+  from?: HTMLElement | null;
 }
 
 /**
@@ -20,10 +23,21 @@ export default function ImagePreview({
   image: PreviewImage | null;
   onClose: () => void;
 }) {
+  // Kept past close (the image is gone by then) to put focus back.
+  const opener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (image) opener.current = image.from ?? null;
+  }, [image]);
   return (
     <Dialog open={image !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
+        onCloseAutoFocus={(event) => {
+          const from = opener.current;
+          if (!from?.isConnected) return;
+          event.preventDefault();
+          from.focus();
+        }}
         className="flex max-h-[94dvh] w-auto max-w-[min(94vw,1600px)] flex-col gap-3 border-0 bg-white p-3 sm:max-w-[min(94vw,1600px)]"
       >
         <DialogTitle className="sr-only">{image?.name ?? "Image"}</DialogTitle>

@@ -63,6 +63,7 @@ function Card({
   selected,
   draggable,
   showStatus,
+  saving,
   onOpen,
 }: {
   row: TaskRow;
@@ -71,6 +72,8 @@ function Card({
   selected: boolean;
   draggable: boolean;
   showStatus: boolean;
+  /** A move is being saved: it can't be moved again until it lands. */
+  saving: boolean;
   onOpen: () => void;
 }) {
   const closed = row.status === "done" || row.status === "cancelled";
@@ -80,7 +83,8 @@ function Card({
       role="button"
       tabIndex={0}
       aria-label={`${row.title}, task ${row.number}`}
-      draggable={draggable}
+      aria-busy={saving || undefined}
+      draggable={draggable && !saving}
       onDragStart={(event) => {
         event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: row.id, from: "sprint" }));
         event.dataTransfer.effectAllowed = "move";
@@ -95,7 +99,8 @@ function Card({
       className={cn(
         "cursor-pointer rounded-lg border border-gray-200 bg-white p-2.5 shadow-xs outline-none hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-indigo-400",
         selected && "border-indigo-300 ring-1 ring-indigo-200",
-        draggable && "active:cursor-grabbing",
+        draggable && !saving && "active:cursor-grabbing",
+        saving && "opacity-60",
       )}
     >
       {(carried || row.priority) && (
@@ -198,6 +203,15 @@ export default function SprintBoard({
   // One move per task at a time: a second drag or Add on a task still being
   // saved is ignored, so an older request can't land after a newer one.
   const moving = useRef(new Set<string>());
+  // The same, for the screen: cards and Add buttons show the move is saving.
+  const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
+  const markSaving = (id: string, on: boolean) =>
+    setSaving((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   const move = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TaskPatchInput }) => patchTask(id, input),
     onMutate: async ({ id, input }) => {
@@ -233,6 +247,7 @@ export default function SprintBoard({
     },
     onSettled: (_data, _error, { id }) => {
       moving.current.delete(id);
+      markSaving(id, false);
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });
     },
   });
@@ -263,6 +278,7 @@ export default function SprintBoard({
   const moveOnce = (id: string, input: TaskPatchInput) => {
     if (moving.current.has(id)) return;
     moving.current.add(id);
+    markSaving(id, true);
     move.mutate({ id, input });
   };
 
@@ -381,6 +397,7 @@ export default function SprintBoard({
                   selected={selected === row.id}
                   draggable={!past}
                   showStatus={column.statuses.length > 1 && row.status !== column.drop}
+                  saving={saving.has(row.id)}
                   onOpen={() => onOpen(row.id)}
                 />
               ))}
@@ -445,7 +462,8 @@ export default function SprintBoard({
                 return (
                   <li
                     key={row.id}
-                    draggable
+                    draggable={!saving.has(row.id)}
+                    aria-busy={saving.has(row.id) || undefined}
                     onDragStart={(event) => {
                       event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: row.id, from: "backlog" }));
                       event.dataTransfer.effectAllowed = "move";
@@ -477,9 +495,10 @@ export default function SprintBoard({
                       variant="ghost"
                       size="xs"
                       className="shrink-0 text-indigo-700 hover:text-indigo-800"
+                      disabled={saving.has(row.id)}
                       onClick={() => moveOnce(row.id, { sprint: sprint.start })}
                     >
-                      <Plus /> Add
+                      {saving.has(row.id) ? <Loader2 className="animate-spin" /> : <Plus />} Add
                     </Button>
                   </li>
                 );

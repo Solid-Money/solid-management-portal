@@ -725,7 +725,9 @@ function TaskBody({
                 </button>
               </CampaignPicker>
             </Field>
-          ) : (
+          ) : null}
+          {/* A piece shows its sprint only when it's in one, so it can be taken out. */}
+          {(!piece || task.sprint) && (
             <Field icon={Timer} label="Sprint">
               <SprintPicker value={task.sprint} onChange={(sprint) => patch.mutate({ sprint })}>
                 <button type="button" className={fieldButton}>

@@ -88,7 +88,7 @@ export function Attachments({
                 key={image.key}
                 type="button"
                 aria-label={`View ${image.fileName ?? "the image"} larger`}
-                onClick={() => setPreview({ src: image.url!, name: image.fileName })}
+                onClick={(event) => setPreview({ src: image.url!, name: image.fileName, from: event.currentTarget })}
                 className="block w-full cursor-zoom-in overflow-hidden rounded-md border border-gray-200 bg-gray-50"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived link to the support service */}
@@ -165,9 +165,12 @@ export function TaskText({
   className?: string;
 }) {
   const html = useMemo(
-    () => (format === "html" ? renderableHtml(body, imageUrls(attachments)) : ""),
+    () => (format === "html" ? renderableHtml(body, imageUrls(attachments), { previewable: true }) : ""),
     [attachments, body, format],
   );
+  // The same object between renders: React re-sets innerHTML when it changes,
+  // which would swap the images (and lose the one focus returns to).
+  const inner = useMemo(() => ({ __html: html }), [html]);
   const [preview, setPreview] = useState<PreviewImage | null>(null);
   if (!body) return null;
   if (format === "html")
@@ -178,15 +181,23 @@ export function TaskText({
             "task-rich break-words text-sm leading-relaxed text-gray-800 [&_img]:cursor-zoom-in",
             className,
           )}
-          // An image in the text opens larger, unless it's a link of its own.
+          // An image in the text opens larger (click, Enter or Space), unless
+          // it's a link of its own.
           onClick={(event) => {
             const target = event.target;
             if (!(target instanceof HTMLImageElement) || target.closest("a")) return;
             event.preventDefault();
-            setPreview({ src: target.currentSrc || target.src, name: target.alt || null });
+            setPreview({ src: target.currentSrc || target.src, name: target.alt || null, from: target });
+          }}
+          onKeyDown={(event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLImageElement) || target.closest("a")) return;
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            setPreview({ src: target.currentSrc || target.src, name: target.alt || null, from: target });
           }}
           // Cleaned by the server and again here (renderableHtml).
-          dangerouslySetInnerHTML={{ __html: html }}
+          dangerouslySetInnerHTML={inner}
         />
         <ImagePreview image={preview} onClose={() => setPreview(null)} />
       </>
