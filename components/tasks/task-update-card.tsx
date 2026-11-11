@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
+import { useMemo, useState, type ReactElement } from "react";
+import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,12 +10,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { fileSize, imageUrls, inlineKeys, isClaudeLooking, renderableHtml } from "@/lib/task-rich";
 import { deleteTaskUpdate, editTaskUpdate, postTaskUpdate, reactToTaskUpdate } from "@/lib/tasks-api";
 import TaskComposer from "@/components/tasks/task-composer";
+import ImagePreview, { type PreviewImage } from "@/components/tasks/image-preview";
 import {
   AuthorAvatar,
+  Avatar,
   STATUS_META,
   authorName,
   firstName,
@@ -71,6 +74,7 @@ export function Attachments({
   const shown = inline
     ? attachments.filter((a) => !inline.has(a.key) || (a.mime.startsWith("image/") && !a.url))
     : attachments;
+  const [preview, setPreview] = useState<PreviewImage | null>(null);
   if (!shown.length) return null;
   const images = shown.filter((a) => a.mime.startsWith("image/"));
   const others = shown.filter((a) => !a.mime.startsWith("image/"));
@@ -80,12 +84,12 @@ export function Attachments({
         <div className={cn("grid gap-2", images.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
           {images.map((image) =>
             image.url ? (
-              <a
+              <button
                 key={image.key}
-                href={image.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block overflow-hidden rounded-md border border-gray-200 bg-gray-50"
+                type="button"
+                aria-label={`View ${image.fileName ?? "the image"} larger`}
+                onClick={(event) => setPreview({ src: image.url!, name: image.fileName, from: event.currentTarget })}
+                className="block w-full cursor-zoom-in overflow-hidden rounded-md border border-gray-200 bg-gray-50"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived link to the support service */}
                 <img
@@ -94,7 +98,7 @@ export function Attachments({
                   loading="lazy"
                   className="max-h-80 w-full object-contain"
                 />
-              </a>
+              </button>
             ) : (
               <div
                 key={image.key}
@@ -129,6 +133,7 @@ export function Attachments({
           ))}
         </div>
       )}
+      <ImagePreview image={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
@@ -160,17 +165,42 @@ export function TaskText({
   className?: string;
 }) {
   const html = useMemo(
-    () => (format === "html" ? renderableHtml(body, imageUrls(attachments)) : ""),
+    () => (format === "html" ? renderableHtml(body, imageUrls(attachments), { previewable: true }) : ""),
     [attachments, body, format],
   );
+  // The same object between renders: React re-sets innerHTML when it changes,
+  // which would swap the images (and lose the one focus returns to).
+  const inner = useMemo(() => ({ __html: html }), [html]);
+  const [preview, setPreview] = useState<PreviewImage | null>(null);
   if (!body) return null;
   if (format === "html")
     return (
-      <div
-        className={cn("task-rich break-words text-sm leading-relaxed text-gray-800", className)}
-        // Cleaned by the server and again here (renderableHtml).
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <>
+        <div
+          className={cn(
+            "task-rich break-words text-sm leading-relaxed text-gray-800 [&_img]:cursor-zoom-in",
+            className,
+          )}
+          // An image in the text opens larger (click, Enter or Space), unless
+          // it's a link of its own.
+          onClick={(event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLImageElement) || target.closest("a")) return;
+            event.preventDefault();
+            setPreview({ src: target.currentSrc || target.src, name: target.alt || null, from: target });
+          }}
+          onKeyDown={(event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLImageElement) || target.closest("a")) return;
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            setPreview({ src: target.currentSrc || target.src, name: target.alt || null, from: target });
+          }}
+          // Cleaned by the server and again here (renderableHtml).
+          dangerouslySetInnerHTML={inner}
+        />
+        <ImagePreview image={preview} onClose={() => setPreview(null)} />
+      </>
     );
   return (
     <p className={cn("whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800", className)}>
@@ -268,6 +298,118 @@ function ActivityLine({ update, people }: { update: TaskUpdate; people: TaskPers
   );
 }
 
+/** Everyone, with their faces; a long list scrolls inside the card. */
+function PeopleList({
+  title,
+  emails,
+  people,
+  focusable = false,
+}: {
+  title: string;
+  emails: string[];
+  people: TaskPerson[];
+  /** In a popover: the list takes focus, so the keyboard can scroll a long one. */
+  focusable?: boolean;
+}) {
+  return (
+    <>
+      <p className="mb-1.5 font-medium">{title}</p>
+      <ul
+        tabIndex={focusable ? 0 : undefined}
+        aria-label={focusable ? title : undefined}
+        className="max-h-60 space-y-1 overflow-y-auto rounded pr-1 outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >
+        {emails.map((email) => (
+          <li key={email} className="flex min-w-0 items-center gap-1.5">
+            <Avatar email={email} people={people} size={18} />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{personName(email, people)}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** On hover or keyboard focus: who. Used for reactions and "Seen by". */
+function PeopleTooltip({
+  title,
+  emails,
+  people,
+  children,
+}: {
+  title: string;
+  emails: string[];
+  people: TaskPerson[];
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6} className="max-w-[min(16rem,calc(100vw-2rem))] px-3 py-2">
+        <PeopleList title={title} emails={emails} people={people} />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
+ * "Seen by N": the names on hover (a tooltip, like reactions), and on tap,
+ * click or Enter in a popover, which touch and keyboard can reach. The
+ * popover opens only on purpose, so it never takes focus from the composer.
+ */
+function SeenBy({ emails, people }: { emails: string[]; people: TaskPerson[] }) {
+  return (
+    <Popover>
+      <PeopleTooltip title="Seen by" emails={emails} people={people}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Seen by ${emails.length}: ${emails.map((email) => personName(email, people)).join(", ")}`}
+            className="ml-auto inline-flex cursor-pointer items-center gap-1 rounded hover:text-gray-900"
+          >
+            <Eye className="size-3.5" /> Seen by {emails.length}
+          </button>
+        </PopoverTrigger>
+      </PeopleTooltip>
+      <PopoverContent side="top" align="end" className="w-auto max-w-[min(16rem,calc(100vw-2rem))] p-2.5 text-xs text-gray-800">
+        <PeopleList title="Seen by" emails={emails} people={people} focusable />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Who reacted, for touch and keyboard: a tap on a reaction changes it, so
+ * this small button beside them lists everyone (hover shows it per reaction).
+ */
+function ReactionPeople({ update, people }: { update: TaskUpdate; people: TaskPerson[] }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Who reacted"
+          title="Who reacted"
+          className="inline-flex size-6 cursor-pointer items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+        >
+          <Users className="size-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="start"
+        className="max-h-[min(24rem,var(--radix-popover-content-available-height))] w-auto max-w-[min(16rem,calc(100vw-2rem))] space-y-2 overflow-y-auto p-2.5 text-xs text-gray-800"
+      >
+        {update.reactions.map((reaction) => (
+          <div key={reaction.emoji}>
+            <PeopleList title={`Reacted ${reaction.emoji}`} emails={reaction.emails} people={people} focusable />
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function Reactions({
   update,
   me,
@@ -283,22 +425,24 @@ function Reactions({
   return (
     <div className="mt-2 flex flex-wrap gap-1">
       {update.reactions.map((reaction) => (
-        <button
-          key={reaction.emoji}
-          type="button"
-          title={reaction.emails.map((email) => personName(email, people)).join(", ")}
-          onClick={() => onReact(reaction.emoji)}
-          className={cn(
-            "inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-xs",
-            reaction.emails.includes(me)
-              ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
-          )}
-        >
-          <span>{reaction.emoji}</span>
-          {reaction.emails.length}
-        </button>
+        <PeopleTooltip key={reaction.emoji} title={`Reacted ${reaction.emoji}`} emails={reaction.emails} people={people}>
+          <button
+            type="button"
+            aria-label={`${reaction.emoji} ${reaction.emails.map((email) => personName(email, people)).join(", ")}`}
+            onClick={() => onReact(reaction.emoji)}
+            className={cn(
+              "inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-xs",
+              reaction.emails.includes(me)
+                ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
+            )}
+          >
+            <span>{reaction.emoji}</span>
+            {reaction.emails.length}
+          </button>
+        </PeopleTooltip>
       ))}
+      <ReactionPeople update={update} people={people} />
     </div>
   );
 }
@@ -449,14 +593,7 @@ export default function TaskUpdateCard({
               >
                 <Reply className="size-3.5" /> Reply
               </button>
-              {seen.length > 0 && (
-                <span
-                  className="ml-auto inline-flex items-center gap-1"
-                  title={seen.map((email) => personName(email, people)).join(", ")}
-                >
-                  <Eye className="size-3.5" /> Seen by {seen.length}
-                </span>
-              )}
+              {seen.length > 0 && <SeenBy emails={seen} people={people} />}
             </div>
           )}
         </div>

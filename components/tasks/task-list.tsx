@@ -68,7 +68,7 @@ function Row({
     <tr
       onClick={onOpen}
       tabIndex={0}
-      aria-label={`T-${row.number}: ${row.title}`}
+      aria-label={row.title}
       onKeyDown={(event) => {
         // Keys pressed on a control inside the row (a label) are that control's.
         if (event.target !== event.currentTarget) return;
@@ -150,7 +150,7 @@ function Row({
       <td className="hidden px-3 py-2.5 md:table-cell">
         <DueLabel date={row.dueDate} closed={closed} />
       </td>
-      <td className="hidden px-3 py-2.5 lg:table-cell">
+      <td className="hidden overflow-hidden px-3 py-2.5 lg:table-cell">
         <TaskSource row={row} people={people} />
       </td>
       <td className="hidden whitespace-nowrap px-3 py-2.5 pr-4 text-xs text-gray-500 xl:table-cell">
@@ -186,7 +186,7 @@ function Table({
           <th className="hidden w-[9.5rem] px-3 py-2 font-medium sm:table-cell">Status</th>
           <th className="hidden w-[6.5rem] px-3 py-2 font-medium md:table-cell">Priority</th>
           <th className="hidden w-[8.5rem] px-3 py-2 font-medium md:table-cell">Due</th>
-          <th className="hidden w-[11rem] px-3 py-2 font-medium lg:table-cell">Opened by</th>
+          <th className="hidden w-[8rem] px-3 py-2 font-medium lg:table-cell">Opened by</th>
           <th className="hidden w-[8.5rem] px-3 py-2 pr-4 font-medium xl:table-cell">{done ? "Closed" : "Last update"}</th>
         </tr>
       </thead>

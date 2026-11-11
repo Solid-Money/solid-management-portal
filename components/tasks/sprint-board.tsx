@@ -1,6 +1,7 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState, type DragEvent } from "react";
+import { useDeferredValue, useMemo, useState, useSyncExternalStore, type DragEvent } from "react";
+import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,33 @@ function byUrgency(a: TaskRow, b: TaskRow): number {
   return rank(a) - rank(b) || a.number - b.number;
 }
 
+/** Boards the team can't make or delete; their tasks aren't in the product backlog. */
+const BUILT_IN_BOARDS = new Set(["support", "radar", "marketing"]);
+
+/** Tasks whose move is being saved, across the page (outlives a board remount). */
+let moving: ReadonlySet<string> = new Set();
+const movingListeners = new Set<() => void>();
+const NOTHING_MOVING: ReadonlySet<string> = new Set();
+
+function setMoving(id: string, on: boolean) {
+  const next = new Set(moving);
+  if (on) next.add(id);
+  else next.delete(id);
+  moving = next;
+  for (const listener of movingListeners) listener();
+}
+
+function useMoving(): ReadonlySet<string> {
+  return useSyncExternalStore(
+    (listener) => {
+      movingListeners.add(listener);
+      return () => movingListeners.delete(listener);
+    },
+    () => moving,
+    () => NOTHING_MOVING,
+  );
+}
+
 function Card({
   row,
   people,
@@ -63,6 +91,7 @@ function Card({
   selected,
   draggable,
   showStatus,
+  saving,
   onOpen,
 }: {
   row: TaskRow;
@@ -71,6 +100,8 @@ function Card({
   selected: boolean;
   draggable: boolean;
   showStatus: boolean;
+  /** A move is being saved: it can't be moved again until it lands. */
+  saving: boolean;
   onOpen: () => void;
 }) {
   const closed = row.status === "done" || row.status === "cancelled";
@@ -80,7 +111,8 @@ function Card({
       role="button"
       tabIndex={0}
       aria-label={`${row.title}, task ${row.number}`}
-      draggable={draggable}
+      aria-busy={saving || undefined}
+      draggable={draggable && !saving}
       onDragStart={(event) => {
         event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: row.id, from: "sprint" }));
         event.dataTransfer.effectAllowed = "move";
@@ -95,7 +127,8 @@ function Card({
       className={cn(
         "cursor-pointer rounded-lg border border-gray-200 bg-white p-2.5 shadow-xs outline-none hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-indigo-400",
         selected && "border-indigo-300 ring-1 ring-indigo-200",
-        draggable && "active:cursor-grabbing",
+        draggable && !saving && "active:cursor-grabbing",
+        saving && "opacity-60",
       )}
     >
       {(carried || row.priority) && (
@@ -164,15 +197,12 @@ export default function SprintBoard({
   onStart,
   selected,
   onOpen,
-  onNewTask,
 }: {
   /** A sprint's Monday from the URL; null for this week's. */
   start: string | null;
   onStart: (start: string | null) => void;
   selected: string | null;
   onOpen: (id: string) => void;
-  /** New task, into the sprint shown (null when it's over). */
-  onNewTask: (sprint: string | null) => void;
 }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useTaskSprint(start);
@@ -182,6 +212,12 @@ export default function SprintBoard({
     () => new Map((boardList?.boards ?? []).map((board) => [board.key, board.name])),
     [boardList],
   );
+  // The backlog lists product tasks: on no board or a board the team made.
+  // (Known before the board list loads: support, radar and marketing are built in.)
+  const isProduct = (row: TaskRow) =>
+    !row.marketing &&
+    (!row.board ||
+      (!BUILT_IN_BOARDS.has(row.board) && !boardList?.boards.find((board) => board.key === row.board)?.system));
   const [over, setOver] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const key = TASK_KEYS.sprint(start);
@@ -198,6 +234,9 @@ export default function SprintBoard({
     staleTime: 30_000,
   });
 
+  // One move per task at a time, shared by every board on the page (and
+  // across remounts): the card dims and Add waits until the move lands.
+  const saving = useMoving();
   const move = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TaskPatchInput }) => patchTask(id, input),
     onMutate: async ({ id, input }) => {
@@ -212,20 +251,45 @@ export default function SprintBoard({
             ...(input.sprint !== undefined ? { sprint: input.sprint } : {}),
           };
           const inSprint = moved.sprint === before.sprint.start;
+          // Taken out of the sprint: back on top of the backlog until the refresh
+          // sorts it (product tasks only: the backlog doesn't list the others).
+          const toBacklog =
+            !inSprint && moved.sprint === null && isProduct(moved) && !before.backlog.some((r) => r.id === id);
           queryClient.setQueryData<TaskSprintPage>(key, {
             ...before,
             rows: [...before.rows.filter((r) => r.id !== id), ...(inSprint ? [moved] : [])],
-            backlog: inSprint ? before.backlog.filter((r) => r.id !== id) : before.backlog,
+            backlog: inSprint
+              ? before.backlog.filter((r) => r.id !== id)
+              : toBacklog
+                ? [moved, ...before.backlog]
+                : before.backlog,
           });
         }
       }
       return { before };
     },
-    // The API layer shows the error; put the card back.
-    onError: (_error, _input, context) => {
-      if (context?.before) queryClient.setQueryData(key, context.before);
+    // The API layer shows the error; put this card back where it was, leaving
+    // other cards' moves since then alone.
+    onError: (_error, { id }, context) => {
+      const before = context?.before;
+      const now = queryClient.getQueryData<TaskSprintPage>(key);
+      if (!before || !now) return;
+      const inRows = before.rows.findIndex((r) => r.id === id);
+      const inBacklog = before.backlog.findIndex((r) => r.id === id);
+      const putBack = (list: TaskRow[], index: number, original: TaskRow[]) => {
+        const rest = list.filter((r) => r.id !== id);
+        if (index < 0) return rest;
+        rest.splice(Math.min(index, rest.length), 0, original[index]!);
+        return rest;
+      };
+      queryClient.setQueryData<TaskSprintPage>(key, {
+        ...now,
+        rows: putBack(now.rows, inRows, before.rows),
+        backlog: putBack(now.backlog, inBacklog, before.backlog),
+      });
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { id }) => {
+      setMoving(id, false);
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });
     },
   });
@@ -253,6 +317,12 @@ export default function SprintBoard({
     ? [...shown, ...(found?.rows ?? []).filter((row) => row.sprint === null && !shownIds.has(row.id))]
     : shown;
 
+  const moveOnce = (id: string, input: TaskPatchInput) => {
+    if (moving.has(id)) return;
+    setMoving(id, true);
+    move.mutate({ id, input });
+  };
+
   const drop = (event: DragEvent, column: (typeof COLUMNS)[number]) => {
     event.preventDefault();
     setOver(null);
@@ -261,9 +331,25 @@ export default function SprintBoard({
     if (!dragged) return;
     const row = rows.find((r) => r.id === dragged.id);
     if (dragged.from === "backlog")
-      move.mutate({ id: dragged.id, input: { sprint: sprint.start, status: column.drop } });
+      moveOnce(dragged.id, { sprint: sprint.start, status: column.drop });
     else if (row && !column.statuses.includes(row.status))
-      move.mutate({ id: dragged.id, input: { status: column.drop } });
+      moveOnce(dragged.id, { status: column.drop });
+  };
+
+  // A card dropped on the backlog leaves the sprint (its status stays).
+  const dropOnBacklog = (event: DragEvent) => {
+    event.preventDefault();
+    setOver(null);
+    const dragged = readDrag(event);
+    if (!dragged || dragged.from !== "sprint") return;
+    const row = rows.find((r) => r.id === dragged.id);
+    if (!row || row.status === "done" || row.status === "cancelled") return;
+    moveOnce(dragged.id, { sprint: null });
+    // Support, radar and marketing tasks aren't in the product backlog: say where it went.
+    if (!isProduct(row)) {
+      const board = row.board ? (boardNames.get(row.board) ?? row.board) : null;
+      toast(`Out of the sprint. It stays on ${board ? `the ${board} board` : "its board"}.`);
+    }
   };
 
   return (
@@ -314,18 +400,13 @@ export default function SprintBoard({
             {done} of {counted} done
           </div>
         )}
-        {!past && (
-          <Button variant="outline" size="sm" className="ml-auto" onClick={() => onNewTask(sprint.start)}>
-            <Plus /> Add task
-          </Button>
-        )}
       </div>
 
       {rows.length === 0 && (
         <div className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500">
           {past
             ? `Nothing was finished in the ${sprint.label} sprint.`
-            : `Nothing planned for ${sprint.label} yet. Drag tasks from the backlog below onto the board, or press Add task.`}
+            : `Nothing planned for ${sprint.label} yet. Drag tasks from the backlog below onto the board, or press New task.`}
         </div>
       )}
 
@@ -362,6 +443,7 @@ export default function SprintBoard({
                   selected={selected === row.id}
                   draggable={!past}
                   showStatus={column.statuses.length > 1 && row.status !== column.drop}
+                  saving={saving.has(row.id)}
                   onOpen={() => onOpen(row.id)}
                 />
               ))}
@@ -371,7 +453,24 @@ export default function SprintBoard({
       </div>
 
       {!past && (
-        <section className="rounded-xl border border-gray-200 bg-white">
+        <section
+          aria-label="Backlog"
+          onDragOver={(event) => {
+            if (!event.dataTransfer.types.includes(DRAG_TYPE)) return;
+            event.preventDefault();
+            setOver("backlog");
+          }}
+          onDragLeave={(event) => {
+            // Only when the pointer leaves the backlog, not one of its rows.
+            if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+            setOver((current) => (current === "backlog" ? null : current));
+          }}
+          onDrop={dropOnBacklog}
+          className={cn(
+            "rounded-xl border border-gray-200 bg-white",
+            over === "backlog" && "border-indigo-300 bg-indigo-50/40",
+          )}
+        >
           <header className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-4 py-3">
             <Inbox className="size-4 text-gray-400" />
             <div>
@@ -379,7 +478,8 @@ export default function SprintBoard({
                 Backlog <span className="font-normal text-gray-400">{data.backlog.length}{data.backlogHasMore ? "+" : ""}</span>
               </h3>
               <p className="text-xs text-gray-500">
-                Open product tasks in no sprint, most urgent first. Drag one onto the board, or press Add.
+                Open product tasks in no sprint, most urgent first. Drag one onto the board, or press Add; drag a card
+                back here to take it out of the sprint.
                 {data.backlogHasMore && " Showing the most urgent; search finds the rest."}
               </p>
             </div>
@@ -408,7 +508,8 @@ export default function SprintBoard({
                 return (
                   <li
                     key={row.id}
-                    draggable
+                    draggable={!saving.has(row.id)}
+                    aria-busy={saving.has(row.id) || undefined}
                     onDragStart={(event) => {
                       event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: row.id, from: "backlog" }));
                       event.dataTransfer.effectAllowed = "move";
@@ -440,9 +541,10 @@ export default function SprintBoard({
                       variant="ghost"
                       size="xs"
                       className="shrink-0 text-indigo-700 hover:text-indigo-800"
-                      onClick={() => move.mutate({ id: row.id, input: { sprint: sprint.start } })}
+                      disabled={saving.has(row.id)}
+                      onClick={() => moveOnce(row.id, { sprint: sprint.start })}
                     >
-                      <Plus /> Add
+                      {saving.has(row.id) ? <Loader2 className="animate-spin" /> : <Plus />} Add
                     </Button>
                   </li>
                 );

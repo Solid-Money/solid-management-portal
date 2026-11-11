@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   daysLate,
   firstName,
@@ -189,6 +190,11 @@ export function PriorityLabel({ priority }: { priority: TaskPriority | null }) {
   );
 }
 
+/**
+ * Who opened a task, in one short line that stays in its column: "Support",
+ * "Radar", "Claude" or the person's first name. The detail ("Chat with
+ * vanav") is in the hover; the title already says who it's about.
+ */
 export function TaskSource({ row, people }: { row: TaskRow; people?: TaskPerson[] }) {
   if (row.createdBy.bot || row.source.kind !== "manual") {
     const what =
@@ -200,20 +206,50 @@ export function TaskSource({ row, people }: { row: TaskRow; people?: TaskPerson[
             ? "Claude"
             : authorName(row.createdBy, people);
     return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-600">
+      <SourceDetail detail={row.source.label ? `${what} · ${row.source.label}` : null}>
         <BotAvatar size={18} />
-        <span className="font-medium text-gray-900">{what}</span>
-        {row.source.label && <span>· {row.source.label}</span>}
-      </span>
+        <span className="truncate font-medium text-gray-900">{what}</span>
+        {row.source.label && <span className="sr-only"> · {row.source.label}</span>}
+      </SourceDetail>
     );
   }
   const email = row.createdBy.email;
   if (!email) return null;
+  // The team list's name first; the name stored on the task for someone not on it.
+  const known = !!people?.find((person) => person.email === email)?.name;
+  const name = known ? personName(email, people) : (row.createdBy.name ?? personName(email, people));
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+    <SourceDetail detail={name}>
       <Avatar email={email} people={people} size={18} />
-      {firstName(email, people)}
-    </span>
+      <span className="truncate">{known ? firstName(email, people) : name.split(" ")[0]}</span>
+    </SourceDetail>
+  );
+}
+
+/** The cell, with its detail on hover or keyboard focus (the drawer shows it on touch). */
+function SourceDetail({ detail, children }: { detail: string | null; children: ReactNode }) {
+  const cell = "flex min-w-0 items-center gap-1.5 text-xs text-gray-600";
+  if (!detail) return <span className={cell}>{children}</span>;
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          // Its row ignores keys from inside it: Enter/Space here opens the task too.
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            event.currentTarget.closest<HTMLElement>("tr, [role='button']")?.click();
+          }}
+          className={cn(cell, "rounded outline-none focus-visible:ring-2 focus-visible:ring-indigo-400")}
+        >
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6} className="max-w-[min(20rem,calc(100vw-2rem))] [overflow-wrap:anywhere]">
+        {detail}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
