@@ -189,6 +189,11 @@ export function PriorityLabel({ priority }: { priority: TaskPriority | null }) {
   );
 }
 
+/**
+ * Who opened a task, in one short line that stays in its column: "Support",
+ * "Radar", "Claude" or the person's first name. The detail ("Chat with
+ * vanav") is in the hover; the title already says who it's about.
+ */
 export function TaskSource({ row, people }: { row: TaskRow; people?: TaskPerson[] }) {
   if (row.createdBy.bot || row.source.kind !== "manual") {
     const what =
@@ -200,19 +205,21 @@ export function TaskSource({ row, people }: { row: TaskRow; people?: TaskPerson[
             ? "Claude"
             : authorName(row.createdBy, people);
     return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-600">
+      <span
+        className="flex min-w-0 items-center gap-1.5 text-xs text-gray-600"
+        title={row.source.label ? `${what} · ${row.source.label}` : what}
+      >
         <BotAvatar size={18} />
-        <span className="font-medium text-gray-900">{what}</span>
-        {row.source.label && <span>· {row.source.label}</span>}
+        <span className="truncate font-medium text-gray-900">{what}</span>
       </span>
     );
   }
   const email = row.createdBy.email;
   if (!email) return null;
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+    <span className="flex min-w-0 items-center gap-1.5 text-xs text-gray-600" title={personName(email, people)}>
       <Avatar email={email} people={people} size={18} />
-      {firstName(email, people)}
+      <span className="truncate">{firstName(email, people)}</span>
     </span>
   );
 }
