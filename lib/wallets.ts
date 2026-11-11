@@ -10,6 +10,7 @@ import {
   WalletFlowResponse,
   WalletForecastResponse,
   WalletInfo,
+  WalletOwedNow,
   WalletPlansResponse,
   WalletRefillPlan,
   WalletRole,
@@ -334,6 +335,12 @@ export const assetRefillPlan = (
   flow?: WalletAssetFlow
 ): WalletRefillPlan | undefined => plan?.plan ?? flow?.plan;
 
+/** Payouts queued behind this balance, from the same read as the verdict. */
+export const assetOwedNow = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): WalletOwedNow | undefined => plan?.owedNow ?? flow?.owedNow;
+
 /** Days of cover to quote, from the same read as the verdict and the floor. */
 export const assetRunwayDays = (
   plan?: WalletAssetPlan,
@@ -422,6 +429,20 @@ export function formatAmount(value: string | number): string {
   const abs = Math.abs(amount);
   const decimals = abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.001 ? 4 : 8;
   return formatNumber(amount, decimals, 0);
+}
+
+/**
+ * A minimum to send, rounded *up* at the precision it is shown at.
+ *
+ * `formatAmount` rounds to nearest, which is right for a balance and wrong for
+ * "send at least": 2,123.40 shown as 2,123 is a send that leaves a refund a
+ * fraction short and still queued.
+ */
+export function formatAtLeast(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return formatAmount(value);
+  const decimals = value >= 1000 ? 0 : value >= 1 ? 2 : value >= 0.001 ? 4 : 8;
+  const step = 10 ** decimals;
+  return formatAmount(Math.ceil(value * step - 1e-9) / step);
 }
 
 /** A USD figure, or an em dash when there is nothing to price. */

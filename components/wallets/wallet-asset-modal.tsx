@@ -12,15 +12,19 @@ import {
   X,
 } from "lucide-react";
 import {
+  RefundQueueItem,
+  RefundQueueResponse,
   WalletAsset,
   WalletAssetFlow,
   WalletFailureEvent,
   WalletInfo,
+  WalletOwedNow,
   WalletTransfer,
 } from "@/types";
 import {
   formatAge,
   formatAmount,
+  formatAtLeast,
   formatDateTime,
   formatRunway,
   formatWalletUsd,
@@ -103,20 +107,31 @@ export default function WalletAssetModal({
         />
 
         <div className="flex gap-1 border-b border-gray-200 px-5">
-          {TABS.map((entry) => (
-            <button
-              key={entry.key}
-              title={entry.hint}
-              onClick={() => setTab(entry.key)}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                tab === entry.key
-                  ? "border-indigo-600 text-indigo-700"
-                  : "border-transparent text-gray-500 hover:text-gray-800"
-              }`}
-            >
-              {entry.label}
-            </button>
-          ))}
+          {TABS.map((entry) => {
+            // On the refund wallet the forecast is the list of refunds still
+            // owed, and that is what an operator comes here looking for.
+            const isRefundQueue =
+              entry.key === "forecast" &&
+              wallet.forecastSource === "card_refund";
+            return (
+              <button
+                key={entry.key}
+                title={
+                  isRefundQueue
+                    ? "Every card refund owed and not yet paid"
+                    : entry.hint
+                }
+                onClick={() => setTab(entry.key)}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                  tab === entry.key
+                    ? "border-indigo-600 text-indigo-700"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                {isRefundQueue ? "Refund queue" : entry.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -203,13 +218,21 @@ function Header({
                 : "—"
             }
             note={
-              flow.realCostPerDay != null
+              (flow.realCostPerDay != null
                 ? "measured net of top-ups — what we actually spend"
                 : flow.isFloat
                 ? "not measured yet; outflow here is users' money, not cost"
                 : flow.outflowPerDay > 0
                 ? "from transfers out — excludes gas spent as fees"
-                : "nothing observed leaving in the window"
+                : "nothing observed leaving in the window") +
+              (flow.observedDays != null && flow.observedDays < 6.5
+                ? ` · over ${flow.observedDays.toFixed(1)} days watched`
+                : "") +
+              (flow.excludedOneOff
+                ? ` · leaves out a one-off ${formatAmount(
+                    flow.excludedOneOff.amount
+                  )} on ${flow.excludedOneOff.timestamp.slice(0, 10)}`
+                : "")
             }
           />
           <Stat
@@ -249,6 +272,30 @@ function Header({
         </div>
       )}
 
+      {flow?.owedNow && flow.owedNow.count + flow.owedNow.failedCount > 0 && (
+        <OwedNowNote owed={flow.owedNow} label={label} />
+      )}
+
+      {flow?.excludedOneOff && (
+        <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <strong>
+            One transfer of {formatAmount(flow.excludedOneOff.amount)} {label}
+          </strong>{" "}
+          on {formatDateTime(flow.excludedOneOff.timestamp)} was{" "}
+          {Math.round(flow.excludedOneOff.share * 100)}% of everything that left
+          in the window, so the daily rate leaves it out — it is not what this
+          wallet spends each day.{" "}
+          <a
+            href={flow.excludedOneOff.explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-amber-900 underline"
+          >
+            View <ExternalLink className="h-3 w-3" />
+          </a>
+        </p>
+      )}
+
       {flow?.plan && (
         <div
           className={`mt-3 rounded border px-3 py-2 text-xs ${
@@ -271,7 +318,11 @@ function Header({
               ) : (
                 <>
                   to reach {flow.plan.targetDays} days of cover (
-                  {formatAmount(flow.plan.targetAmount)} {label}).
+                  {formatAmount(flow.plan.targetAmount)} {label})
+                  {flow.plan.owedAmount
+                    ? `, on top of ${formatAmount(flow.plan.owedAmount)} ${label} for the queued refunds`
+                    : ""}
+                  .
                 </>
               )}
             </>
@@ -305,6 +356,62 @@ function Header({
           <strong>How to top up:</strong> {wallet.topUpHint}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Payouts already queued behind this balance, said before anything about
+ * cover: it is the smallest send that gets somebody paid.
+ */
+function OwedNowNote({ owed, label }: { owed: WalletOwedNow; label: string }) {
+  const short = owed.clearAmount > 0;
+  const what = owed.count === 1 ? "refund" : "refunds";
+
+  return (
+    <div
+      className={`mt-3 rounded border px-3 py-2 text-xs ${
+        short
+          ? "border-red-200 bg-red-50 text-red-900"
+          : "border-gray-200 bg-gray-50 text-gray-700"
+      }`}
+    >
+      {owed.count > 0 &&
+        (short ? (
+          <>
+            <strong>
+              {owed.count} queued {what} ({formatAmount(owed.amount)} {label})
+              cannot be paid.
+            </strong>{" "}
+            Send at least{" "}
+            <strong>
+              {formatAtLeast(owed.clearAmount)} {label}
+            </strong>{" "}
+            to clear {owed.count === 1 ? "it" : "them"}
+            {owed.oldestAt ? `; the oldest has waited ${formatAge(owed.oldestAt)}` : ""}.
+          </>
+        ) : (
+          <>
+            {owed.count} queued {what} ({formatAmount(owed.amount)} {label}) —
+            covered, and set aside before the cover below is counted. They pay on
+            the next run.
+          </>
+        ))}
+      {owed.failedCount > 0 && (
+        <span className="block opacity-80">
+          {owed.failedCount} more {owed.failedCount === 1 ? "waits" : "wait"} on
+          an operator and {owed.failedCount === 1 ? "is" : "are"} not counted.
+        </span>
+      )}
+      {owed.unpricedCount > 0 && (
+        <span className="block opacity-80">
+          {owed.unpricedCount} could not be converted to {label} right now and{" "}
+          {owed.unpricedCount === 1 ? "is" : "are"} not in the total.
+        </span>
+      )}
+      <span className="block opacity-80">
+        The Refund queue tab lists every one of them.
+      </span>
     </div>
   );
 }
@@ -648,6 +755,10 @@ function ForecastTab({ wallet }: { wallet: WalletInfo }) {
     );
   }
 
+  if (data.refundQueue) {
+    return <RefundQueuePanel queue={data.refundQueue} note={data.note} />;
+  }
+
   const shortfall = data.coverage?.shortfallUsd ?? 0;
   const maxBucket = Math.max(...data.byDueDate.map((b) => b.usd), 1);
 
@@ -748,6 +859,157 @@ function ForecastTab({ wallet }: { wallet: WalletInfo }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Every card refund owed and not yet paid, oldest first.
+ *
+ * The list there was no home for: a refund queued behind an empty payout
+ * wallet only surfaced under "Affected users" once it had already failed, and
+ * one waiting quietly for its first attempt did not surface at all.
+ */
+function RefundQueuePanel({
+  queue,
+  note,
+}: {
+  queue: RefundQueueResponse;
+  note?: string;
+}) {
+  const usd = queue.owed.byCurrency.USD;
+  const eur = queue.owed.byCurrency.EUR;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat
+          label="Owed now"
+          value={formatWalletUsd(queue.owed.usd)}
+          note={
+            queue.owed.oldestAt
+              ? `${queue.owed.count} refunds; oldest waiting ${formatAge(queue.owed.oldestAt)}`
+              : `${queue.owed.count} refunds waiting`
+          }
+        />
+        <Stat
+          label="In USDC"
+          value={formatAmount(usd.tokenAmount)}
+          note={`${usd.count} paid back in dollars`}
+        />
+        <Stat
+          label="In EURC"
+          value={formatAmount(eur.tokenAmount)}
+          note={
+            eur.unpricedCount > 0
+              ? `${eur.count} in euros; ${eur.unpricedCount} not priced`
+              : `${eur.count} paid back in euros`
+          }
+        />
+        <Stat
+          label="Needs an operator"
+          value={String(queue.failed.count)}
+          note={
+            queue.failed.count > 0
+              ? `${formatWalletUsd(queue.failed.usd)} stopped retrying`
+              : "nothing stopped retrying"
+          }
+        />
+      </div>
+
+      {note && <p className="text-xs text-gray-500">{note}</p>}
+      {queue.truncated && (
+        <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          More refunds are waiting than this list shows — the oldest{" "}
+          {queue.items.length} are listed and the totals cover only those.
+        </p>
+      )}
+
+      {queue.items.length === 0 ? (
+        <Empty>No refunds are waiting. Every refund recorded has been paid.</Empty>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="border-b border-gray-200 text-left text-xs uppercase text-gray-500">
+            <tr>
+              <th className="py-2 pr-3">Waiting</th>
+              <th className="py-2 pr-3">Amount</th>
+              <th className="py-2 pr-3">Status</th>
+              <th className="py-2">Cardholder · last error</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {queue.items.map((item) => (
+              <RefundQueueRow key={item.uniqueOperationId} item={item} />
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function RefundQueueRow({ item }: { item: RefundQueueItem }) {
+  return (
+    <tr className="align-top">
+      <td className="py-2 pr-3 whitespace-nowrap text-gray-600">
+        <div>{formatAge(item.createdAt)}</div>
+        <div className="text-[11px] text-gray-400">
+          {item.createdAt ? formatDateTime(item.createdAt) : "—"}
+        </div>
+      </td>
+      <td className="py-2 pr-3 whitespace-nowrap">
+        <div className="font-medium text-gray-900">
+          {item.tokenAmount != null
+            ? `${formatAmount(item.tokenAmount)} ${item.symbol}`
+            : `— ${item.symbol}`}
+        </div>
+        <div className="text-[11px] text-gray-500">
+          {formatWalletUsd(item.amountUsd)}
+          {item.reason ? ` · ${item.reason}` : ""}
+        </div>
+      </td>
+      <td className="py-2 pr-3 whitespace-nowrap text-xs">
+        <span
+          className={`rounded px-1.5 py-0.5 font-medium ${
+            item.autoPayable
+              ? "bg-amber-100 text-amber-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
+          {item.autoPayable ? item.status : `${item.status} · operator`}
+        </span>
+        <div className="mt-1 text-[11px] text-gray-500">
+          {item.attempts} attempt{item.attempts === 1 ? "" : "s"}
+          {item.nextAttemptAt && item.autoPayable
+            ? ` · next ${formatDateTime(item.nextAttemptAt)}`
+            : ""}
+        </div>
+      </td>
+      <td className="py-2 text-xs">
+        {item.userId ? (
+          <a
+            href={`/users/${item.userId}`}
+            className="font-mono text-indigo-600 hover:underline"
+          >
+            {item.userId}
+          </a>
+        ) : (
+          <span className="text-gray-400">no user on record</span>
+        )}
+        {item.lastError && (
+          <p className="mt-1 break-words text-gray-700">
+            {item.attributedToBalance && (
+              <span className="mr-1 inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-800">
+                <AlertCircle className="h-3 w-3" /> out of funds
+              </span>
+            )}
+            {item.lastError}
+          </p>
+        )}
+        <p className="mt-1 font-mono text-[11px] text-gray-400">
+          {item.uniqueOperationId}
+        </p>
+      </td>
+    </tr>
   );
 }
 

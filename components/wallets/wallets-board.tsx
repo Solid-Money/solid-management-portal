@@ -31,6 +31,7 @@ import {
   chainStatuses,
   formatAge,
   formatAmount,
+  formatAtLeast,
   formatRunway,
   getWalletFlow,
   getWalletPlans,
@@ -41,6 +42,7 @@ import {
   severityOf,
   truncateAddress,
   assetVerdict,
+  assetOwedNow,
   assetRefillPlan,
   assetRunwayDays,
   walletSeverity,
@@ -820,6 +822,11 @@ function WalletCard({
  * operator to send 200 USDC to the Card Deposit Manager, which is the one
  * action its own config says must never be taken. A balance there is a user's
  * card deposit that never reached their card.
+ *
+ * Payouts already queued behind a balance — card refunds waiting on a top-up —
+ * get a line of their own, above the cover figure. It is the smallest send
+ * that gets somebody paid, and folding it into "N days of cover" hid the one
+ * number an operator needs first.
  */
 function TopUpInstruction({
   wallet,
@@ -831,6 +838,14 @@ function TopUpInstruction({
   planFor: (chainId: number, asset: WalletAsset) => WalletAssetPlan | undefined;
 }) {
   const stuck: Array<{ chainName: string; text: string }> = [];
+  const queued: Array<{
+    chainId: number;
+    chainName: string;
+    text: string;
+    count: number;
+    owed: string;
+    oldestAt?: string;
+  }> = [];
 
   const shortfalls = wallet.chains
     .map((chain) => ({
@@ -840,6 +855,7 @@ function TopUpInstruction({
           const assetPlan = planFor(chain.chainId, reading.asset);
           const flow = flowByAsset.get(`${chain.chainId}:${reading.asset}`);
           const refill = assetRefillPlan(assetPlan, flow);
+          const owedNow = assetOwedNow(assetPlan, flow);
 
           if (assetPlan?.isResidue) {
             if (assetPlan.verdict === "CRITICAL") {
@@ -851,16 +867,40 @@ function TopUpInstruction({
             return null;
           }
 
+          if (owedNow && owedNow.count > 0 && owedNow.clearAmount > 0) {
+            queued.push({
+              chainId: chain.chainId,
+              chainName: chain.chainName,
+              text: `${formatAtLeast(owedNow.clearAmount)} ${reading.label}`,
+              count: owedNow.count,
+              owed: `${formatAmount(owedNow.amount)} ${reading.label}`,
+              ...(owedNow.oldestAt ? { oldestAt: owedNow.oldestAt } : {}),
+            });
+          }
+
           if (refill?.refillAmount && refill.refillAmount > 0) {
             return {
+              kind: "cover" as const,
               text: `${formatAmount(refill.refillAmount)} ${reading.label}`,
-              detail: `brings it to ${refill.targetDays} days of cover`,
+              detail:
+                refill.owedAmount && refill.owedAmount > 0
+                  ? `pays the queued refunds and brings it to ${refill.targetDays} days of cover`
+                  : `brings it to ${refill.targetDays} days of cover`,
+            };
+          }
+          if (owedNow && owedNow.clearAmount > 0) {
+            // No cost measured yet, but the queue is a figure in its own right.
+            return {
+              kind: "minimum" as const,
+              text: `${formatAtLeast(owedNow.clearAmount)} ${reading.label}`,
+              detail: "pays the queued refunds — no cost measured yet for cover",
             };
           }
           // No measured cost to plan from, so fall back to the fixed floor.
           const verdict = assetVerdict(reading.status, assetPlan, flow);
           if (verdict === "LOW" || verdict === "CRITICAL") {
             return {
+              kind: "minimum" as const,
               text: `${formatAmount(reading.threshold)} ${reading.label}`,
               detail: "its configured floor — no cost measured yet",
             };
@@ -871,7 +911,9 @@ function TopUpInstruction({
     }))
     .filter((row) => row.needs.length > 0);
 
-  if (shortfalls.length === 0 && stuck.length === 0) return null;
+  if (shortfalls.length === 0 && stuck.length === 0 && queued.length === 0) {
+    return null;
+  }
 
   return (
     <div className="border-t border-gray-200 px-4 py-3">
@@ -882,9 +924,34 @@ function TopUpInstruction({
           Investigate where it stopped.
         </p>
       ))}
+      {queued.map((row) => (
+        <p
+          key={`queued-${row.chainId}-${row.text}`}
+          className="mb-1 text-sm text-red-900"
+        >
+          <strong>
+            {row.count} queued {row.count === 1 ? "refund" : "refunds"} (
+            {row.owed}) cannot be paid.
+          </strong>{" "}
+          Send at least <strong>{row.text}</strong> on {row.chainName} to clear{" "}
+          {row.count === 1 ? "it" : "them"}
+          {row.oldestAt ? (
+            <span className="text-xs text-red-800">
+              {" "}
+              — oldest waiting {formatAge(row.oldestAt)}
+            </span>
+          ) : null}
+          . The Refund queue tab lists them.
+        </p>
+      ))}
       {shortfalls.map(({ chain, needs }) => (
         <p key={chain.chainId} className="text-sm text-gray-800">
-          Send at least{" "}
+          {/* "To reach", not "send at least", when this is the cover target:
+              reading a target as a minimum is how 18K looked like a
+              requirement. A configured floor or a queue really is a minimum. */}
+          {needs.every((need) => need.kind === "cover")
+            ? "To reach target cover, send"
+            : "Send at least"}{" "}
           <strong>{needs.map((need) => need.text).join(" and ")}</strong> on{" "}
           {chain.chainName} to{" "}
           <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
