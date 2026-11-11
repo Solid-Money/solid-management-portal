@@ -63,3 +63,23 @@ export function isAllowedSignInProvider(
   return signInProvider === ADMIN_SIGN_IN_PROVIDER;
 }
 
+/**
+ * Lets only the newest of overlapping async runs act. Firebase calls the auth
+ * listener again while an earlier call may still be awaiting (reading the ID
+ * token), e.g. a sign-out in another tab: the earlier call must not then
+ * apply its stale user. `begin()` starts a run and returns a check that stays
+ * true until the next `begin()` or `cancel()`.
+ */
+export function latestRun() {
+  let current = 0;
+  return {
+    begin(): () => boolean {
+      const run = ++current;
+      return () => run === current;
+    },
+    /** No run started so far may act any more (the listener is gone). */
+    cancel(): void {
+      current += 1;
+    },
+  };
+}

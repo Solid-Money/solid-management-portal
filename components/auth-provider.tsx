@@ -8,6 +8,7 @@ import {
   validateUserDomain,
   getAllowedDomain,
   isAllowedSignInProvider,
+  latestRun,
 } from '@/lib/auth';
 import { toast } from 'sonner';
 
@@ -89,9 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const runs = latestRun();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const isCurrent = runs.begin();
       console.log('[AuthProvider] Auth state changed:', firebaseUser ? 'User signed in' : 'No user');
-      
+
       if (firebaseUser) {
         console.log('[AuthProvider] User details:', {
           email: firebaseUser.email,
@@ -107,6 +110,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // password set through a reset email) is signed out here, the same
         // rule the backend enforces on every request.
         const usesGoogle = isValid && (await signedInWithGoogle(firebaseUser));
+
+        // The session changed while its token was read (signed out in another
+        // tab, another account signed in): the newer call owns the state, and
+        // this one must not put the old user back.
+        if (!isCurrent()) return;
 
         if (isValid && !usesGoogle) {
           console.warn('[AuthProvider] Session is not a Google sign-in, signing out');
@@ -163,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       console.log('[AuthProvider] Cleaning up auth listener');
+      runs.cancel();
       unsubscribe();
     };
   }, []);
