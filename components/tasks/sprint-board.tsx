@@ -164,15 +164,12 @@ export default function SprintBoard({
   onStart,
   selected,
   onOpen,
-  onNewTask,
 }: {
   /** A sprint's Monday from the URL; null for this week's. */
   start: string | null;
   onStart: (start: string | null) => void;
   selected: string | null;
   onOpen: (id: string) => void;
-  /** New task, into the sprint shown (null when it's over). */
-  onNewTask: (sprint: string | null) => void;
 }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useTaskSprint(start);
@@ -212,10 +209,16 @@ export default function SprintBoard({
             ...(input.sprint !== undefined ? { sprint: input.sprint } : {}),
           };
           const inSprint = moved.sprint === before.sprint.start;
+          // Taken out of the sprint: back on top of the backlog until the refresh sorts it.
+          const toBacklog = !inSprint && moved.sprint === null && !before.backlog.some((r) => r.id === id);
           queryClient.setQueryData<TaskSprintPage>(key, {
             ...before,
             rows: [...before.rows.filter((r) => r.id !== id), ...(inSprint ? [moved] : [])],
-            backlog: inSprint ? before.backlog.filter((r) => r.id !== id) : before.backlog,
+            backlog: inSprint
+              ? before.backlog.filter((r) => r.id !== id)
+              : toBacklog
+                ? [moved, ...before.backlog]
+                : before.backlog,
           });
         }
       }
@@ -266,6 +269,17 @@ export default function SprintBoard({
       move.mutate({ id: dragged.id, input: { status: column.drop } });
   };
 
+  // A card dropped on the backlog leaves the sprint (its status stays).
+  const dropOnBacklog = (event: DragEvent) => {
+    event.preventDefault();
+    setOver(null);
+    const dragged = readDrag(event);
+    if (!dragged || dragged.from !== "sprint") return;
+    const row = rows.find((r) => r.id === dragged.id);
+    if (!row || row.status === "done" || row.status === "cancelled") return;
+    move.mutate({ id: dragged.id, input: { sprint: null } });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -314,18 +328,13 @@ export default function SprintBoard({
             {done} of {counted} done
           </div>
         )}
-        {!past && (
-          <Button variant="outline" size="sm" className="ml-auto" onClick={() => onNewTask(sprint.start)}>
-            <Plus /> Add task
-          </Button>
-        )}
       </div>
 
       {rows.length === 0 && (
         <div className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500">
           {past
             ? `Nothing was finished in the ${sprint.label} sprint.`
-            : `Nothing planned for ${sprint.label} yet. Drag tasks from the backlog below onto the board, or press Add task.`}
+            : `Nothing planned for ${sprint.label} yet. Drag tasks from the backlog below onto the board, or press New task.`}
         </div>
       )}
 
@@ -371,7 +380,24 @@ export default function SprintBoard({
       </div>
 
       {!past && (
-        <section className="rounded-xl border border-gray-200 bg-white">
+        <section
+          aria-label="Backlog"
+          onDragOver={(event) => {
+            if (!event.dataTransfer.types.includes(DRAG_TYPE)) return;
+            event.preventDefault();
+            setOver("backlog");
+          }}
+          onDragLeave={(event) => {
+            // Only when the pointer leaves the backlog, not one of its rows.
+            if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+            setOver((current) => (current === "backlog" ? null : current));
+          }}
+          onDrop={dropOnBacklog}
+          className={cn(
+            "rounded-xl border border-gray-200 bg-white",
+            over === "backlog" && "border-indigo-300 bg-indigo-50/40",
+          )}
+        >
           <header className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-4 py-3">
             <Inbox className="size-4 text-gray-400" />
             <div>
@@ -379,7 +405,8 @@ export default function SprintBoard({
                 Backlog <span className="font-normal text-gray-400">{data.backlog.length}{data.backlogHasMore ? "+" : ""}</span>
               </h3>
               <p className="text-xs text-gray-500">
-                Open product tasks in no sprint, most urgent first. Drag one onto the board, or press Add.
+                Open product tasks in no sprint, most urgent first. Drag one onto the board, or press Add; drag a card
+                back here to take it out of the sprint.
                 {data.backlogHasMore && " Showing the most urgent; search finds the rest."}
               </p>
             </div>

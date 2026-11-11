@@ -254,7 +254,6 @@ function TasksScreen() {
           onStart={(start) => update({ sprint: start })}
           selected={open}
           onOpen={(id) => update({ task: id })}
-          onNewTask={(start) => setCreating({ sprint: start })}
         />
       ) : tab === "marketing" ? (
         <MarketingBoard
