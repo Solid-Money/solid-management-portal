@@ -395,7 +395,11 @@ function ReactionPeople({ update, people }: { update: TaskUpdate; people: TaskPe
           <Users className="size-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-auto max-w-[min(16rem,calc(100vw-2rem))] space-y-2 p-2.5 text-xs text-gray-800">
+      <PopoverContent
+        side="top"
+        align="start"
+        className="max-h-[min(24rem,var(--radix-popover-content-available-height))] w-auto max-w-[min(16rem,calc(100vw-2rem))] space-y-2 overflow-y-auto p-2.5 text-xs text-gray-800"
+      >
         {update.reactions.map((reaction) => (
           <div key={reaction.emoji}>
             <PeopleList title={`Reacted ${reaction.emoji}`} emails={reaction.emails} people={people} focusable />

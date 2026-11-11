@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState, type DragEvent } from "react";
+import { useDeferredValue, useMemo, useState, useSyncExternalStore, type DragEvent } from "react";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Plus, Search } from "lucide-react";
@@ -58,7 +58,28 @@ function byUrgency(a: TaskRow, b: TaskRow): number {
 }
 
 /** Tasks whose move is being saved, across the page (outlives a board remount). */
-const MOVING = new Set<string>();
+let moving: ReadonlySet<string> = new Set();
+const movingListeners = new Set<() => void>();
+const NOTHING_MOVING: ReadonlySet<string> = new Set();
+
+function setMoving(id: string, on: boolean) {
+  const next = new Set(moving);
+  if (on) next.add(id);
+  else next.delete(id);
+  moving = next;
+  for (const listener of movingListeners) listener();
+}
+
+function useMoving(): ReadonlySet<string> {
+  return useSyncExternalStore(
+    (listener) => {
+      movingListeners.add(listener);
+      return () => movingListeners.delete(listener);
+    },
+    () => moving,
+    () => NOTHING_MOVING,
+  );
+}
 
 function Card({
   row,
@@ -207,16 +228,9 @@ export default function SprintBoard({
     staleTime: 30_000,
   });
 
-  // One move per task at a time (MOVING outlives the board, so a remount
-  // can't start a second one), shown on screen: the card dims and Add waits.
-  const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set(MOVING));
-  const markSaving = (id: string, on: boolean) =>
-    setSaving((current) => {
-      const next = new Set(current);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  // One move per task at a time, shared by every board on the page (and
+  // across remounts): the card dims and Add waits until the move lands.
+  const saving = useMoving();
   const move = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TaskPatchInput }) => patchTask(id, input),
     onMutate: async ({ id, input }) => {
@@ -269,8 +283,7 @@ export default function SprintBoard({
       });
     },
     onSettled: (_data, _error, { id }) => {
-      MOVING.delete(id);
-      markSaving(id, false);
+      setMoving(id, false);
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });
     },
   });
@@ -299,9 +312,8 @@ export default function SprintBoard({
     : shown;
 
   const moveOnce = (id: string, input: TaskPatchInput) => {
-    if (MOVING.has(id)) return;
-    MOVING.add(id);
-    markSaving(id, true);
+    if (moving.has(id)) return;
+    setMoving(id, true);
     move.mutate({ id, input });
   };
 
