@@ -226,6 +226,9 @@ export default function AiApiUserPage({
 
   const liveKeys = view.keys.filter((key) => !key.revokedAt);
   const deletedKeys = view.keys.filter((key) => key.revokedAt);
+  // Cache write gets a column only when a key wrote to the cache this month.
+  const showCacheWrite = liveKeys.some((key) => (key.tokensThisMonth?.cacheWrite ?? 0) > 0);
+  const keyColumns = showCacheWrite ? 11 : 10;
 
   return (
     <div className="space-y-6 pb-24">
@@ -390,7 +393,10 @@ export default function AiApiUserPage({
         />
       </Card>
 
-      <Card title="Keys" description="Limits can only be lowered here. Raising one needs a mandate only the user can sign.">
+      <Card
+        title="Keys"
+        description="Limits can only be lowered here. Raising one needs a mandate only the user can sign. Tokens are this month's."
+      >
         <div className="overflow-x-auto rounded-md border border-gray-200">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -399,6 +405,10 @@ export default function AiApiUserPage({
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2 text-right">This month</th>
                 <th className="px-4 py-2 text-right">Requests</th>
+                <th className="px-4 py-2 text-right">Input</th>
+                <th className="px-4 py-2 text-right">Cached input</th>
+                {showCacheWrite ? <th className="px-4 py-2 text-right">Cache write</th> : null}
+                <th className="px-4 py-2 text-right">Output</th>
                 <th className="px-4 py-2">Last used</th>
                 <th className="px-4 py-2">Created</th>
                 <th className="px-4 py-2" aria-label="Actions" />
@@ -407,7 +417,7 @@ export default function AiApiUserPage({
             <tbody className="divide-y divide-gray-100">
               {liveKeys.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan={keyColumns} className="px-4 py-6 text-center text-gray-500">
                     No live keys.
                   </td>
                 </tr>
@@ -431,6 +441,20 @@ export default function AiApiUserPage({
                     {formatUsd(key.spentThisMonthUsd)} / {formatUsd(key.monthlyLimitUsd, 0)}
                   </td>
                   <td className="px-4 py-2 text-right">{key.requestsThisMonth.toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right">
+                    {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.input) : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.cachedInput) : "—"}
+                  </td>
+                  {showCacheWrite ? (
+                    <td className="px-4 py-2 text-right">
+                      {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.cacheWrite) : "—"}
+                    </td>
+                  ) : null}
+                  <td className="px-4 py-2 text-right">
+                    {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.output) : "—"}
+                  </td>
                   <td className="px-4 py-2 text-gray-600">
                     {key.lastUsedAt ? formatDateTime(key.lastUsedAt) : "Never"}
                   </td>
