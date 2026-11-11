@@ -2047,6 +2047,13 @@ export interface UserCardOverview {
    * be read, so absence means "unknown", not "not blocked".
    */
   spendBlock?: CardSpendBlock;
+  /**
+   * Whether the cardholder turned Base spending on. Wirex cards only. Until
+   * they do, a deposit sent on any network but Fuse that lands in their Safe on
+   * Base is out of the card's reach. Only they can turn it on, in the app.
+   * Absent when it could not be read, so absence means "unknown", not "off".
+   */
+  baseSpendEnabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

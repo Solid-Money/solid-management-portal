@@ -214,6 +214,21 @@ function WirexSpendBreakdown({ card }: { card: UserCardOverview }) {
         monthly
       </p>
 
+      {card.baseSpendEnabled !== undefined && (
+        <p className="text-[11px] text-gray-500">
+          Base spending:{" "}
+          {card.baseSpendEnabled ? (
+            <span className="font-medium text-gray-900">On</span>
+          ) : (
+            <>
+              <span className="font-medium text-amber-700">Off</span> — money
+              in their Safe on Base is out of the card&apos;s reach until they
+              tap &ldquo;Turn on Base&rdquo; in the app. Only they can do it.
+            </>
+          )}
+        </p>
+      )}
+
       <p className="text-xs text-gray-600">
         {blocker ??
           "This card spends the user's own assets directly — there is no balance to top up."}
