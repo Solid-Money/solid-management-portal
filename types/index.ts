@@ -3271,6 +3271,124 @@ export interface PartialRefundRestoreResult {
   users: number;
 }
 
+/**
+ * A cashback rate audit: credited rows in a window checked against the rate they
+ * should have earned, and the shortfall topped up. `dryRun` defaults to true on
+ * the server; only an explicit `false` pays.
+ */
+export interface CashbackRateAuditRequest {
+  /** The rate every row should have earned, as a fraction (0.04 is 4%). */
+  rate: number;
+  /** Inclusive start, ISO 8601. */
+  from: string;
+  /** Exclusive end, ISO 8601. */
+  to: string;
+  dateField?: "postedAt" | "createdAt";
+  /** Issuer transaction ids to restrict the audit to. */
+  transactionIds?: string[];
+  /** Replaces each cardholder's tier ceiling for this run, in USD. */
+  monthlyCapUsd?: number;
+  /** Pay cardholders who owe cashback debt. Off by default. */
+  includeUsersWithDebt?: boolean;
+  dryRun: boolean;
+}
+
+/** One short-paid cardholder, and what they are owed before the monthly cap. */
+export interface CashbackRateAuditAffectedUser {
+  userId: string;
+  email?: string;
+  username?: string;
+  rows: number;
+  paidUsd: number;
+  owedUsd: number;
+  topUpUsd: number;
+  /** False when there is nowhere to send it: no account, or no Safe. */
+  payable: boolean;
+  /** Skipped unless `includeUsersWithDebt` is set. */
+  hasActiveDebt: boolean;
+}
+
+/** A cardholder whose monthly cap reduced or blocked their correction. */
+export interface CashbackRateAuditCapHeadroom {
+  userId: string;
+  bridgeCustomerId: string;
+  monthlyCap: number;
+  /** Cashback already credited this calendar month, in USD. */
+  earnedUsd: number;
+  headroomUsd: number;
+  /** What this run will actually send them. */
+  allowedUsd: number;
+  blockedRows: number;
+  clampedRows: number;
+}
+
+export interface CashbackRateAuditResult {
+  dryRun: boolean;
+  window: { from: string; to: string; dateField: string };
+  /** How many ids the audit was restricted to; null when it audited the whole window. */
+  transactionIdsRequested: number | null;
+  /** The cap override applied, or null when tier ceilings applied. */
+  monthlyCapUsd: number | null;
+  expectedRate: number;
+  tolerancePct: number;
+  audited: number;
+  correct: number;
+  underpaid: number;
+  alreadyToppedUp: number;
+  /** Underpaid rows that will actually be paid. */
+  payableRows: number;
+  capBlockedRows: number;
+  capClampedRows: number;
+  capByCustomer: CashbackRateAuditCapHeadroom[];
+  spendUsd: number;
+  paidUsd: number;
+  owedUsd: number;
+  /** What will be sent across every payable row, after the cap. */
+  topUpUsd: number;
+  /** Correction rows this request claimed for sending. Zero on a dry run. */
+  claimed: number;
+  /** The background job paying them; absent on a dry run. */
+  jobId?: string;
+  ratesObserved: Record<string, number>;
+  affectedUsers: CashbackRateAuditAffectedUser[];
+  affectedEmails: string[];
+  unpayableUsers: number;
+  usersWithActiveDebt: number;
+  skipped: { cashbackId: string; transactionId?: string; reason: string }[];
+  requestedBy?: string;
+}
+
+/** What happened to one top-up transfer. */
+export interface CashbackTopUpOutcome {
+  userId: string;
+  originalTransactionId: string;
+  topUpTransactionId: string;
+  topUpUsd: number;
+  soUsdAmount?: string;
+  /**
+   * `sent-unrecorded`: the soUSD moved but the row could not be completed —
+   * the only outcome nothing resolves on its own.
+   */
+  status: "paid" | "failed" | "sent-unrecorded";
+  txHash?: string;
+  error?: string;
+}
+
+/** Progress of the background job paying a rate audit's corrections. */
+export interface CashbackTopUpJobStatus {
+  jobId: string;
+  state: "queued" | "running" | "completed";
+  total: number;
+  sent: number;
+  failed: number;
+  needsReconciliation: number;
+  topUpUsd: number;
+  startedAt: string;
+  finishedAt?: string;
+  requestedBy?: string;
+  outcomes: CashbackTopUpOutcome[];
+}
+
 /** One activated tier trial and the cashback terms its tier grants today. */
 export interface TrialCashbackWindow {
   trialId: string;
