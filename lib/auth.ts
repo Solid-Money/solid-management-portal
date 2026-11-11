@@ -83,3 +83,18 @@ export function latestRun() {
     },
   };
 }
+
+/**
+ * Whether a failure to read the ID token is the network's, not the session's.
+ * `getIdTokenResult()` refreshes an expired token, so a dropped connection can
+ * fail it with the session still valid. Firebase signs a session out itself
+ * when its credentials are revoked or disabled; any other failure fails
+ * closed.
+ */
+export function isTransientAuthError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'auth/network-request-failed'
+  );
+}

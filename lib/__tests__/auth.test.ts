@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ADMIN_SIGN_IN_PROVIDER,
   isAllowedSignInProvider,
+  isTransientAuthError,
   latestRun,
 } from "@/lib/auth";
 
@@ -45,5 +46,27 @@ describe("latestRun", () => {
     const pending = runs.begin();
     runs.cancel();
     expect(pending()).toBe(false);
+  });
+});
+
+describe("isTransientAuthError", () => {
+  it("treats a network failure while refreshing the token as transient", () => {
+    expect(
+      isTransientAuthError({ code: "auth/network-request-failed" }),
+    ).toBe(true);
+  });
+
+  it("treats every other failure as one that signs the session out", () => {
+    for (const error of [
+      { code: "auth/user-token-expired" },
+      { code: "auth/user-disabled" },
+      { code: "auth/internal-error" },
+      new Error("auth/network-request-failed"),
+      "auth/network-request-failed",
+      null,
+      undefined,
+    ]) {
+      expect(isTransientAuthError(error)).toBe(false);
+    }
   });
 });
