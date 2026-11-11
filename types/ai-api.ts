@@ -65,8 +65,9 @@ export interface AiApiAdminOverview {
      */
     tokensPerSecond?: number | null;
     /**
-     * Average time from request to the first bytes of the stream, ms, over
-     * the same requests. Null when too few ran; absent from older backends.
+     * Average time from the request to the first generated output (text,
+     * reasoning or tool arguments), ms, over the same requests. Null when too
+     * few ran; absent from older backends.
      */
     timeToFirstTokenMs?: number | null;
   }[];
