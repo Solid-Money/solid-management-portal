@@ -104,8 +104,9 @@ function TrialRow({ trial }: { trial: TierTrial }) {
  * - A gift sits at "waiting for the user" until they accept it in the app. Its
  *   duration has not started, so "I sent it yesterday and they still have 30
  *   days" is correct, not a bug.
- * - When it ends, they return to the tier their points and FUSE already earn.
- *   Nothing is taken away, so revoking is safe in the same way.
+ * - When it ends, they return to the tier their lock, membership or
+ *   grandfathered route holds them at (Core if none). Nothing is taken away,
+ *   so revoking is safe in the same way.
  *
  * The open trial is read before the gift form opens, which is what lets the
  * replace/extend decision be put to the operator up front: the backend refuses
@@ -161,7 +162,7 @@ export default function UserTierTrialCard({
     mutationFn: () => revokeUserTierTrial(userId),
     onSuccess: () => {
       toast.success(
-        `Revoked ${username}'s trial — they are back on the tier they have earned`
+        `Revoked ${username}'s trial — they are back on the tier they hold without it`
       );
       setIsRevokeOpen(false);
       refresh();
@@ -250,8 +251,8 @@ export default function UserTierTrialCard({
             ) : (
               <p className="text-sm text-gray-600">
                 No trial. A gift hands them Prime or Ultra for a set number of
-                days without changing their points or FUSE balance, and starts
-                counting down only once they accept it in the app.
+                days without touching their FUSE lock, membership or balances,
+                and starts counting down only once they accept it in the app.
               </p>
             )}
 
@@ -293,9 +294,9 @@ export default function UserTierTrialCard({
               {current.status === "active"
                 ? ` that is running until ${formatTrialDate(current.expiresAt)}`
                 : " they have not activated yet"}
-              . They return to the tier their points and FUSE balance earn them
-              — nothing else about the account changes, and their points are
-              untouched.
+              . They return to the tier their FUSE lock, membership or
+              grandfathered route holds them at (Core if none) — nothing else
+              about the account changes.
             </>
           ) : (
             ""

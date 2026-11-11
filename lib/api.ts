@@ -439,8 +439,8 @@ export const getTierLockReevaluationPreview = (userId: string) =>
  *
  * The trial is issued waiting for the user to accept it — the duration runs
  * from their activation, not from now — and grants its tier on top of whatever
- * their points and FUSE balance already earn, without touching either. When it
- * ends they simply return to their earned tier.
+ * their FUSE lock or membership already holds them at, without touching
+ * either. When it ends they simply return to that tier (Core if none).
  *
  * `onExistingTrial` is required when the user already has one open: pass
  * `replace` to swap their trial for this one, or `extend` to add these days to
@@ -479,7 +479,7 @@ export const batchIssueTierTrials = (request: BatchIssueTierTrialRequest) =>
 
 /**
  * Take a tier trial back — one the user has not opened, or one already running.
- * Either way they return to the tier their points and FUSE balance earn them.
+ * Either way they return to the tier their FUSE lock or membership holds them at.
  */
 export const revokeUserTierTrial = (
   userId: string,

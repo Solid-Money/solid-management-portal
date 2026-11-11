@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 import { getTierRecipients } from "@/lib/api";
+import { tierRankName, tierRecipientsSource } from "@/lib/tier-recipients";
 
 interface TierUsersModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export default function TierUsersModal({
   const [loading, setLoading] = useState(false);
   const [emails, setEmails] = useState<string[]>([]);
   const [count, setCount] = useState(0);
+  const [asOf, setAsOf] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -25,6 +27,7 @@ export default function TierUsersModal({
       const response = await getTierRecipients(tier);
       setEmails(response.data.emails);
       setCount(response.data.count);
+      setAsOf(response.data.asOf ?? null);
     } catch (error) {
       console.error("Failed to fetch tier users:", error);
     } finally {
@@ -45,7 +48,7 @@ export default function TierUsersModal({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
           <h2 className="text-lg font-bold text-gray-900">
-            Tier {tier} Users
+            {tierRankName(tier)} Users
           </h2>
           <button
             onClick={onClose}
@@ -64,11 +67,12 @@ export default function TierUsersModal({
             <>
               <div className="mb-4">
                 <p className="text-sm text-gray-700">
-                  <span className="font-semibold">{count}</span> users in Tier{" "}
-                  {tier}
+                  <span className="font-semibold">{count}</span> users hold{" "}
+                  {tierRankName(tier)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Team accounts (excluded wallets) are not included
+                  {tierRecipientsSource(asOf)} Team accounts (excluded
+                  wallets) are not included.
                 </p>
               </div>
               <div className="space-y-1">

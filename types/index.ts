@@ -1681,21 +1681,12 @@ export interface FeeFlatCharge {
 }
 
 /**
- * How a tier is bought in rewards v3.
- *
- * The FUSE thresholds are deliberately not repeated here: a locked position is
- * measured against the same `FuseStakingConfig` amounts a held one is, so a tier
- * costs the same FUSE either way and there is one set of numbers to change.
+ * How a tier is bought in rewards v3 — the only two ways to upgrade one: a
+ * FUSE lock (its own `lockTier*Amount` thresholds, separate from
+ * skip-the-line's) and the annual USDC membership. Points are deprecated and
+ * no longer grant a tier; their old rollback switch is gone.
  */
 export interface TierMembershipConfig {
-  /**
-   * Whether the points ladder still grants a tier.
-   *
-   * The v3 rollback switch. v3 sells tiers instead of awarding them, but leaving
-   * this on keeps the old ladder working alongside the purchase routes — so the
-   * two can be shipped apart, and the ladder restored without a deploy.
-   */
-  pointsUnlockEnabled: boolean;
   /** Whether a FUSE lock can buy a tier. */
   lockEnabled: boolean;
   /** The term a new lock carries, in days. Existing locks keep their own. */
@@ -1975,7 +1966,11 @@ export interface TierOfferView {
 /** The membership payload the app renders, as support reads it. */
 export interface TierMembershipStateView {
   enabled: boolean;
-  pointsUnlockEnabled: boolean;
+  /**
+   * @deprecated Always false: points are deprecated and no longer upgrade a
+   * tier. Still on the payload for older app builds; do not display it.
+   */
+  pointsUnlockEnabled?: boolean;
   offers: TierOfferView[];
   lock: TierLockView;
   subscription: TierSubscriptionView | null;
@@ -2875,14 +2870,31 @@ export interface SavingsVaultResult {
 
 export type RewardsTierName = "core" | "prime" | "ultra";
 
-/** Tier and points as the app's rewards screen shows them. */
+/** Tier and cashback as the app's rewards screen shows them. */
 export interface UserRewardsData {
+  /**
+   * The tier held. Upgraded only by a FUSE lock or the annual USDC membership;
+   * also held by a trial or, while it lasts, grandfathered skip-the-line.
+   * Never by points.
+   */
   currentTier: RewardsTierName;
+  /** Points total. Informational: points no longer move a user between tiers. */
   totalPoints: number;
   nextTier: RewardsTierName | null;
+  /** @deprecated The retired points threshold of the next tier. Do not show. */
   nextTierPoints: number;
+  /** @deprecated Points to the retired threshold. Points reach no tier. */
   pointsToNextTier: number;
+  /**
+   * Share of the next tier's FUSE lock already locked, 0-100 (100 at the top
+   * tier, 0 when the lock route cannot take the user there).
+   */
   progressToNextTierPct: number;
+  /**
+   * FUSE still to lock to reach the next tier, or null when there is no next
+   * tier or the lock cannot take them there. Absent on older backends.
+   */
+  fuseToNextTier?: number | null;
   /**
    * The rate this cardholder actually earns — their tier's, unless an operator
    * has pinned one to them.
@@ -2949,8 +2961,9 @@ export type TierTrialStatus =
 
 /**
  * A temporary tier upgrade: the user holds `tier` for `durationDays` from the
- * moment they activate it, then returns to the tier their points and FUSE
- * balance earn them. Their points and balances are never touched.
+ * moment they activate it, then returns to the tier their FUSE lock or
+ * membership holds them at (Core if none). Locks and balances are never
+ * touched.
  */
 export interface TierTrial {
   id: string;

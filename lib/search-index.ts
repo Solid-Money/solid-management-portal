@@ -243,15 +243,15 @@ const TREASURY_ENTRIES: SearchEntry[] = [
 const CONFIG_ENTRIES: SearchEntry[] = [
   ...(
     [
-      ["tier-thresholds", "Tier thresholds", ["levels", "points needed"]],
-      ["points-earning", "Points earning", ["points", "earn rate"]],
+      ["tier-thresholds", "Email a tier", ["tier email", "tier users", "core", "prime", "ultra"]],
+      ["points-earning", "Points earning (no longer affects tiers)", ["points", "earn rate"]],
       ["referral-system", "Referral system", ["referral rewards", "invite"]],
       ["referral-cashback", "Referral cashback program", ["referrer cashback"]],
       ["card-cashback", "Cashback on card transactions", ["cashback rate", "card rewards"]],
       ["yield-boost", "Yield boost", ["apy boost", "bonus yield"]],
       ["card-welcome-bonus", "Card welcome bonus", ["signup bonus", "first card"]],
       ["subscription-discounts", "Subscription discounts", ["netflix", "spotify", "mcc", "category"]],
-      ["fuse-staking", "FUSE staking for tier unlock", ["stake", "fuse", "unlock"]],
+      ["fuse-staking", "FUSE staking (retired skip the line)", ["stake", "fuse", "grandfather"]],
       ["tier-membership", "Tier membership", ["v3", "tier lock", "prime", "ultra"]],
     ] as const
   ).map(([id, label, keywords]) =>

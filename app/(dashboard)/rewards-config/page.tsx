@@ -216,23 +216,6 @@ export default function RewardsConfigPage() {
       : "";
   };
 
-  const saveTierThresholds = async () => {
-    if (!config) return;
-
-    await saveSection(
-      "Tier Thresholds",
-      "tiers",
-      {
-        tier1MinPoints: Number(config.tiers.tier1.min),
-        tier1MaxPoints: Number(config.tiers.tier1.max),
-        tier2MinPoints: Number(config.tiers.tier2.min),
-        tier2MaxPoints: Number(config.tiers.tier2.max),
-        tier3MinPoints: Number(config.tiers.tier3.min),
-      },
-      "tiers",
-    );
-  };
-
   const saveCashbackConfig = async () => {
     if (!config) return;
 
@@ -316,13 +299,13 @@ export default function RewardsConfigPage() {
   };
 
   /**
-   * Saves the whole v3 section, which spans two config groups.
+   * Saves the whole v3 section.
    *
-   * The FUSE amounts live under `fuseStaking` because a tier costs the same
-   * FUSE whether it is held or locked — one pair of numbers, two features. The
-   * v3 section edits them in place rather than sending the admin up the page,
-   * so its save has to cover them too. Skipped when untouched, so saving the
-   * annual charge does not rewrite the staking config.
+   * The lock has its own FUSE amounts (`lockTier2Amount`/`lockTier3Amount`),
+   * separate from skip-the-line's `fuseStaking` pair. Unsaved skip-the-line
+   * edits are still saved alongside, so one button never silently drops the
+   * other's changes; skipped when untouched, so saving the annual charge does
+   * not rewrite the staking config.
    */
   const saveTierMembershipConfig = async () => {
     if (!config) return;
@@ -352,7 +335,6 @@ export default function RewardsConfigPage() {
       "Tier Membership",
       "tier-membership",
       {
-        pointsUnlockEnabled: config.tierMembership.pointsUnlockEnabled,
         lockEnabled: config.tierMembership.lockEnabled,
         lockDurationDays: Number(config.tierMembership.lockDurationDays),
         lockTier2Amount: Number(config.tierMembership.lockTier2Amount),
@@ -608,30 +590,23 @@ export default function RewardsConfigPage() {
       </div>
 
       <div className="space-y-4">
-        {/* Tier Thresholds */}
+        {/*
+          Email a tier. Points no longer decide a tier, so this section no
+          longer edits the old points thresholds: recipients are the users
+          who actually hold each tier (a FUSE lock, a USDC membership, a trial
+          or a grandfathered route), read from the latest daily tier snapshot.
+        */}
         <ConfigSection
           id="tier-thresholds"
-          title="Tier Thresholds"
-          description="Define points required to reach each loyalty tier"
+          title="Email a Tier"
+          description="See and email the users who hold each tier. Tiers are upgraded only by locking FUSE or the annual USDC membership — points no longer count."
           icon={<Settings className="h-5 w-5 text-indigo-600" />}
           defaultOpen
         >
           <TierGrid>
             <TierCard tier="Tier 1">
-              <InputField
-                label="Min Points"
-                value={config.tiers.tier1.min}
-                onChange={(v) => handleNumericUpdate("tiers", "tier1.min", v)}
-                type="number"
-                tooltip="Minimum points to enter this tier (usually 0 for Tier 1)"
-              />
-              <InputField
-                label="Max Points"
-                value={config.tiers.tier1.max}
-                onChange={(v) => handleNumericUpdate("tiers", "tier1.max", v)}
-                type="number"
-                tooltip="Maximum points before user advances to next tier"
-              />
+              <p className="text-sm font-medium text-gray-700">Core</p>
+              <p className="text-xs text-gray-500">Everyone without Prime or Ultra</p>
               <div className="flex gap-2 pt-2 border-t border-gray-200">
                 <button
                   onClick={() => setTierUsersModal(1)}
@@ -650,20 +625,8 @@ export default function RewardsConfigPage() {
               </div>
             </TierCard>
             <TierCard tier="Tier 2">
-              <InputField
-                label="Min Points"
-                value={config.tiers.tier2.min}
-                onChange={(v) => handleNumericUpdate("tiers", "tier2.min", v)}
-                type="number"
-                tooltip="Points required to unlock Tier 2 benefits"
-              />
-              <InputField
-                label="Max Points"
-                value={config.tiers.tier2.max}
-                onChange={(v) => handleNumericUpdate("tiers", "tier2.max", v)}
-                type="number"
-                tooltip="Maximum points before user advances to Tier 3"
-              />
+              <p className="text-sm font-medium text-gray-700">Prime</p>
+              <p className="text-xs text-gray-500">Holds Prime by any route</p>
               <div className="flex gap-2 pt-2 border-t border-gray-200">
                 <button
                   onClick={() => setTierUsersModal(2)}
@@ -682,13 +645,8 @@ export default function RewardsConfigPage() {
               </div>
             </TierCard>
             <TierCard tier="Tier 3">
-              <InputField
-                label="Min Points"
-                value={config.tiers.tier3.min}
-                onChange={(v) => handleNumericUpdate("tiers", "tier3.min", v)}
-                type="number"
-                tooltip="Points required to unlock the highest tier benefits"
-              />
+              <p className="text-sm font-medium text-gray-700">Ultra</p>
+              <p className="text-xs text-gray-500">Holds Ultra by any route</p>
               <div className="flex gap-2 pt-2 border-t border-gray-200">
                 <button
                   onClick={() => setTierUsersModal(3)}
@@ -707,21 +665,13 @@ export default function RewardsConfigPage() {
               </div>
             </TierCard>
           </TierGrid>
-          <button
-            onClick={saveTierThresholds}
-            disabled={saving || !hasChanges("tiers")}
-            className="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save Tier Thresholds
-          </button>
         </ConfigSection>
 
         {/* Points Earning */}
         <ConfigSection
           id="points-earning"
           title="Points Earning"
-          description="Configure how users earn loyalty points through various activities"
+          description="Configure how users earn points through various activities. Points are deprecated: they no longer move anyone between tiers — only a FUSE lock or the annual USDC membership upgrades a tier."
           icon={<Coins className="h-5 w-5 text-yellow-600" />}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -938,7 +888,7 @@ export default function RewardsConfigPage() {
         <ConfigSection
           id="referral-cashback"
           title="Referral cashback — legacy (friends before v4 launch)"
-          description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield and counts towards the FUSE skip-the-line unlock, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Once referral v4 is on, these settings apply only to friends who signed up before its launch time. Separate from the points-based referral rewards above."
+          description="Two-sided USD cashback, paid in soFUSE once a referred friend gets a card and proves everyday use — so the reward lands as a savings position that earns yield, and turning it into dollars is a swap the user pays a fee on. Rewards earned before the payout switch (REFERRAL_FUSE_PAYOUT_START_DATE) still settle in soUSD. Once referral v4 is on, these settings apply only to friends who signed up before its launch time. Separate from the points-based referral rewards above."
           icon={<Gift className="h-5 w-5 text-pink-600" />}
         >
           <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
@@ -1796,7 +1746,7 @@ export default function RewardsConfigPage() {
         <ConfigSection
           id="fuse-staking"
           title="FUSE Staking for Tier Unlock"
-          description={`"Skip the line": HOLDING FUSE in the soFUSE savings vault unlocks a tier outright, bypassing the points ladder — the tier lasts only while the balance stays above the threshold. The toggle here gates that route alone. The two amounts are shared with the v3 FUSE lock below and apply to it whether this toggle is on or off, which is why they are editable in both places.`}
+          description={`"Skip the line" (retired): HOLDING FUSE in the soFUSE savings vault no longer upgrades anyone. It only keeps users on the grandfather list at the tier they held through it at v3 launch, until the window in Tier Membership closes, and only while their balance stays above these thresholds. The toggle gates that route alone. These amounts are separate from the v3 FUSE lock's, which are set in Tier Membership below.`}
           icon={<Wallet className="h-5 w-5 text-orange-600" />}
         >
           <div className="mb-4">
@@ -1853,25 +1803,19 @@ export default function RewardsConfigPage() {
             does nothing.
           </div>
 
-          {/* 1 — the v2 ladder */}
-          <div className="mb-6 rounded-lg border border-gray-200 p-4">
-            <h4 className="mb-1 text-sm font-semibold text-gray-900">
-              Points
-            </h4>
-            <p className="mb-3 text-xs text-gray-500">
-              The v2 route, and the rollback switch for the whole of v3.
-            </p>
-            <ToggleField
-              label="Points Still Unlock Tiers"
-              value={config.tierMembership.pointsUnlockEnabled}
-              onChange={(v) =>
-                updateConfig("tierMembership", "pointsUnlockEnabled", v)
-              }
-              tooltip="Off retires the points ladder for everyone, grandfathered users included — a tier can then only be bought. Leave it on through the grandfather window: points already take nobody higher than the tier the list caps them at, and the app shows the membership card instead of the points card to everyone they cannot raise."
-            />
+          {/*
+            Points used to be the first route here, with a rollback switch.
+            Points are deprecated and no longer grant a tier, so the switch is
+            gone: the lock and the annual charge are the only ways up.
+          */}
+          <div className="mb-6 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            Only two routes upgrade a tier: <strong>locking FUSE</strong> and
+            the <strong>annual USDC membership</strong>. Points no longer count
+            toward any tier. Switching both routes off leaves nobody able to
+            upgrade.
           </div>
 
-          {/* 2 — the lock route, with the numbers it actually uses */}
+          {/* 1 — the lock route, with the numbers it actually uses */}
           <div className="mb-6 rounded-lg border border-gray-200 p-4">
             <h4 className="mb-1 text-sm font-semibold text-gray-900">
               Lock FUSE
@@ -1927,22 +1871,20 @@ export default function RewardsConfigPage() {
             </div>
           </div>
 
-          {/* 3 — retiring the routes v3 replaces */}
+          {/* 2 — retiring skip-the-line */}
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
             <h4 className="mb-1 text-sm font-semibold text-gray-900">
-              Retiring Skip-the-Line and Points
+              Retiring Skip-the-Line
             </h4>
             <p className="mb-3 text-xs text-gray-500">
-              Holding FUSE in Savings, and the points ladder, keep granting a
-              tier only to users who held one through them on the launch date —
-              up to the tier they had then — and only for the window below.
-              Everyone else gets v3 only, however old their account, and the
-              app shows them only the v3 routes. The list records what each
-              route would grant whatever its toggle says, so a toggle only
-              ever hides a route — for everyone on the list too — and never
-              erases the list. Both dates are read-only
-              here except the window: the launch date is stamped the first time
-              the backend needs it, so it records when v3 actually went live.
+              Holding FUSE in Savings keeps granting a tier only to users who
+              held one on the launch date — up to the tier they had then — and
+              only for the window below. It never upgrades anyone. Points
+              already grant nothing to anyone. Everyone else gets v3 only,
+              however old their account, and the app shows them only the v3
+              routes. Both dates are read-only here except the window: the
+              launch date is stamped the first time the backend needs it, so it
+              records when v3 actually went live.
             </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <InputField
@@ -1971,12 +1913,12 @@ export default function RewardsConfigPage() {
                 value={asDay(config.tierMembership.legacyGrandfatherUntil)}
                 onChange={() => {}}
                 disabled
-                tooltip="Launch date plus the window. After this, holding FUSE and points grant nothing to anyone, and every tier comes from a lock or an annual charge."
+                tooltip="Launch date plus the window. After this, holding FUSE grants nothing to anyone, and every tier comes from a lock, an annual charge or a trial."
               />
             </div>
           </div>
 
-          {/* 4 — the cash route */}
+          {/* 3 — the cash route */}
           <div className="mb-4 rounded-lg border border-gray-200 p-4">
             <h4 className="mb-1 text-sm font-semibold text-gray-900">
               Annual Charge

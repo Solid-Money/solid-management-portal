@@ -59,8 +59,22 @@ function monthCashbackHint(rewards: UserRewardsData): string {
 }
 
 /**
- * Tier, points and cashback allowance, read from the same rewards service the
- * app's rewards screen uses — so "why am I not getting 2% cashback?" can be
+ * What the next tier would take: the FUSE still to lock, when the lock route
+ * can take them there. Points are deprecated and never reach a tier, so they
+ * are never quoted here.
+ */
+function nextTierHint(rewards: UserRewardsData): string {
+  if (!rewards.nextTier) return "Top tier";
+  const fuse = rewards.fuseToNextTier;
+  if (typeof fuse === "number" && fuse > 0) {
+    return `Lock ${Math.ceil(fuse).toLocaleString("en-US")} more FUSE for ${rewards.nextTier}`;
+  }
+  return `${rewards.nextTier} by FUSE lock or annual membership`;
+}
+
+/**
+ * Tier and cashback allowance, read from the same rewards service the app's
+ * rewards screen uses — so "why am I not getting 2% cashback?" can be
  * answered from the same numbers the customer is seeing.
  */
 export default function UserRewardsCard({ userId }: { userId: string }) {
@@ -95,13 +109,9 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
           <div className="space-y-4">
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <Stat
-                label="Points"
-                value={rewards.totalPoints.toLocaleString()}
-                hint={
-                  rewards.nextTier
-                    ? `${rewards.pointsToNextTier.toLocaleString()} to ${rewards.nextTier}`
-                    : "Top tier"
-                }
+                label="Next tier"
+                value={rewards.nextTier ?? "—"}
+                hint={nextTierHint(rewards)}
               />
               <Stat
                 label="Cashback rate"
@@ -143,10 +153,12 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
               />
             </dl>
 
-            {rewards.nextTier && (
+            {/* Lock progress only: a membership is bought outright, and points
+                no longer count, so there is no bar to draw without a lock. */}
+            {rewards.nextTier && rewards.progressToNextTierPct > 0 && (
               <div>
                 <div className="mb-1 flex items-center justify-between text-[11px] text-gray-500">
-                  <span>Progress to {rewards.nextTier}</span>
+                  <span>{rewards.nextTier} lock progress</span>
                   <span>{Math.round(rewards.progressToNextTierPct)}%</span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
@@ -164,23 +176,23 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
               {!rewards.hasOptedIn && (
                 <Badge variant="warning">Not opted in to rewards</Badge>
               )}
-              {rewards.legacyCarryoverPoints > 0 && (
+              {rewards.totalPoints > 0 && (
                 <Badge variant="muted">
-                  {rewards.legacyCarryoverPoints.toLocaleString()} carried over
-                  from {rewards.legacyPoints.toLocaleString()} legacy points
+                  {rewards.totalPoints.toLocaleString()} points (no longer count
+                  toward a tier)
                 </Badge>
               )}
               {rewards.fuseSkipLine?.enabled &&
                 rewards.fuseSkipLine.balanceFuse > 0 && (
                   <Badge variant="info">
                     <Sparkles className="h-3 w-3" />
-                    {rewards.fuseSkipLine.balanceFuse.toLocaleString()} FUSE
-                    staked → {rewards.fuseSkipLine.unlockedTier}
+                    {rewards.fuseSkipLine.balanceFuse.toLocaleString()} FUSE in
+                    Savings (grandfathered) → {rewards.fuseSkipLine.unlockedTier}
                   </Badge>
                 )}
               {/* The tier above can be a trial rather than something they
-                  earned, which is the first thing to know when the tier and the
-                  points next to it don't line up. */}
+                  bought, which is the first thing to know when the tier and
+                  their lock or membership don't line up. */}
               {rewards.activeTierTrial && (
                 <Badge variant="success">
                   <Sparkles className="h-3 w-3" />
