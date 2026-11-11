@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,12 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { fileSize, imageUrls, inlineKeys, isClaudeLooking, renderableHtml } from "@/lib/task-rich";
 import { deleteTaskUpdate, editTaskUpdate, postTaskUpdate, reactToTaskUpdate } from "@/lib/tasks-api";
 import TaskComposer from "@/components/tasks/task-composer";
 import {
   AuthorAvatar,
+  Avatar,
   STATUS_META,
   authorName,
   firstName,
@@ -268,6 +270,40 @@ function ActivityLine({ update, people }: { update: TaskUpdate; people: TaskPers
   );
 }
 
+const PEOPLE_SHOWN = 12;
+
+/** On hover (or focus): who, with their faces. Used for reactions and "Seen by". */
+function PeopleTooltip({
+  title,
+  emails,
+  people,
+  children,
+}: {
+  title: string;
+  emails: string[];
+  people: TaskPerson[];
+  children: ReactElement;
+}) {
+  const shown = emails.slice(0, PEOPLE_SHOWN);
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6} className="max-w-64 px-3 py-2">
+        <p className="mb-1.5 font-medium">{title}</p>
+        <ul className="space-y-1">
+          {shown.map((email) => (
+            <li key={email} className="flex items-center gap-1.5">
+              <Avatar email={email} people={people} size={18} />
+              <span className="truncate">{personName(email, people)}</span>
+            </li>
+          ))}
+        </ul>
+        {emails.length > shown.length && <p className="mt-1 opacity-70">and {emails.length - shown.length} more</p>}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function Reactions({
   update,
   me,
@@ -283,21 +319,22 @@ function Reactions({
   return (
     <div className="mt-2 flex flex-wrap gap-1">
       {update.reactions.map((reaction) => (
-        <button
-          key={reaction.emoji}
-          type="button"
-          title={reaction.emails.map((email) => personName(email, people)).join(", ")}
-          onClick={() => onReact(reaction.emoji)}
-          className={cn(
-            "inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-xs",
-            reaction.emails.includes(me)
-              ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
-          )}
-        >
-          <span>{reaction.emoji}</span>
-          {reaction.emails.length}
-        </button>
+        <PeopleTooltip key={reaction.emoji} title={`Reacted ${reaction.emoji}`} emails={reaction.emails} people={people}>
+          <button
+            type="button"
+            aria-label={`${reaction.emoji} ${reaction.emails.map((email) => personName(email, people)).join(", ")}`}
+            onClick={() => onReact(reaction.emoji)}
+            className={cn(
+              "inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-xs",
+              reaction.emails.includes(me)
+                ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
+            )}
+          >
+            <span>{reaction.emoji}</span>
+            {reaction.emails.length}
+          </button>
+        </PeopleTooltip>
       ))}
     </div>
   );
@@ -450,12 +487,15 @@ export default function TaskUpdateCard({
                 <Reply className="size-3.5" /> Reply
               </button>
               {seen.length > 0 && (
-                <span
-                  className="ml-auto inline-flex items-center gap-1"
-                  title={seen.map((email) => personName(email, people)).join(", ")}
-                >
-                  <Eye className="size-3.5" /> Seen by {seen.length}
-                </span>
+                <PeopleTooltip title="Seen by" emails={seen} people={people}>
+                  <button
+                    type="button"
+                    aria-label={`Seen by ${seen.map((email) => personName(email, people)).join(", ")}`}
+                    className="ml-auto inline-flex cursor-default items-center gap-1 rounded hover:text-gray-900"
+                  >
+                    <Eye className="size-3.5" /> Seen by {seen.length}
+                  </button>
+                </PeopleTooltip>
               )}
             </div>
           )}
