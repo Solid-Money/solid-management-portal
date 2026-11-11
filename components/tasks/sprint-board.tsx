@@ -1,6 +1,7 @@
 "use client";
 
-import { useDeferredValue, useMemo, useRef, useState, type DragEvent } from "react";
+import { useDeferredValue, useMemo, useState, type DragEvent } from "react";
+import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,9 @@ function byUrgency(a: TaskRow, b: TaskRow): number {
   const rank = (row: TaskRow) => (row.priority ? PRIORITY_META[row.priority].rank : 9);
   return rank(a) - rank(b) || a.number - b.number;
 }
+
+/** Tasks whose move is being saved, across the page (outlives a board remount). */
+const MOVING = new Set<string>();
 
 function Card({
   row,
@@ -184,6 +188,9 @@ export default function SprintBoard({
     () => new Map((boardList?.boards ?? []).map((board) => [board.key, board.name])),
     [boardList],
   );
+  // The backlog lists product tasks: on no board or a board the team made.
+  const isProduct = (row: TaskRow) =>
+    !row.board || !boardList?.boards.find((board) => board.key === row.board)?.system;
   const [over, setOver] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const key = TASK_KEYS.sprint(start);
@@ -200,11 +207,9 @@ export default function SprintBoard({
     staleTime: 30_000,
   });
 
-  // One move per task at a time: a second drag or Add on a task still being
-  // saved is ignored, so an older request can't land after a newer one.
-  const moving = useRef(new Set<string>());
-  // The same, for the screen: cards and Add buttons show the move is saving.
-  const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
+  // One move per task at a time (MOVING outlives the board, so a remount
+  // can't start a second one), shown on screen: the card dims and Add waits.
+  const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set(MOVING));
   const markSaving = (id: string, on: boolean) =>
     setSaving((current) => {
       const next = new Set(current);
@@ -226,8 +231,10 @@ export default function SprintBoard({
             ...(input.sprint !== undefined ? { sprint: input.sprint } : {}),
           };
           const inSprint = moved.sprint === before.sprint.start;
-          // Taken out of the sprint: back on top of the backlog until the refresh sorts it.
-          const toBacklog = !inSprint && moved.sprint === null && !before.backlog.some((r) => r.id === id);
+          // Taken out of the sprint: back on top of the backlog until the refresh
+          // sorts it (product tasks only: the backlog doesn't list the others).
+          const toBacklog =
+            !inSprint && moved.sprint === null && isProduct(moved) && !before.backlog.some((r) => r.id === id);
           queryClient.setQueryData<TaskSprintPage>(key, {
             ...before,
             rows: [...before.rows.filter((r) => r.id !== id), ...(inSprint ? [moved] : [])],
@@ -241,12 +248,28 @@ export default function SprintBoard({
       }
       return { before };
     },
-    // The API layer shows the error; put the card back.
-    onError: (_error, _input, context) => {
-      if (context?.before) queryClient.setQueryData(key, context.before);
+    // The API layer shows the error; put this card back where it was, leaving
+    // other cards' moves since then alone.
+    onError: (_error, { id }, context) => {
+      const before = context?.before;
+      const now = queryClient.getQueryData<TaskSprintPage>(key);
+      if (!before || !now) return;
+      const inRows = before.rows.findIndex((r) => r.id === id);
+      const inBacklog = before.backlog.findIndex((r) => r.id === id);
+      const putBack = (list: TaskRow[], index: number, original: TaskRow[]) => {
+        const rest = list.filter((r) => r.id !== id);
+        if (index < 0) return rest;
+        rest.splice(Math.min(index, rest.length), 0, original[index]!);
+        return rest;
+      };
+      queryClient.setQueryData<TaskSprintPage>(key, {
+        ...now,
+        rows: putBack(now.rows, inRows, before.rows),
+        backlog: putBack(now.backlog, inBacklog, before.backlog),
+      });
     },
     onSettled: (_data, _error, { id }) => {
-      moving.current.delete(id);
+      MOVING.delete(id);
       markSaving(id, false);
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });
     },
@@ -276,8 +299,8 @@ export default function SprintBoard({
     : shown;
 
   const moveOnce = (id: string, input: TaskPatchInput) => {
-    if (moving.current.has(id)) return;
-    moving.current.add(id);
+    if (MOVING.has(id)) return;
+    MOVING.add(id);
     markSaving(id, true);
     move.mutate({ id, input });
   };
@@ -304,6 +327,11 @@ export default function SprintBoard({
     const row = rows.find((r) => r.id === dragged.id);
     if (!row || row.status === "done" || row.status === "cancelled") return;
     moveOnce(dragged.id, { sprint: null });
+    // Support, radar and marketing tasks aren't in the product backlog: say where it went.
+    if (!isProduct(row)) {
+      const board = row.board ? (boardNames.get(row.board) ?? row.board) : null;
+      toast(`Out of the sprint. It stays on ${board ? `the ${board} board` : "its board"}.`);
+    }
   };
 
   return (

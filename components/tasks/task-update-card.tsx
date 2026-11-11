@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactElement } from "react";
-import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
+import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -299,11 +299,26 @@ function ActivityLine({ update, people }: { update: TaskUpdate; people: TaskPers
 }
 
 /** Everyone, with their faces; a long list scrolls inside the card. */
-function PeopleList({ title, emails, people }: { title: string; emails: string[]; people: TaskPerson[] }) {
+function PeopleList({
+  title,
+  emails,
+  people,
+  focusable = false,
+}: {
+  title: string;
+  emails: string[];
+  people: TaskPerson[];
+  /** In a popover: the list takes focus, so the keyboard can scroll a long one. */
+  focusable?: boolean;
+}) {
   return (
     <>
       <p className="mb-1.5 font-medium">{title}</p>
-      <ul className="max-h-60 space-y-1 overflow-y-auto pr-1">
+      <ul
+        tabIndex={focusable ? 0 : undefined}
+        aria-label={focusable ? title : undefined}
+        className="max-h-60 space-y-1 overflow-y-auto rounded pr-1 outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >
         {emails.map((email) => (
           <li key={email} className="flex min-w-0 items-center gap-1.5">
             <Avatar email={email} people={people} size={18} />
@@ -349,7 +364,7 @@ function SeenBy({ emails, people }: { emails: string[]; people: TaskPerson[] }) 
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label={`Seen by ${emails.map((email) => personName(email, people)).join(", ")}`}
+            aria-label={`Seen by ${emails.length}: ${emails.map((email) => personName(email, people)).join(", ")}`}
             className="ml-auto inline-flex cursor-pointer items-center gap-1 rounded hover:text-gray-900"
           >
             <Eye className="size-3.5" /> Seen by {emails.length}
@@ -357,7 +372,35 @@ function SeenBy({ emails, people }: { emails: string[]; people: TaskPerson[] }) 
         </PopoverTrigger>
       </PeopleTooltip>
       <PopoverContent side="top" align="end" className="w-auto max-w-[min(16rem,calc(100vw-2rem))] p-2.5 text-xs text-gray-800">
-        <PeopleList title="Seen by" emails={emails} people={people} />
+        <PeopleList title="Seen by" emails={emails} people={people} focusable />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Who reacted, for touch and keyboard: a tap on a reaction changes it, so
+ * this small button beside them lists everyone (hover shows it per reaction).
+ */
+function ReactionPeople({ update, people }: { update: TaskUpdate; people: TaskPerson[] }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Who reacted"
+          title="Who reacted"
+          className="inline-flex size-6 cursor-pointer items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+        >
+          <Users className="size-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-auto max-w-[min(16rem,calc(100vw-2rem))] space-y-2 p-2.5 text-xs text-gray-800">
+        {update.reactions.map((reaction) => (
+          <div key={reaction.emoji}>
+            <PeopleList title={`Reacted ${reaction.emoji}`} emails={reaction.emails} people={people} focusable />
+          </div>
+        ))}
       </PopoverContent>
     </Popover>
   );
@@ -395,6 +438,7 @@ function Reactions({
           </button>
         </PeopleTooltip>
       ))}
+      <ReactionPeople update={update} people={people} />
     </div>
   );
 }
