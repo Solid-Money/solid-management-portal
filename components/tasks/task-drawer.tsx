@@ -565,13 +565,16 @@ function TaskBody({
             </span>
           )}
           {/* Who opened it and when: a person, Solid AI, the radar or Claude. */}
-          <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
-            {task.source.kind !== "manual" || task.createdBy.bot || !task.createdBy.email ? (
-              <BotAvatar size={16} />
-            ) : (
-              <Avatar email={task.createdBy.email} people={people} size={16} />
-            )}
-            <span className="truncate">
+          {/* Wraps rather than clips, so a long chat label reads in full on a phone. */}
+          <span className="inline-flex min-w-0 items-start gap-1.5">
+            <span className="mt-px shrink-0">
+              {task.source.kind !== "manual" || task.createdBy.bot || !task.createdBy.email ? (
+                <BotAvatar size={16} />
+              ) : (
+                <Avatar email={task.createdBy.email} people={people} size={16} />
+              )}
+            </span>
+            <span className="min-w-0 break-words">
               Opened by {authorName(task.createdBy, people)}
               {task.source.kind !== "manual" && task.source.label && (
                 <span className="text-gray-400"> · {task.source.label}</span>
