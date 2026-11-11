@@ -258,7 +258,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/anti-abuse",
         label: "Anti-abuse",
         description:
-          "Merchants excluded from cashback and referrals, and referral spend rules",
+          "Merchants excluded from cashback and referrals, referral spend rules, and known service wallets",
         icon: ShieldAlert,
       },
       {

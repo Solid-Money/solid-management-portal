@@ -10,7 +10,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-/** Dismissing or resolving an item always says why; the reason goes to the audit log. */
+/**
+ * Dismissing or resolving an item always says why; the reason goes to the
+ * audit log. Also asks for a known service's name (`label`, `placeholder`,
+ * `minLength`, `maxLength`, one line).
+ */
 export function ReasonDialog({
   open,
   title,
@@ -19,6 +23,10 @@ export function ReasonDialog({
   pending,
   onCancel,
   onConfirm,
+  label = "Reason",
+  placeholder = "What you found, so the next person knows",
+  minLength = 3,
+  maxLength = 500,
 }: {
   open: boolean;
   title: string;
@@ -27,9 +35,13 @@ export function ReasonDialog({
   pending: boolean;
   onCancel: () => void;
   onConfirm: (reason: string) => void;
+  label?: string;
+  placeholder?: string;
+  minLength?: number;
+  maxLength?: number;
 }) {
   const [reason, setReason] = useState("");
-  const valid = reason.trim().length >= 3;
+  const valid = reason.trim().length >= minLength;
 
   // Cleared when the dialog closes, not on confirm: a failed action leaves it
   // open with the reason still there to retry.
@@ -58,15 +70,15 @@ export function ReasonDialog({
           className="text-[13px] font-medium text-gray-700"
           htmlFor="attention-reason"
         >
-          Reason
+          {label}
         </label>
         <textarea
           id="attention-reason"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          maxLength={500}
-          rows={3}
-          placeholder="What you found, so the next person knows"
+          maxLength={maxLength}
+          rows={maxLength <= 100 ? 1 : 3}
+          placeholder={placeholder}
           className="w-full rounded-md border border-[#e6e8ee] px-3 py-2 text-[13px] outline-none focus:border-[#3b3bd6]"
         />
         <DialogFooter>

@@ -2,57 +2,59 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
-import { MoreHorizontal, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
+import { ArrowRight, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/components/auth-provider";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAttention, useAttentionAction } from "@/hooks/use-attention";
+import { useAttention } from "@/hooks/use-attention";
+import { useMinuteClock } from "@/hooks/use-minute-clock";
+import { useTaskList, useTaskPeople } from "@/hooks/use-tasks";
 import { describeApiError } from "@/lib/api";
+import { TONE_CLASSES, levelBadge } from "@/lib/attention";
 import {
-  TONE_CLASSES,
-  footerLine,
-  levelBadge,
-  resolvedLink,
-  statusPill,
-  summaryPills,
-} from "@/lib/attention";
-import {
-  RADAR_TABS,
-  type AttentionItemView,
-  type RadarTab,
-} from "@/types/radar";
+  type RadarTask,
+  cardSummary,
+  closedLine,
+  quietLabel,
+  tasksHref,
+} from "@/lib/attention-tasks";
+import { personName } from "@/lib/task-format";
+import { Avatar } from "@/components/tasks/task-format";
+import type { AttentionItemView } from "@/types/radar";
+import type { TaskPerson } from "@/types/tasks";
 import { OverviewCard } from "@/components/overview/overview-ui";
 import { AttentionDetail } from "@/components/overview/attention-detail";
-import { ReasonDialog } from "@/components/overview/reason-dialog";
 
-const TAB_LABELS: Record<RadarTab, string> = {
-  all: "All",
-  incidents: "Incidents",
-  abuse: "Abuse",
-  security: "Security",
-  reliability: "Reliability",
-  money: "Money",
-  resolved: "Resolved",
+type View = "tasks" | "quiet" | "check" | "watching";
+
+const LIST_TITLES: Record<View, string> = {
+  tasks: "Most urgent",
+  quiet: "Quiet for 24 h or more",
+  check: "To check",
+  watching: "Watching",
 };
 
+const LIST_HINTS: Record<View, string> = {
+  tasks: "Incidents, then what is happening now or today, by people hit",
+  quiet: "No update from a person in a day or more",
+  check: "A task opens if it is still the case at the time shown",
+  watching: "Seen by the radar, not anyone's work yet",
+};
+
+/** Rows shown before "N more"; the rest are in Tasks. */
+const SHOWN = 3;
+
 /**
- * Needs your attention: the incident radar. Live incidents first, then High,
- * Check and Watch. Resolved items live under the Resolved tab; All shows one
- * line linking there. Every row has one main
- * action and a menu (Assign, Snooze, Dismiss with a reason); every click is
- * audited server side.
+ * Needs your attention, once Tasks is the work queue. The radar opens one
+ * task per problem and keeps it current; this card only says whether
+ * anything needs you: four counts, the most urgent open tasks with their
+ * owner and how long since a person wrote on them, and what closed on its
+ * own. The work itself (owners, updates, outcomes) happens in Tasks.
+ *
+ * `?item=<id>` still opens that alert's view (the links in radar tasks), with
+ * its timeline, app notice and actions.
  */
 export function AttentionCard() {
-  const [tab, setTab] = useState<RadarTab>("all");
-  // `?item=<id>` opens that item: the links in radar tasks and Slack posts.
+  const [view, setView] = useState<View>("tasks");
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -65,7 +67,7 @@ export function AttentionCard() {
   if (seenLinked !== linkedId) {
     setSeenLinked(linkedId);
     if (linkedId) setOpenId(linkedId);
-    // The link went away (back button): close what it opened, not a row opened by hand.
+    // The link went away (back button): close what it opened, not one opened by hand.
     else if (openId === seenLinked) setOpenId(null);
   }
   const closeItem = () => {
@@ -74,368 +76,450 @@ export function AttentionCard() {
     const next = new URLSearchParams(params.toString());
     next.delete("item");
     const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  };
-  // "Show" disappears once Resolved opens; focus moves to that tab instead.
-  const resolvedTab = useRef<HTMLButtonElement>(null);
-  const [closing, setClosing] = useState<{
-    item: AttentionItemView;
-    kind: "dismiss" | "resolve";
-  } | null>(null);
-  const { data, error, isLoading } = useAttention(tab);
-  const action = useAttentionAction();
-
-  const run = (input: Parameters<typeof action.mutate>[0], done: string) =>
-    action.mutate(input, {
-      onSuccess: () => toast.success(done),
-      onError: (e) => toast.error(describeApiError(e)),
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
     });
+  };
 
-  const items = tab === "resolved" ? [] : (data?.items ?? []);
-  const resolved = data?.resolved ?? [];
-  const nothing = data && data.counts.all === 0;
-  const resolvedNote = data ? resolvedLink(tab, data.counts.resolved) : null;
+  const radar = useAttention("all");
+  const taskList = useTaskList({ view: "radar" });
+  const { data: people } = useTaskPeople();
+  const clock = useMinuteClock();
+
+  const rows = taskList.data?.pages.flatMap((page) => page.rows) ?? [];
+  const ready = !!radar.data && !!taskList.data && clock !== null;
+  const nowIso = clock !== null ? new Date(clock).toISOString() : null;
+  const summary =
+    ready && nowIso
+      ? cardSummary(rows, radar.data!.items, radar.data!.resolved, nowIso)
+      : null;
+  const live = radar.data?.summary.liveIncidents ?? 0;
+  const error = radar.error ?? taskList.error;
 
   return (
     <OverviewCard className="px-5 pt-4 pb-3">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="flex flex-wrap items-center gap-2.5">
           <h2 className="text-[15px] font-semibold text-gray-900">
             Needs your attention
           </h2>
-          {data ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {summaryPills(data.summary).map((pill) => (
-                <span
-                  key={pill.label}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-medium",
-                    TONE_CLASSES[pill.tone],
-                  )}
-                >
-                  {pill.dot ? (
-                    <span className="size-[6px] rounded-full bg-[#16a34a]" />
-                  ) : null}
-                  {pill.label}
-                </span>
-              ))}
-            </div>
+          {radar.data ? (
+            live > 0 ? (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium",
+                  TONE_CLASSES["solid-red"],
+                )}
+              >
+                {live} live incident{live === 1 ? "" : "s"}
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-medium",
+                  TONE_CLASSES.green,
+                )}
+              >
+                <span className="size-[6px] rounded-full bg-[#16a34a]" />
+                No live incidents
+              </span>
+            )
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={() => setTab("all")}
+        <Link
+          href={tasksHref()}
           className="text-[13px] font-medium whitespace-nowrap text-[#3b3bd6] hover:underline"
         >
-          All items →
-        </button>
+          Open in Tasks →
+        </Link>
       </div>
 
-      {error && !data ? (
+      {error && !summary ? (
         <p className="mt-3 text-[13px] text-red-700">
-          The radar could not load: {describeApiError(error)}.
+          Could not load: {describeApiError(error)}.
         </p>
       ) : null}
-      {isLoading && !data ? (
+      {!summary && !error ? (
         <p className="mt-3 text-[13px] text-gray-400">Loading…</p>
       ) : null}
 
-      {data && nothing && resolved.length === 0 ? (
-        <p className="mt-3 flex items-center gap-2 text-[13px] text-gray-600">
-          <span className="size-[7px] rounded-full bg-[#16a34a]" />
-          Nothing needs attention
-        </p>
-      ) : null}
-
-      {data && (!nothing || resolved.length > 0) ? (
+      {summary ? (
         <>
-          {/* Scrolls sideways on a narrow screen, with no scrollbar drawn. The
-              baseline is an inset shadow so the active tab's border covers it
-              without hanging below the row, which made a vertical scrollbar. */}
-          <div className="mt-3 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_#eef0f4] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {RADAR_TABS.map((t) => (
-              <button
-                key={t}
-                ref={t === "resolved" ? resolvedTab : undefined}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-[13px] whitespace-nowrap",
-                  tab === t
-                    ? "border-gray-900 font-medium text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-800",
-                )}
-              >
-                {TAB_LABELS[t]}
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 text-[11px]",
-                    tab === t
-                      ? "bg-gray-900 text-white"
-                      : "bg-[#f1f2f6] text-gray-500",
-                  )}
-                >
-                  {data.counts[t]}
-                </span>
-              </button>
-            ))}
+          <div className="mt-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+            <Tile
+              label="Open tasks"
+              count={summary.tasks.length + summary.untasked.length}
+              sub={
+                summary.tasks.length
+                  ? `${summary.byCategory} · ${
+                      summary.unassigned
+                        ? `${summary.unassigned} with no owner`
+                        : "each has an owner"
+                    }`
+                  : "Nothing open from the radar"
+              }
+              active={view === "tasks"}
+              onClick={() => setView("tasks")}
+            />
+            <Tile
+              label="Quiet for 24 h+"
+              count={summary.quiet.length}
+              sub="No update from a person in a day or more"
+              warn={summary.quiet.length > 0}
+              active={view === "quiet"}
+              onClick={() => setView("quiet")}
+            />
+            <Tile
+              label="To check"
+              count={summary.toCheck.length}
+              sub={
+                summary.toCheck.length
+                  ? summary.toCheck.map((i) => i.title).join(" · ")
+                  : "Nothing waiting for a check"
+              }
+              active={view === "check"}
+              onClick={() => setView("check")}
+            />
+            <Tile
+              label="Watching"
+              count={summary.watching.length}
+              sub={
+                summary.watching.length
+                  ? summary.watching.map((i) => i.title).join(" · ")
+                  : "Nothing on watch"
+              }
+              active={view === "watching"}
+              onClick={() => setView("watching")}
+            />
           </div>
 
-          <div>
-            {items.map((item) => (
-              <Row
-                key={item.id}
-                item={item}
-                onOpen={() => setOpenId(item.id)}
-                onAssign={(owner) =>
-                  run(
-                    { kind: "assign", id: item.id, owner },
-                    owner ? "Assigned" : "Unassigned",
-                  )
-                }
-                onSnooze={() =>
-                  run(
-                    { kind: "snooze", id: item.id, hours: 1 },
-                    "Snoozed for an hour",
-                  )
-                }
-                onClose={(kind) => setClosing({ item, kind })}
-              />
-            ))}
-            {tab !== "resolved" && items.length === 0 ? (
-              <p className="py-4 text-[13px] text-gray-500">
-                Nothing open under {TAB_LABELS[tab]}.
-              </p>
-            ) : null}
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between gap-3 pb-2">
+              <span className="text-[11px] font-semibold tracking-[0.5px] text-gray-400 uppercase">
+                {LIST_TITLES[view]}
+              </span>
+              <span className="hidden text-[11.5px] text-gray-400 sm:inline">
+                {LIST_HINTS[view]}
+              </span>
+            </div>
+            <List
+              view={view}
+              summary={summary}
+              people={people}
+              onOpenItem={setOpenId}
+            />
+          </div>
 
-            {tab === "resolved"
-              ? resolved.slice(0, 50).map((item) => (
-                  <Row
-                    key={item.id}
-                    item={item}
-                    onOpen={() => setOpenId(item.id)}
-                  />
-                ))
-              : null}
-            {tab === "resolved" && resolved.length === 0 ? (
-              <p className="py-4 text-[13px] text-gray-500">
-                Nothing resolved this week.
-              </p>
-            ) : null}
-            {resolvedNote ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("resolved");
-                  resolvedTab.current?.focus();
-                }}
-                className="mt-1 w-full border-t border-[#eef0f4] pt-2.5 pb-1 text-left text-[12.5px] text-gray-500 hover:text-gray-800"
-              >
-                {resolvedNote} · <span className="text-[#3b3bd6]">Show</span>
-              </button>
-            ) : null}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#eef0f4] pt-2.5 text-[11.5px] text-gray-400">
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <span className="size-[6px] shrink-0 rounded-full bg-[#16a34a]" />
+              <span className="truncate">
+                {[
+                  closedLine(summary.closedOnOwn),
+                  "checks every 5 min",
+                  radar.data?.lastCheckAt
+                    ? `last ${radar.data.lastCheckAt.slice(11, 16)} UTC`
+                    : "not checked yet",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </span>
           </div>
         </>
       ) : null}
 
-      {data ? (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#eef0f4] pt-2.5 text-[11.5px] text-gray-400">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-[6px] rounded-full bg-[#16a34a]" />
-            {footerLine(data)}
-          </span>
-        </div>
-      ) : null}
-
       <AttentionDetail id={openId} onClose={closeItem} />
-      <ReasonDialog
-        open={closing !== null}
-        title={
-          closing?.kind === "resolve"
-            ? "Resolve this item"
-            : "Dismiss this item"
-        }
-        description={closing?.item.title ?? ""}
-        confirmLabel={closing?.kind === "resolve" ? "Resolve" : "Dismiss"}
-        pending={action.isPending}
-        onCancel={() => setClosing(null)}
-        onConfirm={(reason) => {
-          if (!closing) return;
-          action.mutate(
-            { kind: closing.kind, id: closing.item.id, reason },
-            {
-              onSuccess: () => {
-                toast.success(
-                  closing.kind === "resolve" ? "Resolved" : "Dismissed",
-                );
-                setClosing(null);
-              },
-              onError: (e) => toast.error(describeApiError(e)),
-            },
-          );
-        }}
-      />
     </OverviewCard>
   );
 }
 
-function Row({
+function Tile({
+  label,
+  count,
+  sub,
+  warn,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  sub: string;
+  warn?: boolean;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex min-w-0 flex-col rounded-[10px] border px-3.5 pt-3 pb-3.5 text-left transition-colors",
+        active
+          ? "border-gray-900 bg-white"
+          : "border-[#eef0f4] bg-[#fafbfc] hover:border-gray-300",
+      )}
+    >
+      <span className="flex items-center justify-between text-[12.5px] font-medium text-gray-600">
+        {label}
+        <ArrowRight
+          className={cn("size-3.5", active ? "text-gray-900" : "text-gray-400")}
+        />
+      </span>
+      <span
+        className={cn(
+          "mt-1 text-[26px] leading-8 font-semibold",
+          warn ? "text-[#b45309]" : "text-gray-900",
+        )}
+      >
+        {count}
+      </span>
+      <span className="mt-1 line-clamp-2 text-[12px] leading-4 text-gray-500">
+        {sub}
+      </span>
+    </button>
+  );
+}
+
+function List({
+  view,
+  summary,
+  people,
+  onOpenItem,
+}: {
+  view: View;
+  summary: NonNullable<ReturnType<typeof cardSummary>>;
+  people: TaskPerson[] | undefined;
+  onOpenItem: (id: string) => void;
+}) {
+  if (view === "check" || view === "watching") {
+    const alerts = view === "check" ? summary.toCheck : summary.watching;
+    if (!alerts.length)
+      return (
+        <p className="border-t border-[#f0f1f5] py-3 text-[13px] text-gray-500">
+          {view === "check"
+            ? "Nothing waiting for a check."
+            : "Nothing on watch."}
+        </p>
+      );
+    return (
+      <div>
+        {alerts.map((item) => (
+          <AlertRow
+            key={item.id}
+            item={item}
+            onOpen={() => onOpenItem(item.id)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const tasks = view === "quiet" ? summary.quiet : summary.tasks;
+  // Escalated alerts in no task you can see come first: never hidden.
+  const untasked = view === "tasks" ? summary.untasked : [];
+  const shownTasks = tasks.slice(0, Math.max(0, SHOWN - untasked.length));
+  const rest = tasks.slice(shownTasks.length);
+  if (!tasks.length && !untasked.length)
+    return (
+      <p className="flex items-center gap-2 border-t border-[#f0f1f5] py-3 text-[13px] text-gray-600">
+        <span className="size-[7px] rounded-full bg-[#16a34a]" />
+        {view === "quiet"
+          ? "Every open task had an update today."
+          : "Nothing needs attention."}
+      </p>
+    );
+  return (
+    <div>
+      {untasked.map((item) => (
+        <AlertRow
+          key={item.id}
+          item={item}
+          onOpen={() => onOpenItem(item.id)}
+          noTask
+        />
+      ))}
+      {shownTasks.map((row) => (
+        <TaskLine
+          key={row.task.id}
+          row={row}
+          people={people}
+          onOpenItem={onOpenItem}
+        />
+      ))}
+      {rest.length ? (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-[#f0f1f5] pt-2.5 pb-1 text-[12px] text-gray-500">
+          <span className="min-w-0 truncate">
+            {rest.length} more:{" "}
+            {rest
+              .slice(0, 2)
+              .map(
+                (r) =>
+                  `${r.task.title} (${firstOf(r.task.ownerEmail, people)})`,
+              )
+              .join(", ")}
+            {rest.length > 2 ? "…" : ""}
+          </span>
+          <Link
+            href={tasksHref()}
+            className="font-medium text-[#3b3bd6] hover:underline"
+          >
+            All in Tasks →
+          </Link>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function firstOf(
+  email: string | null,
+  people: TaskPerson[] | undefined,
+): string {
+  return email ? personName(email, people).split(" ")[0]! : "no owner";
+}
+
+function TaskLine({
+  row,
+  people,
+  onOpenItem,
+}: {
+  row: RadarTask;
+  people: TaskPerson[] | undefined;
+  onOpenItem: (id: string) => void;
+}) {
+  const quiet = quietLabel(row.quietHours);
+  const incidentItem = row.items.find((i) => i.level === "incident");
+  return (
+    <div className="grid grid-cols-[56px_minmax(0,1fr)] items-start gap-x-3.5 gap-y-2 border-t border-[#f0f1f5] py-3 md:grid-cols-[56px_minmax(0,1fr)_110px_110px_auto] md:items-center">
+      <Badge {...row.badge} />
+      <Link href={tasksHref(row.task.id)} className="min-w-0">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 md:flex-nowrap">
+          <span className="line-clamp-2 text-[13.5px] font-semibold text-gray-900 hover:underline md:truncate">
+            {row.task.title}
+          </span>
+          <span className="shrink-0 rounded-[4px] bg-[#f4f5f8] px-1.5 text-[10.5px] font-medium text-gray-500">
+            {row.tag}
+          </span>
+          {row.happening ? (
+            <span className="shrink-0 text-[11px] font-medium text-[#b91c1c]">
+              Still happening
+            </span>
+          ) : null}
+        </span>
+        <span
+          className="mt-0.5 block truncate text-[12px] text-gray-500"
+          title={row.meta}
+        >
+          {row.meta}
+        </span>
+      </Link>
+      {/* One row under the title on a phone; three columns from md up. */}
+      <div className="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-2 md:contents">
+        <span className="flex items-center gap-1.5 text-[12.5px] text-gray-700">
+          {row.task.ownerEmail ? (
+            <>
+              <Avatar email={row.task.ownerEmail} people={people} />
+              <span className="truncate">
+                {firstOf(row.task.ownerEmail, people)}
+              </span>
+            </>
+          ) : (
+            <span className="text-gray-400">No owner</span>
+          )}
+        </span>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 text-[12.5px]",
+            quiet.quiet ? "font-medium text-[#b45309]" : "text-gray-500",
+          )}
+        >
+          {quiet.quiet ? <Clock className="size-3.5" /> : null}
+          {quiet.text}
+        </span>
+        <span className="ml-auto flex justify-end md:ml-0">
+          {incidentItem ? (
+            <button
+              type="button"
+              onClick={() => onOpenItem(incidentItem.id)}
+              className="rounded-[7px] bg-[#111827] px-2.5 py-[5px] text-[12px] font-medium text-white"
+            >
+              Open incident
+            </button>
+          ) : (
+            <Link
+              href={tasksHref(row.task.id)}
+              className="rounded-[7px] border border-[#e6e8ee] bg-white px-2.5 py-[5px] text-[12px] font-medium whitespace-nowrap text-gray-800 hover:border-gray-300"
+            >
+              Open task
+            </Link>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AlertRow({
   item,
   onOpen,
-  onAssign,
-  onSnooze,
-  onClose,
+  noTask,
 }: {
   item: AttentionItemView;
   onOpen: () => void;
-  onAssign?: (owner: string | null) => void;
-  onSnooze?: () => void;
-  onClose?: (kind: "dismiss" | "resolve") => void;
+  noTask?: boolean;
 }) {
-  const { user } = useAuth();
-  const badge = levelBadge(item);
-  const status = statusPill(item.status);
-  const resolved = item.status === "resolved";
-  const isIncident = item.level === "incident" || item.category === "incident";
-
   return (
-    <div className="grid grid-cols-[64px_minmax(0,1fr)] items-center gap-x-3.5 gap-y-2 border-t border-[#f0f1f5] py-2.5 first:border-t-0 md:grid-cols-[64px_minmax(0,1fr)_120px_110px_190px]">
-      <span
-        className={cn(
-          "rounded-[5px] py-[3px] text-center text-[10.5px] font-bold tracking-[0.4px]",
-          TONE_CLASSES[badge.tone],
-        )}
-      >
-        {badge.label}
-      </span>
-
+    <div className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-[#f0f1f5] py-3">
+      <Badge {...levelBadge(item)} />
       <button type="button" onClick={onOpen} className="min-w-0 text-left">
-        <span className="flex items-center gap-2">
-          <span
-            className={cn(
-              "truncate text-[13.5px] font-semibold",
-              resolved ? "text-gray-500" : "text-gray-900",
-            )}
-          >
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 md:flex-nowrap">
+          <span className="line-clamp-2 text-[13.5px] font-semibold text-gray-900 hover:underline md:truncate">
             {item.title}
           </span>
           <span className="shrink-0 rounded-[4px] bg-[#f4f5f8] px-1.5 text-[10.5px] font-medium text-gray-500">
             {item.tag}
           </span>
+          {noTask ? (
+            <span className="shrink-0 text-[11px] text-gray-400">
+              no task yet
+            </span>
+          ) : null}
         </span>
-        <span className="mt-0.5 block truncate text-[12px] text-gray-500">
+        <span
+          className="mt-0.5 block truncate text-[12px] text-gray-500"
+          title={item.metaLine}
+        >
           {item.metaLine}
         </span>
-        {item.about ? (
-          // One line, cut by the layout; the whole text on hover and in the view.
-          <span
-            className="mt-0.5 block truncate text-[12px] text-gray-400"
-            title={item.about}
-          >
-            {item.about}
-          </span>
-        ) : null}
       </button>
-
-      <span className="col-start-2 md:col-start-auto">
-        <span
-          className={cn(
-            "inline-flex rounded-full px-2.5 py-[3px] text-[12px] font-medium",
-            TONE_CLASSES[status.tone],
-          )}
-        >
-          {status.label}
-        </span>
-      </span>
-
-      <span className="col-start-2 flex items-center gap-1.5 text-[12px] text-gray-500 md:col-start-auto">
-        {item.owner ? (
-          <>
-            <span className="flex size-[22px] items-center justify-center rounded-full bg-[#3b3bd6] text-[11px] font-semibold text-white">
-              {(item.owner.name ?? item.owner.email).charAt(0).toUpperCase()}
-            </span>
-            <span className="truncate">
-              {item.owner.name ?? item.owner.email.split("@")[0]}
-            </span>
-          </>
-        ) : onAssign ? (
-          <button
-            type="button"
-            onClick={() => onAssign("me")}
-            className="inline-flex items-center gap-1.5 hover:text-gray-800"
-          >
-            <span className="flex size-[22px] items-center justify-center rounded-full border border-dashed border-[#c4c8d2] text-gray-400">
-              <Plus className="size-3" />
-            </span>
-            Assign
-          </button>
-        ) : (
-          <span>—</span>
-        )}
-      </span>
-
-      <span className="col-start-2 flex items-center justify-end gap-1.5 md:col-start-auto">
-        {isIncident && !resolved ? (
-          <button
-            type="button"
-            onClick={onOpen}
-            className="rounded-[7px] bg-[#111827] px-2.5 py-[5px] text-[12px] font-medium text-white"
-          >
-            Open incident
-          </button>
-        ) : item.mainAction ? (
-          <Link
-            href={item.mainAction.href}
-            className="rounded-[7px] border border-[#e6e8ee] bg-white px-2.5 py-[5px] text-[12px] font-medium text-gray-800 hover:border-gray-300"
-          >
-            {item.mainAction.label}
-          </Link>
-        ) : (
-          // No page to send it to: the item view is the drill-down.
-          <button
-            type="button"
-            onClick={onOpen}
-            className="rounded-[7px] border border-[#e6e8ee] bg-white px-2.5 py-[5px] text-[12px] font-medium text-gray-800 hover:border-gray-300"
-          >
-            {item.affectedCount > 0 ? "See accounts" : "Details"}
-          </button>
-        )}
-        {!resolved && onAssign && onSnooze && onClose ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="More actions"
-                className="rounded-[7px] border border-[#e6e8ee] bg-white px-2 py-[5px] text-gray-500 hover:border-gray-300"
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onAssign("me")}>
-                Assign to me
-                {user?.email ? ` (${user.email.split("@")[0]})` : ""}
-              </DropdownMenuItem>
-              {item.owner ? (
-                <DropdownMenuItem onClick={() => onAssign(null)}>
-                  Unassign
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuItem onClick={onSnooze}>Snooze 1 h</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onClose("resolve")}>
-                Resolve…
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onClose("dismiss")}
-                className="text-red-700"
-              >
-                Dismiss…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </span>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="rounded-[7px] border border-[#e6e8ee] bg-white px-2.5 py-[5px] text-[12px] font-medium whitespace-nowrap text-gray-800 hover:border-gray-300"
+      >
+        Details
+      </button>
     </div>
+  );
+}
+
+function Badge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: keyof typeof TONE_CLASSES;
+}) {
+  return (
+    <span
+      className={cn(
+        "rounded-[5px] py-[3px] text-center text-[10.5px] font-bold tracking-[0.4px]",
+        TONE_CLASSES[tone],
+      )}
+    >
+      {label}
+    </span>
   );
 }
