@@ -43,46 +43,56 @@ export function KnownServicesSection() {
         <p className="text-sm text-gray-500">None yet.</p>
       ) : null}
       {data && data.length > 0 ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
-              <th className="py-2 pr-4 font-medium">Service</th>
-              <th className="py-2 pr-4 font-medium">Wallet</th>
-              <th className="py-2 pr-4 font-medium">Added</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row) => (
-              <tr key={row.address} className="border-b border-gray-100">
-                <td className="py-2 pr-4 font-medium text-gray-900">{row.name}</td>
-                <td className="py-2 pr-4 font-mono text-xs text-gray-600" title={row.address}>
-                  {row.address.slice(0, 8)}…{row.address.slice(-4)}
-                </td>
-                <td className="py-2 pr-4 text-gray-500">
-                  {formatDateTime(row.addedAt)} · {row.addedBy.split("@")[0]}
-                </td>
-                <td className="py-2 text-right">
-                  <button
-                    type="button"
-                    disabled={remove.isPending}
-                    onClick={() =>
-                      remove.mutate(row.address, {
-                        onSuccess: () =>
-                          toast.success(`Removed ${row.name}: checked again from the next run`),
-                        onError: (e) => toast.error(describeApiError(e)),
-                      })
-                    }
-                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:border-gray-300 disabled:opacity-40"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                    Remove
-                  </button>
-                </td>
+        // Scrolls sideways when a long name would push Remove out of reach.
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
+                <th className="py-2 pr-4 font-medium">Service</th>
+                <th className="py-2 pr-4 font-medium">Wallet</th>
+                <th className="py-2 pr-4 font-medium">Added</th>
+                <th className="py-2" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.address} className="border-b border-gray-100">
+                  <td className="max-w-[240px] py-2 pr-4 font-medium break-words text-gray-900">
+                    {row.name}
+                  </td>
+                  <td
+                    className="py-2 pr-4 font-mono text-xs text-gray-600"
+                    title={row.address}
+                  >
+                    {row.address.slice(0, 8)}…{row.address.slice(-4)}
+                  </td>
+                  <td className="py-2 pr-4 text-gray-500">
+                    {formatDateTime(row.addedAt)} · {row.addedBy.split("@")[0]}
+                  </td>
+                  <td className="py-2 text-right">
+                    <button
+                      type="button"
+                      disabled={remove.isPending}
+                      onClick={() =>
+                        remove.mutate(row.address, {
+                          onSuccess: () =>
+                            toast.success(
+                              `Removed ${row.name}: checked again from the next run`,
+                            ),
+                          onError: (e) => toast.error(describeApiError(e)),
+                        })
+                      }
+                      className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:border-gray-300 disabled:opacity-40"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : null}
     </ConfigSection>
   );

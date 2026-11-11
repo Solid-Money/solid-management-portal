@@ -238,6 +238,12 @@ describe("Needs your attention, as a summary of Tasks", () => {
     expect(quietLabel(68)).toEqual({ text: "2d quiet", quiet: true });
     expect(quietLabel(5)).toEqual({ text: "updated 5 h ago", quiet: false });
     expect(quietLabel(0)).toEqual({ text: "updated just now", quiet: false });
+    // No person has written yet: opening it is not an update.
+    expect(quietLabel(5, false)).toEqual({
+      text: "opened 5 h ago",
+      quiet: false,
+    });
+    expect(quietLabel(30, false)).toEqual({ text: "1d quiet", quiet: true });
   });
 
   it("sums up the card: tasks, quiet, to check, watching, and what has no task", () => {

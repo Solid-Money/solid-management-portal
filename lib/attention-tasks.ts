@@ -88,14 +88,21 @@ export function quietHours(
   return Math.max(0, Math.floor((Date.parse(nowIso) - since) / HOUR_MS));
 }
 
-/** "2d quiet", "5 h quiet", "updated 3 h ago", "updated just now" */
-export function quietLabel(hours: number): { text: string; quiet: boolean } {
+/**
+ * "2d quiet" past a day; under it, "updated 3 h ago" when a person wrote,
+ * else "opened 3 h ago" (opening a task is not a person's update).
+ */
+export function quietLabel(
+  hours: number,
+  byPerson = true,
+): { text: string; quiet: boolean } {
   if (hours >= QUIET_AFTER_HOURS) {
     const days = Math.floor(hours / 24);
     return { text: `${days}d quiet`, quiet: true };
   }
-  if (hours < 1) return { text: "updated just now", quiet: false };
-  return { text: `updated ${hours} h ago`, quiet: false };
+  const verb = byPerson ? "updated" : "opened";
+  if (hours < 1) return { text: `${verb} just now`, quiet: false };
+  return { text: `${verb} ${hours} h ago`, quiet: false };
 }
 
 const PRIORITY_BADGE: Record<TaskPriority, { label: string; tone: Tone }> = {

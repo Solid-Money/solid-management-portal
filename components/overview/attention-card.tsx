@@ -86,7 +86,12 @@ export function AttentionCard() {
   const { data: people } = useTaskPeople();
   const clock = useMinuteClock();
 
-  const rows = taskList.data?.pages.flatMap((page) => page.rows) ?? [];
+  // Open tasks come in one page of up to 1,000 (the API ignores paging for
+  // open views); past that the counts read "1000+" rather than undercount.
+  const firstPage = taskList.data?.pages[0];
+  const rows = firstPage?.rows ?? [];
+  const capped = !!firstPage?.hasMore;
+  const count = (n: number) => (capped ? `${n}+` : n);
   const ready = !!radar.data && !!taskList.data && clock !== null;
   const nowIso = clock !== null ? new Date(clock).toISOString() : null;
   const summary =
@@ -148,22 +153,27 @@ export function AttentionCard() {
           <div className="mt-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
             <Tile
               label="Open tasks"
-              count={summary.tasks.length + summary.untasked.length}
-              sub={
+              count={count(summary.tasks.length)}
+              sub={[
                 summary.tasks.length
                   ? `${summary.byCategory} · ${
                       summary.unassigned
                         ? `${summary.unassigned} with no owner`
                         : "each has an owner"
                     }`
-                  : "Nothing open from the radar"
-              }
+                  : "Nothing open from the radar",
+                summary.untasked.length
+                  ? `${summary.untasked.length} alert${summary.untasked.length === 1 ? "" : "s"} with no task yet`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
               active={view === "tasks"}
               onClick={() => setView("tasks")}
             />
             <Tile
               label="Quiet for 24 h+"
-              count={summary.quiet.length}
+              count={count(summary.quiet.length)}
               sub="No update from a person in a day or more"
               warn={summary.quiet.length > 0}
               active={view === "quiet"}
@@ -243,7 +253,7 @@ function Tile({
   onClick,
 }: {
   label: string;
-  count: number;
+  count: number | string;
   sub: string;
   warn?: boolean;
   active: boolean;
@@ -319,7 +329,8 @@ function List({
   const tasks = view === "quiet" ? summary.quiet : summary.tasks;
   // Escalated alerts in no task you can see come first: never hidden.
   const untasked = view === "tasks" ? summary.untasked : [];
-  const shownTasks = tasks.slice(0, Math.max(0, SHOWN - untasked.length));
+  // Three task slots whatever else shows: an incident task is never pushed out.
+  const shownTasks = tasks.slice(0, SHOWN);
   const rest = tasks.slice(shownTasks.length);
   if (!tasks.length && !untasked.length)
     return (
@@ -389,7 +400,7 @@ function TaskLine({
   people: TaskPerson[] | undefined;
   onOpenItem: (id: string) => void;
 }) {
-  const quiet = quietLabel(row.quietHours);
+  const quiet = quietLabel(row.quietHours, !!row.task.lastPersonUpdateAt);
   const incidentItem = row.items.find((i) => i.level === "incident");
   return (
     <div className="grid grid-cols-[56px_minmax(0,1fr)] items-start gap-x-3.5 gap-y-2 border-t border-[#f0f1f5] py-3 md:grid-cols-[56px_minmax(0,1fr)_110px_110px_auto] md:items-center">
