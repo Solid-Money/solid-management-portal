@@ -235,6 +235,12 @@ function SourceDetail({ detail, children }: { detail: string | null; children: R
       <TooltipTrigger asChild>
         <span
           tabIndex={0}
+          // Its row ignores keys from inside it: Enter/Space here opens the task too.
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            event.currentTarget.closest<HTMLElement>("tr, [role='button']")?.click();
+          }}
           className={cn(cell, "rounded outline-none focus-visible:ring-2 focus-visible:ring-indigo-400")}
         >
           {children}

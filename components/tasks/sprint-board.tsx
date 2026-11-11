@@ -57,6 +57,9 @@ function byUrgency(a: TaskRow, b: TaskRow): number {
   return rank(a) - rank(b) || a.number - b.number;
 }
 
+/** Boards the team can't make or delete; their tasks aren't in the product backlog. */
+const BUILT_IN_BOARDS = new Set(["support", "radar", "marketing"]);
+
 /** Tasks whose move is being saved, across the page (outlives a board remount). */
 let moving: ReadonlySet<string> = new Set();
 const movingListeners = new Set<() => void>();
@@ -210,8 +213,11 @@ export default function SprintBoard({
     [boardList],
   );
   // The backlog lists product tasks: on no board or a board the team made.
+  // (Known before the board list loads: support, radar and marketing are built in.)
   const isProduct = (row: TaskRow) =>
-    !row.board || !boardList?.boards.find((board) => board.key === row.board)?.system;
+    !row.marketing &&
+    (!row.board ||
+      (!BUILT_IN_BOARDS.has(row.board) && !boardList?.boards.find((board) => board.key === row.board)?.system));
   const [over, setOver] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const key = TASK_KEYS.sprint(start);

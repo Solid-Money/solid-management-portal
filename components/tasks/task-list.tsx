@@ -68,7 +68,7 @@ function Row({
     <tr
       onClick={onOpen}
       tabIndex={0}
-      aria-label={`T-${row.number}: ${row.title}`}
+      aria-label={row.title}
       onKeyDown={(event) => {
         // Keys pressed on a control inside the row (a label) are that control's.
         if (event.target !== event.currentTarget) return;
