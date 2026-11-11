@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfigSection } from "@/components/config/config-fields";
+import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { useKnownServices, useRemoveKnownService } from "@/hooks/use-attention";
 import { describeApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
+import type { RadarKnownService } from "@/types/radar";
 
 /**
  * Config → Anti-abuse → Known services: outside wallets many honest users pay
@@ -18,6 +21,19 @@ import { formatDateTime } from "@/lib/utils";
 export function KnownServicesSection() {
   const { data, isLoading, error } = useKnownServices();
   const remove = useRemoveKnownService();
+  // Removing can't be undone from here (it comes back only from a new radar
+  // alert), so it asks first, naming the service and wallet.
+  const [confirming, setConfirming] = useState<RadarKnownService | null>(null);
+  const confirmRemove = () => {
+    const row = confirming;
+    if (!row) return;
+    setConfirming(null);
+    remove.mutate(row.address, {
+      onSuccess: () =>
+        toast.success(`Removed ${row.name}: checked again from the next run`),
+      onError: (e) => toast.error(describeApiError(e)),
+    });
+  };
 
   return (
     <ConfigSection
@@ -73,15 +89,7 @@ export function KnownServicesSection() {
                     <button
                       type="button"
                       disabled={remove.isPending}
-                      onClick={() =>
-                        remove.mutate(row.address, {
-                          onSuccess: () =>
-                            toast.success(
-                              `Removed ${row.name}: checked again from the next run`,
-                            ),
-                          onError: (e) => toast.error(describeApiError(e)),
-                        })
-                      }
+                      onClick={() => setConfirming(row)}
                       className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:border-gray-300 disabled:opacity-40"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -94,6 +102,26 @@ export function KnownServicesSection() {
           </table>
         </div>
       ) : null}
+      <ConfirmationModal
+        isOpen={!!confirming}
+        title={`Remove ${confirming?.name ?? "this service"}?`}
+        message={
+          confirming ? (
+            <>
+              The radar checks{" "}
+              <span className="font-mono text-sm break-all text-gray-900">
+                {confirming.address}
+              </span>{" "}
+              for shared cash-outs again from its next run. To add it back, use
+              &ldquo;Known service…&rdquo; on its next alert.
+            </>
+          ) : null
+        }
+        confirmText="Remove"
+        isDestructive
+        onCancel={() => setConfirming(null)}
+        onConfirm={confirmRemove}
+      />
     </ConfigSection>
   );
 }

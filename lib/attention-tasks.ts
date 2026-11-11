@@ -79,12 +79,25 @@ export interface RadarTask {
   quietHours: number;
 }
 
+/**
+ * When a person last wrote on the task. `null` means no one has, so it counts
+ * from when it opened. Absent (an older backend) means unknown: it goes by
+ * the last update of any kind rather than call an active task quiet.
+ */
+export function lastActivityAt(
+  task: Pick<TaskRow, "lastPersonUpdateAt" | "lastUpdateAt" | "createdAt">,
+): string {
+  if (task.lastPersonUpdateAt === undefined)
+    return task.lastUpdateAt ?? task.createdAt;
+  return task.lastPersonUpdateAt ?? task.createdAt;
+}
+
 /** Whole hours since a person last wrote on the task, or since it opened. */
 export function quietHours(
-  task: Pick<TaskRow, "lastPersonUpdateAt" | "createdAt">,
+  task: Pick<TaskRow, "lastPersonUpdateAt" | "lastUpdateAt" | "createdAt">,
   nowIso: string,
 ): number {
-  const since = Date.parse(task.lastPersonUpdateAt ?? task.createdAt);
+  const since = Date.parse(lastActivityAt(task));
   return Math.max(0, Math.floor((Date.parse(nowIso) - since) / HOUR_MS));
 }
 
@@ -130,7 +143,7 @@ const SEVERITY_RANK: Record<string, number> = {
  * now keeps in one alert). The problem is read from the task's alerts open
  * or recently closed (`resolved`): when the one it lists has just closed and
  * a new alert of the same problem opens, the new one is still its task's,
- * not "no task yet". Only open alerts are shown under it.
+ * not "no task shown here". Only open alerts are shown under it.
  */
 export function radarTasks(
   tasks: TaskRow[],

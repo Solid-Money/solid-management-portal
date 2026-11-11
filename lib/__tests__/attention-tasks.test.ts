@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cardSummary,
   closedLine,
+  lastActivityAt,
   problemKey,
   quietHours,
   quietLabel,
@@ -245,6 +246,18 @@ describe("Needs your attention, as a summary of Tasks", () => {
       quiet: false,
     });
     expect(quietLabel(30, false)).toEqual({ text: "1d quiet", quiet: true });
+  });
+
+  it("does not call a task quiet when the backend did not say who last wrote", () => {
+    const old = {
+      createdAt: "2026-11-01T13:30:00.000Z",
+      lastUpdateAt: "2026-11-11T11:30:00.000Z",
+    };
+    // Field absent (older backend): goes by the last update of any kind.
+    expect(quietHours(old, NOW)).toBe(2);
+    expect(lastActivityAt(old)).toBe(old.lastUpdateAt);
+    // null: no person has written, so it counts from when it opened.
+    expect(quietHours({ ...old, lastPersonUpdateAt: null }, NOW)).toBe(240);
   });
 
   it("sums up the card: tasks, quiet, to check, watching, and what has no task", () => {

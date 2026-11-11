@@ -186,7 +186,7 @@ export function AttentionCard() {
                     }`
                   : "Nothing open from the radar",
                 summary.untasked.length
-                  ? `${summary.untasked.length} alert${summary.untasked.length === 1 ? "" : "s"} with no task yet`
+                  ? `${summary.untasked.length} alert${summary.untasked.length === 1 ? "" : "s"} not in a task shown here`
                   : null,
               ]
                 .filter(Boolean)
@@ -423,7 +423,13 @@ function TaskLine({
   people: TaskPerson[] | undefined;
   onOpenItem: (id: string) => void;
 }) {
-  const quiet = quietLabel(row.quietHours, !!row.task.lastPersonUpdateAt);
+  // "updated" once someone wrote; "opened" when no one has (null). Absent
+  // (older backend): any update counts, as in quietHours.
+  const wrote =
+    row.task.lastPersonUpdateAt === undefined
+      ? !!row.task.lastUpdateAt
+      : !!row.task.lastPersonUpdateAt;
+  const quiet = quietLabel(row.quietHours, wrote);
   const incidentItem = row.items.find((i) => i.level === "incident");
   return (
     <div className="grid grid-cols-[56px_minmax(0,1fr)] items-start gap-x-3.5 gap-y-2 border-t border-[#f0f1f5] py-3 md:grid-cols-[56px_minmax(0,1fr)_110px_110px_auto] md:items-center">
@@ -517,7 +523,7 @@ function AlertRow({
           </span>
           {noTask ? (
             <span className="shrink-0 text-[11px] text-gray-400">
-              no task yet
+              no task shown here
             </span>
           ) : null}
         </span>
