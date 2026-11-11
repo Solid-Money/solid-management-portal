@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { fileSize, imageUrls, inlineKeys, isClaudeLooking, renderableHtml } from "@/lib/task-rich";
 import { deleteTaskUpdate, editTaskUpdate, postTaskUpdate, reactToTaskUpdate } from "@/lib/tasks-api";
 import TaskComposer from "@/components/tasks/task-composer";
+import ImagePreview, { type PreviewImage } from "@/components/tasks/image-preview";
 import {
   AuthorAvatar,
   Avatar,
@@ -73,6 +74,7 @@ export function Attachments({
   const shown = inline
     ? attachments.filter((a) => !inline.has(a.key) || (a.mime.startsWith("image/") && !a.url))
     : attachments;
+  const [preview, setPreview] = useState<PreviewImage | null>(null);
   if (!shown.length) return null;
   const images = shown.filter((a) => a.mime.startsWith("image/"));
   const others = shown.filter((a) => !a.mime.startsWith("image/"));
@@ -82,12 +84,12 @@ export function Attachments({
         <div className={cn("grid gap-2", images.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
           {images.map((image) =>
             image.url ? (
-              <a
+              <button
                 key={image.key}
-                href={image.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block overflow-hidden rounded-md border border-gray-200 bg-gray-50"
+                type="button"
+                aria-label={`View ${image.fileName ?? "the image"} larger`}
+                onClick={() => setPreview({ src: image.url!, name: image.fileName })}
+                className="block w-full cursor-zoom-in overflow-hidden rounded-md border border-gray-200 bg-gray-50"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived link to the support service */}
                 <img
@@ -96,7 +98,7 @@ export function Attachments({
                   loading="lazy"
                   className="max-h-80 w-full object-contain"
                 />
-              </a>
+              </button>
             ) : (
               <div
                 key={image.key}
@@ -131,6 +133,7 @@ export function Attachments({
           ))}
         </div>
       )}
+      <ImagePreview image={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
@@ -165,14 +168,28 @@ export function TaskText({
     () => (format === "html" ? renderableHtml(body, imageUrls(attachments)) : ""),
     [attachments, body, format],
   );
+  const [preview, setPreview] = useState<PreviewImage | null>(null);
   if (!body) return null;
   if (format === "html")
     return (
-      <div
-        className={cn("task-rich break-words text-sm leading-relaxed text-gray-800", className)}
-        // Cleaned by the server and again here (renderableHtml).
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <>
+        <div
+          className={cn(
+            "task-rich break-words text-sm leading-relaxed text-gray-800 [&_img]:cursor-zoom-in",
+            className,
+          )}
+          // An image in the text opens larger, unless it's a link of its own.
+          onClick={(event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLImageElement) || target.closest("a")) return;
+            event.preventDefault();
+            setPreview({ src: target.currentSrc || target.src, name: target.alt || null });
+          }}
+          // Cleaned by the server and again here (renderableHtml).
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+        <ImagePreview image={preview} onClose={() => setPreview(null)} />
+      </>
     );
   return (
     <p className={cn("whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800", className)}>
