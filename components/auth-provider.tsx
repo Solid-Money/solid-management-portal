@@ -4,8 +4,27 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { validateUserDomain, getAllowedDomain } from '@/lib/auth';
+import {
+  validateUserDomain,
+  getAllowedDomain,
+  isAllowedSignInProvider,
+} from '@/lib/auth';
 import { toast } from 'sonner';
+
+/**
+ * Whether this session signed in with Google, read from the ID token's
+ * `sign_in_provider` claim. Fails closed: if the token can't be read, the
+ * session isn't kept.
+ */
+async function signedInWithGoogle(user: User): Promise<boolean> {
+  try {
+    const { signInProvider } = await user.getIdTokenResult();
+    return isAllowedSignInProvider(signInProvider);
+  } catch (error) {
+    console.error('[AuthProvider] Could not read the sign-in provider:', error);
+    return false;
+  }
+}
 
 interface AuthContextType {
   user: User | null;
@@ -83,8 +102,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Validate user domain
         const isValid = validateUserDomain(firebaseUser);
         console.log('[AuthProvider] Domain validation result:', isValid);
-        
-        if (isValid) {
+
+        // Google sign-in only. A session from any other provider (e.g. a
+        // password set through a reset email) is signed out here, the same
+        // rule the backend enforces on every request.
+        const usesGoogle = isValid && (await signedInWithGoogle(firebaseUser));
+
+        if (isValid && !usesGoogle) {
+          console.warn('[AuthProvider] Session is not a Google sign-in, signing out');
+          await signOut(auth);
+          setUser(null);
+          toast.error('Please sign in with your Google account.');
+          routerRef.current.push('/login');
+        } else if (isValid) {
           console.log('[AuthProvider] User domain is valid, setting user');
           setUser(firebaseUser);
           

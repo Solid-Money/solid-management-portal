@@ -43,3 +43,23 @@ export function getAllowedDomain(): string {
   return ALLOWED_DOMAIN;
 }
 
+/**
+ * The only way into the portal: Google sign-in, which carries the Workspace's
+ * 2-Step Verification. The backend refuses every other provider (a password
+ * set through a reset email, an email link, …), so the portal does too rather
+ * than keep a session every request would bounce.
+ */
+export const ADMIN_SIGN_IN_PROVIDER = 'google.com';
+
+/**
+ * Whether a session's sign-in method is allowed. `signInProvider` is the
+ * `firebase.sign_in_provider` claim of the user's ID token
+ * (`user.getIdTokenResult()`), i.e. how this session signed in — not merely a
+ * provider linked to the account.
+ */
+export function isAllowedSignInProvider(
+  signInProvider: string | null | undefined,
+): boolean {
+  return signInProvider === ADMIN_SIGN_IN_PROVIDER;
+}
+
