@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   daysLate,
   firstName,
@@ -205,22 +206,44 @@ export function TaskSource({ row, people }: { row: TaskRow; people?: TaskPerson[
             ? "Claude"
             : authorName(row.createdBy, people);
     return (
-      <span
-        className="flex min-w-0 items-center gap-1.5 text-xs text-gray-600"
-        title={row.source.label ? `${what} · ${row.source.label}` : what}
-      >
+      <SourceDetail detail={row.source.label ? `${what} · ${row.source.label}` : null}>
         <BotAvatar size={18} />
         <span className="truncate font-medium text-gray-900">{what}</span>
-      </span>
+        {row.source.label && <span className="sr-only"> · {row.source.label}</span>}
+      </SourceDetail>
     );
   }
   const email = row.createdBy.email;
   if (!email) return null;
+  // The team list's name first; the name stored on the task for someone not on it.
+  const known = !!people?.find((person) => person.email === email)?.name;
+  const name = known ? personName(email, people) : (row.createdBy.name ?? personName(email, people));
   return (
-    <span className="flex min-w-0 items-center gap-1.5 text-xs text-gray-600" title={personName(email, people)}>
+    <SourceDetail detail={name}>
       <Avatar email={email} people={people} size={18} />
-      <span className="truncate">{firstName(email, people)}</span>
-    </span>
+      <span className="truncate">{known ? firstName(email, people) : name.split(" ")[0]}</span>
+    </SourceDetail>
+  );
+}
+
+/** The cell, with its detail on hover or keyboard focus (the drawer shows it on touch). */
+function SourceDetail({ detail, children }: { detail: string | null; children: ReactNode }) {
+  const cell = "flex min-w-0 items-center gap-1.5 text-xs text-gray-600";
+  if (!detail) return <span className={cell}>{children}</span>;
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn(cell, "rounded outline-none focus-visible:ring-2 focus-visible:ring-indigo-400")}
+        >
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>
+        {detail}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
