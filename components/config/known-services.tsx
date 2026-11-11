@@ -5,7 +5,14 @@ import { Loader2, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfigSection } from "@/components/config/config-fields";
-import ConfirmationModal from "@/components/ui/confirmation-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useKnownServices, useRemoveKnownService } from "@/hooks/use-attention";
 import { describeApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
@@ -102,26 +109,47 @@ export function KnownServicesSection() {
           </table>
         </div>
       ) : null}
-      <ConfirmationModal
-        isOpen={!!confirming}
-        title={`Remove ${confirming?.name ?? "this service"}?`}
-        message={
-          confirming ? (
-            <>
+      {/* Radix dialog: moves focus in, keeps it there, announces itself, and
+          puts focus back on Remove when it closes. */}
+      <Dialog
+        open={!!confirming}
+        onOpenChange={(next) => {
+          if (!next) setConfirming(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="min-w-0">
+            {/* Wraps an 80-character name with no spaces; clear of the close button. */}
+            <DialogTitle className="pr-6 leading-snug [overflow-wrap:anywhere]">
+              Remove {confirming?.name ?? "this service"}?
+            </DialogTitle>
+            <DialogDescription>
               The radar checks{" "}
-              <span className="font-mono text-sm break-all text-gray-900">
-                {confirming.address}
+              <span className="font-mono break-all text-gray-900">
+                {confirming?.address}
               </span>{" "}
               for shared cash-outs again from its next run. To add it back, use
               &ldquo;Known service…&rdquo; on its next alert.
-            </>
-          ) : null
-        }
-        confirmText="Remove"
-        isDestructive
-        onCancel={() => setConfirming(null)}
-        onConfirm={confirmRemove}
-      />
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setConfirming(null)}
+              className="rounded-md border border-[#e6e8ee] px-3 py-1.5 text-[13px] text-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmRemove}
+              className="rounded-md bg-red-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-red-700"
+            >
+              Remove
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ConfigSection>
   );
 }
