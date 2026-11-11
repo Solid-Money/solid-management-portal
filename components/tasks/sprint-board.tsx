@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState, type DragEvent } from "react";
+import { useDeferredValue, useMemo, useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -195,6 +195,9 @@ export default function SprintBoard({
     staleTime: 30_000,
   });
 
+  // One move per task at a time: a second drag or Add on a task still being
+  // saved is ignored, so an older request can't land after a newer one.
+  const moving = useRef(new Set<string>());
   const move = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TaskPatchInput }) => patchTask(id, input),
     onMutate: async ({ id, input }) => {
@@ -228,7 +231,8 @@ export default function SprintBoard({
     onError: (_error, _input, context) => {
       if (context?.before) queryClient.setQueryData(key, context.before);
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { id }) => {
+      moving.current.delete(id);
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.all });
     },
   });
@@ -256,6 +260,12 @@ export default function SprintBoard({
     ? [...shown, ...(found?.rows ?? []).filter((row) => row.sprint === null && !shownIds.has(row.id))]
     : shown;
 
+  const moveOnce = (id: string, input: TaskPatchInput) => {
+    if (moving.current.has(id)) return;
+    moving.current.add(id);
+    move.mutate({ id, input });
+  };
+
   const drop = (event: DragEvent, column: (typeof COLUMNS)[number]) => {
     event.preventDefault();
     setOver(null);
@@ -264,9 +274,9 @@ export default function SprintBoard({
     if (!dragged) return;
     const row = rows.find((r) => r.id === dragged.id);
     if (dragged.from === "backlog")
-      move.mutate({ id: dragged.id, input: { sprint: sprint.start, status: column.drop } });
+      moveOnce(dragged.id, { sprint: sprint.start, status: column.drop });
     else if (row && !column.statuses.includes(row.status))
-      move.mutate({ id: dragged.id, input: { status: column.drop } });
+      moveOnce(dragged.id, { status: column.drop });
   };
 
   // A card dropped on the backlog leaves the sprint (its status stays).
@@ -277,7 +287,7 @@ export default function SprintBoard({
     if (!dragged || dragged.from !== "sprint") return;
     const row = rows.find((r) => r.id === dragged.id);
     if (!row || row.status === "done" || row.status === "cancelled") return;
-    move.mutate({ id: dragged.id, input: { sprint: null } });
+    moveOnce(dragged.id, { sprint: null });
   };
 
   return (
@@ -467,7 +477,7 @@ export default function SprintBoard({
                       variant="ghost"
                       size="xs"
                       className="shrink-0 text-indigo-700 hover:text-indigo-800"
-                      onClick={() => move.mutate({ id: row.id, input: { sprint: sprint.start } })}
+                      onClick={() => moveOnce(row.id, { sprint: sprint.start })}
                     >
                       <Plus /> Add
                     </Button>

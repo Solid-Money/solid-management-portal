@@ -240,7 +240,7 @@ function SourceDetail({ detail, children }: { detail: string | null; children: R
           {children}
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={6}>
+      <TooltipContent side="top" sideOffset={6} className="max-w-[min(20rem,calc(100vw-2rem))] [overflow-wrap:anywhere]">
         {detail}
       </TooltipContent>
     </Tooltip>

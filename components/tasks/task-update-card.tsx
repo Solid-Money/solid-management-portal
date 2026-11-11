@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -270,9 +270,24 @@ function ActivityLine({ update, people }: { update: TaskUpdate; people: TaskPers
   );
 }
 
-const PEOPLE_SHOWN = 12;
+/** Everyone, with their faces; a long list scrolls inside the card. */
+function PeopleList({ title, emails, people }: { title: string; emails: string[]; people: TaskPerson[] }) {
+  return (
+    <>
+      <p className="mb-1.5 font-medium">{title}</p>
+      <ul className="max-h-60 space-y-1 overflow-y-auto pr-1">
+        {emails.map((email) => (
+          <li key={email} className="flex min-w-0 items-center gap-1.5">
+            <Avatar email={email} people={people} size={18} />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{personName(email, people)}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
-/** On hover (or focus): who, with their faces. Used for reactions and "Seen by". */
+/** On hover or keyboard focus: who. Used for reactions and "Seen by". */
 function PeopleTooltip({
   title,
   emails,
@@ -284,68 +299,37 @@ function PeopleTooltip({
   people: TaskPerson[];
   children: ReactElement;
 }) {
-  const shown = emails.slice(0, PEOPLE_SHOWN);
   return (
     <Tooltip delayDuration={150}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="top" sideOffset={6} className="max-w-64 px-3 py-2">
-        <p className="mb-1.5 font-medium">{title}</p>
-        <ul className="space-y-1">
-          {shown.map((email) => (
-            <li key={email} className="flex items-center gap-1.5">
-              <Avatar email={email} people={people} size={18} />
-              <span className="truncate">{personName(email, people)}</span>
-            </li>
-          ))}
-        </ul>
-        {emails.length > shown.length && <p className="mt-1 opacity-70">and {emails.length - shown.length} more</p>}
+      <TooltipContent side="top" sideOffset={6} className="max-w-[min(16rem,calc(100vw-2rem))] px-3 py-2">
+        <PeopleList title={title} emails={emails} people={people} />
       </TooltipContent>
     </Tooltip>
   );
 }
 
 /**
- * "Seen by N": the names on hover with a mouse, and on tap or click (touch
- * has no hover). Separate from reactions, whose click toggles a reaction.
+ * "Seen by N": the names on hover (a tooltip, like reactions), and on tap,
+ * click or Enter in a popover, which touch and keyboard can reach. The
+ * popover opens only on purpose, so it never takes focus from the composer.
  */
 function SeenBy({ emails, people }: { emails: string[]; people: TaskPerson[] }) {
-  const [open, setOpen] = useState(false);
-  const pointer = useRef<string | null>(null);
-  const shown = emails.slice(0, PEOPLE_SHOWN);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Seen by ${emails.map((email) => personName(email, people)).join(", ")}`}
-          onPointerEnter={(event) => event.pointerType === "mouse" && setOpen(true)}
-          onPointerLeave={(event) => event.pointerType === "mouse" && setOpen(false)}
-          // With a mouse, hovering already shows it: a click doesn't close it.
-          onPointerDown={(event) => (pointer.current = event.pointerType)}
-          onClick={(event) => pointer.current === "mouse" && event.preventDefault()}
-          className="ml-auto inline-flex cursor-pointer items-center gap-1 rounded hover:text-gray-900"
-        >
-          <Eye className="size-3.5" /> Seen by {emails.length}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="top"
-        align="end"
-        className="w-auto max-w-64 p-2.5 text-xs"
-        onOpenAutoFocus={(event) => event.preventDefault()}
-      >
-        <p className="mb-1.5 font-medium text-gray-900">Seen by</p>
-        <ul className="space-y-1">
-          {shown.map((email) => (
-            <li key={email} className="flex items-center gap-1.5 text-gray-700">
-              <Avatar email={email} people={people} size={18} />
-              <span className="truncate">{personName(email, people)}</span>
-            </li>
-          ))}
-        </ul>
-        {emails.length > shown.length && (
-          <p className="mt-1 text-gray-500">and {emails.length - shown.length} more</p>
-        )}
+    <Popover>
+      <PeopleTooltip title="Seen by" emails={emails} people={people}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Seen by ${emails.map((email) => personName(email, people)).join(", ")}`}
+            className="ml-auto inline-flex cursor-pointer items-center gap-1 rounded hover:text-gray-900"
+          >
+            <Eye className="size-3.5" /> Seen by {emails.length}
+          </button>
+        </PopoverTrigger>
+      </PeopleTooltip>
+      <PopoverContent side="top" align="end" className="w-auto max-w-[min(16rem,calc(100vw-2rem))] p-2.5 text-xs text-gray-800">
+        <PeopleList title="Seen by" emails={emails} people={people} />
       </PopoverContent>
     </Popover>
   );
