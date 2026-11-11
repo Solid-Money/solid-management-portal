@@ -28,6 +28,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
     recovery_code_sent: { label: "Recovery code sent", variant: "info" },
     account_email_set: { label: "Recovery email changed", variant: "danger" },
     two_factor_reset: { label: "2FA reset", variant: "warning" },
+    push_campaign_test_sent: { label: "Test push sent", variant: "muted" },
     card_frozen: { label: "Card frozen", variant: "warning" },
     card_unfrozen: { label: "Card unfrozen", variant: "success" },
     card_issued: { label: "Card issued", variant: "info" },
@@ -181,6 +182,16 @@ const stringField = (entry: AdminAuditEntry, key: string): string | null => {
 
 /** The one or two facts that make an entry readable without opening Mongo. */
 function detailFor(entry: AdminAuditEntry): string | null {
+  if (entry.action === "push_campaign_test_sent") {
+    // The copy that reached this user's phone, one title per variant.
+    const variants = entry.metadata?.variants;
+    if (!Array.isArray(variants)) return null;
+    const titles = variants
+      .map((v: unknown) => (v as { title?: unknown })?.title)
+      .filter((title): title is string => typeof title === "string");
+    return titles.length ? titles.map((t) => `“${t}”`).join(" · ") : null;
+  }
+
   if (entry.action === "account_recovered") {
     const closedAt = stringField(entry, "closedAt");
     const stillBlocked = stringField(entry, "remainingSpendBlockReason");

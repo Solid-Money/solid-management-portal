@@ -2,6 +2,7 @@ import {
   Activity,
   AlertTriangle,
   BarChart2,
+  BellRing,
   Headphones,
   Inbox,
   LayoutDashboard,
@@ -311,6 +312,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Cohorts",
         description: "User segments and email exports for lifecycle sends",
         icon: UsersRound,
+      },
+      {
+        href: "/push-notifications",
+        label: "Push notifications",
+        description:
+          "Targeted pushes and A/B tests to an uploaded user list, opening any screen",
+        icon: BellRing,
       },
       {
         href: "/referrals",
