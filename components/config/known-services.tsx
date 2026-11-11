@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,9 +31,16 @@ export function KnownServicesSection() {
   // Removing can't be undone from here (it comes back only from a new radar
   // alert), so it asks first, naming the service and wallet.
   const [confirming, setConfirming] = useState<RadarKnownService | null>(null);
+  // The dialog has no trigger, so focus is put back by hand when it closes:
+  // on the Remove that opened it after Cancel or Escape, on the list after a
+  // removal (that row's Remove is disabled, then gone).
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const list = useRef<HTMLDivElement | null>(null);
+  const removed = useRef(false);
   const confirmRemove = () => {
     const row = confirming;
     if (!row) return;
+    removed.current = true;
     setConfirming(null);
     remove.mutate(row.address, {
       onSuccess: () =>
@@ -67,7 +74,11 @@ export function KnownServicesSection() {
       ) : null}
       {data && data.length > 0 ? (
         // Scrolls sideways when a long name would push Remove out of reach.
-        <div className="overflow-x-auto">
+        <div
+          ref={list}
+          tabIndex={-1}
+          className="overflow-x-auto focus:outline-none"
+        >
           <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
@@ -96,7 +107,10 @@ export function KnownServicesSection() {
                     <button
                       type="button"
                       disabled={remove.isPending}
-                      onClick={() => setConfirming(row)}
+                      onClick={(e) => {
+                        opener.current = e.currentTarget;
+                        setConfirming(row);
+                      }}
                       className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:border-gray-300 disabled:opacity-40"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -109,15 +123,24 @@ export function KnownServicesSection() {
           </table>
         </div>
       ) : null}
-      {/* Radix dialog: moves focus in, keeps it there, announces itself, and
-          puts focus back on Remove when it closes. */}
+      {/* Radix dialog: moves focus in, keeps it there and announces itself;
+          where focus goes on close is set below. */}
       <Dialog
         open={!!confirming}
         onOpenChange={(next) => {
           if (!next) setConfirming(null);
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            const target = removed.current ? list.current : opener.current;
+            removed.current = false;
+            opener.current = null;
+            if (target?.isConnected) target.focus();
+          }}
+        >
           <DialogHeader className="min-w-0">
             {/* Wraps an 80-character name with no spaces; clear of the close button. */}
             <DialogTitle className="pr-6 leading-snug [overflow-wrap:anywhere]">
