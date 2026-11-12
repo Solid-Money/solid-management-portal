@@ -754,7 +754,11 @@ export type WalletFailureSource =
   | "referral_payout"
   | "user_activity";
 
-export type WalletForecastSource = "cashback" | "referral";
+export type WalletForecastSource =
+  | "cashback"
+  | "referral"
+  // The Card Refund Payout Wallet: its forecast is the unpaid refund queue.
+  | "card_refund";
 
 /** The six assets the page tracks, as the backend names them. */
 export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE" | "EURC";
@@ -859,9 +863,85 @@ export interface WalletRefillPlan {
    */
   floorBasis?: "days" | "minimum";
   targetAmount: number;
-  /** What to actually send now. Zero when the balance already covers it. */
+  /**
+   * What to actually send now. Zero when the balance already covers it.
+   * Counts `owedAmount` first: money already owed out is not cover.
+   */
   refillAmount: number;
+  /** Payouts already queued against this balance, reserved before cover. */
+  owedAmount?: number;
   belowFloor: boolean;
+}
+
+/**
+ * A transfer the daily rate leaves out as a one-off — one 2,900 USDC credit
+ * among dozens of ordinary refunds is not what the wallet spends each day.
+ */
+export interface WalletExcludedOneOff {
+  amount: number;
+  /** Its share of everything that left in the window, 0–1. */
+  share: number;
+  timestamp: string;
+  hash: string;
+  explorerUrl: string;
+}
+
+/**
+ * Payouts already queued behind this balance — card refunds waiting on a
+ * top-up. `clearAmount` is the least that gets them paid.
+ */
+export interface WalletOwedNow {
+  kind: "card-refunds";
+  count: number;
+  amount: number;
+  oldestAt?: string;
+  clearAmount: number;
+  /** Stopped retrying and waiting on an operator; not in `amount`. */
+  failedCount: number;
+  /** Queued but not convertible to this asset right now; not in `amount`. */
+  unpricedCount: number;
+}
+
+/** One card refund, chargeback or credit adjustment not yet paid out. */
+export interface RefundQueueItem {
+  uniqueOperationId: string;
+  transactionId?: string;
+  userId?: string;
+  status: "PENDING" | "APPROVED" | "PAYING" | "FAILED";
+  /** Wirex's reason — Refund, Reversal, OriginalCredit, … */
+  reason?: string;
+  amountUsd: number;
+  currency: "USD" | "EUR";
+  symbol: "USDC" | "EURC";
+  /** Roughly what will be sent in `symbol`; absent when it could not be priced. */
+  tokenAmount?: number;
+  createdAt?: string;
+  attempts: number;
+  nextAttemptAt?: string;
+  lastError?: string;
+  attributedToBalance: boolean;
+  /** False when it waits on an operator rather than on a top-up. */
+  autoPayable: boolean;
+}
+
+export interface RefundQueueCurrencyTotals {
+  count: number;
+  usd: number;
+  tokenAmount: number;
+  unpricedCount: number;
+}
+
+export interface RefundQueueResponse {
+  items: RefundQueueItem[];
+  owed: {
+    count: number;
+    usd: number;
+    byCurrency: Record<"USD" | "EUR", RefundQueueCurrencyTotals>;
+    oldestAt?: string;
+  };
+  failed: { count: number; usd: number };
+  truncated: boolean;
+  generatedAt: string;
 }
 
 /** The verdict to render: one rule, computed server-side. */
@@ -880,7 +960,9 @@ export type WalletVerdictBasis =
   | "estimated"
   | "configured"
   | "residue"
-  | "warming-up";
+  | "warming-up"
+  // Payouts are queued against this balance and it cannot pay them.
+  | "queued";
 
 /**
  * One asset's verdict and refill plan, for every wallet at once.
@@ -909,6 +991,10 @@ export interface WalletAssetPlan {
   runwayBasis?: "measured" | "outflow";
   snapshotCount: number;
   plan?: WalletRefillPlan;
+  /** Payouts already queued behind this balance, when there are any. */
+  owedNow?: WalletOwedNow;
+  /** A transfer left out of the daily rate as a one-off. */
+  excludedOneOff?: WalletExcludedOneOff;
   verdict: WalletVerdict;
   verdictBasis: WalletVerdictBasis;
   verdictReason: string;
@@ -1037,6 +1123,15 @@ export interface WalletAssetFlow {
   /** Which figure the runway was computed from. */
   runwayBasis?: "measured" | "outflow";
   plan?: WalletRefillPlan;
+  /** Payouts already queued behind this balance, when there are any. */
+  owedNow?: WalletOwedNow;
+  /** A transfer left out of the daily rate as a one-off. */
+  excludedOneOff?: WalletExcludedOneOff;
+  /**
+   * Days of history the rates were taken over: the window, or less when the
+   * wallet has not been watched that long.
+   */
+  observedDays?: number;
   /**
    * The verdict to render. Optional only so a page deployed ahead of the
    * backend keeps working — it falls back to `status`, which is what it
@@ -1075,6 +1170,8 @@ export interface WalletForecastResponse {
     shortfallUsd?: number;
     coversUntil?: string;
   };
+  /** The unpaid refunds themselves, on the Card Refund Payout Wallet. */
+  refundQueue?: RefundQueueResponse;
   note?: string;
   generatedAt: string;
 }
