@@ -9,6 +9,7 @@ import AiApiUsageChart from "@/components/ai-api/usage-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import UserLink from "@/components/user-link";
 import { useAiApiOverview, useAiApiUsers } from "@/hooks/use-ai-api";
 import {
@@ -187,23 +188,37 @@ function UsersTable() {
                     </td>
                     <td className="px-4 py-2">
                       {closest ? (
-                        <span
-                          className="inline-flex items-center gap-1 whitespace-nowrap"
-                          title={`${closest.name}: ${formatUsd(closest.spentUsd)} of ${formatUsd(
-                            closest.limitUsd,
-                            0,
-                          )} this month`}
-                        >
-                          {percent >= NEAR_LIMIT_PERCENT ? (
-                            <Badge variant="warning">{percent}%</Badge>
-                          ) : (
-                            <span>{percent}%</span>
-                          )}
-                          <span className="text-gray-600">
-                            of {formatUsd(closest.limitUsd, 0)} ·
-                          </span>
-                          <span className="max-w-48 truncate text-gray-600">{closest.name}</span>
-                        </span>
+                        // A button, so the exact spend is reachable from the
+                        // keyboard too: the tooltip opens on hover and on focus,
+                        // and Radix ties its text to the button
+                        // (aria-describedby). A click still opens the user, as
+                        // anywhere else on the row.
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex cursor-help items-center gap-1 whitespace-nowrap"
+                            >
+                              {percent >= NEAR_LIMIT_PERCENT ? (
+                                <Badge variant="warning">{percent}%</Badge>
+                              ) : (
+                                <span>{percent}%</span>
+                              )}
+                              <span className="text-gray-600">
+                                of {formatUsd(closest.limitUsd, 0)} ·
+                              </span>
+                              <span className="max-w-48 truncate text-gray-600">
+                                {closest.name}
+                              </span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {`${closest.name}: ${formatUsd(closest.spentUsd)} of ${formatUsd(
+                              closest.limitUsd,
+                              0,
+                            )} this month`}
+                          </TooltipContent>
+                        </Tooltip>
                       ) : (
                         "—"
                       )}
