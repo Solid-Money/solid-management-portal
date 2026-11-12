@@ -37,5 +37,9 @@ export interface HiddenActivityRestorePreview {
 export interface HiddenActivityRestoreResult {
   restored: number;
   accounts: number;
-  preview: HiddenActivityRestorePreview;
+  /**
+   * What is left after the restore, or null when the restore committed but
+   * the server could not read the rest. `restored` is authoritative either way.
+   */
+  preview: HiddenActivityRestorePreview | null;
 }

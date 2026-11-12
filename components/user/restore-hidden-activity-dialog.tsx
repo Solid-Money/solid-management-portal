@@ -12,6 +12,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 
 /**
@@ -30,44 +31,39 @@ export default function RestoreHiddenActivityDialog({
   const queryClient = useQueryClient();
 
   return (
-    <>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => setOpen(true)}
-        className="cursor-pointer"
-      >
-        <RotateCcw className="h-3.5 w-3.5" />
-        Restore hidden activity
-      </Button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        {/* Remounted on each open, so a stale preview is never shown. */}
-        {open && (
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Restore hidden activity</DialogTitle>
-              <DialogDescription>
-                Finds this user&apos;s sends and Earn withdrawals that were
-                hidden as spam although they went through on chain (soFUSE,
-                soETH, USDT on Fuse, soUSD on Base), and puts them back in their
-                activity.
-              </DialogDescription>
-            </DialogHeader>
-            <HiddenActivityRestore
-              userId={userId}
-              onRestored={() => {
-                void queryClient.invalidateQueries({
-                  queryKey: ["user-activity", userId],
-                });
-                void queryClient.invalidateQueries({
-                  queryKey: ["user-audit-log", userId],
-                });
-              }}
-            />
-          </DialogContent>
-        )}
-      </Dialog>
-    </>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {/* A trigger, not a plain button, so focus returns here on close. */}
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="cursor-pointer">
+          <RotateCcw className="h-3.5 w-3.5" />
+          Restore hidden activity
+        </Button>
+      </DialogTrigger>
+      {/* Remounted on each open, so a stale preview is never shown. */}
+      {open && (
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Restore hidden activity</DialogTitle>
+            <DialogDescription>
+              Finds this user&apos;s sends and Earn withdrawals that were
+              hidden as spam although they went through on chain (soFUSE,
+              soETH, USDT on Fuse, soUSD on Base), and puts them back in their
+              activity.
+            </DialogDescription>
+          </DialogHeader>
+          <HiddenActivityRestore
+            userId={userId}
+            onApplySettled={() => {
+              void queryClient.invalidateQueries({
+                queryKey: ["user-activity", userId],
+              });
+              void queryClient.invalidateQueries({
+                queryKey: ["user-audit-log", userId],
+              });
+            }}
+          />
+        </DialogContent>
+      )}
+    </Dialog>
   );
 }

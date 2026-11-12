@@ -48,10 +48,15 @@ function errorMessage(error: unknown) {
  */
 export function HiddenActivityRestore({
   userId: fixedUserId,
-  onRestored,
+  onApplySettled,
 }: {
   userId?: string;
-  onRestored?: (result: HiddenActivityRestoreResult) => void;
+  /**
+   * Called after every restore attempt, whatever its outcome: a lost response
+   * can follow a restore that committed, so whatever shows the account's
+   * activity should read it again either way.
+   */
+  onApplySettled?: () => void;
 }) {
   const [userFilter, setUserFilter] = useState("");
   const [preview, setPreview] = useState<HiddenActivityRestorePreview | null>(
@@ -112,19 +117,21 @@ export function HiddenActivityRestore({
         },
         { quietErrors: true },
       );
-      if (
-        typeof response.data?.restored !== "number" ||
-        !isHiddenActivityRestorePreview(response.data.preview)
-      ) {
+      const data = response.data;
+      if (typeof data?.restored !== "number") {
         setPreview(null);
         setError(
           "The server did not return the restore state. Preview again to check whether the rows were restored.",
         );
         return;
       }
-      setResult(response.data);
-      setPreview(response.data.preview);
-      onRestored?.(response.data);
+      // The restore committed. Without a readable follow-up preview, say so
+      // and leave the next preview to the operator rather than show an error.
+      const after = isHiddenActivityRestorePreview(data.preview)
+        ? data.preview
+        : null;
+      setResult({ ...data, preview: after });
+      setPreview(after);
     } catch (error: unknown) {
       // An interrupted response can follow a successful commit. Force a new
       // read so the operator sees the actual state before any retry.
@@ -133,6 +140,7 @@ export function HiddenActivityRestore({
     } finally {
       inFlight.current = false;
       setPending(null);
+      onApplySettled?.();
     }
   }
 
@@ -199,9 +207,11 @@ export function HiddenActivityRestore({
           <CheckCircle className="h-5 w-5" aria-hidden="true" />
           {result.restored} row{result.restored === 1 ? "" : "s"} restored for{" "}
           {result.accounts} account{result.accounts === 1 ? "" : "s"}.
-          {result.preview.hasMore
-            ? " More remain — the next batch is previewed below."
-            : ""}
+          {!result.preview
+            ? " Preview again to see what is left."
+            : result.preview.hasMore
+              ? " More remain — the next batch is previewed below."
+              : ""}
         </p>
       )}
 
