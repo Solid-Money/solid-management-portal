@@ -4,8 +4,36 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { validateUserDomain, getAllowedDomain } from '@/lib/auth';
+import {
+  validateUserDomain,
+  getAllowedDomain,
+  isAllowedSignInProvider,
+  isTransientAuthError,
+  latestRun,
+} from '@/lib/auth';
 import { toast } from 'sonner';
+
+/**
+ * How this session signed in, read from the ID token's `sign_in_provider`
+ * claim:
+ * - `google`: allowed.
+ * - `rejected`: another provider, or a token that can't be read for any
+ *   reason but the network. The session is signed out (fails closed).
+ * - `unverified`: the token needed a refresh and the network failed. The
+ *   session itself is fine, so it is kept, but the portal stays closed until
+ *   a reload or a new sign-in checks it again.
+ */
+async function sessionProvider(
+  user: User,
+): Promise<'google' | 'rejected' | 'unverified'> {
+  try {
+    const { signInProvider } = await user.getIdTokenResult();
+    return isAllowedSignInProvider(signInProvider) ? 'google' : 'rejected';
+  } catch (error) {
+    console.error('[AuthProvider] Could not read the sign-in provider:', error);
+    return isTransientAuthError(error) ? 'unverified' : 'rejected';
+  }
+}
 
 interface AuthContextType {
   user: User | null;
@@ -70,9 +98,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const runs = latestRun();
+    // Set when the listener goes away. Checked after awaiting signOut, which
+    // itself fires the listener again (a new run), so run identity alone
+    // can't tell whether this provider is still mounted.
+    let disposed = false;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const isCurrent = runs.begin();
       console.log('[AuthProvider] Auth state changed:', firebaseUser ? 'User signed in' : 'No user');
-      
+
       if (firebaseUser) {
         console.log('[AuthProvider] User details:', {
           email: firebaseUser.email,
@@ -83,8 +117,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Validate user domain
         const isValid = validateUserDomain(firebaseUser);
         console.log('[AuthProvider] Domain validation result:', isValid);
-        
-        if (isValid) {
+
+        // Google sign-in only. A session from any other provider (e.g. a
+        // password set through a reset email) is signed out here, the same
+        // rule the backend enforces on every request.
+        const provider = isValid ? await sessionProvider(firebaseUser) : null;
+
+        // The session changed while its token was read (signed out in another
+        // tab, another account signed in): the newer call owns the state, and
+        // this one must not put the old user back.
+        if (!isCurrent()) return;
+
+        if (provider === 'unverified') {
+          // Keep the session, keep the portal closed. Reloading, or signing
+          // in again from /login, runs this check again.
+          console.warn('[AuthProvider] Could not verify the sign-in provider; portal stays closed');
+          setUser(null);
+          toast.error(
+            "We couldn't verify your sign-in. Check your connection, then reload or sign in again.",
+          );
+          const currentPath = window.location.pathname;
+          if (currentPath !== '/login') {
+            rememberReturn(currentPath, window.location.search);
+            routerRef.current.push('/login');
+          }
+        } else if (provider === 'rejected') {
+          console.warn('[AuthProvider] Session is not a Google sign-in, signing out');
+          await signOut(auth);
+          if (disposed) return;
+          setUser(null);
+          toast.error('Please sign in with your Google account.');
+          routerRef.current.push('/login');
+        } else if (isValid) {
           console.log('[AuthProvider] User domain is valid, setting user');
           setUser(firebaseUser);
           
@@ -109,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           );
           console.log('[AuthProvider] Signing out unauthorized user');
           await signOut(auth);
+          if (disposed) return;
           setUser(null);
           toast.error(
             `Access denied. Only @${getAllowedDomain()} accounts are allowed.`
@@ -133,6 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       console.log('[AuthProvider] Cleaning up auth listener');
+      disposed = true;
+      runs.cancel();
       unsubscribe();
     };
   }, []);
