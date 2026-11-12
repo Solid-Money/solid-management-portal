@@ -17,6 +17,7 @@ import api, { getUserCard } from "@/lib/api";
 import { Activity, Balance, User, UserCardOverview } from "@/types";
 import ActivityList from "@/components/activity-list";
 import ResyncActivityDialog from "@/components/user/resync-activity-dialog";
+import RestoreHiddenActivityDialog from "@/components/user/restore-hidden-activity-dialog";
 import BalancesCard from "@/components/balances-card";
 import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
@@ -281,7 +282,8 @@ export default function UserDetailPage({
         <TabsContent value="activity" className="space-y-3">
           {/* "A transfer is missing from my history": the app's sync only
               reads what is new, so support re-reads the wallet from here. */}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <RestoreHiddenActivityDialog userId={id} />
             <ResyncActivityDialog userId={id} />
           </div>
           {activityLoading ? (

@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import { Play, Calendar, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AtoActivityCleanup } from "@/components/scripts/ato-activity-cleanup";
+import { HiddenActivityRestore } from "@/components/scripts/hidden-activity-restore";
 
 export default function ScriptsPage() {
   const [loading, setLoading] = useState(false);
@@ -39,6 +40,30 @@ export default function ScriptsPage() {
           </p>
         </div>
       </div>
+
+      <section
+        id="hidden-activity-restore"
+        aria-labelledby="hidden-activity-restore-heading"
+        className="rounded-lg bg-white p-6 shadow space-y-5"
+      >
+        <div>
+          <h2
+            id="hidden-activity-restore-heading"
+            className="text-lg font-medium text-gray-900"
+          >
+            Restore activity hidden as spam by mistake
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-gray-600">
+            Sends and Earn withdrawals of soFUSE, soETH, USDT on Fuse and soUSD
+            on Base were hidden from customers’ Activity moments after they
+            were made, although they went through on chain. Preview the rows
+            that qualify, then put them back. Spam tokens, card settlement
+            sweeps and deposit legs stay hidden. To fix one customer, use
+            “Restore hidden activity” on their user page.
+          </p>
+        </div>
+        <HiddenActivityRestore />
+      </section>
 
       <AtoActivityCleanup />
 
