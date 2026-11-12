@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -72,6 +72,9 @@ export default function FeePromotionModal({
   const [enabled, setEnabled] = useState(promotion?.enabled ?? false);
   const [attempted, setAttempted] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // The button only disables once the pending state renders; a click in
+  // between would send the save again (a second promotion, on create).
+  const inFlight = useRef(false);
 
   const startIso = windowInstant(startsAt, promotion?.startsAt);
   const endIso = windowInstant(endsAt, promotion?.endsAt);
@@ -86,7 +89,7 @@ export default function FeePromotionModal({
   const error =
     !promotion && !scopeOption
       ? "Pick what the promotion makes free."
-      : feePromotionDraftError(draft, limits);
+      : feePromotionDraftError(draft, limits, undefined, promotion);
   const changes = promotion ? feePromotionChanges(promotion, draft) : null;
   const nothingChanged = !!changes && Object.keys(changes).length === 0;
   // Switching a promotion off from here is as consequential as from the list,
@@ -94,6 +97,7 @@ export default function FeePromotionModal({
   const switchingOff = !!promotion?.enabled && !enabled;
 
   const submit = () => {
+    if (inFlight.current) return;
     setAttempted(true);
     if (error || !startIso || !endIso) return;
     if (nothingChanged) {
@@ -113,12 +117,17 @@ export default function FeePromotionModal({
     const onError = (err: unknown) => {
       if (isAxiosError(err) && err.response?.status === 409) onClose();
     };
+    const onSettled = () => {
+      inFlight.current = false;
+    };
     if (promotion && changes) {
+      inFlight.current = true;
       save.mutate(
         { id: promotion.id, body: { version: promotion.version, ...changes } },
-        { onSuccess, onError },
+        { onSuccess, onError, onSettled },
       );
     } else if (scopeOption) {
+      inFlight.current = true;
       save.mutate(
         {
           body: {
@@ -130,7 +139,7 @@ export default function FeePromotionModal({
             freeCountPerUser: Number(freeCount),
           },
         },
-        { onSuccess, onError },
+        { onSuccess, onError, onSettled },
       );
     }
   };

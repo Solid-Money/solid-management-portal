@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BadgePercent, Edit2, Eye, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -66,15 +66,22 @@ export default function FeePromotionsPage() {
     setIsModalOpen(true);
   };
 
+  // The confirm button stays clickable while the save is out, and a second
+  // click would resend the same version and come back as a false 409.
+  const toggleInFlight = useRef(false);
   const confirmToggle = () => {
-    if (!toggling) return;
+    if (!toggling || toggleInFlight.current) return;
+    toggleInFlight.current = true;
     const { id, name, version, enabled } = toggling;
     save.mutate(
       { id, body: { version, enabled: !enabled } },
       {
         onSuccess: () =>
           toast.success(`“${name}” switched ${enabled ? "off" : "on"}`),
-        onSettled: () => setToggling(null),
+        onSettled: () => {
+          toggleInFlight.current = false;
+          setToggling(null);
+        },
       },
     );
   };
@@ -274,9 +281,8 @@ export default function FeePromotionsPage() {
                 Switch <strong>{toggling.name}</strong> on? Between{" "}
                 {formatUtc(toggling.startsAt)} and {formatUtc(toggling.endsAt)}
                 , each user&apos;s first{" "}
-                {freeDepositsLabel(toggling.freeCountPerUser)} in{" "}
-                {toggling.scopeLabel.toLowerCase()} cost nothing, whatever
-                their tier.
+                {freeDepositsLabel(toggling.freeCountPerUser)} cost nothing,
+                whatever their tier. Applies to: {toggling.scopeLabel}.
               </>
             )
           ) : null

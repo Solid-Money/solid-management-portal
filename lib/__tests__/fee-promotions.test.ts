@@ -65,6 +65,29 @@ describe("feePromotionDraftError", () => {
     expect(feePromotionDraftError(draft({ ...ended, enabled: false }), undefined, NOW)).toBeNull();
   });
 
+  describe("on a promotion left on past its end", () => {
+    const ended = { startsAt: "2026-10-01T00:00:00.000Z", endsAt: "2026-11-01T00:00:00.000Z" };
+    const current = { enabled: true, endsAt: ended.endsAt };
+
+    it("still lets it be renamed or recounted, as the backend does", () => {
+      expect(
+        feePromotionDraftError(draft({ ...ended, name: "Renamed", freeCountPerUser: "5" }), undefined, NOW, current),
+      ).toBeNull();
+    });
+
+    it("refuses moving its end to another moment already past", () => {
+      expect(
+        feePromotionDraftError(draft({ ...ended, endsAt: "2026-11-02T00:00:00.000Z" }), undefined, NOW, current),
+      ).toMatch(/already passed/);
+    });
+
+    it("refuses switching one on that was off", () => {
+      expect(
+        feePromotionDraftError(draft(ended), undefined, NOW, { ...current, enabled: false }),
+      ).toMatch(/already ended/);
+    });
+  });
+
   it("uses the limits the backend sent", () => {
     expect(
       feePromotionDraftError(draft({ freeCountPerUser: "6" }), { maxFreeCountPerUser: 5, maxDays: 366 }, NOW),

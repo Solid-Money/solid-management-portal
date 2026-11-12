@@ -61,11 +61,16 @@ export interface FeePromotionDraft {
  * Why a draft can't be saved, or null. The same rules the backend applies, so
  * a typo is caught before the request — the backend holds the line either way
  * (and is the only one that can check for an overlapping promotion).
+ *
+ * `current` is the promotion being edited, or null for a new one: an ended
+ * window only stops a save that switches the promotion on or moves its end,
+ * so one left on past its end can still be renamed or recounted.
  */
 export function feePromotionDraftError(
   draft: FeePromotionDraft,
   limits: { maxFreeCountPerUser: number; maxDays: number } = FEE_PROMOTION_DEFAULT_LIMITS,
   now: number = Date.now(),
+  current: Pick<FeePromotion, "enabled" | "endsAt"> | null = null,
 ): string | null {
   const name = draft.name.trim();
   if (!name) return "Give the promotion a name.";
@@ -89,7 +94,12 @@ export function feePromotionDraftError(
     return `A promotion can run for at most ${limits.maxDays} days.`;
   }
   if (draft.enabled && end <= now) {
-    return "That window has already ended. Move the end into the future to switch it on.";
+    if (!current?.enabled) {
+      return "That window has already ended. Move the end into the future to switch it on.";
+    }
+    if (new Date(current.endsAt).getTime() !== end) {
+      return "That end has already passed. Move it into the future, or switch the promotion off.";
+    }
   }
   return null;
 }
