@@ -43,10 +43,18 @@ export function CollectionSummary({
 }) {
   const [first, ...rest] = line.destinations;
   if (!first) return null;
+  // Only say "collected" when something was: a destination with fees still
+  // owed and none in yet is where they will land, not where they did.
+  const lead =
+    first.collectedCount > 0
+      ? "Collected at"
+      : first.outstandingCount > 0
+        ? "Owed; to be collected at"
+        : "Collects at";
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
-      <span className="text-gray-400">Collected at</span>
+      <span className="text-gray-400">{lead}</span>
       <span className="font-medium text-gray-700">{first.label}</span>
       {first.address ? (
         <CopyableValue
@@ -257,12 +265,21 @@ function DestinationRow({
   );
 }
 
-/** A token amount with its symbol, at the token's own precision. */
+/**
+ * A token amount with its symbol, at the token's own precision. An amount too
+ * small to show at that precision reads as "< 0.01", never as 0: a vault that
+ * holds a little is not a vault that holds nothing.
+ */
 function tokenAmount(value: string | null, symbol: string): string {
   if (value === null) return "—";
   const amount = Number(value);
   if (!Number.isFinite(amount)) return `${value} ${symbol}`;
-  return `${formatNumber(amount, tokenFractionDigits(symbol))} ${symbol}`;
+  const digits = tokenFractionDigits(symbol);
+  const smallest = 10 ** -digits;
+  if (amount > 0 && amount < smallest) {
+    return `< ${formatNumber(smallest, digits)} ${symbol}`;
+  }
+  return `${formatNumber(amount, digits)} ${symbol}`;
 }
 
 /** USD beside a token amount, unless the asset is a dollar already. */
@@ -299,6 +316,8 @@ export function VaultFeeAccountants({
         <code className="text-[11px]">claimFees()</code> pays them to its payout
         address. All time, read from the chain at{" "}
         {formatDateTime(vaults.readAt, {
+          month: "short",
+          day: "numeric",
           hour: "2-digit",
           minute: "2-digit",
         })}
@@ -380,7 +399,10 @@ function AccountantRow({ accountant }: { accountant: VaultFeeAccountant }) {
             href={accountant.payoutExplorerUrl ?? undefined}
           />
         </td>
-        <td className="py-1.5 pr-4 text-right tabular-nums text-gray-900">
+        <td
+          className="py-1.5 pr-4 text-right tabular-nums text-gray-900"
+          title={accountant.claimed ?? undefined}
+        >
           {tokenAmount(accountant.claimed, symbol)}
           <div className="text-[11px] text-gray-400">
             {[
@@ -393,7 +415,10 @@ function AccountantRow({ accountant }: { accountant: VaultFeeAccountant }) {
               .join(" · ")}
           </div>
         </td>
-        <td className="py-1.5 pr-4 text-right tabular-nums text-amber-700">
+        <td
+          className="py-1.5 pr-4 text-right tabular-nums text-amber-700"
+          title={accountant.unclaimed ?? undefined}
+        >
           {tokenAmount(accountant.unclaimed, symbol)}
           {unclaimedHint ? (
             <div className="text-[11px] text-gray-400">{unclaimedHint}</div>

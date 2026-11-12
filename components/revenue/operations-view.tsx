@@ -63,16 +63,24 @@ function rowColor(product: ProductRevenue): string {
   );
 }
 
-/** What a row needs to say where its money lands. */
+/**
+ * What a row needs to say where its money lands.
+ *
+ * `isError` is only an error with nothing to show. A refresh that fails while
+ * earlier figures are still held sets `isStale` instead, so a blip in the
+ * background poll does not take addresses off the page.
+ */
 interface RowCollection {
   line?: RevenueCollectionLine;
   isLoading: boolean;
   isError: boolean;
+  isStale: boolean;
   /** Vault yield share's own read, from the chain. */
   vaults: {
     data: VaultFeeCollectionResponse | null;
     isLoading: boolean;
     isError: boolean;
+    isStale: boolean;
   };
 }
 
@@ -102,11 +110,13 @@ export function OperationsView() {
       (line) => line.revenueType === product.revenueType
     ),
     isLoading: collection.isLoading,
-    isError: Boolean(collection.error),
+    isError: Boolean(collection.error) && !collection.data,
+    isStale: Boolean(collection.error) && Boolean(collection.data),
     vaults: {
       data: vaultFees.data ?? null,
       isLoading: vaultFees.isLoading,
-      isError: Boolean(vaultFees.error),
+      isError: Boolean(vaultFees.error) && !vaultFees.data,
+      isStale: Boolean(vaultFees.error) && Boolean(vaultFees.data),
     },
   });
 
@@ -344,6 +354,12 @@ function RowCollectionInfo({
     ? collection.vaults.isLoading
     : collection.isLoading;
   const isError = isVaults ? collection.vaults.isError : collection.isError;
+  const isStale = isVaults ? collection.vaults.isStale : collection.isStale;
+  const staleNotice = isStale ? (
+    <p className="text-[11px] text-amber-700">
+      The latest refresh failed; these are the last figures read.
+    </p>
+  ) : null;
 
   if (isLoading) {
     return (
@@ -373,6 +389,7 @@ function RowCollectionInfo({
           expanded={expanded}
           onToggle={onToggle}
         />
+        {staleNotice}
         {expanded ? (
           <VaultFeeAccountants vaults={collection.vaults.data} />
         ) : null}
@@ -381,7 +398,13 @@ function RowCollectionInfo({
   }
 
   if (!collection.line || collection.line.destinations.length === 0) {
-    return null;
+    // Said rather than left blank, so "nothing recorded" cannot be mistaken
+    // for a row the collection data never reached.
+    return (
+      <p className="text-xs text-gray-400">
+        No collection address is recorded for this line.
+      </p>
+    );
   }
 
   return (
@@ -391,6 +414,7 @@ function RowCollectionInfo({
         expanded={expanded}
         onToggle={onToggle}
       />
+      {staleNotice}
       {expanded ? <CollectionDetails line={collection.line} /> : null}
     </div>
   );
