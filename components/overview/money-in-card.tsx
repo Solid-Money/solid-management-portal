@@ -303,6 +303,7 @@ const METHOD_LABELS: Record<MoneyInMethod, string> = {
   ethereum: "Ethereum",
   polygon: "Polygon",
   fuse: "Fuse",
+  other: "other networks",
   bank: "bank",
   transfi: "TransFi",
 };

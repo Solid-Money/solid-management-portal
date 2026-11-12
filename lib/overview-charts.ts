@@ -16,7 +16,7 @@ export const MONEY_IN_SERIES = [
   {
     id: "other",
     label: "Other networks",
-    methods: ["arbitrum", "ethereum", "polygon", "fuse"],
+    methods: ["arbitrum", "ethereum", "polygon", "fuse", "other"],
     color: "#c7cbf5",
   },
   { id: "bank", label: "Bank transfer", methods: ["bank"], color: "#16a37a" },
