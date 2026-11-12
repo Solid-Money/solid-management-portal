@@ -49,6 +49,9 @@ import {
   ReevaluateFailedCashbackResult,
   ActivityResyncResult,
   BulkReevaluateFailedCashbackResult,
+  CashbackRateAuditRequest,
+  CashbackRateAuditResult,
+  CashbackTopUpJobStatus,
   PartialRefundRestoreResult,
   PartialRefundVoidedList,
   StuckCashbackList,
@@ -558,6 +561,33 @@ export const restorePartialRefundVoidedCashback = (
     "/admin/v1/cashback/partial-refund-voided/restore",
     { cashbackIds, reason: reason || undefined },
   );
+
+/**
+ * Check credited cashback in a window against the rate it should have earned,
+ * and — only with `dryRun: false` — top up what came out short.
+ *
+ * A dry run changes nothing and is the preview: who is owed what. A real run
+ * claims the corrections and returns before any money moves; the soUSD is sent
+ * from the payout wallet by a background job, polled with
+ * {@link getCashbackRateAuditJob}. Re-running is safe: a row already topped up
+ * is reported, not paid twice. Not wrapped in `{ data }`.
+ */
+export const auditCashbackRate = (request: CashbackRateAuditRequest) =>
+  api.post<CashbackRateAuditResult>("/admin/v1/cashback/audit-campaign-rate", request);
+
+/**
+ * Progress of a rate audit's sending job. The report lives in the process that
+ * started it for 24h, so a restart or another replica answers `{ error }`.
+ */
+export const getCashbackRateAuditJob = (jobId: string) =>
+  api.get<CashbackTopUpJobStatus | { error: string }>(
+    `/admin/v1/cashback/audit-campaign-rate/jobs/${encodeURIComponent(jobId)}`,
+    { quietErrors: true },
+  );
+
+/** Send corrections an earlier run claimed but never sent (a restart mid-job). */
+export const resumeCashbackRateAudit = () =>
+  api.post<CashbackTopUpJobStatus>("/admin/v1/cashback/audit-campaign-rate/resume");
 
 /**
  * What putting this user's tier-trial cashback terms back on the purchases made
