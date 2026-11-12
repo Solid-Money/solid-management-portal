@@ -10,6 +10,7 @@ import {
   PaginatedUserRevenueResponse,
   ProductRevenueResponse,
   RevenueCollectionResponse,
+  VaultFeeCollectionResponse,
   InvestorReportResponse,
   DailyFlowResponse,
   TreasuryInterestResponse,
@@ -188,6 +189,23 @@ export function useRevenueCollection(startDate?: Date, endDate?: Date) {
       if (start) params.set("startDate", start);
       if (end) params.set("endDate", end);
       const response = await api.get(`/admin/v1/revenue/collection?${params}`);
+      return response.data;
+    },
+    refetchInterval: REFRESH_INTERVALS.operationsView,
+    staleTime: REFRESH_INTERVALS.operationsView / 2,
+  });
+}
+
+/**
+ * Each vault accountant's payout address and fees claimed and unclaimed, read
+ * on-chain, all-time. Its own request: a cold read can take a while, and the
+ * fee lines must not wait on it.
+ */
+export function useVaultFeeCollection() {
+  return useQuery<VaultFeeCollectionResponse>({
+    queryKey: REVENUE_QUERY_KEYS.vaultFees,
+    queryFn: async () => {
+      const response = await api.get(`/admin/v1/revenue/vault-fees`);
       return response.data;
     },
     refetchInterval: REFRESH_INTERVALS.operationsView,

@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   useRevenueByProduct,
   useRevenueCollection,
+  useVaultFeeCollection,
 } from "@/hooks/use-revenue";
 import { DateRangePicker } from "./date-range-picker";
 import {
@@ -30,6 +31,7 @@ import {
   type ProductRevenue,
   type RevenueBusinessLine,
   type RevenueCollectionLine,
+  type RevenueLineType,
   type VaultFeeCollectionResponse,
 } from "@/types/revenue";
 
@@ -64,10 +66,20 @@ function rowColor(product: ProductRevenue): string {
 /** What a row needs to say where its money lands. */
 interface RowCollection {
   line?: RevenueCollectionLine;
-  vaults: VaultFeeCollectionResponse | null;
   isLoading: boolean;
   isError: boolean;
+  /** Vault yield share's own read, from the chain. */
+  vaults: {
+    data: VaultFeeCollectionResponse | null;
+    isLoading: boolean;
+    isError: boolean;
+  };
 }
+
+/** How a missing line is named in the notice under the heading. */
+const LINE_NAMES: Partial<Record<RevenueLineType, string>> = {
+  [TIER_SUBSCRIPTION_LINE]: "Tier subscriptions",
+};
 
 export function OperationsView() {
   const [dateRange, setDateRange] = useState({
@@ -83,13 +95,19 @@ export function OperationsView() {
   // Same range, separate request: a slow chain read must not hold up the
   // revenue figures, and an error here leaves them standing.
   const collection = useRevenueCollection(dateRange.start, dateRange.end);
+  // All-time and from the chain, so not tied to the range; read only once.
+  const vaultFees = useVaultFeeCollection();
   const collectionFor = (product: ProductRevenue): RowCollection => ({
     line: collection.data?.lines.find(
       (line) => line.revenueType === product.revenueType
     ),
-    vaults: collection.data?.vaults ?? null,
     isLoading: collection.isLoading,
     isError: Boolean(collection.error),
+    vaults: {
+      data: vaultFees.data ?? null,
+      isLoading: vaultFees.isLoading,
+      isError: Boolean(vaultFees.error),
+    },
   });
 
   if (isLoading) {
@@ -110,6 +128,9 @@ export function OperationsView() {
   }
 
   const total = productsData?.totalRevenue ?? 0;
+  const missingLines = (productsData?.missingLines ?? []).map(
+    (line) => LINE_NAMES[line] ?? line
+  );
   const lines = BUSINESS_LINES.map((line) => {
     const rows = (productsData?.products ?? []).filter(
       (product) => product.businessLine === line.id
@@ -164,6 +185,16 @@ export function OperationsView() {
               year: "numeric",
             })}{" "}
             window of the same length.
+          </p>
+        ) : null}
+        {missingLines.length > 0 ? (
+          // A line that could not be read is not a line that earned nothing:
+          // say so, and that the total is short by it.
+          <p className="mb-4 flex items-start gap-1 rounded-md border border-amber-100 bg-amber-50 p-2 text-xs text-amber-800">
+            <AlertCircle className="mt-px h-3 w-3 shrink-0" aria-hidden />
+            {missingLines.join(", ")} could not be loaded, so{" "}
+            {missingLines.length === 1 ? "it is" : "they are"} missing below
+            and from the total. Refresh to try again.
           </p>
         ) : null}
 
@@ -307,31 +338,44 @@ function RowCollectionInfo({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  if (collection.isLoading) {
+  // Vault yield share has its own read, from the chain; its state is its own.
+  const isVaults = product.revenueType === "yield_share";
+  const isLoading = isVaults
+    ? collection.vaults.isLoading
+    : collection.isLoading;
+  const isError = isVaults ? collection.vaults.isError : collection.isError;
+
+  if (isLoading) {
     return (
       <p className="flex items-center gap-1 text-xs text-gray-400">
         <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-        Finding where it is collected…
+        {isVaults
+          ? "Reading the vault accountants…"
+          : "Finding where it is collected…"}
       </p>
     );
   }
-  if (collection.isError) {
+  if (isError) {
     return (
       <p className="text-xs text-gray-400">
-        Collection addresses could not be loaded.
+        {isVaults
+          ? "The vault accountants could not be read just now."
+          : "Collection addresses could not be loaded."}
       </p>
     );
   }
 
-  if (product.revenueType === "yield_share") {
+  if (isVaults) {
     return (
       <div className="space-y-2">
         <VaultCollectionSummary
-          vaults={collection.vaults}
+          vaults={collection.vaults.data}
           expanded={expanded}
           onToggle={onToggle}
         />
-        {expanded ? <VaultFeeAccountants vaults={collection.vaults} /> : null}
+        {expanded ? (
+          <VaultFeeAccountants vaults={collection.vaults.data} />
+        ) : null}
       </div>
     );
   }

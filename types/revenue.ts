@@ -177,6 +177,11 @@ export interface ProductRevenueResponse {
   products: ProductRevenue[];
   totalRevenue: number;
   previousTotalRevenue: number;
+  /**
+   * Lines that could not be read this time: missing from the rows and both
+   * totals. Absent when nothing is missing.
+   */
+  missingLines?: RevenueLineType[];
   period: {
     startDate: string;
     endDate: string;
@@ -256,10 +261,9 @@ export interface VaultFeeCollectionResponse {
   readAt: string;
 }
 
+/** Fee lines and memberships. Vault fees come from `/revenue/vault-fees`. */
 export interface RevenueCollectionResponse {
   lines: RevenueCollectionLine[];
-  /** Null when the vault reads did not answer in time. */
-  vaults: VaultFeeCollectionResponse | null;
   period: { startDate: string; endDate: string };
 }
 
@@ -309,6 +313,7 @@ export const REVENUE_QUERY_KEYS = {
   byUser: (page: number, limit: number) => ['revenue', 'users', page, limit],
   byProduct: (start: string, end: string) => ['revenue', 'products', start, end],
   collection: (start: string, end: string) => ['revenue', 'collection', start, end],
+  vaultFees: ['revenue', 'vault-fees'],
   investorReport: (month: string) => ['revenue', 'investor', month],
   treasuryInterest: (start: string, end: string) => ['revenue', 'treasury-interest', start, end],
 } as const;
