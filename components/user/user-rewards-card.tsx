@@ -4,8 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Gift, Loader2, Sparkles } from "lucide-react";
 
 import { getUserRewards } from "@/lib/api";
+import {
+  formatCashbackMoney,
+  formatCashbackTotals,
+} from "@/lib/card-transactions";
 import { tierTrialRemaining } from "@/lib/tier-trial";
-import { UserRewardsData } from "@/types";
+import { CashbackCurrency, UserRewardsData } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -33,26 +37,78 @@ function Stat({
   );
 }
 
+/** One currency's view of the month's cashback. */
+interface MonthCashback {
+  currency: CashbackCurrency;
+  thisMonth: number;
+  pending?: number;
+  tierCap: number;
+  monthCap?: number;
+}
+
 /**
- * What is still pending this month, and the cap the month is paid up to.
+ * The month's cashback in the cardholder's own currency.
+ *
+ * The top-level figures count USD rows only; a euro cardholder's month is in
+ * `cashbackEur`, in euros and held to the tier's euro cap. The two are never
+ * added together.
+ */
+function monthCashbackOf(rewards: UserRewardsData): MonthCashback {
+  const eur = rewards.cashbackEur;
+  if (rewards.cashbackCurrency === "EUR" && eur) {
+    return {
+      currency: "EUR",
+      thisMonth: eur.cashbackThisMonth,
+      pending: eur.cashbackPendingThisMonth,
+      tierCap: eur.maxCashbackMonthly,
+      monthCap: eur.cashbackCapThisMonth,
+    };
+  }
+
+  return {
+    currency: "USD",
+    thisMonth: rewards.cashbackThisMonth,
+    pending: rewards.cashbackPendingThisMonth,
+    tierCap: rewards.maxCashbackMonthly,
+    monthCap: rewards.cashbackCapThisMonth,
+  };
+}
+
+/**
+ * The month's cashback, and dollars earned beside it when a euro cardholder
+ * has both (a currency switched mid-month) — side by side, never summed.
+ */
+function monthCashbackValue(
+  rewards: UserRewardsData,
+  month: MonthCashback
+): string {
+  return month.currency === "EUR"
+    ? formatCashbackTotals(rewards.cashbackThisMonth, month.thisMonth)
+    : formatCashbackMoney(month.thisMonth, "USD");
+}
+
+/**
+ * What is still pending this month, and the cap the month is paid up to, in
+ * the month's own currency.
  *
  * The month's cap sits above the tier's when purchases were made on a bigger
  * tier — a trial that has since ended keeps its cap on what was bought during
  * it — which is exactly what a cardholder asks support about, so both are
  * shown then.
  */
-function monthCashbackHint(rewards: UserRewardsData): string {
+function monthCashbackHint(month: MonthCashback): string {
   const parts: string[] = [];
+  const money = (value: number) => formatCashbackMoney(value, month.currency);
 
-  const pending = rewards.cashbackPendingThisMonth ?? 0;
-  if (pending > 0) parts.push(`+$${pending.toFixed(2)} pending`);
+  const pending = month.pending ?? 0;
+  if (pending > 0) parts.push(`+${money(pending)} pending`);
 
-  const tierCap = rewards.maxCashbackMonthly;
-  const monthCap = rewards.cashbackCapThisMonth ?? tierCap;
+  const tierCap = month.tierCap;
+  const monthCap = month.monthCap ?? tierCap;
   parts.push(
     monthCap > tierCap
-      ? `Cap $${monthCap.toFixed(2)} (tier $${tierCap.toFixed(2)})`
-      : `Cap $${monthCap.toFixed(2)}`
+      ? `Cap ${money(monthCap)} (tier ${money(tierCap)})`
+      : `Cap ${money(monthCap)}`
   );
 
   return parts.join(" · ");
@@ -70,6 +126,7 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
   });
 
   const rewards = data?.data;
+  const month = rewards ? monthCashbackOf(rewards) : undefined;
 
   return (
     <Card>
@@ -112,11 +169,13 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
                     : undefined
                 }
               />
-              <Stat
-                label="Cashback this month"
-                value={`$${rewards.cashbackThisMonth.toFixed(2)}`}
-                hint={monthCashbackHint(rewards)}
-              />
+              {month && (
+                <Stat
+                  label="Cashback this month"
+                  value={monthCashbackValue(rewards, month)}
+                  hint={monthCashbackHint(month)}
+                />
+              )}
               <Stat
                 label="Referral points"
                 value={rewards.referralPoints.toLocaleString()}

@@ -7,12 +7,19 @@ import { toast } from "sonner";
 
 import { applyTrialCashbackTerms, getTrialCashbackTerms } from "@/lib/api";
 import {
+  cashbackCurrencyOf,
+  formatCashbackMoney,
+  formatCashbackTotals,
+  sumByCashbackCurrency,
+} from "@/lib/card-transactions";
+import {
   formatCashbackRate,
   formatMonthlyCap,
 } from "@/lib/cashback-percentage";
 import { formatDateTime, formatUsd } from "@/lib/utils";
 import {
   ApplyTrialCashbackTermsResult,
+  CashbackCurrency,
   TrialCashbackCorrectionPlan,
   TrialCorrectionAction,
   TrialCorrectionRow,
@@ -80,17 +87,21 @@ const dayAndTime: Intl.DateTimeFormatOptions = {
 
 /**
  * "3% · $50/mo cap", or the live tier's cap when none is frozen on the row.
- * A subscription discount has no rate: it pays its own figure, `earns`.
+ * A subscription discount has no rate: it pays its own figure, `earns`. A
+ * euro row is held to its euro cap, "€50/mo cap".
  */
 function terms(
-  side: { percentage?: number; monthlyCapUsd?: number },
+  side: { percentage?: number; monthlyCapUsd?: number; monthlyCapEur?: number },
+  currency: CashbackCurrency,
   earns?: string,
 ): string {
   return [
     side.percentage !== undefined
       ? formatCashbackRate(side.percentage)
       : (earns ?? "tier rate"),
-    formatMonthlyCap(side.monthlyCapUsd) ?? "live tier cap",
+    (currency === "EUR"
+      ? formatMonthlyCap(side.monthlyCapEur, "EUR")
+      : formatMonthlyCap(side.monthlyCapUsd)) ?? "live tier cap",
   ].join(" · ");
 }
 
@@ -134,9 +145,10 @@ export default function TrialCashbackTermsDialog({
   const plan = data?.data;
   const rows = useMemo(() => plan?.rows ?? [], [plan]);
   const selectedRows = rows.filter((row) => !deselected.has(row.cashbackId));
-  const selectedUsd = selectedRows.reduce(
-    (sum, row) => sum + row.additionalUsd,
-    0,
+  // Per currency: a euro row's top-up is never added to the dollars.
+  const selectedAdditional = sumByCashbackCurrency(
+    selectedRows,
+    (row) => row.additionalUsd,
   );
   const blocked = Boolean(plan?.blockedReason);
   const headerChecked =
@@ -380,7 +392,10 @@ export default function TrialCashbackTermsDialog({
               <DialogFooter className="items-center sm:justify-between">
                 <span className="text-sm text-gray-600">
                   {selectedRows.length > 0 &&
-                    `Up to ${formatUsd(selectedUsd)} more, before the cap`}
+                    `Up to ${formatCashbackTotals(
+                      selectedAdditional.usd,
+                      selectedAdditional.eur,
+                    )} more, before the cap`}
                 </span>
                 <div className="flex gap-2">
                   <Button
@@ -430,9 +445,12 @@ function CorrectionRow({
 }) {
   const action = ACTIONS[row.action];
   const spend = Number(row.fiatAmount);
+  // A euro row's figures are euros; shown as such, never as dollars.
+  const currency = cashbackCurrencyOf(row);
+  const money = (value: number) => formatCashbackMoney(value, currency);
   const earns =
     row.type === "SubscriptionDiscount"
-      ? `${formatUsd(row.owedUsd)} discount`
+      ? `${money(row.owedUsd)} discount`
       : undefined;
 
   return (
@@ -461,7 +479,7 @@ function CorrectionRow({
         <Badge variant="muted">{row.status}</Badge>
         {row.paidUsd !== undefined && (
           <div className="mt-0.5 text-xs text-gray-500">
-            paid {formatUsd(row.paidUsd)} of {formatUsd(row.owedUsd)}
+            paid {money(row.paidUsd)} of {money(row.owedUsd)}
           </div>
         )}
       </TableCell>
@@ -470,11 +488,12 @@ function CorrectionRow({
           {action.label}
         </Badge>
         <div className="mt-0.5 text-xs whitespace-nowrap text-gray-500">
-          {terms(row.from, earns)} → {terms(row.to, earns)}
+          {terms(row.from, currency, earns)} →{" "}
+          {terms(row.to, currency, earns)}
         </div>
       </TableCell>
       <TableCell className="text-right font-medium whitespace-nowrap text-gray-900 tabular-nums">
-        {row.additionalUsd > 0 ? formatUsd(row.additionalUsd) : "—"}
+        {row.additionalUsd > 0 ? money(row.additionalUsd) : "—"}
       </TableCell>
     </TableRow>
   );
@@ -540,7 +559,11 @@ function ApplyOutcome({
                 <Badge variant={ACTIONS[row.action].variant}>
                   {ACTIONS[row.action].label}
                 </Badge>
-                {row.additionalUsd > 0 && formatUsd(row.additionalUsd)}
+                {row.additionalUsd > 0 &&
+                  formatCashbackMoney(
+                    row.additionalUsd,
+                    cashbackCurrencyOf(row),
+                  )}
               </span>
             </li>
           ))}

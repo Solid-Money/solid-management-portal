@@ -10,7 +10,8 @@ import { MetricLabel } from "@/components/analytics/metric-label";
 import { Panel } from "@/components/analytics/panel";
 import { useRewardsPaid } from "@/hooks/use-analytics";
 import { useAnalyticsFilters } from "@/components/analytics/analytics-filters";
-import { formatNumber, formatUsd } from "@/lib/utils";
+import { formatEur, formatNumber, formatUsd } from "@/lib/utils";
+import { readChainAsset } from "@/lib/wallets";
 import type { WalletInfo, WalletStatusResponse } from "@/types";
 
 /**
@@ -63,6 +64,9 @@ export function RewardsWalletsView() {
 
     return {
       cashback: paid.data.cashback.totalUsd / days,
+      // Euro cashback leaves the soEUR float on Base, so it has its own
+      // outflow and its own runway — never folded into the dollar one.
+      cashbackEur: (paid.data.cashback.totalEur ?? 0) / days,
       referral: paid.data.referrals.totalUsd / days,
       days,
     };
@@ -78,9 +82,29 @@ export function RewardsWalletsView() {
     }));
   }, [wallets.data, outflow]);
 
+  /** The cashback wallet's euro float, when it holds one. */
+  const euroFloat = useMemo(() => {
+    const wallet = payoutWallets.find((entry) => entry.id === "cashback")
+      ?.wallet;
+    if (!wallet || !holdsSoEur(wallet)) return null;
+
+    const balance = payoutBalanceEur(wallet);
+    const dailyOutflow = outflow?.cashbackEur;
+    return {
+      balance,
+      dailyOutflow,
+      runway:
+        dailyOutflow && dailyOutflow > 0 ? balance / dailyOutflow : null,
+    };
+  }, [payoutWallets, outflow]);
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div
+        className={`grid grid-cols-1 gap-4 ${
+          euroFloat ? "lg:grid-cols-3" : "lg:grid-cols-2"
+        }`}
+      >
         {payoutWallets.map((entry) => {
           const balance = entry.wallet ? payoutBalanceUsd(entry.wallet) : null;
           const runway =
@@ -115,6 +139,25 @@ export function RewardsWalletsView() {
             />
           );
         })}
+        {euroFloat ? (
+          <AnalyticsKpiCard
+            title="Cashback payout runway (EUR)"
+            metric="payoutRunway"
+            value={
+              paid.isLoading
+                ? undefined
+                : euroFloat.runway === null
+                  ? "No outflow in period"
+                  : `${formatNumber(euroFloat.runway, 0, 0)} days`
+            }
+            scope={`${formatEur(euroFloat.balance)} soEUR held on Base · ${formatEur(
+              euroFloat.dailyOutflow ?? 0
+            )}/day average euro cashback outflow`}
+            source="on-chain"
+            updatedAt={wallets.data?.lastUpdated}
+            invertTrendColor
+          />
+        ) : null}
       </div>
 
       {payoutWallets.some(
@@ -177,6 +220,7 @@ export function RewardsWalletsView() {
                         <th className="py-2 pr-4">Chain</th>
                         <th className="py-2 pr-4 text-right">soUSD</th>
                         <th className="py-2 pr-4 text-right">soFUSE</th>
+                        <th className="py-2 pr-4 text-right">soEUR</th>
                         <th className="py-2 pr-4 text-right">Gas</th>
                         <th className="py-2 text-right">Needs top-up</th>
                       </tr>
@@ -192,6 +236,9 @@ export function RewardsWalletsView() {
                           </td>
                           <td className="py-2 pr-4 text-right text-gray-700">
                             {balanceCell(chain.soFuseBalance)}
+                          </td>
+                          <td className="py-2 pr-4 text-right text-gray-700">
+                            {balanceCell(chain.soEurBalance)}
                           </td>
                           <td className="py-2 pr-4 text-right text-gray-700">
                             {balanceCell(chain.gasBalance)}{" "}
@@ -224,9 +271,11 @@ export function RewardsWalletsView() {
           <p className="border-t border-gray-100 pt-4 text-xs leading-relaxed text-gray-500">
             The cashback wallet also receives Wirex card spend, so its balance
             moves on inflows as well as payouts — a rising balance there is not
-            evidence that payouts have stopped. Runway assumes the average daily
-            outflow over the selected window holds; the alert threshold is{" "}
-            {RUNWAY_ALERT_DAYS} days.
+            evidence that payouts have stopped. Its soEUR float on Base pays
+            euro cardholders and gets its own runway from euro cashback
+            outflow; it is never added to the soUSD balance. Runway assumes the
+            average daily outflow over the selected window holds; the alert
+            threshold is {RUNWAY_ALERT_DAYS} days.
           </p>
         </div>
       </Panel>
@@ -246,6 +295,14 @@ export function RewardsWalletsView() {
               {paid.data ? formatUsd(paid.data.cashback.totalUsd) : "—"}
             </dd>
           </div>
+          {paid.data?.cashback.totalEur !== undefined && (
+            <div>
+              <dt className="text-xs text-gray-500">Euro cashback paid</dt>
+              <dd className="font-medium text-gray-900">
+                {formatEur(paid.data.cashback.totalEur)}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="text-xs text-gray-500">Referral payouts</dt>
             <dd className="font-medium text-gray-900">
@@ -278,7 +335,8 @@ export function RewardsWalletsView() {
  * soUSD and soFUSE are both counted at face value: a precise figure needs the
  * soUSD rate and the FUSE price, which this endpoint does not carry, so the
  * number is treated as a float size rather than a valuation — enough to answer
- * "how many more payouts fit in here".
+ * "how many more payouts fit in here". soEUR is not dollars and is left out;
+ * it is {@link payoutBalanceEur}.
  */
 function payoutBalanceUsd(wallet: WalletInfo): number {
   return wallet.chains.reduce((sum, chain) => {
@@ -289,6 +347,25 @@ function payoutBalanceUsd(wallet: WalletInfo): number {
       (Number.isFinite(soUsd) ? soUsd : 0) +
       (Number.isFinite(soFuse) ? soFuse : 0)
     );
+  }, 0);
+}
+
+/** Whether the wallet is monitored for soEUR on any chain. */
+function holdsSoEur(wallet: WalletInfo): boolean {
+  return wallet.chains.some(
+    (chain) => readChainAsset(chain, "soEUR").status !== "N/A"
+  );
+}
+
+/**
+ * The euro payout float: soEUR at face value, for the same reason soUSD is
+ * counted that way in {@link payoutBalanceUsd}. Kept apart from it — euro
+ * cashback is paid from this alone.
+ */
+function payoutBalanceEur(wallet: WalletInfo): number {
+  return wallet.chains.reduce((sum, chain) => {
+    const soEur = Number(chain.soEurBalance ?? 0);
+    return sum + (Number.isFinite(soEur) ? soEur : 0);
   }, 0);
 }
 

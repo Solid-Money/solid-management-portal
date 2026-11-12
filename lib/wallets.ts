@@ -179,12 +179,13 @@ export const WALLET_ASSETS: WalletAsset[] = [
   "USDC",
   "USDT",
   "EURC",
+  "soEUR",
 ];
 
 /**
  * Read one asset off a chain row.
  *
- * `ChainBalance` stores six assets as six parallel triples of fields, so any
+ * `ChainBalance` stores seven assets as seven parallel triples of fields, so any
  * code that wants "the soFUSE numbers" has to know three field names and get
  * all three right. Spelling that out per call site is how soFUSE ended up
  * missing from four of the five severity checks this page used to run.
@@ -246,6 +247,15 @@ export function readChainAsset(
         threshold: chain.eurcThreshold ?? "0",
         status: chain.eurcStatus ?? "N/A",
         tokenAddress: chain.eurcAddress,
+      };
+    case "soEUR":
+      return {
+        asset,
+        label: "soEUR",
+        balance: chain.soEurBalance ?? "0",
+        threshold: chain.soEurThreshold ?? "0",
+        status: chain.soEurStatus ?? "N/A",
+        tokenAddress: chain.soEurAddress,
       };
   }
 }
