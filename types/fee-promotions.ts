@@ -44,6 +44,14 @@ export interface FeePromotion {
   stats: FeePromotionStats;
 }
 
+/**
+ * What a create or update answers with. `stats` is null when the save went
+ * through but its totals could not be read; the list reload reads them again.
+ */
+export interface SavedFeePromotion extends Omit<FeePromotion, "stats"> {
+  stats: FeePromotionStats | null;
+}
+
 export interface FeePromotionScopeOption {
   scope: FeePromotionScope;
   label: string;

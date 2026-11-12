@@ -8,8 +8,8 @@ import {
 import api, { unwrapData } from "@/lib/api";
 import type {
   CreateFeePromotionBody,
-  FeePromotion,
   FeePromotionList,
+  SavedFeePromotion,
   UpdateFeePromotionBody,
 } from "@/types/fee-promotions";
 
@@ -37,7 +37,7 @@ export function useSaveFeePromotion() {
         | { id?: undefined; body: CreateFeePromotionBody }
         | { id: string; body: UpdateFeePromotionBody },
     ) =>
-      unwrapData<FeePromotion>(
+      unwrapData<SavedFeePromotion>(
         input.id
           ? (
               await api.patch(
