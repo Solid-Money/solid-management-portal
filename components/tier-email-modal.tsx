@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { X, AlertTriangle } from "lucide-react";
 import { getTierRecipients, sendTierEmail } from "@/lib/api";
 import ConfirmationModal from "@/components/ui/confirmation-modal";
+import { tierRankName, tierRecipientsSource } from "@/lib/tier-recipients";
 
 interface TierEmailModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export default function TierEmailModal({
   const [sendLoading, setSendLoading] = useState(false);
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
   const [sampleEmails, setSampleEmails] = useState<string[]>([]);
+  const [asOf, setAsOf] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [result, setResult] = useState<{
     sent: number;
@@ -33,6 +35,7 @@ export default function TierEmailModal({
       const response = await getTierRecipients(tier);
       setRecipientCount(response.data.count);
       setSampleEmails(response.data.emails.slice(0, 10));
+      setAsOf(response.data.asOf ?? null);
     } catch (error) {
       console.error("Failed to fetch recipients:", error);
     } finally {
@@ -50,6 +53,7 @@ export default function TierEmailModal({
     setTemplateId("");
     setRecipientCount(null);
     setSampleEmails([]);
+    setAsOf(null);
     setResult(null);
     setShowConfirm(false);
   };
@@ -80,7 +84,7 @@ export default function TierEmailModal({
         <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="text-lg font-bold text-gray-900">
-              Send Email to Tier {tier}
+              Send Email to {tierRankName(tier)}
             </h2>
             <button
               onClick={handleClose}
@@ -140,7 +144,11 @@ export default function TierEmailModal({
                 ) : (
                   <>
                     <p className="text-sm text-gray-700">
-                      <strong>{recipientCount}</strong> users in Tier {tier}
+                      <strong>{recipientCount}</strong> users hold{" "}
+                      {tierRankName(tier)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {tierRecipientsSource(asOf)}
                     </p>
                     {sampleEmails.length > 0 && (
                       <div>
@@ -199,8 +207,8 @@ export default function TierEmailModal({
           <p>
             Are you sure you want to send Brevo template{" "}
             <strong>#{templateId}</strong> to{" "}
-            <strong>{recipientCount}</strong> users in Tier {tier}? This action
-            cannot be undone.
+            <strong>{recipientCount}</strong> users who hold{" "}
+            {tierRankName(tier)}? This action cannot be undone.
           </p>
         }
         onConfirm={handleSend}

@@ -194,10 +194,6 @@ export default function UserTierMembershipCard({
                 }
               />
               <Stat
-                label="Points unlock tiers"
-                value={state.pointsUnlockEnabled ? "Yes" : "No (v3)"}
-              />
-              <Stat
                 label="Routes on offer"
                 value={
                   state.offers
