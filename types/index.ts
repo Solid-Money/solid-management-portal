@@ -2513,7 +2513,12 @@ export interface ResetTwoFactorResult {
 
 /** Ledger state of a referral cashback reward, as rewards-service stores it. */
 export type ReferralRewardStatus =
-  "pending" | "qualified" | "paid" | "expired" | "reversed" | "under_review";
+  | "pending"
+  | "qualified"
+  | "paid"
+  | "expired"
+  | "reversed"
+  | "under_review";
 
 /** The spend a referral reward is judged on, read live from card data. */
 export interface ReferralSpendReading {
@@ -2646,7 +2651,10 @@ export interface AdminUserReferrals {
  * did clear the bar in their window) or `still_expired`.
  */
 export type ReferralReevaluationOutcome =
-  "reinstated" | "still_reversed" | "qualified" | "still_expired";
+  | "reinstated"
+  | "still_reversed"
+  | "qualified"
+  | "still_expired";
 
 export interface ReferralReevaluationResult {
   referredUserId: string;
@@ -2755,12 +2763,19 @@ export interface CardIssuanceContext {
     shipping?: Partial<CardShippingAddress>;
   };
   cardholder?: { firstName?: string; lastName?: string; email?: string };
+  /**
+   * Rain sunset: no Rain card can be issued, but the one the user holds can
+   * still be cancelled for good. Only with `canIssue: false`.
+   */
+  cancelOnly?: boolean;
 }
 
 export interface IssueCardRequest {
   type: CardType;
   /** Cancel the card they hold today, at the issuer. Irreversible. */
   cancelExisting: boolean;
+  /** Rain sunset: cancel the Rain card and issue nothing. */
+  cancelOnly?: boolean;
   displayName?: string;
   limit?: CardLimit;
   shipping?: CardShippingAddress;
@@ -2777,6 +2792,8 @@ export interface IssueCardResult {
   expiration?: string;
   previousCardId?: string;
   previousCardCanceled: boolean;
+  /** False for a cancel-only request: `cardId` is the card that was cancelled. */
+  replacementIssued?: boolean;
   adminUsername: string;
   reason?: string;
 }
@@ -2945,7 +2962,10 @@ export type TierTrialSource = "admin_gift" | "promotion";
  * the user accepts it — the duration is theirs to start.
  */
 export type TierTrialStatus =
-  "pending_activation" | "active" | "expired" | "revoked";
+  | "pending_activation"
+  | "active"
+  | "expired"
+  | "revoked";
 
 /**
  * A temporary tier upgrade: the user holds `tier` for `durationDays` from the
@@ -3261,7 +3281,10 @@ export type PartialRefundRestoreSkipReason =
 export interface PartialRefundRestoreResult {
   batchId: string;
   requested: number;
-  restored: (PartialRefundVoidedRow & { percentage: number; payoutAt: string })[];
+  restored: (PartialRefundVoidedRow & {
+    percentage: number;
+    payoutAt: string;
+  })[];
   skipped: {
     id: string;
     userId?: string;
@@ -3580,8 +3603,90 @@ export interface RainRtfConfig {
   chains: RainRtfResolvedChain[];
 }
 
+/**
+ * Rain sunset: no new Rain cards or accounts, and the move of Rain users to
+ * Wirex. Same layered settings as RTF, so each row reports every layer.
+ */
+export type RainSunsetSetting = RainRtfSetting;
+
+export interface RainSunsetConfig {
+  settings: RainSunsetSetting[];
+  /** What the four settings resolve to right now. */
+  resolved: {
+    onboardingClosed: boolean;
+    migrationEnabled: boolean;
+    noticeEnabled: boolean;
+    /** YYYY-MM-DD, or null while no closing date is announced. */
+    closesAt: string | null;
+  };
+  /** How far the sunset has got, across every user. */
+  summary: {
+    /** Rain cards still held: active, frozen or pending, not retired. */
+    rainCardsHeld: number;
+    /** Rain cards retired because their holder moved to Wirex. */
+    rainCardsRetired: number;
+    /** Retired cards Rain has not yet confirmed cancelled. */
+    rainCancellationsPending: number;
+    /** Users who started a Sumsub check for their move to Wirex. */
+    migrationsStarted: number;
+    /** Of those, how many Wirex approved. */
+    migrationsVerified: number;
+  };
+}
+
 export interface GeneralConfig {
   rainRtf: RainRtfConfig;
+  rainSunset: RainSunsetConfig;
+}
+
+/**
+ * An edit to the Rain sunset settings. Absent leaves a setting as it is;
+ * `null` (or an empty date) clears it and hands it back to the environment.
+ */
+export interface UpdateRainSunsetConfig {
+  onboardingClosed?: boolean | null;
+  migrationEnabled?: boolean | null;
+  noticeEnabled?: boolean | null;
+  /** YYYY-MM-DD, or "" to clear. */
+  closesAt?: string | null;
+}
+
+/** One user's Rain sunset, for the user page's card tab. */
+export interface UserRainSunsetState {
+  /** Holds a Rain card, or a Rain verification that can no longer lead to one. */
+  affected: boolean;
+  /** Can move to Wirex now (Wirex serves their country, move open). */
+  canMigrate: boolean;
+  country: string | null;
+  countryServedByWirex: boolean;
+  hasRainCard: boolean;
+  hasWirexCard: boolean;
+  /** Moved: their Rain card was retired. */
+  retired: boolean;
+  retiredAt: string | null;
+  /**
+   * Moved to a Wirex card, but Wirex has no bank account for them (Wirex only
+   * issues EUR IBANs, in SEPA countries), so their Rain virtual account stays
+   * open. Optional: older backends do not send it.
+   */
+  rainVirtualAccountKept?: boolean;
+  /** Their Sumsub check for the move, once started. */
+  migration: {
+    startedAt: string | null;
+    kycStatus: string | null;
+    sumsubReviewStatus: string | null;
+    sumsubReviewAnswer: string | null;
+    wirexUserId: string | null;
+    wirexVerificationStatus: string | null;
+  } | null;
+  rainCards: Array<{
+    cardId: string;
+    status: string;
+    retiredAt: string | null;
+    cancelledAt: string | null;
+    /** Last error cancelling at Rain; the sweep retries every 30 minutes. */
+    cancelError: string | null;
+  }>;
 }
 
 /**

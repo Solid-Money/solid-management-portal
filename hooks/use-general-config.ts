@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import api from "@/lib/api";
-import type { GeneralConfig, UpdateRainRtfConfig } from "@/types";
+import type {
+  GeneralConfig,
+  UpdateRainRtfConfig,
+  UpdateRainSunsetConfig,
+} from "@/types";
 
 export const GENERAL_CONFIG_QUERY_KEY = ["general-config"] as const;
 
@@ -40,6 +44,27 @@ export function useUpdateRainRtfConfig() {
     mutationFn: async (changes) => {
       const response = await api.patch<GeneralConfig>(
         "/admin/v1/general-config/rain-rtf",
+        changes,
+      );
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(GENERAL_CONFIG_QUERY_KEY, data);
+    },
+  });
+}
+
+/**
+ * Save a change to the Rain sunset settings. Same contract as the RTF save:
+ * the response is the whole page as it now resolves, written into the cache.
+ */
+export function useUpdateRainSunsetConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation<GeneralConfig, Error, UpdateRainSunsetConfig>({
+    mutationFn: async (changes) => {
+      const response = await api.patch<GeneralConfig>(
+        "/admin/v1/general-config/rain-sunset",
         changes,
       );
       return response.data;
