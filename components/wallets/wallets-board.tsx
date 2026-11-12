@@ -80,8 +80,32 @@ export default function WalletsBoard({
   onRefillableChange?: (items: WalletAssetPlan[]) => void;
 }) {
   const [target, setTarget] = useState<AssetTarget | null>(null);
-  const [flowForTarget, setFlowForTarget] = useState<WalletAssetFlow | undefined>();
   const { anchor, pinging } = useAnchorPing();
+
+  /**
+   * The open popup's flow, read live rather than captured at click time.
+   *
+   * Same query key as the card's own flow call, so this shares its cache and
+   * fetches nothing extra. Captured at click, a popup opened before that call
+   * finished kept an empty flow — and with it no queued-refund warning and no
+   * send amount — until it was closed and reopened.
+   */
+  const { data: targetWalletFlow } = useQuery({
+    queryKey: ["wallet-flow", target?.wallet.name],
+    queryFn: () => getWalletFlow(target?.wallet.name ?? "", 7),
+    enabled: target != null,
+    staleTime: 5 * 60 * 1000,
+  });
+  const flowForTarget = useMemo(
+    () =>
+      target
+        ? targetWalletFlow?.assets.find(
+            (asset) =>
+              asset.chainId === target.chainId && asset.asset === target.asset
+          )
+        : undefined,
+    [target, targetWalletFlow]
+  );
 
   const { data, isLoading, error } = useQuery<WalletStatusResponse>({
     queryKey: ["wallets"],
@@ -273,14 +297,13 @@ export default function WalletsBoard({
                 plansReady={plansReady}
                 anchor={anchor}
                 pinging={pinging}
-                onOpenAsset={(chain, asset, flow) => {
+                onOpenAsset={(chain, asset) => {
                   setTarget({
                     wallet,
                     chainId: chain.chainId,
                     chainName: chain.chainName,
                     asset,
                   });
-                  setFlowForTarget(flow);
                 }}
               />
             ))}
@@ -318,11 +341,7 @@ function WalletCard({
   /** The row a Slack link asked for, if this page was opened by one. */
   anchor?: string;
   pinging: boolean;
-  onOpenAsset: (
-    chain: ChainBalance,
-    asset: WalletAsset,
-    flow?: WalletAssetFlow
-  ) => void;
+  onOpenAsset: (chain: ChainBalance, asset: WalletAsset) => void;
 }) {
   /**
    * Null until somebody clicks, then their choice.
@@ -405,10 +424,34 @@ function WalletCard({
       wallet.chains.some((chain) =>
         monitoredAssets(chain).some(
           (reading) =>
-            assetRefillPlan(planFor(chain.chainId, reading.asset))?.belowFloor
+            assetRefillPlan(
+              planFor(chain.chainId, reading.asset),
+              flowByKey.get(`${chain.chainId}:${reading.asset}`)
+            )?.belowFloor
         )
       ),
-    [wallet.chains, planFor]
+    [wallet.chains, planFor, flowByKey]
+  );
+
+  /**
+   * Whether any asset has queued refunds its balance cannot pay.
+   *
+   * Read from the flow as well as the plan, so the warning still shows when
+   * the board-wide plans call has failed and the card's own flow says
+   * refunds are waiting — a live status can read OK while they are.
+   */
+  const queueShort = useMemo(
+    () =>
+      wallet.chains.some((chain) =>
+        monitoredAssets(chain).some(
+          (reading) =>
+            (assetOwedNow(
+              planFor(chain.chainId, reading.asset),
+              flowByKey.get(`${chain.chainId}:${reading.asset}`)
+            )?.clearAmount ?? 0) > 0
+        )
+      ),
+    [wallet.chains, planFor, flowByKey]
   );
 
   /**
@@ -696,7 +739,7 @@ function WalletCard({
                     chain.chainId,
                     reading.asset
                   )}
-                  onClick={() => onOpenAsset(chain, reading.asset, assetFlow)}
+                  onClick={() => onOpenAsset(chain, reading.asset)}
                   className={`cursor-pointer scroll-mt-24 hover:bg-indigo-50/50 ${
                     anchor ===
                     assetAnchorId(wallet.name, chain.chainId, reading.asset)
@@ -791,8 +834,10 @@ function WalletCard({
 
           {/* Also shown when nothing has tripped its configured threshold but
               an asset is inside its measured floor — the Connect Wallet FUSE
-              case, comfortably above a stale 1,000 and under a day of cover. */}
-          {((severity != null && severity < 2) || belowFloor) && (
+              case, comfortably above a stale 1,000 and under a day of cover —
+              or has refunds queued that it cannot pay. Not unconditional: on a
+              healthy wallet it would nag to top every asset up to ten days. */}
+          {((severity != null && severity < 2) || belowFloor || queueShort) && (
             <TopUpInstruction
               wallet={wallet}
               flowByAsset={flowByKey}
@@ -881,7 +926,8 @@ function TopUpInstruction({
           if (refill?.refillAmount && refill.refillAmount > 0) {
             return {
               kind: "cover" as const,
-              text: `${formatAmount(refill.refillAmount)} ${reading.label}`,
+              // Rounded up: sending the figure shown must reach the target.
+              text: `${formatAtLeast(refill.refillAmount)} ${reading.label}`,
               detail:
                 refill.owedAmount && refill.owedAmount > 0
                   ? `pays the queued refunds and brings it to ${refill.targetDays} days of cover`
@@ -944,24 +990,34 @@ function TopUpInstruction({
           . The Refund queue tab lists them.
         </p>
       ))}
-      {shortfalls.map(({ chain, needs }) => (
-        <p key={chain.chainId} className="text-sm text-gray-800">
-          {/* "To reach", not "send at least", when this is the cover target:
-              reading a target as a minimum is how 18K looked like a
-              requirement. A configured floor or a queue really is a minimum. */}
-          {needs.every((need) => need.kind === "cover")
-            ? "To reach target cover, send"
-            : "Send at least"}{" "}
-          <strong>{needs.map((need) => need.text).join(" and ")}</strong> on{" "}
-          {chain.chainName} to{" "}
-          <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
-            {wallet.address}
-          </code>
-          <span className="ml-1 text-xs text-gray-500">
-            ({needs[0].detail})
-          </span>
-        </p>
-      ))}
+      {shortfalls.flatMap(({ chain, needs }) =>
+        // One line per kind, minimums first. "To reach", not "send at least",
+        // for a cover target: reading a target as a minimum is how 18K looked
+        // like a requirement. A configured floor or a queue really is one, and
+        // a chain with both must not label the target as a minimum too.
+        (["minimum", "cover"] as const).map((kind) => {
+          const group = needs.filter((need) => need.kind === kind);
+          if (group.length === 0) return null;
+          return (
+            <p key={`${chain.chainId}-${kind}`} className="text-sm text-gray-800">
+              {kind === "cover" ? "To reach target cover, send" : "Send at least"}{" "}
+              {group.map((need, index) => (
+                <span key={need.text}>
+                  {index > 0 && " and "}
+                  <strong>{need.text}</strong>
+                  <span className="ml-1 text-xs text-gray-500">
+                    ({need.detail})
+                  </span>
+                </span>
+              ))}{" "}
+              on {chain.chainName} to{" "}
+              <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
+                {wallet.address}
+              </code>
+            </p>
+          );
+        })
+      )}
       {shortfalls.length > 0 && wallet.topUpHint && (
         <p className="mt-2 text-xs text-indigo-900">{wallet.topUpHint}</p>
       )}

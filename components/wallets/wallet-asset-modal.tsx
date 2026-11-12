@@ -307,7 +307,7 @@ function Header({
           {flow.plan.refillAmount > 0 ? (
             <>
               <strong>
-                Send {formatAmount(flow.plan.refillAmount)} {label}
+                Send {formatAtLeast(flow.plan.refillAmount)} {label}
               </strong>{" "}
               {flow.plan.floorBasis === "minimum" ? (
                 <>
