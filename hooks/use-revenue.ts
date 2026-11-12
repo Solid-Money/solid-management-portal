@@ -9,6 +9,7 @@ import {
   FinanceDetailResponse,
   PaginatedUserRevenueResponse,
   ProductRevenueResponse,
+  RevenueCollectionResponse,
   InvestorReportResponse,
   DailyFlowResponse,
   TreasuryInterestResponse,
@@ -164,6 +165,29 @@ export function useRevenueByProduct(startDate?: Date, endDate?: Date) {
       if (start) params.set("startDate", start);
       if (end) params.set("endDate", end);
       const response = await api.get(`/admin/v1/revenue/by-product?${params}`);
+      return response.data;
+    },
+    refetchInterval: REFRESH_INTERVALS.operationsView,
+    staleTime: REFRESH_INTERVALS.operationsView / 2,
+  });
+}
+
+/**
+ * Where each business-line row's money is collected: address, chain, asset,
+ * collected against still owed, and the vault accountants' fees. Loaded apart
+ * from the revenue figures so a slow chain read never holds them up.
+ */
+export function useRevenueCollection(startDate?: Date, endDate?: Date) {
+  const start = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
+  const end = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
+
+  return useQuery<RevenueCollectionResponse>({
+    queryKey: REVENUE_QUERY_KEYS.collection(start || "", end || ""),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (start) params.set("startDate", start);
+      if (end) params.set("endDate", end);
+      const response = await api.get(`/admin/v1/revenue/collection?${params}`);
       return response.data;
     },
     refetchInterval: REFRESH_INTERVALS.operationsView,

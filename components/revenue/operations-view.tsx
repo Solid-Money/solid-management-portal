@@ -1,8 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRevenueByProduct } from "@/hooks/use-revenue";
+import {
+  useRevenueByProduct,
+  useRevenueCollection,
+} from "@/hooks/use-revenue";
 import { DateRangePicker } from "./date-range-picker";
+import {
+  CollectionDetails,
+  CollectionSummary,
+  VaultCollectionSummary,
+  VaultFeeAccountants,
+} from "./revenue-collection";
 import {
   Loader2,
   AlertCircle,
@@ -16,9 +25,12 @@ import { cn, formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 import {
   FEE_REVENUE_COLORS,
   REVENUE_COLORS,
+  TIER_SUBSCRIPTION_LINE,
   type FeeRevenueType,
   type ProductRevenue,
   type RevenueBusinessLine,
+  type RevenueCollectionLine,
+  type VaultFeeCollectionResponse,
 } from "@/types/revenue";
 
 /** Business lines in display order, with their headings. */
@@ -29,18 +41,32 @@ const BUSINESS_LINES: Array<{ id: RevenueBusinessLine; label: string }> = [
   { id: "banking", label: "Banking" },
   { id: "stocks", label: "Stocks" },
   { id: "buy_crypto", label: "Buy crypto" },
+  { id: "memberships", label: "Memberships" },
 ];
 
 /** Issuer FX payouts have no fee colour of their own. */
 const CARD_FX_PAYOUT_COLOR = "#0891b2"; // cyan-600
+/** Nor do memberships. */
+const TIER_SUBSCRIPTION_COLOR = "#ca8a04"; // yellow-600
 
 function rowColor(product: ProductRevenue): string {
   if (product.revenueType === "yield_share") return REVENUE_COLORS.yieldShare;
   if (product.revenueType === "card_fx_payout") return CARD_FX_PAYOUT_COLOR;
+  if (product.revenueType === TIER_SUBSCRIPTION_LINE) {
+    return TIER_SUBSCRIPTION_COLOR;
+  }
   return (
     FEE_REVENUE_COLORS[product.revenueType as FeeRevenueType] ??
     REVENUE_COLORS.borrowingFees
   );
+}
+
+/** What a row needs to say where its money lands. */
+interface RowCollection {
+  line?: RevenueCollectionLine;
+  vaults: VaultFeeCollectionResponse | null;
+  isLoading: boolean;
+  isError: boolean;
 }
 
 export function OperationsView() {
@@ -54,6 +80,17 @@ export function OperationsView() {
     isLoading,
     error,
   } = useRevenueByProduct(dateRange.start, dateRange.end);
+  // Same range, separate request: a slow chain read must not hold up the
+  // revenue figures, and an error here leaves them standing.
+  const collection = useRevenueCollection(dateRange.start, dateRange.end);
+  const collectionFor = (product: ProductRevenue): RowCollection => ({
+    line: collection.data?.lines.find(
+      (line) => line.revenueType === product.revenueType
+    ),
+    vaults: collection.data?.vaults ?? null,
+    isLoading: collection.isLoading,
+    isError: Boolean(collection.error),
+  });
 
   if (isLoading) {
     return (
@@ -107,9 +144,10 @@ export function OperationsView() {
             card is all revenue types over a fixed 30 days. Both are correct;
             they answer different questions, and the labels say which. */}
         <p className="text-sm text-gray-500">
-          Every revenue line over the selected range, grouped by business line.
-          Card includes the FX fee Rain and Wirex pay out to us. This total will
-          not match the 30-day executive figure above.
+          Every revenue line over the selected range, grouped by business line,
+          with where its money is collected. Card includes the FX fee Rain and
+          Wirex pay out to us; Memberships are Prime and Ultra charges. This
+          total will not match the 30-day executive figure above.
         </p>
         {productsData?.period ? (
           <p className="mb-4 mt-1 text-xs text-gray-400">
@@ -146,6 +184,7 @@ export function OperationsView() {
                     key={product.revenueType}
                     product={product}
                     total={total}
+                    collection={collectionFor(product)}
                   />
                 ))}
               </div>
@@ -173,10 +212,13 @@ export function OperationsView() {
 function ProductRow({
   product,
   total,
+  collection,
 }: {
   product: ProductRevenue;
   total: number;
+  collection: RowCollection;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const percentage = total > 0 ? (product.revenue / total) * 100 : 0;
   const color = rowColor(product);
   const isNew = product.changePercent === null && product.revenue > 0;
@@ -243,6 +285,69 @@ function ProductRow({
           </span>
         )}
       </div>
+      <RowCollectionInfo
+        product={product}
+        collection={collection}
+        expanded={expanded}
+        onToggle={() => setExpanded((open) => !open)}
+      />
+    </div>
+  );
+}
+
+/** Where one row's money lands: a line under it, and the detail on demand. */
+function RowCollectionInfo({
+  product,
+  collection,
+  expanded,
+  onToggle,
+}: {
+  product: ProductRevenue;
+  collection: RowCollection;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  if (collection.isLoading) {
+    return (
+      <p className="flex items-center gap-1 text-xs text-gray-400">
+        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+        Finding where it is collected…
+      </p>
+    );
+  }
+  if (collection.isError) {
+    return (
+      <p className="text-xs text-gray-400">
+        Collection addresses could not be loaded.
+      </p>
+    );
+  }
+
+  if (product.revenueType === "yield_share") {
+    return (
+      <div className="space-y-2">
+        <VaultCollectionSummary
+          vaults={collection.vaults}
+          expanded={expanded}
+          onToggle={onToggle}
+        />
+        {expanded ? <VaultFeeAccountants vaults={collection.vaults} /> : null}
+      </div>
+    );
+  }
+
+  if (!collection.line || collection.line.destinations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2">
+      <CollectionSummary
+        line={collection.line}
+        expanded={expanded}
+        onToggle={onToggle}
+      />
+      {expanded ? <CollectionDetails line={collection.line} /> : null}
     </div>
   );
 }
