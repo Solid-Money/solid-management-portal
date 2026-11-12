@@ -5,6 +5,8 @@ import {
   feePromotionDraftError,
   feePromotionStatus,
   freeDepositsLabel,
+  nextStatusChange,
+  windowInstant,
 } from "@/lib/fee-promotions";
 
 const NOW = Date.parse("2026-11-20T12:00:00.000Z");
@@ -104,5 +106,69 @@ describe("freeDepositsLabel", () => {
   it("counts", () => {
     expect(freeDepositsLabel(1)).toBe("1 free deposit");
     expect(freeDepositsLabel(3)).toBe("3 free deposits");
+  });
+});
+
+describe("windowInstant", () => {
+  const stored = "2026-11-15T12:00:30.000Z";
+
+  it("keeps a stored instant with seconds while its minute is untouched", () => {
+    expect(windowInstant("2026-11-15T12:00", stored)).toBe(stored);
+  });
+
+  it("reads an edited input as typed, in UTC", () => {
+    expect(windowInstant("2026-11-15T13:00", stored)).toBe("2026-11-15T13:00:00.000Z");
+  });
+
+  it("reads a new promotion's input, and nothing for an empty one", () => {
+    expect(windowInstant("2026-11-15T12:00")).toBe("2026-11-15T12:00:00.000Z");
+    expect(windowInstant("", stored)).toBeNull();
+  });
+
+  it("leaves an untouched window out of the change set", () => {
+    const current = {
+      name: "Free SEPA deposits",
+      enabled: true,
+      startsAt: stored,
+      endsAt: "2027-01-01T00:00:45.000Z",
+      freeCountPerUser: 3,
+    };
+    expect(
+      feePromotionChanges(current, {
+        name: "Renamed",
+        enabled: true,
+        startsAt: windowInstant("2026-11-15T12:00", current.startsAt),
+        endsAt: windowInstant("2027-01-01T00:00", current.endsAt),
+        freeCountPerUser: "3",
+      }),
+    ).toEqual({ name: "Renamed" });
+  });
+});
+
+describe("nextStatusChange", () => {
+  const on = (startsAt: string, endsAt: string) => ({ enabled: true, startsAt, endsAt });
+
+  it("is the nearest start or end still ahead", () => {
+    expect(
+      nextStatusChange(
+        [
+          on("2026-11-15T00:00:00.000Z", "2027-01-01T00:00:00.000Z"),
+          on("2026-12-01T00:00:00.000Z", "2026-12-02T00:00:00.000Z"),
+        ],
+        NOW,
+      ),
+    ).toBe(Date.parse("2026-12-01T00:00:00.000Z"));
+  });
+
+  it("ignores promotions that are off, and is null once every window is past", () => {
+    expect(
+      nextStatusChange(
+        [
+          { ...on("2026-12-01T00:00:00.000Z", "2026-12-02T00:00:00.000Z"), enabled: false },
+          on("2026-10-01T00:00:00.000Z", "2026-11-01T00:00:00.000Z"),
+        ],
+        NOW,
+      ),
+    ).toBeNull();
   });
 });

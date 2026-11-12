@@ -12,8 +12,9 @@ import {
   feePromotionChanges,
   feePromotionDraftError,
   freeDepositsLabel,
+  windowInstant,
 } from "@/lib/fee-promotions";
-import { formatUtc, isoToUtcInput, utcInputToIso } from "@/lib/referral-v4";
+import { formatUtc, isoToUtcInput } from "@/lib/referral-v4";
 import type {
   FeePromotion,
   FeePromotionList,
@@ -72,8 +73,8 @@ export default function FeePromotionModal({
   const [attempted, setAttempted] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  const startIso = utcInputToIso(startsAt);
-  const endIso = utcInputToIso(endsAt);
+  const startIso = windowInstant(startsAt, promotion?.startsAt);
+  const endIso = windowInstant(endsAt, promotion?.endsAt);
   const draft = {
     name,
     enabled,
@@ -88,6 +89,9 @@ export default function FeePromotionModal({
       : feePromotionDraftError(draft, limits);
   const changes = promotion ? feePromotionChanges(promotion, draft) : null;
   const nothingChanged = !!changes && Object.keys(changes).length === 0;
+  // Switching a promotion off from here is as consequential as from the list,
+  // which asks first, so the editor does too.
+  const switchingOff = !!promotion?.enabled && !enabled;
 
   const submit = () => {
     setAttempted(true);
@@ -96,7 +100,7 @@ export default function FeePromotionModal({
       onClose();
       return;
     }
-    if (enabled && !confirming) {
+    if ((enabled || switchingOff) && !confirming) {
       setConfirming(true);
       return;
     }
@@ -151,7 +155,9 @@ export default function FeePromotionModal({
           </DialogTitle>
           <DialogDescription>
             {confirming
-              ? "It is on, so every user's next fees in its scope cost nothing until their free ones run out. Check it before saving."
+              ? enabled
+                ? "It is on, so every user's next fees in its scope cost nothing until their free ones run out. Check it before saving."
+                : "It is being switched off, so deposits from now on pay the normal fee. Free deposits already given stay free. Check it before saving."
               : "Makes each user's first fees free, whatever their tier, for deposits that arrive between the start and the end (UTC). Fees that were already free (Ultra, below the minimum charge) don't use one up."}
           </DialogDescription>
         </DialogHeader>
@@ -303,9 +309,11 @@ export default function FeePromotionModal({
           >
             {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             {confirming
-              ? promotion?.enabled
-                ? "Save"
-                : "Save and switch on"
+              ? switchingOff
+                ? "Save and switch off"
+                : promotion?.enabled
+                  ? "Save"
+                  : "Save and switch on"
               : promotion
                 ? "Save changes"
                 : "Create promotion"}

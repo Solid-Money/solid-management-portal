@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BadgePercent, Edit2, Eye, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -18,10 +18,13 @@ import {
   FEE_PROMOTION_STATUS_VARIANT,
   feePromotionStatus,
   freeDepositsLabel,
+  nextStatusChange,
 } from "@/lib/fee-promotions";
 import { formatUtc } from "@/lib/referral-v4";
 import { formatNumber, formatUsd } from "@/lib/utils";
 import type { FeePromotion } from "@/types/fee-promotions";
+
+const HOUR_MS = 60 * 60 * 1000;
 
 /**
  * Fee promotions: time-boxed campaigns that make each user's first N fees on
@@ -45,6 +48,18 @@ export default function FeePromotionsPage() {
 
   const promotions = data?.promotions ?? [];
   const scopes = data?.scopes ?? [];
+
+  // Status is worked out from the clock, so a page left open must move a
+  // badge on when a window opens or closes — the backend already has.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const next = nextStatusChange(data?.promotions ?? [], now);
+    if (next === null) return;
+    // Capped so a far-off boundary never overflows setTimeout; re-armed then.
+    const wait = Math.min(Math.max(next - Date.now(), 0) + 1_000, HOUR_MS);
+    const timer = setTimeout(() => setNow(Date.now()), wait);
+    return () => clearTimeout(timer);
+  }, [data?.promotions, now]);
 
   const openCreate = () => {
     setEditing(null);
@@ -162,7 +177,7 @@ export default function FeePromotionsPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {promotions.map((promotion) => {
-                const status = feePromotionStatus(promotion);
+                const status = feePromotionStatus(promotion, now);
                 return (
                   <tr key={promotion.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">

@@ -1,3 +1,4 @@
+import { isoToUtcInput, utcInputToIso } from "@/lib/referral-v4";
 import type { BadgeVariant } from "@/lib/referral-v4";
 import type {
   FeePromotion,
@@ -135,4 +136,39 @@ export function feePromotionChanges(
 /** "3 free deposits" / "1 free deposit". */
 export function freeDepositsLabel(count: number): string {
   return `${count} free deposit${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * The instant a window input stands for. The input only holds minutes, so a
+ * stored boundary with seconds would come back moved by up to 59 of them and
+ * read as an edit; while the input still shows the stored minute, the stored
+ * instant is kept as it is.
+ */
+export function windowInstant(
+  input: string,
+  stored?: string | null,
+): string | null {
+  if (stored && input === isoToUtcInput(stored)) return stored;
+  return utcInputToIso(input);
+}
+
+/**
+ * When the status shown for any of these promotions next changes — its
+ * nearest start or end still ahead of `now` — or null when none will.
+ */
+export function nextStatusChange(
+  promotions: Pick<FeePromotion, "enabled" | "startsAt" | "endsAt">[],
+  now: number = Date.now(),
+): number | null {
+  let next: number | null = null;
+  for (const promotion of promotions) {
+    if (!promotion.enabled) continue;
+    for (const boundary of [promotion.startsAt, promotion.endsAt]) {
+      const at = new Date(boundary).getTime();
+      if (Number.isFinite(at) && at > now && (next === null || at < next)) {
+        next = at;
+      }
+    }
+  }
+  return next;
 }
