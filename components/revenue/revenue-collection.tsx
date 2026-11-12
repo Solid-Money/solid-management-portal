@@ -275,11 +275,13 @@ function tokenAmount(value: string | null, symbol: string): string {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return `${value} ${symbol}`;
   const digits = tokenFractionDigits(symbol);
-  const smallest = 10 ** -digits;
-  if (amount > 0 && amount < smallest) {
-    return `< ${formatNumber(smallest, digits)} ${symbol}`;
+  const formatted = formatNumber(amount, digits);
+  // Only an amount that would round to a bare zero gets the threshold:
+  // 0.009 still reads 0.01, as before; 0.0001 reads "< 0.01".
+  if (amount > 0 && formatted === "0") {
+    return `< ${formatNumber(10 ** -digits, digits)} ${symbol}`;
   }
-  return `${formatNumber(amount, digits)} ${symbol}`;
+  return `${formatted} ${symbol}`;
 }
 
 /** USD beside a token amount, unless the asset is a dollar already. */
