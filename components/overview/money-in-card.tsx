@@ -168,7 +168,7 @@ export function MoneyInCard({
                   allowDataOverflow={cap !== null}
                   tick={{ fontSize: 11, fill: "#9ca3af" }}
                 />
-                <Tooltip cursor={{ fill: "#f4f5fb" }} content={<MoneyTooltip />} />
+                <Tooltip cursor={{ fill: "#f4f5fb" }} content={<MoneyTooltip picked={picked} />} />
 
                 {callouts.map((spec) => (
                   <ReferenceLine
@@ -303,6 +303,7 @@ const METHOD_LABELS: Record<MoneyInMethod, string> = {
   ethereum: "Ethereum",
   polygon: "Polygon",
   fuse: "Fuse",
+  other: "other networks",
   bank: "bank",
   transfi: "TransFi",
 };
@@ -338,20 +339,26 @@ function gapGroups(gaps: OverviewMoneyInGap[]): Array<{ from: string; to: string
 function MoneyTooltip({
   active,
   payload,
+  picked = null,
 }: {
   active?: boolean;
   payload?: Array<{ payload: MoneyBar }>;
+  /** The method picked with a chip: the bar is that method alone, so the tooltip is too. */
+  picked?: OverviewMoneyInMethod | null;
 }) {
   const bar = payload?.[0]?.payload;
   if (!active || !bar) return null;
-  const rows = MONEY_IN_SERIES.map((s) => ({ ...s, usd: bar.series[s.id] }))
-    .filter((r) => r.usd > 0)
-    .sort((a, b) => b.usd - a.usd);
+  const total = picked ? (bar.byMethod[picked.method] ?? 0) : bar.total;
+  const rows = picked
+    ? [{ id: picked.method, label: picked.label, color: methodColor(picked.method), usd: total }]
+    : MONEY_IN_SERIES.map((s) => ({ ...s, usd: bar.series[s.id] }))
+        .filter((r) => r.usd > 0)
+        .sort((a, b) => b.usd - a.usd);
   return (
     <div className="min-w-[180px] rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg">
       <div className="font-semibold">
         {bar.date === bar.until ? dayLabel(bar.date) : `${dayLabel(bar.date)} – ${dayLabel(bar.until)}`}
-        {bar.partial ? " (so far)" : ""} · {compactUsd(bar.total)}
+        {bar.partial ? " (so far)" : ""} · {compactUsd(total)}
       </div>
       <div className="mt-1.5 flex flex-col gap-1">
         {rows.map((row) => (
