@@ -134,9 +134,15 @@ function Field({
 const fieldButton =
   "inline-flex h-7 max-w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-sm text-gray-800 hover:bg-gray-100";
 
-/** Updates in the order they were written: the newest last. */
+/**
+ * Updates in the order they were written, the newest last, as one stream:
+ * replies posted before replying went away (or by Claude, or through the
+ * connector) take their place by time.
+ */
 function oldestFirst(updates: TaskUpdate[]): TaskUpdate[] {
-  return [...updates].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  return updates
+    .flatMap((update) => [update, ...update.replies])
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
 function linkHref(link: TaskLink): string | null {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactElement } from "react";
-import { Download, Eye, Loader2, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2, Users } from "lucide-react";
+import { Download, Eye, Loader2, MoreHorizontal, Pencil, SmilePlus, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { fileSize, imageUrls, inlineKeys, isClaudeLooking, renderableHtml } from "@/lib/task-rich";
-import { deleteTaskUpdate, editTaskUpdate, postTaskUpdate, reactToTaskUpdate } from "@/lib/tasks-api";
+import { deleteTaskUpdate, editTaskUpdate, reactToTaskUpdate } from "@/lib/tasks-api";
 import TaskComposer from "@/components/tasks/task-composer";
 import ImagePreview, { type PreviewImage } from "@/components/tasks/image-preview";
 import {
@@ -35,7 +35,6 @@ import {
   type TaskBodyFormat,
   type TaskPerson,
   type TaskPriority,
-  type TaskBodyInput,
   type TaskReaction,
   type TaskStatus,
   type TaskUpdate,
@@ -46,7 +45,6 @@ export interface UpdateApi {
   react: (updateId: string, emoji: TaskReaction) => Promise<unknown>;
   edit: (updateId: string, input: { body: string; format: TaskBodyFormat; mentions: string[] }) => Promise<unknown>;
   remove: (updateId: string) => Promise<unknown>;
-  reply: (parentId: string, input: Required<TaskBodyInput>) => Promise<unknown>;
 }
 
 export function taskUpdateApi(taskId: string): UpdateApi {
@@ -54,7 +52,6 @@ export function taskUpdateApi(taskId: string): UpdateApi {
     react: (updateId, emoji) => reactToTaskUpdate(taskId, updateId, emoji),
     edit: (updateId, input) => editTaskUpdate(taskId, updateId, input),
     remove: (updateId) => deleteTaskUpdate(taskId, updateId),
-    reply: (parentId, input) => postTaskUpdate(taskId, { ...input, parentId }),
   };
 }
 
@@ -449,26 +446,24 @@ function Reactions({
 
 /**
  * One update: who wrote it and when, the text with mentions picked out,
- * images inside the message, reactions, replies and who has seen it. Field
- * changes render as a single line instead.
+ * images inside the message, reactions and who has seen it. Field changes
+ * render as a single line instead. No replies under it: like monday, the
+ * conversation is one stream, answered from the box at the bottom.
  */
 export default function TaskUpdateCard({
   api,
   update,
   me,
   people,
-  isReply = false,
   onChanged,
 }: {
   api: UpdateApi;
   update: TaskUpdate;
   me: string;
   people: TaskPerson[];
-  isReply?: boolean;
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [replying, setReplying] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
 
   if (update.kind === "activity") return <ActivityLine update={update} people={people} />;
@@ -483,9 +478,9 @@ export default function TaskUpdateCard({
   };
 
   return (
-    <div className={cn(!isReply && "rounded-lg border border-gray-200 bg-white")}>
-      <div className={cn("flex gap-3", isReply ? "py-2" : "p-3.5")}>
-        <AuthorAvatar author={update.author} people={people} size={isReply ? 24 : 30} />
+    <div className="rounded-lg border border-gray-200 bg-white">
+      <div className="flex gap-3 p-3.5">
+        <AuthorAvatar author={update.author} people={people} size={30} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span className="text-sm font-semibold text-gray-900">{authorName(update.author, people)}</span>
@@ -584,53 +579,13 @@ export default function TaskUpdateCard({
             </>
           )}
 
-          {!isReply && !update.deleted && !editing && (
-            <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
-              <button
-                type="button"
-                onClick={() => setReplying((open) => !open)}
-                className="inline-flex cursor-pointer items-center gap-1 hover:text-gray-900"
-              >
-                <Reply className="size-3.5" /> Reply
-              </button>
-              {seen.length > 0 && <SeenBy emails={seen} people={people} />}
+          {!update.deleted && !editing && seen.length > 0 && (
+            <div className="mt-2 flex justify-end text-xs text-gray-500">
+              <SeenBy emails={seen} people={people} />
             </div>
           )}
         </div>
       </div>
-
-      {!isReply && (update.replies.length > 0 || replying) && (
-        <div className="border-t border-gray-100 bg-gray-50/60 px-3.5 pb-2 pl-14">
-          {update.replies.map((reply) => (
-            <TaskUpdateCard
-              key={reply.id}
-              api={api}
-              update={reply}
-              me={me}
-              people={people}
-              isReply
-              onChanged={onChanged}
-            />
-          ))}
-          {replying && (
-            <TaskComposer
-              className="my-2"
-              people={people}
-              placeholder="Reply… @ to mention, @Claude to ask AI"
-              submitLabel="Reply"
-              askClaude
-              autoFocus
-              minRows={2}
-              onCancel={() => setReplying(false)}
-              onSubmit={async (input) => {
-                await api.reply(update.id, input);
-                setReplying(false);
-                onChanged();
-              }}
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 }
