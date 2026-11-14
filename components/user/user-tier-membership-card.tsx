@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, KeyRound, Loader2, Lock, RefreshCw } from "lucide-react";
 
 import { getUserTierMembership } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatFuseExact } from "@/lib/utils";
 import {
   TierMembershipView,
   TierSubscriptionFundingView,
@@ -219,6 +219,16 @@ export default function UserTierMembershipCard({
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Locked" value={formatFuse(lock.lockedFuse)} />
+                  {/* What the tier is resolved from, to the grade's own slack:
+                      a lock a fraction of a FUSE under a threshold is exactly
+                      the case this is here to explain, and coarser rounding
+                      would show it as reaching the threshold. */}
+                  {typeof lock.committedFuse === "number" ? (
+                    <Stat
+                      label="Graded at"
+                      value={formatFuseExact(lock.committedFuse)}
+                    />
+                  ) : null}
                   <Stat
                     label="Unlocks tier"
                     value={lock.unlockedTier}

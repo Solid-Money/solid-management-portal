@@ -1871,6 +1871,12 @@ export interface TierLockView {
   lockAddress: string | null;
   durationDays: number;
   lockedFuse: number;
+  /**
+   * What the tier is resolved from: each tranche at no less than its floor.
+   * Above `lockedFuse` while the soFUSE rate sits below a floor. Optional
+   * because a backend from before top-up protection omits it.
+   */
+  committedFuse?: number;
   lockedShares: string;
   unlockedTier: string;
   lockedSince: string | null;
@@ -1885,8 +1891,18 @@ export type TierLockTrancheValueSource = "recorded" | "activity" | "live";
 /** One tranche of a re-evaluated lock. */
 export interface TierLockTrancheReport {
   shares: string;
-  /** What the tranche is graded on at minimum: its FUSE value when locked. */
+  /** Its FUSE value when locked. */
   fuseAtLock: number;
+  /**
+   * Its value when a later tranche was locked, when higher: the floor a top-up
+   * protects it at. Null when nothing has topped it up. Optional because a
+   * backend from before top-up protection omits it.
+   */
+  protectedFuse?: number | null;
+  /** What it is graded on at minimum: the higher of the two above. */
+  floorFuse?: number;
+  /** That floor before this re-evaluation; null for a tranche not yet recorded. */
+  previousFloorFuse?: number | null;
   /** What it is worth at today's soFUSE rate. */
   liveFuse: number;
   source: TierLockTrancheValueSource;
@@ -1960,12 +1976,50 @@ export interface TierLockReevaluationPreview {
   liveThresholds: TierLockThresholds;
   /** Re-evaluating needs support to enter the prices to pin. */
   needsThresholds: boolean;
+  /**
+   * The tier the lock alone grants now, and would after a re-evaluation.
+   * Optional (with everything below) because a backend from before top-up
+   * protection omits them.
+   */
+  lockTierNow?: string;
+  lockTierAfter?: string;
+  /** The FUSE the lock is graded on now, and would be after. */
+  committedFuseNow?: number;
+  committedFuseAfter?: number;
+  /** Every open tranche, oldest first, with the floor it would be left at. */
+  tranches?: TierLockTranchePreview[];
+}
+
+/** One tranche as a re-evaluation would leave it. */
+export interface TierLockTranchePreview {
+  shares: string;
+  lockedAt: string;
+  unlocksAt: string;
+  /** What it is worth at today's soFUSE rate. */
+  liveFuse: number;
+  /** Its lock-time value on the record now; null when not recorded. */
+  fuseAtLock: number | null;
+  fuseAtLockAfter: number;
+  /** What it is graded on at minimum now; null when not recorded. */
+  floorFuse: number | null;
+  /** What it would be graded on at minimum after. */
+  floorFuseAfter: number;
+  /**
+   * Whether that floor comes from its value when a later tranche was locked —
+   * the protection a top-up gives what was already locked.
+   */
+  raisedByTopUp: boolean;
 }
 
 /** What one tier costs by each route, and whether the user already holds it. */
 export interface TierOfferView {
   tier: string;
   lockFuse: number;
+  /**
+   * FUSE still to lock for this tier, against the graded value — what the app
+   * quotes. Optional because a backend from before it omits it.
+   */
+  lockShortfallFuse?: number;
   lockAvailable: boolean;
   annualFeeUsd: number;
   cashAvailable: boolean;
@@ -3106,6 +3160,49 @@ export interface CashbackEntry {
   cashbackPercentageSource?: CashbackPercentageSource;
   /** The monthly cap frozen on the row with that rate, in USD. */
   monthlyCapUsd?: number;
+}
+
+/**
+ * What correcting one purchase's cashback to a tier does:
+ * `reprice` — still owed, so its rate and cap move to the tier's;
+ * `top_up` — already paid, so a new escrowed row pays the difference;
+ * `none` — nothing to correct, and `reason` says why.
+ */
+export type CashbackTierCorrectionAction = "reprice" | "top_up" | "none";
+
+/** A cashback tier correction, previewed or applied. */
+export interface CashbackTierCorrectionPlan {
+  transactionId: string;
+  status: string;
+  fiatAmount: string;
+  merchantName: string | null;
+  createdAt: string;
+  /** The tier the purchase is being corrected to. */
+  tier: string;
+  /** The cardholder's tier now — what the dialog offers first. */
+  currentTier: string;
+  /** The rate (fraction) and cap the row carries now; null when it predates them. */
+  percentage: number | null;
+  percentageSource: CashbackPercentageSource | null;
+  monthlyCapUsd: number | null;
+  /** What the tier pays. */
+  tierPercentage: number;
+  tierMonthlyCapUsd: number;
+  action: CashbackTierCorrectionAction;
+  /** USD owed at the tier's rate, before the monthly cap. */
+  owedUsd: number;
+  /** USD already paid, earlier corrections included. Null while unpaid. */
+  paidUsd: number | null;
+  /** What a top-up would pay. Null unless `action` is `top_up`. */
+  topUpUsd: number | null;
+  topUpTransactionId: string | null;
+  /** Why nothing would be done. Null unless `action` is `none`. */
+  reason: string | null;
+}
+
+/** A correction that landed: the plan, and the row it wrote or re-priced. */
+export interface CashbackTierCorrectionResult extends CashbackTierCorrectionPlan {
+  correctedTransactionId: string;
 }
 
 /** Cashback rows plus the totals support is usually actually after. */

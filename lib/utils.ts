@@ -49,6 +49,26 @@ export function tokenFractionDigits(symbol?: string | null): number {
 }
 
 /**
+ * FUSE to the millionth, with at least cents: "399,999.57 FUSE",
+ * "49,999.999 FUSE".
+ *
+ * For figures a tier threshold is decided on, where any rounding coarser than
+ * the grade's own slack would show a position just under a threshold as
+ * reaching it — exactly the case these figures are shown to explain. Six
+ * decimals matches that slack (the backend's 1e-6 FUSE rounding tolerance), so
+ * a figure that reads at or above a threshold is one the grade grants. Zero for
+ * anything that is not a number.
+ */
+export function formatFuseExact(amount: number): string {
+  const safe = Number.isFinite(amount) ? amount : 0;
+
+  return `${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(safe)} FUSE`;
+}
+
+/**
  * A USD amount, always `$1,234.56` — the only way money should be rendered.
  *
  * Locked to en-US rather than the browser's locale. `toLocaleString(undefined,

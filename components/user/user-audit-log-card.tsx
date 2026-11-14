@@ -92,6 +92,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       label: "Trial cashback terms applied",
       variant: "info",
     },
+    cashback_tier_corrected: {
+      label: "Cashback tier corrected",
+      variant: "info",
+    },
     cashback_partial_refund_restored: {
       label: "Cashback restored after partial refund",
       variant: "info",
@@ -414,6 +418,19 @@ function detailFor(entry: AdminAuditEntry): string | null {
     ]
       .filter(Boolean)
       .join(" · ");
+  }
+
+  if (entry.action === "cashback_tier_corrected") {
+    const tier = stringField(entry, "tier");
+    const action = stringField(entry, "action");
+    const topUp = entry.metadata?.topUpUsd;
+    const reason = stringField(entry, "reason");
+    if (action === "top_up" && typeof topUp === "number") {
+      return `to ${tier ?? "?"} · ${formatUsd(topUp)} top-up escrowed`;
+    }
+    if (action === "reprice") return `to ${tier ?? "?"} · unpaid row re-priced`;
+    // A refusal: the plan says why nothing was done.
+    return reason ?? (tier ? `to ${tier}` : null);
   }
 
   if (entry.action === "cashback_withheld") {
