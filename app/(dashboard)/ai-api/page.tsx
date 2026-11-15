@@ -9,9 +9,17 @@ import AiApiUsageChart from "@/components/ai-api/usage-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import UserLink from "@/components/user-link";
 import { useAiApiOverview, useAiApiUsers } from "@/hooks/use-ai-api";
-import { formatTokens, PAUSE_REASON_LABELS } from "@/lib/ai-api";
+import {
+  formatFirstToken,
+  formatTokens,
+  formatTokensPerSecond,
+  NEAR_LIMIT_PERCENT,
+  PAUSE_REASON_LABELS,
+  usedPercent,
+} from "@/lib/ai-api";
 import { formatUsd } from "@/lib/utils";
 
 type RangeKey = "month" | "7d" | "30d";
@@ -127,19 +135,20 @@ function UsersTable() {
               <th className="px-4 py-2 text-right">Keys</th>
               <th className="px-4 py-2 text-right">Billed this month</th>
               <th className="px-4 py-2 text-right">Requests</th>
+              <th className="px-4 py-2">Closest to limit</th>
               <th className="px-4 py-2">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center">
+                <td colSpan={7} className="px-4 py-8 text-center">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin text-gray-400" />
                 </td>
               </tr>
             ) : isError && !data ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   Could not load the users with keys.{" "}
                   <button
                     type="button"
@@ -152,41 +161,82 @@ function UsersTable() {
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   {search ? "No users with keys match." : "No one has a key yet."}
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr
-                  key={row.userId}
-                  onClick={() => router.push(`/ai-api/${row.userId}`)}
-                  className="cursor-pointer hover:bg-gray-50"
-                >
-                  <td className="px-4 py-2">
-                    <UserLink userId={row.userId} username={row.username} />
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">{row.email ?? "—"}</td>
-                  <td className="px-4 py-2 text-right">{row.keys}</td>
-                  <td className="px-4 py-2 text-right font-medium">
-                    {formatUsd(row.spentThisMonthUsd)}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    {row.requestsThisMonth.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2">
-                    {row.paused ? (
-                      <Badge variant="warning">
-                        {row.pausedReason
-                          ? PAUSE_REASON_LABELS[row.pausedReason]
-                          : "Paused"}
-                      </Badge>
-                    ) : (
-                      <Badge variant="success">Active</Badge>
-                    )}
-                  </td>
-                </tr>
-              ))
+              rows.map((row) => {
+                const closest = row.closestKey;
+                const percent = closest ? usedPercent(closest.usedShare) : 0;
+                return (
+                  <tr
+                    key={row.userId}
+                    onClick={() => router.push(`/ai-api/${row.userId}`)}
+                    className="cursor-pointer hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-2">
+                      <UserLink userId={row.userId} username={row.username} />
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">{row.email ?? "—"}</td>
+                    <td className="px-4 py-2 text-right">{row.keys}</td>
+                    <td className="px-4 py-2 text-right font-medium">
+                      {formatUsd(row.spentThisMonthUsd)}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {row.requestsThisMonth.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2">
+                      {closest ? (
+                        // A button, so the exact spend is reachable from the
+                        // keyboard too: the tooltip opens on hover and on focus,
+                        // and Radix ties its text to the button
+                        // (aria-describedby). A click still opens the user, as
+                        // anywhere else on the row.
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex cursor-help items-center gap-1 whitespace-nowrap"
+                            >
+                              {percent >= NEAR_LIMIT_PERCENT ? (
+                                <Badge variant="warning">{percent}%</Badge>
+                              ) : (
+                                <span>{percent}%</span>
+                              )}
+                              <span className="text-gray-600">
+                                of {formatUsd(closest.limitUsd, 0)} ·
+                              </span>
+                              <span className="max-w-48 truncate text-gray-600">
+                                {closest.name}
+                              </span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {`${closest.name}: ${formatUsd(closest.spentUsd)} of ${formatUsd(
+                              closest.limitUsd,
+                              0,
+                            )} this month`}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {row.paused ? (
+                        <Badge variant="warning">
+                          {row.pausedReason
+                            ? PAUSE_REASON_LABELS[row.pausedReason]
+                            : "Paused"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="success">Active</Badge>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -354,7 +404,10 @@ export default function AiApiPage() {
             <AiApiUsageChart data={overview.byDay} />
           </Section>
 
-          <Section title="By model" description="What each model was used for, at our prices.">
+          <Section
+            title="By model"
+            description="What each model was used for, at our prices. Speed and first token are averages over its streamed requests."
+          >
             <div className="overflow-x-auto rounded-md border border-gray-200">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -362,6 +415,8 @@ export default function AiApiPage() {
                     <th className="px-4 py-2">Model</th>
                     <th className="px-4 py-2 text-right">Requests</th>
                     <th className="px-4 py-2 text-right">Tokens</th>
+                    <th className="px-4 py-2 text-right">Speed</th>
+                    <th className="px-4 py-2 text-right">First token</th>
                     <th className="px-4 py-2 text-right">Cost</th>
                     <th className="px-4 py-2 text-right">Billed</th>
                   </tr>
@@ -369,7 +424,7 @@ export default function AiApiPage() {
                 <tbody className="divide-y divide-gray-100">
                   {overview.byModel.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                      <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
                         No usage in this range.
                       </td>
                     </tr>
@@ -384,6 +439,12 @@ export default function AiApiPage() {
                         </td>
                         <td className="px-4 py-2 text-right">{row.requests.toLocaleString()}</td>
                         <td className="px-4 py-2 text-right">{formatTokens(row.tokens)}</td>
+                        <td className="px-4 py-2 text-right">
+                          {formatTokensPerSecond(row.tokensPerSecond)}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {formatFirstToken(row.timeToFirstTokenMs)}
+                        </td>
                         <td className="px-4 py-2 text-right">{formatUsd(row.costUsd)}</td>
                         <td className="px-4 py-2 text-right font-medium">
                           {formatUsd(row.billedUsd)}
@@ -400,7 +461,7 @@ export default function AiApiPage() {
 
       <Section
         title="Users with keys"
-        description="Ordered by what they have been billed this month. Open one to see their keys and charges."
+        description={`Ordered by what they have been billed this month. Open one to see their keys and charges. A key at ${NEAR_LIMIT_PERCENT}% of its monthly limit is flagged so support can reach out: only the user can raise a limit.`}
       >
         <UsersTable />
       </Section>

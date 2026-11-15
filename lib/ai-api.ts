@@ -7,6 +7,7 @@ import type {
   AiApiUpstreamModel,
   AiApiUpstreamOffer,
 } from "@/types/ai-api";
+import { formatNumber } from "@/lib/utils";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "muted";
 
@@ -55,6 +56,26 @@ export const formatTokens = (tokens: number): string =>
     : tokens >= 1_000
       ? `${(tokens / 1_000).toFixed(1)}K`
       : tokens.toLocaleString();
+
+/** Output speed as `85 tok/s`; `—` when too few requests ran to say. */
+export const formatTokensPerSecond = (value: number | null | undefined): string =>
+  value == null || !Number.isFinite(value) ? "—" : `${formatNumber(value, 0, 0)} tok/s`;
+
+/** Time to first token, ms, as `1.2 s`; `—` when too few requests ran to say. */
+export const formatFirstToken = (ms: number | null | undefined): string =>
+  // Rounded in tenths first: `(0.35).toFixed(1)` is "0.3".
+  ms == null || !Number.isFinite(ms) ? "—" : `${(Math.round(ms / 100) / 10).toFixed(1)} s`;
+
+/**
+ * At this share of a key's monthly limit used (as a whole percent), the users
+ * table flags its holder, so support can reach out before requests stop. Only
+ * the user can raise a limit: it needs a mandate they sign.
+ */
+export const NEAR_LIMIT_PERCENT = 80;
+
+/** A share of a limit as a whole percent: 0.82 → 82. */
+export const usedPercent = (share: number): number =>
+  Number.isFinite(share) ? Math.round(share * 100) : 0;
 
 /** A UTC day key (`2026-10-14`) as `Oct 14`. */
 export const formatDay = (day: string): string =>
