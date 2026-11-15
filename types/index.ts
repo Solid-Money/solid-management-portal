@@ -3431,7 +3431,9 @@ export type TrialCorrectionSkipReason =
   | "refunded"
   | "canceled_other"
   | "ineligible"
-  | "claimed_correction";
+  | "claimed_correction"
+  /** Euro cashback: the correction pays soUSD at dollar caps, so it skips euro rows. */
+  | "euro_cashback";
 
 /** What "Apply trial terms" would change for one user. */
 export interface TrialCashbackCorrectionPlan {

@@ -76,6 +76,7 @@ const SKIP_REASONS: Record<TrialCorrectionSkipReason, string> = {
   canceled_other: "canceled for another reason",
   ineligible: "not eligible for cashback",
   claimed_correction: "a correction is mid-send",
+  euro_cashback: "euro cashback, correct by hand",
 };
 
 const dayAndTime: Intl.DateTimeFormatOptions = {
@@ -488,8 +489,7 @@ function CorrectionRow({
           {action.label}
         </Badge>
         <div className="mt-0.5 text-xs whitespace-nowrap text-gray-500">
-          {terms(row.from, currency, earns)} →{" "}
-          {terms(row.to, currency, earns)}
+          {terms(row.from, currency, earns)} → {terms(row.to, currency, earns)}
         </div>
       </TableCell>
       <TableCell className="text-right font-medium whitespace-nowrap text-gray-900 tabular-nums">
