@@ -65,8 +65,13 @@ export function RewardsWalletsView() {
     return {
       cashback: paid.data.cashback.totalUsd / days,
       // Euro cashback leaves the soEUR float on Base, so it has its own
-      // outflow and its own runway — never folded into the dollar one.
-      cashbackEur: (paid.data.cashback.totalEur ?? 0) / days,
+      // outflow and its own runway — never folded into the dollar one. Null
+      // when the response carries no euro measurement at all (a backend
+      // without euro cashback), which is not the same as a measured zero.
+      cashbackEur:
+        typeof paid.data.cashback.totalEur === "number"
+          ? paid.data.cashback.totalEur / days
+          : null,
       referral: paid.data.referrals.totalUsd / days,
       days,
     };
@@ -89,12 +94,16 @@ export function RewardsWalletsView() {
     if (!wallet || !holdsSoEur(wallet)) return null;
 
     const balance = payoutBalanceEur(wallet);
-    const dailyOutflow = outflow?.cashbackEur;
+    // Null when the paid query failed or measured no euro outflow: runway is
+    // then unknown, not "no outflow".
+    const dailyOutflow = outflow?.cashbackEur ?? null;
     return {
       balance,
       dailyOutflow,
       runway:
-        dailyOutflow && dailyOutflow > 0 ? balance / dailyOutflow : null,
+        dailyOutflow !== null && dailyOutflow > 0
+          ? balance / dailyOutflow
+          : null,
     };
   }, [payoutWallets, outflow]);
 
@@ -146,13 +155,19 @@ export function RewardsWalletsView() {
             value={
               paid.isLoading
                 ? undefined
-                : euroFloat.runway === null
-                  ? "No outflow in period"
-                  : `${formatNumber(euroFloat.runway, 0, 0)} days`
+                : euroFloat.dailyOutflow === null
+                  ? "Unavailable"
+                  : euroFloat.runway === null
+                    ? "No outflow in period"
+                    : `${formatNumber(euroFloat.runway, 0, 0)} days`
             }
-            scope={`${formatEur(euroFloat.balance)} soEUR held on Base · ${formatEur(
-              euroFloat.dailyOutflow ?? 0
-            )}/day average euro cashback outflow`}
+            scope={
+              euroFloat.dailyOutflow === null
+                ? `${formatEur(euroFloat.balance)} soEUR held on Base · euro cashback outflow could not be measured`
+                : `${formatEur(euroFloat.balance)} soEUR held on Base · ${formatEur(
+                    euroFloat.dailyOutflow
+                  )}/day average euro cashback outflow`
+            }
             source="on-chain"
             updatedAt={wallets.data?.lastUpdated}
             invertTrendColor

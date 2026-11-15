@@ -45,6 +45,29 @@ describe("formatCashbackAmount", () => {
     ).toEqual({ amount: "2.0000 soEUR", value: "€2.10" });
   });
 
+  it("shows the soEUR the transfer moved, not the pre-debt payout", () => {
+    // 2 soEUR earned, 1 collected against a debt, 1 sent.
+    expect(
+      formatCashbackAmount({
+        currency: "EUR",
+        soEurAmount: "2",
+        sentSoEurAmount: "1",
+        soEurRate: "1.05",
+      })
+    ).toEqual({ amount: "1.0000 soEUR", value: "€1.05" });
+  });
+
+  it("keeps a stored zero transfer as zero", () => {
+    expect(
+      formatCashbackAmount({
+        currency: "EUR",
+        soEurAmount: "2",
+        sentSoEurAmount: "0",
+        soEurRate: "1.05",
+      })
+    ).toEqual({ amount: "0.0000 soEUR", value: "€0.00" });
+  });
+
   it("never reads a EUR row's figure as dollars", () => {
     // A stray soUSD field on a EUR row must not turn it into a dollar payout.
     expect(

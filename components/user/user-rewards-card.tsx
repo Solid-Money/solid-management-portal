@@ -91,17 +91,31 @@ function monthCashbackValue(
  * What is still pending this month, and the cap the month is paid up to, in
  * the month's own currency.
  *
+ * A euro cardholder who switched mid-month can still have dollar rows
+ * pending; those are shown beside the euro figure, in dollars, never summed
+ * into it — as {@link monthCashbackValue} shows the paid side. The cap is the
+ * month's own (euro) cap.
+ *
  * The month's cap sits above the tier's when purchases were made on a bigger
  * tier — a trial that has since ended keeps its cap on what was bought during
  * it — which is exactly what a cardholder asks support about, so both are
  * shown then.
  */
-function monthCashbackHint(month: MonthCashback): string {
+function monthCashbackHint(
+  rewards: UserRewardsData,
+  month: MonthCashback
+): string {
   const parts: string[] = [];
   const money = (value: number) => formatCashbackMoney(value, month.currency);
 
   const pending = month.pending ?? 0;
   if (pending > 0) parts.push(`+${money(pending)} pending`);
+
+  const usdPending =
+    month.currency === "EUR" ? (rewards.cashbackPendingThisMonth ?? 0) : 0;
+  if (usdPending > 0) {
+    parts.push(`+${formatCashbackMoney(usdPending, "USD")} pending`);
+  }
 
   const tierCap = month.tierCap;
   const monthCap = month.monthCap ?? tierCap;
@@ -173,7 +187,7 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
                 <Stat
                   label="Cashback this month"
                   value={monthCashbackValue(rewards, month)}
-                  hint={monthCashbackHint(month)}
+                  hint={monthCashbackHint(rewards, month)}
                 />
               )}
               <Stat

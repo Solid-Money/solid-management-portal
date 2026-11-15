@@ -121,6 +121,7 @@ type CashbackPayoutFields = Pick<
   | "fuseAmount"
   | "fuseUsdPrice"
   | "soEurAmount"
+  | "sentSoEurAmount"
   | "soEurRate"
 >;
 
@@ -131,7 +132,12 @@ type CashbackPayoutFields = Pick<
  * Cashback moved from native FUSE to soUSD; the table showed only the FUSE
  * field, so every cashback paid since the migration rendered as "—" — the
  * dashboard looked like cashback had stopped being paid. A EUR row pays in
- * soEUR, worth `soEurAmount * soEurRate` euros — never shown in dollars.
+ * soEUR, worth `shares * soEurRate` euros — never shown in dollars.
+ *
+ * A EUR row's shares are `sentSoEurAmount`, what the transfer actually moved —
+ * `soEurAmount` is the payout before debt collection and refunds rewrote it —
+ * falling back to `soEurAmount` only when no sent figure was stored. A stored
+ * sent figure of zero is shown as zero, not skipped.
  */
 export function formatCashbackAmount(
   cashback?: CashbackPayoutFields
@@ -139,8 +145,11 @@ export function formatCashbackAmount(
   if (!cashback) return null;
 
   if (cashbackCurrencyOf(cashback) === "EUR") {
-    const soEur = Number(cashback.soEurAmount ?? 0);
-    if (!(soEur > 0)) return null;
+    const sent = cashback.sentSoEurAmount;
+    const hasSent = sent !== undefined && sent !== null && sent !== "";
+    const soEur = Number(hasSent ? sent : (cashback.soEurAmount ?? 0));
+    if (!Number.isFinite(soEur) || soEur < 0) return null;
+    if (!hasSent && !(soEur > 0)) return null;
 
     const rate = Number(cashback.soEurRate ?? 0);
     return {
