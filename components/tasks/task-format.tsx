@@ -269,7 +269,11 @@ export function LastUpdateLine({
   className?: string;
 }) {
   if (!update) return <span className={cn("truncate text-xs text-gray-400", className)}>No updates yet</span>;
-  const name = update.author.bot ? BOT_NAMES[update.author.bot] : firstName(update.author.email, people);
+  const name = update.author.bot
+    ? BOT_NAMES[update.author.bot]
+    : update.author.email
+      ? firstName(update.author.email, people)
+      : (update.author.name?.split(" ")[0] ?? "Someone");
   return (
     <span
       title={`${authorName(update.author, people)}: ${update.text}`}

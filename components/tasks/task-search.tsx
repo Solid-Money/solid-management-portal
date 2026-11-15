@@ -138,6 +138,12 @@ export default function TaskSearch({ onOpen, className }: { onOpen: (id: string)
   const showPanel = open && searching;
   const current = Math.min(active, Math.max(results.length - 1, 0));
 
+  // The picked result stays in view as the arrows move past the list's edge.
+  useEffect(() => {
+    if (!showPanel) return;
+    document.getElementById(`${listId}-${current}`)?.scrollIntoView({ block: "nearest" });
+  }, [showPanel, current, listId]);
+
   return (
     <div ref={box} className={cn("relative", className)}>
       <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
@@ -196,7 +202,7 @@ export default function TaskSearch({ onOpen, className }: { onOpen: (id: string)
       </span>
 
       {showPanel && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-[min(42rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-[min(42rem,calc(100vw-2rem))] overflow-hidden sm:left-auto sm:right-0 rounded-lg border border-gray-200 bg-white shadow-lg">
           {isError && !fresh ? (
             <p className="px-4 py-6 text-center text-sm text-red-700">The search didn&apos;t work. Try again in a moment.</p>
           ) : results.length === 0 ? (
