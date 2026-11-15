@@ -40,6 +40,8 @@ export interface FeeProductDefinition {
   collection: string;
   toggleTooltip: string;
   tierTooltips: Record<FeeTierKey, string>;
+  /** Something an admin must know before switching this fee on, shown as a callout. */
+  caution?: string;
 }
 
 /**
@@ -117,6 +119,10 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
       tier2: "Reduced rate for Prime.",
       tier3: "Keep at 0 so Ultra converts currency for free.",
     },
+    // The app's tier pages quote Wirex cardholders the flat tier FX price, which
+    // this fee is charged on top of — see `cardFx` on the tier-benefits payload.
+    caution:
+      "This is not the \"Card FX fee\" on the app's tier pages. Wirex purchases are priced by flat tier FX pricing (card_fees.fx_pricing): each tier's rate replaces Wirex's own fee, and the tier pages quote that rate to Wirex cardholders. This fee is charged on top of it, so switching it on makes Wirex cardholders pay more than their tier page says.",
   },
   {
     key: "offRamp",
@@ -197,6 +203,11 @@ export function FeeProductRates({
         tooltip={product.toggleTooltip}
       />
       <p className="text-sm text-gray-500">{product.collection}</p>
+      {product.caution ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {product.caution}
+        </p>
+      ) : null}
       <TierGrid>
         {FEE_TIERS.map((tier) => (
           <TierCard key={tier.key} tier={tier.card}>
