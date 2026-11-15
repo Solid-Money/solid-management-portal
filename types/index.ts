@@ -2913,6 +2913,12 @@ export interface UserRewardsData {
   cashbackThisMonth: number;
   /** This month's cashback still in escrow, already held to the cap. */
   cashbackPendingThisMonth?: number;
+  /**
+   * The app's "Lifetime cashback": everything paid on every card the user has
+   * held, plus what is still in escrow. Absent on older backends, or when the
+   * paid total couldn't be read.
+   */
+  cashbackLifetime?: number;
   /** The monthly cap of the tier held now. */
   maxCashbackMonthly: number;
   /**

@@ -117,6 +117,13 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
                 value={`$${rewards.cashbackThisMonth.toFixed(2)}`}
                 hint={monthCashbackHint(rewards)}
               />
+              {typeof rewards.cashbackLifetime === "number" && (
+                <Stat
+                  label="Lifetime cashback"
+                  value={`$${rewards.cashbackLifetime.toFixed(2)}`}
+                  hint="Paid on every card, plus pending — as the app shows it"
+                />
+              )}
               <Stat
                 label="Referral points"
                 value={rewards.referralPoints.toLocaleString()}
