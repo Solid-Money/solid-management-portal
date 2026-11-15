@@ -535,6 +535,7 @@ function TaskBody({
   const boards = boardList?.boards ?? [];
   const boardName = task.board ? (boards.find((b) => b.key === task.board)?.name ?? task.board) : null;
   const [following, setFollowing] = useState<boolean | null>(null);
+  const [scrolled, setScrolled] = useState(false);
   const isFollowing = following ?? task.following;
   const closed = task.status === "done" || task.status === "cancelled";
 
@@ -560,10 +561,19 @@ function TaskBody({
   };
 
   // One scroll for the whole task: the fields go up with the description and
-  // updates instead of staying pinned and leaving a small window below.
+  // updates instead of staying pinned and leaving a small window below. Only
+  // the title (and who opened it, and its actions) stays at the top.
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="border-b border-gray-200 px-6 pb-4 pt-5">
+    <div
+      className="min-h-0 flex-1 overflow-y-auto"
+      onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
+    >
+      <div
+        className={cn(
+          "sticky top-0 z-10 border-b bg-white px-6 pb-2 pt-5",
+          scrolled ? "border-gray-200 shadow-[0_4px_12px_-8px_rgba(0,0,0,0.15)]" : "border-transparent",
+        )}
+      >
         <div className="mb-2 flex items-center gap-2 pr-8 text-xs text-gray-500">
           {task.visibility === "restricted" && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5">
@@ -618,9 +628,11 @@ function TaskBody({
         </div>
 
         <TitleEditor task={task} onSave={(title) => patch.mutate({ title })} />
+      </div>
+      <div className="border-b border-gray-200 px-6 pb-4">
         <SheetDescription className="sr-only">Task T-{task.number}</SheetDescription>
 
-        <div className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 sm:grid-cols-[5rem_minmax(0,1fr)_5rem_minmax(0,1fr)]">
+        <div className="mt-1 grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 sm:grid-cols-[5rem_minmax(0,1fr)_5rem_minmax(0,1fr)]">
           {piece ? (
             <Field icon={CircleDot} label="Status">
               <StagePicker value={piece.stage} onChange={(stage) => void patchPiece({ stage })}>

@@ -146,6 +146,48 @@ export interface TaskRow {
   closedAt: string | null;
   /** On the Marketing board: the piece's channel, stage, brief…; else null. */
   marketing: TaskMarketing | null;
+  /** The newest update written on it, on one line; null when none. Only on list, sprint and search rows. */
+  lastUpdate?: TaskLastUpdate | null;
+}
+
+export interface TaskLastUpdate {
+  author: TaskAuthor;
+  /** Its words on one line, at most 160 characters. */
+  text: string;
+  at: string;
+}
+
+/** Where a search found its words. */
+export type TaskSearchField =
+  | "number"
+  | "title"
+  | "description"
+  | "update"
+  | "checklist"
+  | "label"
+  | "brief"
+  | "person"
+  | "link";
+
+export interface TaskSearchMatch {
+  field: TaskSearchField;
+  /** The words around the match; null for the title or a number. */
+  text: string | null;
+  /** An update's author and time. */
+  author: TaskAuthor | null;
+  at: string | null;
+}
+
+export interface TaskSearchResult {
+  task: TaskRow;
+  match: TaskSearchMatch;
+}
+
+/** Every board, open and closed, best first. */
+export interface TaskSearchPage {
+  q: string;
+  results: TaskSearchResult[];
+  hasMore: boolean;
 }
 
 // ---- Marketing --------------------------------------------------------------

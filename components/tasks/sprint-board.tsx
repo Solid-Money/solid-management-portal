@@ -1,13 +1,12 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState, useSyncExternalStore, type DragEvent } from "react";
+import { useMemo, useState, useSyncExternalStore, type DragEvent } from "react";
 import { toast } from "sonner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Inbox, Loader2, Plus, Search } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Inbox, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { TASK_KEYS, useTaskBoards, useTaskPeople, useTaskSprint } from "@/hooks/use-tasks";
-import { getTasks, patchTask } from "@/lib/tasks-api";
+import { patchTask } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import {
   Avatar,
@@ -15,6 +14,7 @@ import {
   PRIORITY_META,
   PriorityLabel,
   STATUS_META,
+  LastUpdateLine,
   StatusPill,
   personName,
 } from "@/components/tasks/task-format";
@@ -219,20 +219,7 @@ export default function SprintBoard({
     (!row.board ||
       (!BUILT_IN_BOARDS.has(row.board) && !boardList?.boards.find((board) => board.key === row.board)?.system));
   const [over, setOver] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const key = TASK_KEYS.sprint(start);
-  // The board brings the most urgent 200; past that, a search asks the API
-  // for the rest of the open product tasks. The open list has no pages: it
-  // returns up to 1,000 matches and says when there are more, which the
-  // backlog then says too.
-  const term = useDeferredValue(search.trim());
-  const searchAll = !!data?.backlogHasMore && data.sprint.when !== "past" && term.length >= 2;
-  const { data: found, isFetching: searching } = useQuery({
-    queryKey: ["tasks", "backlog-search", term],
-    queryFn: () => getTasks({ view: "open", area: "product", q: term }),
-    enabled: searchAll,
-    staleTime: 30_000,
-  });
 
   // One move per task at a time, shared by every board on the page (and
   // across remounts): the card dims and Add waits until the move lands.
@@ -308,14 +295,7 @@ export default function SprintBoard({
   const past = sprint.when === "past";
   const done = rows.filter((row) => row.status === "done").length;
   const counted = rows.filter((row) => row.status !== "cancelled").length;
-  const query = search.trim().toLowerCase();
-  const shown = query
-    ? data.backlog.filter((row) => `t-${row.number} ${row.title}`.toLowerCase().includes(query))
-    : data.backlog;
-  const shownIds = new Set(shown.map((row) => row.id));
-  const backlog = searchAll
-    ? [...shown, ...(found?.rows ?? []).filter((row) => row.sprint === null && !shownIds.has(row.id))]
-    : shown;
+  const backlog = data.backlog;
 
   const moveOnce = (id: string, input: TaskPatchInput) => {
     if (moving.has(id)) return;
@@ -480,26 +460,13 @@ export default function SprintBoard({
               <p className="text-xs text-gray-500">
                 Open product tasks in no sprint, most urgent first. Drag one onto the board, or press Add; drag a card
                 back here to take it out of the sprint.
-                {data.backlogHasMore && " Showing the most urgent; search finds the rest."}
+                {data.backlogHasMore && " Showing the most urgent; the search at the top finds the rest."}
               </p>
-            </div>
-            <div className="relative ml-auto w-full sm:w-56">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-gray-400" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Find in the backlog"
-                className="h-8 pl-8 text-sm"
-              />
             </div>
           </header>
           {backlog.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-gray-500">
-              {query
-                ? searchAll && searching
-                  ? "Searching the whole backlog…"
-                  : "Nothing in the backlog matches."
-                : "The backlog is empty: every open product task is in a sprint."}
+              The backlog is empty: every open product task is in a sprint.
             </p>
           ) : (
             <ul className="divide-y divide-gray-100">
@@ -515,7 +482,7 @@ export default function SprintBoard({
                       event.dataTransfer.effectAllowed = "move";
                     }}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-2 hover:bg-gray-50",
+                      "flex items-center gap-3 px-4 py-2 hover:bg-gray-50",
                       selected === row.id && "bg-indigo-50/60",
                     )}
                   >
@@ -531,6 +498,21 @@ export default function SprintBoard({
                         </span>
                       )}
                     </button>
+                    {/* What happened last, so the backlog can be planned without opening each task. */}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => onOpen(row.id)}
+                      className="hidden min-w-0 flex-1 cursor-pointer text-left lg:flex"
+                    >
+                      <LastUpdateLine update={row.lastUpdate} people={people} className="w-full" />
+                    </button>
+                    <span className="hidden w-16 shrink-0 md:block">
+                      {row.status !== "todo" && <StatusPill status={row.status} className="h-5 px-2 text-[11px]" />}
+                    </span>
+                    <span className="hidden w-24 shrink-0 md:block">
+                      {row.dueDate && <DueLabel date={row.dueDate} />}
+                    </span>
                     <span className="hidden w-20 shrink-0 sm:block">
                       <PriorityLabel priority={row.priority} />
                     </span>
@@ -550,11 +532,6 @@ export default function SprintBoard({
                 );
               })}
             </ul>
-          )}
-          {searchAll && found?.hasMore && (
-            <p className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
-              Over 1,000 open tasks match, so not all are listed: type more of the title, or its T-number.
-            </p>
           )}
         </section>
       )}
