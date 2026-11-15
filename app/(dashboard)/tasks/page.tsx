@@ -11,6 +11,7 @@ import MarketingBoard, { type MarketingView } from "@/components/tasks/marketing
 import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
 import TaskList from "@/components/tasks/task-list";
+import TaskSearch from "@/components/tasks/task-search";
 import BoardTabs, { Pill } from "@/components/tasks/board-tabs";
 import PartnerWaits from "@/components/tasks/partner-waits";
 import SprintBoard from "@/components/tasks/sprint-board";
@@ -215,9 +216,12 @@ function TasksScreen() {
             The sprint, product work, support work, and what marketing is putting out.
           </p>
         </div>
-        <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={newTask}>
-          <Plus /> {tab === "marketing" ? "New piece" : "New task"}
-        </Button>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <TaskSearch className="min-w-0 flex-1 sm:w-96 sm:flex-none" onOpen={(id) => update({ task: id })} />
+          <Button className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700" onClick={newTask}>
+            <Plus /> {tab === "marketing" ? "New piece" : "New task"}
+          </Button>
+        </div>
       </div>
 
       <div className="inline-flex max-w-full flex-wrap rounded-lg bg-gray-200/70 p-1">

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatAgo,
+  searchWords,
+  splitMatches,
   daysLate,
   formatDue,
   formatWhen,
@@ -121,5 +124,36 @@ describe("sprints", () => {
     expect(shiftSprint("2026-11-09", 1)).toBe("2026-11-16");
     expect(sprintLabel("2026-11-09")).toBe("Nov 9–15");
     expect(sprintLabel("2026-11-30")).toBe("Nov 30–Dec 6");
+  });
+});
+
+describe("search", () => {
+  it("reads words and quoted phrases as the API does", () => {
+    expect(searchWords('  Swap "base  bug" swap ')).toEqual(["swap", "base bug"]);
+    expect(searchWords("")).toEqual([]);
+  });
+
+  it("marks the words found, longest first, any case", () => {
+    expect(splitMatches("Swap fails: swapping on Base", ["swap", "swapping"])).toEqual([
+      { text: "Swap", match: true },
+      { text: " fails: ", match: false },
+      { text: "swapping", match: true },
+      { text: " on Base", match: false },
+    ]);
+    expect(splitMatches("a (b)", ["(b)"])).toEqual([
+      { text: "a ", match: false },
+      { text: "(b)", match: true },
+    ]);
+  });
+
+  it("says how long ago, short", () => {
+    const now = new Date(2026, 10, 15, 12, 0);
+    expect(formatAgo(new Date(2026, 10, 15, 11, 59, 40).toISOString(), now)).toBe("now");
+    expect(formatAgo(new Date(2026, 10, 15, 11, 15).toISOString(), now)).toBe("45m");
+    expect(formatAgo(new Date(2026, 10, 15, 2, 0).toISOString(), now)).toBe("10h");
+    expect(formatAgo(new Date(2026, 10, 12, 12, 0).toISOString(), now)).toBe("3d");
+    expect(formatAgo(new Date(2026, 10, 1, 12, 0).toISOString(), now)).toBe("2w");
+    expect(formatAgo(new Date(2026, 8, 7, 12, 0).toISOString(), now)).toBe("Sep 7");
+    expect(formatAgo(new Date(2025, 8, 7, 12, 0).toISOString(), now)).toBe("Sep 7 2025");
   });
 });

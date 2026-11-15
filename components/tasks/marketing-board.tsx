@@ -489,8 +489,8 @@ export default function MarketingBoard({
                 if (!event.target.value) onFilters({ q: null });
               }}
               onBlur={() => (search.trim() || null) !== filters.q && onFilters({ q: search.trim() || null })}
-              placeholder="Search pieces"
-              aria-label="Search pieces"
+              placeholder="Filter pieces"
+              aria-label="Filter pieces"
               className="h-8 pl-8 text-sm"
             />
           </form>

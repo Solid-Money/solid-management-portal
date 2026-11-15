@@ -18,6 +18,7 @@ import {
   getMarketing,
   getTaskSprint,
   getTasks,
+  searchTasks,
   markTaskNotificationsRead,
   patchTask,
 } from "@/lib/tasks-api";
@@ -33,6 +34,7 @@ export const TASK_KEYS = {
   partners: ["tasks", "partners"] as const,
   list: (filters: TaskListFilters) => ["tasks", "list", filters] as const,
   sprint: (start: string | null) => ["tasks", "sprint", start ?? "current"] as const,
+  search: (q: string) => ["tasks", "search", q] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
   marketing: (range: { from: string; to: string } | null) =>
@@ -93,6 +95,18 @@ export function useTaskSprint(start: string | null, enabled = true) {
     enabled,
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
+  });
+}
+
+/** The central search (two characters or more, or a number), the last results kept while the next load. */
+export function useTaskSearch(q: string) {
+  const term = q.trim();
+  return useQuery({
+    queryKey: TASK_KEYS.search(term),
+    queryFn: () => searchTasks(term),
+    enabled: term.length >= 2 || /^\d+$/.test(term),
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
   });
 }
 
