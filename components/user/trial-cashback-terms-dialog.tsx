@@ -331,24 +331,30 @@ export default function TrialCashbackTermsDialog({
                     </div>
                   )}
 
-                  {(plan.alreadyCorrect > 0 || plan.skipped.length > 0) &&
-                    rows.length > 0 && (
-                      <p className="text-xs text-gray-500">
-                        {plan.alreadyCorrect > 0 &&
-                          `${plan.alreadyCorrect} other trial purchase${
-                            plan.alreadyCorrect === 1 ? "" : "s"
-                          } already carry the trial's terms. `}
-                        {plan.skipped.length > 0 &&
-                          `Left alone: ${plan.skipped
-                            .map(
-                              (row) =>
-                                `${row.merchantName ?? "purchase"} (${
-                                  SKIP_REASONS[row.reason] ?? row.reason
-                                })`,
-                            )
-                            .join(", ")}.`}
-                      </p>
-                    )}
+                  {/* Skipped purchases are listed even when nothing is left
+                      to correct — an all-euro plan is exactly the case whose
+                      "correct by hand" note must not be hidden. The
+                      already-correct count is only repeated here when the
+                      "Nothing to correct" line above has not said it. */}
+                  {((plan.alreadyCorrect > 0 && rows.length > 0) ||
+                    plan.skipped.length > 0) && (
+                    <p className="text-xs text-gray-500">
+                      {plan.alreadyCorrect > 0 &&
+                        rows.length > 0 &&
+                        `${plan.alreadyCorrect} other trial purchase${
+                          plan.alreadyCorrect === 1 ? "" : "s"
+                        } already carry the trial's terms. `}
+                      {plan.skipped.length > 0 &&
+                        `Left alone: ${plan.skipped
+                          .map(
+                            (row) =>
+                              `${row.merchantName ?? "purchase"} (${
+                                SKIP_REASONS[row.reason] ?? row.reason
+                              })`,
+                          )
+                          .join(", ")}.`}
+                    </p>
+                  )}
 
                   {rows.length > 0 && (
                     <>
