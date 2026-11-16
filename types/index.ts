@@ -954,7 +954,10 @@ export interface RefundQueueResponse {
     oldestAt?: string;
   };
   failed: { count: number; usd: number };
+  /** More rows than the list carries; the totals still cover every one. */
   truncated: boolean;
+  /** More payable refunds than could be read: `owed` is a floor. */
+  owedIncomplete?: boolean;
   generatedAt: string;
 }
 

@@ -950,11 +950,20 @@ function RefundQueuePanel({
       </div>
 
       {note && <p className="text-xs text-gray-500">{note}</p>}
-      {queue.truncated && (
+      {queue.owedIncomplete ? (
         <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          More refunds are waiting than this list shows — the oldest{" "}
-          {queue.items.length} are listed and the totals cover only those.
+          More refunds are queued than could be read — the totals above count
+          only the oldest of them, so the amount owed is at least this and the
+          full total is unknown.
         </p>
+      ) : (
+        queue.truncated && (
+          <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            More refunds are waiting than this list shows — the oldest{" "}
+            {queue.items.length} are listed. The totals above count every refund
+            the cron will pay.
+          </p>
+        )
       )}
 
       {queue.items.length === 0 ? (
