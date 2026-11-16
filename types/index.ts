@@ -1311,7 +1311,11 @@ export interface CashbackRowCurrencyFields {
   discountEur?: string;
   /** The tier's euro monthly cap frozen on the row at purchase. */
   monthlyCapEur?: number;
-  /** 8453 (Base) for a soEUR payout; absent = Fuse (122). */
+  /**
+   * The chain `payoutTxHash` is on: 8453 (Base) for a soEUR payout, and for a
+   * soUSD one the Base float covered; 122 (Fuse) for soUSD it did not.
+   * Absent = Fuse (122): soUSD paid before the chain was recorded.
+   */
   payoutChainId?: number;
   /**
    * Set only when a euro cardholder's purchase was billed in another

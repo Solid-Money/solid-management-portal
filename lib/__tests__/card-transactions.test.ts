@@ -102,6 +102,24 @@ describe("cashbackPayoutLink", () => {
     });
   });
 
+  it("links a soUSD payout the Base float covered to Basescan", () => {
+    expect(
+      cashbackPayoutLink({ payoutTxHash: "0xbase", payoutChainId: 8453 })
+    ).toEqual({
+      href: "https://basescan.org/tx/0xbase",
+      title: "View payout on Basescan",
+    });
+  });
+
+  it("links a soUSD payout made on Fuse, the fallback, to the Fuse explorer", () => {
+    expect(
+      cashbackPayoutLink({ payoutTxHash: "0xfuse", payoutChainId: 122 })
+    ).toEqual({
+      href: "https://explorer.fuse.io/tx/0xfuse",
+      title: "View payout on Fuse explorer",
+    });
+  });
+
   it("links any other payout to the Fuse explorer", () => {
     expect(cashbackPayoutLink({ payoutTxHash: "0xdef" })).toEqual({
       href: "https://explorer.fuse.io/tx/0xdef",

@@ -183,9 +183,11 @@ export function formatCashbackAmount(
 const DEDUCTED_FROM_DEBT = "DEDUCTED_FROM_DEBT";
 
 /**
- * Where a cashback payout can be looked up: Basescan for a soEUR payout
- * (`payoutChainId` 8453), the Fuse explorer otherwise. Null when there is no
- * transaction to show — not paid yet, or deducted from a debt.
+ * Where a cashback payout can be looked up: Basescan for a payout on Base
+ * (`payoutChainId` 8453) — every soEUR payout, and soUSD the Base float
+ * covered — the Fuse explorer otherwise, including soUSD paid before the chain
+ * was recorded. Null when there is no transaction to show — not paid yet, or
+ * deducted from a debt.
  */
 export function cashbackPayoutLink(
   cashback?: Pick<CardTransactionCashback, "payoutTxHash" | "payoutChainId">

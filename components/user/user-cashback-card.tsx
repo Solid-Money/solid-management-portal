@@ -34,8 +34,9 @@ function capOf(entry: CashbackEntry): string | undefined {
 }
 
 /**
- * The payout transaction on its chain's explorer — Basescan for soEUR, the
- * Fuse explorer for soUSD — or nothing when there is no transaction.
+ * The payout transaction on its chain's explorer — Basescan for soEUR and for
+ * soUSD paid from Base, the Fuse explorer for soUSD paid from Fuse — or
+ * nothing when there is no transaction.
  */
 function PayoutTxLink({ entry }: { entry: CashbackEntry }) {
   const link = cashbackPayoutLink(entry);

@@ -1153,7 +1153,7 @@ export default function RewardsConfigPage() {
         <ConfigSection
           id="card-cashback"
           title="Cashback on Card Transactions"
-          description="Users earn cashback on card purchases based on their tier, in their card's currency: USD cardholders are paid in soUSD on Fuse and held to the USD monthly caps; euro cardholders (Wirex main currency EUR) earn on the euro amount, are held to the euro monthly caps and are paid in soEUR on Base. The two are never converted or added together."
+          description="Users earn cashback on card purchases based on their tier, in their card's currency: USD cardholders are paid in soUSD (from Base first, Fuse as the fallback) and held to the USD monthly caps; euro cardholders (Wirex main currency EUR) earn on the euro amount, are held to the euro monthly caps and are paid in soEUR on Base. The two are never converted or added together."
           icon={<Percent className="h-5 w-5 text-green-600" />}
         >
           <div className="flex items-center justify-between mb-4">

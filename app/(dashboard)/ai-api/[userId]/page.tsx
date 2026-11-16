@@ -28,6 +28,7 @@ import {
 } from "@/lib/ai-api";
 import { formatCashbackRate } from "@/lib/cashback-percentage";
 import { formatDateTime, formatUsd } from "@/lib/utils";
+import { cashbackPayoutLink } from "@/lib/card-transactions";
 import type {
   AiApiAccountAction,
   AiApiAdminCharge,
@@ -37,8 +38,8 @@ import type {
 
 /** Billing runs on Base: the module, the Safe it charges, and each charge. */
 const BILLING_EXPLORER = "https://basescan.org";
-/** Cashback is paid in soUSD on Fuse, the payout card cashback already uses. */
-const CASHBACK_EXPLORER = "https://explorer.fuse.io";
+// Cashback is paid in soUSD by the payout card cashback uses — from Base first,
+// Fuse as the fallback — so its link follows the charge's `cashbackChainId`.
 
 type PendingAction =
   | { kind: "key"; key: AiApiAdminKey; action: AiApiKeyAction }
@@ -639,16 +640,23 @@ export default function AiApiUserPage({
                         Charge <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : null}
-                    {charge.cashbackTxHash ? (
-                      <a
-                        href={`${CASHBACK_EXPLORER}/tx/${charge.cashbackTxHash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 flex items-center gap-1 text-indigo-600 hover:underline"
-                      >
-                        Cashback <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : null}
+                    {(() => {
+                      const payout = cashbackPayoutLink({
+                        payoutTxHash: charge.cashbackTxHash ?? undefined,
+                        payoutChainId: charge.cashbackChainId ?? undefined,
+                      });
+                      return payout ? (
+                        <a
+                          href={payout.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={payout.title}
+                          className="mt-1 flex items-center gap-1 text-indigo-600 hover:underline"
+                        >
+                          Cashback <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : null;
+                    })()}
                     {charge.chargedAt ? (
                       <div className="mt-1 text-gray-500">{formatDateTime(charge.chargedAt)}</div>
                     ) : null}
