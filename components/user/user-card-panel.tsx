@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Ban, CreditCard, Loader2, Snowflake } from "lucide-react";
 
 import { getCardAuditHistory } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 import {
   CardAuditAction,
   CardAuditEntry,
@@ -66,22 +67,10 @@ const usd = (value: number | null | undefined) =>
  * The spendable figure the app shows the cardholder, e.g. "€12.73", or null
  * when it is missing or unreadable.
  */
-const cardCurrency = (value?: CardCurrencyAmount) => {
-  // `Number("")` is 0: an empty amount must read as missing, not as nothing
-  // to spend.
-  if (typeof value?.amount !== "string" || !value.amount.trim()) return null;
-  const amount = Number(value.amount);
-  if (!Number.isFinite(amount)) return null;
-  try {
-    return amount.toLocaleString("en-US", {
-      style: "currency",
-      currency: value.currency,
-    });
-  } catch {
-    // Not a currency code Intl knows; still worth showing.
-    return `${value.amount} ${value.currency}`;
-  }
-};
+const cardCurrency = (value?: CardCurrencyAmount) =>
+  typeof value?.amount === "string"
+    ? formatCurrency(value.amount, value.currency)
+    : null;
 
 /** A spend cap. `null` means the Safe set no cap of its own, which is not $0. */
 const cap = (value: number | null | undefined) =>

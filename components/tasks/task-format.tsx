@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   daysLate,
   firstName,
+  formatAgo,
   formatDue,
   formatShortDate,
   mentionNames,
@@ -18,13 +19,14 @@ import {
 import type {
   TaskAuthor,
   TaskBot,
+  TaskLastUpdate,
   TaskPerson,
   TaskPriority,
   TaskRow,
   TaskStatus,
 } from "@/types/tasks";
 
-export { daysLate, firstName, formatDue, formatWhen, personName } from "@/lib/task-format";
+export { daysLate, firstName, formatAgo, formatDue, formatWhen, personName } from "@/lib/task-format";
 
 export const STATUS_META: Record<
   TaskStatus,
@@ -250,6 +252,39 @@ function SourceDetail({ detail, children }: { detail: string | null; children: R
         {detail}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+/**
+ * The newest update on a task, on one line: who, what they wrote, and how
+ * long ago. The whole update is in the hover.
+ */
+export function LastUpdateLine({
+  update,
+  people,
+  className,
+}: {
+  update: TaskLastUpdate | null | undefined;
+  people?: TaskPerson[];
+  className?: string;
+}) {
+  if (!update) return <span className={cn("truncate text-xs text-gray-400", className)}>No updates yet</span>;
+  const name = update.author.bot
+    ? BOT_NAMES[update.author.bot]
+    : update.author.email
+      ? firstName(update.author.email, people)
+      : (update.author.name?.split(" ")[0] ?? "Someone");
+  return (
+    <span
+      title={`${authorName(update.author, people)}: ${update.text}`}
+      className={cn("flex min-w-0 items-center gap-1.5 text-xs text-gray-500", className)}
+    >
+      <AuthorAvatar author={update.author} people={people} size={16} />
+      <span className="min-w-0 truncate">
+        <span className="font-medium text-gray-700">{name}</span> {update.text}
+      </span>
+      <span className="shrink-0 text-gray-400">· {formatAgo(update.at)}</span>
+    </span>
   );
 }
 

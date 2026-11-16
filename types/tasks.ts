@@ -146,6 +146,86 @@ export interface TaskRow {
   closedAt: string | null;
   /** On the Marketing board: the piece's channel, stage, brief…; else null. */
   marketing: TaskMarketing | null;
+  /** The newest update written on it, on one line; null when none. Only on list, sprint and search rows. */
+  lastUpdate?: TaskLastUpdate | null;
+}
+
+export interface TaskLastUpdate {
+  author: TaskAuthor;
+  /** Its words on one line, at most 160 characters. */
+  text: string;
+  at: string;
+}
+
+/** The Team tab: `sprint` = all work in progress, stuck, waiting or in review, plus this sprint's To do; `open` = every open task. */
+export type TaskTeamScope = "sprint" | "open";
+
+export interface TaskTeamCard {
+  task: TaskRow;
+  /** On this person's row as a helper, not the owner. */
+  helping: boolean;
+  /** Days without an update from a person while in progress, stuck, waiting or in review (3+); else null. */
+  quietDays: number | null;
+}
+
+export interface TaskTeamColumns {
+  working: TaskTeamCard[];
+  blocked: TaskTeamCard[];
+  review: TaskTeamCard[];
+  next: TaskTeamCard[];
+  done: TaskTeamCard[];
+}
+
+export interface TaskTeamPerson {
+  /** null: tasks nobody owns. */
+  email: string | null;
+  lastActiveAt: string | null;
+  updatesThisWeek: number;
+  /** Open tasks they own, whatever the scope. */
+  open: number;
+  columns: TaskTeamColumns;
+}
+
+export interface TaskTeamPage {
+  scope: TaskTeamScope;
+  area: TaskArea | null;
+  sprint: TaskSprint;
+  people: TaskTeamPerson[];
+  summary: { people: number; working: number; blocked: number; review: number; quiet: number; doneThisWeek: number };
+  truncated: boolean;
+}
+
+/** Where a search found its words. */
+export type TaskSearchField =
+  | "number"
+  | "title"
+  | "description"
+  | "update"
+  | "checklist"
+  | "label"
+  | "brief"
+  | "person"
+  | "link";
+
+export interface TaskSearchMatch {
+  field: TaskSearchField;
+  /** The words around the match; null for the title or a number. */
+  text: string | null;
+  /** An update's author and time. */
+  author: TaskAuthor | null;
+  at: string | null;
+}
+
+export interface TaskSearchResult {
+  task: TaskRow;
+  match: TaskSearchMatch;
+}
+
+/** Every board, open and closed, best first. */
+export interface TaskSearchPage {
+  q: string;
+  results: TaskSearchResult[];
+  hasMore: boolean;
 }
 
 // ---- Marketing --------------------------------------------------------------

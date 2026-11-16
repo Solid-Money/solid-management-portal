@@ -236,6 +236,18 @@ export default function RewardsConfigPage() {
   const saveCashbackConfig = async () => {
     if (!config) return;
 
+    // A cleared euro cap would go out as 0 and stop every euro cardholder on
+    // that tier earning card cashback, so it is refused instead.
+    const euroCaps = [
+      config.cashback.tier1.monthlyCapEur,
+      config.cashback.tier2.monthlyCapEur,
+      config.cashback.tier3.monthlyCapEur,
+    ];
+    if (euroCaps.some((cap) => (cap as unknown) === "" || Number(cap) < 0)) {
+      toast.error("Every euro monthly cap needs a value of €0 or more");
+      return;
+    }
+
     await saveSection(
       "Cashback",
       "cashback",
@@ -248,6 +260,9 @@ export default function RewardsConfigPage() {
         tier2MonthlyCap: Number(config.cashback.tier2.monthlyCap),
         tier3Percentage: Number(config.cashback.tier3.percentage),
         tier3MonthlyCap: Number(config.cashback.tier3.monthlyCap),
+        tier1MonthlyCapEur: Number(config.cashback.tier1.monthlyCapEur),
+        tier2MonthlyCapEur: Number(config.cashback.tier2.monthlyCapEur),
+        tier3MonthlyCapEur: Number(config.cashback.tier3.monthlyCapEur),
       },
       "cashback",
     );
@@ -261,13 +276,17 @@ export default function RewardsConfigPage() {
       config.subscriptionDiscount.tier1.monthlyCap,
       config.subscriptionDiscount.tier2.monthlyCap,
       config.subscriptionDiscount.tier3.monthlyCap,
+      config.subscriptionDiscount.eligibleAmountCapEur,
+      config.subscriptionDiscount.tier1.monthlyCapEur,
+      config.subscriptionDiscount.tier2.monthlyCapEur,
+      config.subscriptionDiscount.tier3.monthlyCapEur,
     ];
 
     // A cleared box would go out as 0 and quietly switch a tier's subscription
     // cashback — or the grandfathered rate — off, so it is refused instead. A
     // negative cap is refused for the same reason.
     if (caps.some((cap) => (cap as unknown) === "" || Number(cap) < 0)) {
-      toast.error("Every subscription cap needs a value of $0 or more");
+      toast.error("Every subscription cap needs a value of 0 or more");
       return;
     }
 
@@ -295,6 +314,18 @@ export default function RewardsConfigPage() {
           config.subscriptionDiscount.tier3.categoryLimit,
         ),
         tier3MonthlyCap: Number(config.subscriptionDiscount.tier3.monthlyCap),
+        eligibleAmountCapEur: Number(
+          config.subscriptionDiscount.eligibleAmountCapEur,
+        ),
+        tier1MonthlyCapEur: Number(
+          config.subscriptionDiscount.tier1.monthlyCapEur,
+        ),
+        tier2MonthlyCapEur: Number(
+          config.subscriptionDiscount.tier2.monthlyCapEur,
+        ),
+        tier3MonthlyCapEur: Number(
+          config.subscriptionDiscount.tier3.monthlyCapEur,
+        ),
       },
       "subscriptionDiscount",
     );
@@ -1122,7 +1153,7 @@ export default function RewardsConfigPage() {
         <ConfigSection
           id="card-cashback"
           title="Cashback on Card Transactions"
-          description="Users earn cashback in soUSD on card purchases based on their tier, paid from Base first and Fuse as the fallback"
+          description="Users earn cashback on card purchases based on their tier, in their card's currency: USD cardholders are paid in soUSD (from Base first, Fuse as the fallback) and held to the USD monthly caps; euro cardholders (Wirex main currency EUR) earn on the euro amount, are held to the euro monthly caps and are paid in soEUR on Base. The two are never converted or added together."
           icon={<Percent className="h-5 w-5 text-green-600" />}
         >
           <div className="flex items-center justify-between mb-4">
@@ -1158,7 +1189,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="0.1"
-                tooltip="Percentage of card transaction returned as FUSE tokens"
+                tooltip="Percentage of card transaction returned as cashback — soUSD for USD cardholders, soEUR for euro cardholders"
               />
               <InputField
                 label="Monthly Cap"
@@ -1168,7 +1199,17 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="$"
-                tooltip="Maximum cashback amount user can earn per month"
+                tooltip="Maximum cashback a USD cardholder can earn per month, in USD"
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.cashback.tier1.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate("cashback", "tier1.monthlyCapEur", v)
+                }
+                type="number"
+                suffix="€"
+                tooltip="Maximum cashback a euro cardholder can earn per month, in EUR. Set on its own — never converted from the USD cap."
               />
             </TierCard>
             <TierCard tier="Tier 2">
@@ -1185,7 +1226,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="0.1"
-                tooltip="Percentage of card transaction returned as FUSE tokens"
+                tooltip="Percentage of card transaction returned as cashback — soUSD for USD cardholders, soEUR for euro cardholders"
               />
               <InputField
                 label="Monthly Cap"
@@ -1195,7 +1236,17 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="$"
-                tooltip="Maximum cashback amount user can earn per month"
+                tooltip="Maximum cashback a USD cardholder can earn per month, in USD"
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.cashback.tier2.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate("cashback", "tier2.monthlyCapEur", v)
+                }
+                type="number"
+                suffix="€"
+                tooltip="Maximum cashback a euro cardholder can earn per month, in EUR. Set on its own — never converted from the USD cap."
               />
             </TierCard>
             <TierCard tier="Tier 3">
@@ -1212,7 +1263,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="0.1"
-                tooltip="Percentage of card transaction returned as FUSE tokens"
+                tooltip="Percentage of card transaction returned as cashback — soUSD for USD cardholders, soEUR for euro cardholders"
               />
               <InputField
                 label="Monthly Cap"
@@ -1222,7 +1273,17 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="$"
-                tooltip="Maximum cashback amount user can earn per month"
+                tooltip="Maximum cashback a USD cardholder can earn per month, in USD"
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.cashback.tier3.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate("cashback", "tier3.monthlyCapEur", v)
+                }
+                type="number"
+                suffix="€"
+                tooltip="Maximum cashback a euro cardholder can earn per month, in EUR. Set on its own — never converted from the USD cap."
               />
             </TierCard>
           </TierGrid>
@@ -1437,7 +1498,7 @@ export default function RewardsConfigPage() {
         <ConfigSection
           id="subscription-discounts"
           title="Category-based Subscription Discounts"
-          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins). Each tier has its own monthly cap on subscription cashback across all categories together (Core $50, Prime $100, Ultra $200) — there is no per-service cap, except on grandfathered subscriptions still paid at the old flat rate. Paid as soUSD and also drawn from the card cashback monthly cap."
+          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins). Each tier has its own monthly cap on subscription cashback across all categories together (Core $50, Prime $100, Ultra $200; for euro cardholders €50, €100, €200) — there is no per-service cap, except on grandfathered subscriptions still paid at the old flat rate. Paid as soUSD on Fuse — soEUR on Base for euro cardholders, against the euro caps — and also drawn from the card cashback monthly cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
         >
           <ToggleField
@@ -1446,7 +1507,7 @@ export default function RewardsConfigPage() {
             onChange={(v) => updateConfig("subscriptionDiscount", "enabled", v)}
             tooltip="Enable or disable subscription discounts for all users"
           />
-          <div className="mt-4 max-w-xs">
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <InputField
               label="Grandfathered Cap / Payment"
               value={config.subscriptionDiscount.eligibleAmountCap}
@@ -1460,6 +1521,20 @@ export default function RewardsConfigPage() {
               type="number"
               suffix="$"
               tooltip="Applies ONLY to grandfathered subscriptions — ones a member was already being paid on before the category rates took effect, which keep the old flat rate (Prime 25%, Ultra 50%). Most cashback one such payment can earn at that rate (e.g. $50). If the category rate pays more on the charge, the member gets that instead. Category-rate charges are not capped per payment, only by each tier's Monthly Cap below. Rewards Terms §6 promises $50 per payment — changing it changes what the published terms owe."
+            />
+            <InputField
+              label="Grandfathered Cap / Payment (EUR)"
+              value={config.subscriptionDiscount.eligibleAmountCapEur}
+              onChange={(v) =>
+                handleNumericUpdate(
+                  "subscriptionDiscount",
+                  "eligibleAmountCapEur",
+                  v,
+                )
+              }
+              type="number"
+              suffix="€"
+              tooltip="The same per-payment cap for euro cardholders, in EUR (e.g. €50). Set on its own — never converted from the USD cap."
             />
           </div>
           <div className="mt-4 space-y-3">
@@ -1590,6 +1665,20 @@ export default function RewardsConfigPage() {
                 suffix="$"
                 tooltip="Most subscription cashback Core can earn in a calendar month, across all its categories together — not per service (default $50). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
               />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.subscriptionDiscount.tier1.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier1.monthlyCapEur",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="€"
+                tooltip="The same monthly cap for euro cardholders on Core, in EUR (default €50). Set on its own — never converted from the USD cap."
+              />
             </TierCard>
             <TierCard tier="Tier 2">
               <InputField
@@ -1639,6 +1728,20 @@ export default function RewardsConfigPage() {
                 suffix="$"
                 tooltip="Most subscription cashback Prime can earn in a calendar month, across all its categories together — not per service (default $100). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
               />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.subscriptionDiscount.tier2.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier2.monthlyCapEur",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="€"
+                tooltip="The same monthly cap for euro cardholders on Prime, in EUR (default €100). Set on its own — never converted from the USD cap."
+              />
             </TierCard>
             <TierCard tier="Tier 3">
               <InputField
@@ -1687,6 +1790,20 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="$"
                 tooltip="Most subscription cashback Ultra can earn in a calendar month, across all its categories together — not per service (default $200). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.subscriptionDiscount.tier3.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier3.monthlyCapEur",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="€"
+                tooltip="The same monthly cap for euro cardholders on Ultra, in EUR (default €200). Set on its own — never converted from the USD cap."
               />
             </TierCard>
           </TierGrid>

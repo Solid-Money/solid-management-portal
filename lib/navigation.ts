@@ -1,5 +1,6 @@
 import {
   Activity,
+  BadgePercent,
   AlertTriangle,
   BarChart2,
   BellRing,
@@ -247,6 +248,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "The fee on bridged deposits, per route and source chain",
         icon: ArrowRightLeft,
+      },
+      {
+        href: "/fee-promotions",
+        label: "Fee Promotions",
+        description:
+          "Time-boxed free fees, e.g. each user's first SEPA deposits to the euro account",
+        icon: BadgePercent,
       },
       {
         href: "/costs-config",

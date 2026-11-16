@@ -144,6 +144,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       variant: "warning",
     },
     activity_resynced: { label: "Activity re-synced", variant: "info" },
+    hidden_activity_restored: {
+      label: "Hidden activity restored",
+      variant: "info",
+    },
   };
 
 /** How the audit trail names a referral v4 reward step. */
@@ -245,6 +249,12 @@ function detailFor(entry: AdminAuditEntry): string | null {
 
   if (entry.action === "referral_reward_reevaluated") {
     return referralReevaluationDetail(entry);
+  }
+
+  if (entry.action === "hidden_activity_restored") {
+    const restored = entry.metadata?.restored;
+    if (typeof restored !== "number") return null;
+    return `${restored} row${restored === 1 ? "" : "s"} put back in Activity`;
   }
 
   if (entry.action === "activity_resynced") {

@@ -14,6 +14,12 @@ import {
 import { toast } from "sonner";
 
 import { bulkReevaluateFailedCashback, getStuckCashback } from "@/lib/api";
+import {
+  cashbackCurrencyOf,
+  formatCashbackMoney,
+  formatCashbackTotals,
+  sumByCashbackCurrency,
+} from "@/lib/card-transactions";
 import { formatDateTime, formatUsd } from "@/lib/utils";
 import {
   BulkReevaluateFailedCashbackResult,
@@ -54,17 +60,17 @@ const CAUSES: Record<
 > = {
   rpc_unavailable: {
     label: "Payout RPC refused",
-    hint: "The payout wallet's balance could not be read on Base or Fuse (RPC 403), so nothing was sent.",
+    hint: "The payout wallet's balance could not be read from a payout chain's RPC (403), so nothing was sent.",
     variant: "warning",
   },
   wallet_underfunded: {
     label: "Payout wallet empty",
-    hint: "Neither chain's payout float (Base first, then Fuse) could cover the soUSD or the gas.",
+    hint: "The payout wallet could not cover the soUSD (soEUR on Base for a euro row) or the gas. soUSD pays from Base with Fuse as the fallback; rows that failed before that checked Fuse only.",
     variant: "warning",
   },
   transfer_reverted: {
     label: "Transfer reverted",
-    hint: "The soUSD transfer reverted — almost always the payout wallet running dry.",
+    hint: "The soUSD (or, for a euro row, soEUR) transfer reverted — almost always the payout wallet running dry.",
     variant: "warning",
   },
   no_payout_address: {
@@ -262,6 +268,8 @@ export default function StuckCashbackBulk({ open }: { open: boolean }) {
   }
 
   const { summary, total, truncated, generatedAt } = query.data;
+  // The backend's summary counts USD rows only; euro rows are listed in euros.
+  const hasEuroRows = rows.some((row) => cashbackCurrencyOf(row) === "EUR");
   const minutes =
     Math.max(1, Math.ceil(selectedRows.length / RETRY_BATCH_SIZE)) *
     RETRY_INTERVAL_MINUTES;
@@ -288,6 +296,12 @@ export default function StuckCashbackBulk({ open }: { open: boolean }) {
                 summary.unpricedRows === 1 ? "" : "s"
               } priced at payout`}
           </p>
+          {hasEuroRows && (
+            <p className="text-xs text-gray-500">
+              These totals count USD rows only. Euro rows are shown in euros
+              and never added in.
+            </p>
+          )}
           {summary.noPayoutAddressRows > 0 && (
             <p className="text-xs text-gray-500">
               {summary.noPayoutAddressRows} row
@@ -369,7 +383,11 @@ export default function StuckCashbackBulk({ open }: { open: boolean }) {
                   </span>{" "}
                   · {selectedTotals.users} user
                   {selectedTotals.users === 1 ? "" : "s"} ·{" "}
-                  {formatUsd(selectedTotals.owedUsd)} owed
+                  {formatCashbackTotals(
+                    selectedTotals.owedUsd,
+                    selectedTotals.owedEur,
+                  )}{" "}
+                  owed
                   {selectedTotals.unpricedRows > 0 &&
                     ` + ${selectedTotals.unpricedRows} priced at payout`}
                   {hiddenSelectedCount > 0 &&
@@ -471,7 +489,10 @@ export default function StuckCashbackBulk({ open }: { open: boolean }) {
               Check the Cashback Payout wallet is funded first (Treasury →
               Wallets): these rows owe about{" "}
               <span className="font-semibold text-gray-900">
-                {formatUsd(selectedTotals.owedUsd)}
+                {formatCashbackTotals(
+                  selectedTotals.owedUsd,
+                  selectedTotals.owedEur,
+                )}
               </span>{" "}
               before monthly caps
               {selectedTotals.unpricedRows > 0 &&
@@ -578,7 +599,7 @@ function StuckRow({
             At payout
           </span>
         ) : (
-          formatUsd(row.owedUsd)
+          formatCashbackMoney(row.owedUsd, cashbackCurrencyOf(row))
         )}
       </TableCell>
       <TableCell className="text-right tabular-nums">
@@ -696,10 +717,14 @@ function BulkResult({
   );
 }
 
+/** Owed is summed per currency — a euro row's figure is never added to the dollars. */
 function totalsOf(rows: StuckCashbackRow[]) {
+  const owed = sumByCashbackCurrency(rows, (row) => row.owedUsd);
+
   return {
     users: unique(rows.map((row) => row.userId)).length,
-    owedUsd: rows.reduce((sum, row) => sum + (row.owedUsd ?? 0), 0),
+    owedUsd: owed.usd,
+    owedEur: owed.eur,
     unpricedRows: rows.filter((row) => row.owedUsd === null).length,
   };
 }

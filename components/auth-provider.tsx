@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
+import { useQueryClient } from '@tanstack/react-query';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import {
@@ -82,6 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const routerRef = useRef(router);
+  // Every query is the signed-in admin's view (edit rights, their emails, …),
+  // so none may outlive the session: the next admin to sign in on this tab
+  // would see the last one's answers until each refetched.
+  const queryClient = useQueryClient();
+  const queryClientRef = useRef(queryClient);
 
   // Keep router ref up to date
   useEffect(() => {
@@ -183,6 +189,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         console.log('[AuthProvider] No user signed in');
         setUser(null);
+        // Signed out here, in another tab, or refused for the domain above
+        // (whose signOut lands here too): drop the previous admin's data.
+        queryClientRef.current.clear();
         // Redirect to login if trying to access protected routes
         const currentPath = window.location.pathname;
         console.log('[AuthProvider] Current path:', currentPath);

@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Headphones, ListTodo, Loader2, Megaphone, Plus, Timer } from "lucide-react";
+import { Headphones, ListTodo, Loader2, Megaphone, Plus, Timer, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTaskBoards, useTaskCounts, useTaskSprint } from "@/hooks/use-tasks";
 import NewTaskDialog from "@/components/tasks/new-task-dialog";
@@ -11,16 +11,20 @@ import MarketingBoard, { type MarketingView } from "@/components/tasks/marketing
 import { cn } from "@/lib/utils";
 import TaskDrawer from "@/components/tasks/task-drawer";
 import TaskList from "@/components/tasks/task-list";
+import TaskSearch from "@/components/tasks/task-search";
 import BoardTabs, { Pill } from "@/components/tasks/board-tabs";
 import PartnerWaits from "@/components/tasks/partner-waits";
 import SprintBoard from "@/components/tasks/sprint-board";
+import TeamBoard from "@/components/tasks/team-board";
 import { sprintStart } from "@/lib/task-format";
 import { weekStart } from "@/lib/task-marketing";
 import {
+  TASK_AREAS,
   TASK_CHANNELS,
   TASK_PRIORITIES,
   TASK_STAGES,
   TASK_VIEWS,
+  type TaskArea,
   type TaskChannel,
   type TaskListFilters,
   type TaskListView,
@@ -40,13 +44,17 @@ function isChannel(value: string | null): value is TaskChannel {
   return !!value && (TASK_CHANNELS as readonly string[]).includes(value);
 }
 
+function isArea(value: string | null): value is TaskArea {
+  return !!value && (TASK_AREAS as readonly string[]).includes(value);
+}
+
 function isStage(value: string | null): value is TaskStage {
   return !!value && (TASK_STAGES as readonly string[]).includes(value);
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-const TABS = ["sprint", "product", "support", "partners", "marketing"] as const;
+const TABS = ["sprint", "product", "support", "partners", "marketing", "team"] as const;
 type Tab = (typeof TABS)[number];
 
 /** Support and Radar: escalated chats and radar alerts, kept apart from product work. */
@@ -97,7 +105,8 @@ function SupportTabs({
  * and cases waiting on partners) and Marketing (campaigns and their pieces,
  * or a week's calendar). The tab, board, sprint, view, filters and the open
  * task live in the URL (`?tab=&board=&sprint=&view=&owner=&priority=&label=
- * &q=&channel=&stage=&week=&task=`), so any task, board or sprint is a link.
+ * &q=&channel=&stage=&week=&scope=&area=&helpers=&person=&task=`), so any
+ * task, board, sprint or person is a link.
  */
 function TasksScreen() {
   const router = useRouter();
@@ -152,6 +161,7 @@ function TasksScreen() {
   const week = rawWeek && DAY.test(rawWeek) && !Number.isNaN(Date.parse(rawWeek)) ? weekStart(rawWeek) : null;
   const rawChannel = params.get("channel");
   const rawStage = params.get("stage");
+  const rawArea = params.get("area");
 
   const update = useCallback(
     (changes: Record<string, string | null | undefined>) => {
@@ -189,6 +199,10 @@ function TasksScreen() {
       channel: null,
       stage: null,
       week: null,
+      scope: null,
+      area: null,
+      helpers: null,
+      person: null,
     });
 
   // The same query the board reads, so while the next week loads (the board
@@ -215,9 +229,12 @@ function TasksScreen() {
             The sprint, product work, support work, and what marketing is putting out.
           </p>
         </div>
-        <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={newTask}>
-          <Plus /> {tab === "marketing" ? "New piece" : "New task"}
-        </Button>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <TaskSearch className="min-w-0 flex-1 sm:w-96 sm:flex-none" onOpen={(id) => update({ task: id })} />
+          <Button className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700" onClick={newTask}>
+            <Plus /> {tab === "marketing" ? "New piece" : "New task"}
+          </Button>
+        </div>
       </div>
 
       <div className="inline-flex max-w-full flex-wrap rounded-lg bg-gray-200/70 p-1">
@@ -227,6 +244,7 @@ function TasksScreen() {
             { key: "product", label: "Product", icon: ListTodo },
             { key: "support", label: "Support", icon: Headphones },
             { key: "marketing", label: "Marketing", icon: Megaphone },
+            { key: "team", label: "Team", icon: Users },
           ] as const
         ).map(({ key, label, icon: Icon }) => {
           const active = tab === key || (key === "support" && tab === "partners");
@@ -252,6 +270,18 @@ function TasksScreen() {
         <SprintBoard
           start={sprint}
           onStart={(start) => update({ sprint: start })}
+          selected={open}
+          onOpen={(id) => update({ task: id })}
+        />
+      ) : tab === "team" ? (
+        <TeamBoard
+          filters={{
+            scope: params.get("scope") === "open" ? "open" : "sprint",
+            area: isArea(rawArea) ? rawArea : null,
+            helpers: params.get("helpers") !== "0",
+            person: params.get("person"),
+          }}
+          onFilters={(next) => update(next)}
           selected={open}
           onOpen={(id) => update({ task: id })}
         />

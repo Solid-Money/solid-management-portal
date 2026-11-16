@@ -33,6 +33,8 @@ export type MoneyInMethod =
   | "ethereum"
   | "polygon"
   | "fuse"
+  /** Networks only rhino.fi serves: Solana, Tron, Bitcoin, Plasma, ... */
+  | "other"
   | "bank"
   | "transfi";
 
