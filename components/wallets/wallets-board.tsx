@@ -873,6 +873,14 @@ function WalletCard({
  * that gets somebody paid, and folding it into "N days of cover" hid the one
  * number an operator needs first.
  */
+/** One amount to send on a chain, and what it buys. */
+interface TopUpNeed {
+  /** A minimum (a floor, a queue) or the larger cover target. */
+  kind: "minimum" | "cover";
+  text: string;
+  detail: string;
+}
+
 function TopUpInstruction({
   wallet,
   flowByAsset,
@@ -895,8 +903,7 @@ function TopUpInstruction({
   const shortfalls = wallet.chains
     .map((chain) => ({
       chain,
-      needs: monitoredAssets(chain)
-        .map((reading) => {
+      needs: monitoredAssets(chain).flatMap((reading): TopUpNeed[] => {
           const assetPlan = planFor(chain.chainId, reading.asset);
           const flow = flowByAsset.get(`${chain.chainId}:${reading.asset}`);
           const refill = assetRefillPlan(assetPlan, flow);
@@ -909,7 +916,7 @@ function TopUpInstruction({
                 text: `${formatAmount(reading.balance)} ${reading.label}`,
               });
             }
-            return null;
+            return [];
           }
 
           if (owedNow && owedNow.count > 0 && owedNow.clearAmount > 0) {
@@ -924,8 +931,8 @@ function TopUpInstruction({
           }
 
           if (refill?.refillAmount && refill.refillAmount > 0) {
-            return {
-              kind: "cover" as const,
+            const cover: TopUpNeed = {
+              kind: "cover",
               // Rounded up: sending the figure shown must reach the target.
               text: `${formatAtLeast(refill.refillAmount)} ${reading.label}`,
               detail:
@@ -933,27 +940,51 @@ function TopUpInstruction({
                   ? `pays the queued refunds and brings it to ${refill.targetDays} days of cover`
                   : `brings it to ${refill.targetDays} days of cover`,
             };
+            // The least that clears the floor, beside the cover target: one
+            // "24,974 for ten days" read as the minimum when 4,768 was enough
+            // to stop it being urgent. Net of queued payouts, as the floor is.
+            const toFloor =
+              refill.floorAmount -
+              (Number(reading.balance) - (refill.owedAmount ?? 0));
+            return Number.isFinite(toFloor) &&
+              toFloor > 0 &&
+              toFloor < refill.refillAmount
+              ? [
+                  {
+                    kind: "minimum",
+                    text: `${formatAtLeast(toFloor)} ${reading.label}`,
+                    detail:
+                      refill.floorBasis === "minimum"
+                        ? "reaches the minimum set on this asset"
+                        : `reaches the ${refill.floorDays}-day floor`,
+                  },
+                  cover,
+                ]
+              : [cover];
           }
           if (owedNow && owedNow.clearAmount > 0) {
             // No cost measured yet, but the queue is a figure in its own right.
-            return {
-              kind: "minimum" as const,
-              text: `${formatAtLeast(owedNow.clearAmount)} ${reading.label}`,
-              detail: "pays the queued refunds — no cost measured yet for cover",
-            };
+            return [
+              {
+                kind: "minimum",
+                text: `${formatAtLeast(owedNow.clearAmount)} ${reading.label}`,
+                detail: "pays the queued refunds — no cost measured yet for cover",
+              },
+            ];
           }
           // No measured cost to plan from, so fall back to the fixed floor.
           const verdict = assetVerdict(reading.status, assetPlan, flow);
           if (verdict === "LOW" || verdict === "CRITICAL") {
-            return {
-              kind: "minimum" as const,
-              text: `${formatAmount(reading.threshold)} ${reading.label}`,
-              detail: "its configured floor — no cost measured yet",
-            };
+            return [
+              {
+                kind: "minimum",
+                text: `${formatAmount(reading.threshold)} ${reading.label}`,
+                detail: "its configured floor — no cost measured yet",
+              },
+            ];
           }
-          return null;
-        })
-        .filter((need): need is NonNullable<typeof need> => need !== null),
+          return [];
+        }),
     }))
     .filter((row) => row.needs.length > 0);
 

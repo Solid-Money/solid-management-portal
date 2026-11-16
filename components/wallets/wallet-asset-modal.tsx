@@ -162,6 +162,7 @@ function Header({
   onClose,
 }: Omit<Props, "onClose"> & { onClose: () => void }) {
   const label = flow?.symbol ?? target.asset;
+  const toFloor = flow ? floorShortfall(flow) : undefined;
 
   return (
     <div className="border-b border-gray-200 px-5 py-4">
@@ -306,6 +307,21 @@ function Header({
         >
           {flow.plan.refillAmount > 0 ? (
             <>
+              {/* The floor first: it is the least that stops this being
+                  urgent, and the cover figure below is a target, not a
+                  minimum. */}
+              {toFloor != null && (
+                <span className="block">
+                  <strong>
+                    Send at least {formatAtLeast(toFloor)} {label}
+                  </strong>{" "}
+                  to reach the{" "}
+                  {flow.plan.floorBasis === "minimum"
+                    ? "minimum set on this asset"
+                    : `${flow.plan.floorDays}-day floor`}
+                  , or
+                </span>
+              )}
               <strong>
                 Send {formatAtLeast(flow.plan.refillAmount)} {label}
               </strong>{" "}
@@ -414,6 +430,23 @@ function OwedNowNote({ owed, label }: { owed: WalletOwedNow; label: string }) {
       </span>
     </div>
   );
+}
+
+/**
+ * The least that lifts this asset back to its floor, or nothing when it is
+ * not under it — or when that would be the whole refill anyway. Net of queued
+ * payouts, as the plan's own `belowFloor` is.
+ */
+function floorShortfall(flow: WalletAssetFlow): number | undefined {
+  const plan = flow.plan;
+  if (!plan) return undefined;
+  const shortfall =
+    plan.floorAmount - (Number(flow.balance) - (plan.owedAmount ?? 0));
+  return Number.isFinite(shortfall) &&
+    shortfall > 0 &&
+    shortfall < plan.refillAmount
+    ? shortfall
+    : undefined;
 }
 
 function Stat({
