@@ -19,10 +19,11 @@ import {
   getTaskSprint,
   getTasks,
   searchTasks,
+  getTeam,
   markTaskNotificationsRead,
   patchTask,
 } from "@/lib/tasks-api";
-import type { TaskDetail, TaskListFilters, TaskPatchInput } from "@/types/tasks";
+import type { TaskArea, TaskDetail, TaskListFilters, TaskPatchInput, TaskTeamScope } from "@/types/tasks";
 import { claudeLookingIn } from "@/lib/task-rich";
 
 /** Every tasks query sits under this key: a live event refreshes them all. */
@@ -35,6 +36,7 @@ export const TASK_KEYS = {
   list: (filters: TaskListFilters) => ["tasks", "list", filters] as const,
   sprint: (start: string | null) => ["tasks", "sprint", start ?? "current"] as const,
   search: (q: string) => ["tasks", "search", q] as const,
+  team: (scope: string, area: string | null, helpers: boolean) => ["tasks", "team", scope, area ?? "all", helpers] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
   marketing: (range: { from: string; to: string } | null) =>
@@ -93,6 +95,16 @@ export function useTaskSprint(start: string | null, enabled = true) {
     queryKey: TASK_KEYS.sprint(start),
     queryFn: () => getTaskSprint(start ?? undefined),
     enabled,
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+  });
+}
+
+/** The Team tab, kept fresh every minute; the last answer stays while the next loads. */
+export function useTeam(scope: TaskTeamScope, area: TaskArea | null, helpers: boolean) {
+  return useQuery({
+    queryKey: TASK_KEYS.team(scope, area, helpers),
+    queryFn: () => getTeam({ scope, area, helpers }),
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
   });
