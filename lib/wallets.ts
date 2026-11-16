@@ -371,6 +371,30 @@ export const assetReading = (
   flow?: WalletAssetFlow
 ): WalletAssetPlan | WalletAssetFlow | undefined => plan ?? flow;
 
+/**
+ * What to quote as an asset's daily cost, from the same read as its runway
+ * and floor.
+ *
+ * `measured` is that read's cost. `estimate` — gross transfers out, which
+ * miss gas — is offered only when there is no plan: beside a plan that
+ * measured no cost, the runway says "not draining", and an older flow's
+ * outflow next to it would contradict it. Never on a float, where outflow is
+ * a user's money leaving, not ours.
+ */
+export const assetCostPerDay = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): { measured?: number; estimate?: number; isFloat: boolean } => {
+  const reading = assetReading(plan, flow);
+  const isFloat = reading?.isFloat ?? false;
+  const measured = reading?.realCostPerDay;
+  const estimate =
+    measured == null && !plan && flow && !isFloat && flow.outflowPerDay > 0
+      ? flow.outflowPerDay
+      : undefined;
+  return { measured, estimate, isFloat };
+};
+
 export const chainStatuses = (chain: ChainBalance): BalanceStatus[] =>
   monitoredAssets(chain).map((reading) => reading.status);
 

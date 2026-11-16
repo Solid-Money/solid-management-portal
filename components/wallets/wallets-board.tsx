@@ -42,6 +42,7 @@ import {
   severityOf,
   truncateAddress,
   assetVerdict,
+  assetCostPerDay,
   assetOwedNow,
   assetReading,
   assetRefillPlan,
@@ -1075,11 +1076,11 @@ function CostCell({
   plan?: WalletAssetPlan;
   flow?: WalletAssetFlow;
 }) {
-  // The cost comes from the plan, because the floor shown one column to the
-  // left is that cost times the floor days — quoting a flow-measured cost
-  // beside a plan-derived floor makes the arithmetic on screen not add up.
-  const measured = plan?.realCostPerDay ?? flow?.realCostPerDay;
-  const isFloat = plan?.isFloat ?? flow?.isFloat ?? false;
+  // The cost comes from the same read as the runway and the floor shown one
+  // column to the left, which is that cost times the floor days — quoting a
+  // flow-measured cost beside a plan-derived floor makes the arithmetic on
+  // screen not add up.
+  const { measured, estimate, isFloat } = assetCostPerDay(plan, flow);
 
   if (measured == null && !flow) {
     return <span className="text-gray-400">—</span>;
@@ -1088,8 +1089,8 @@ function CostCell({
   const cost =
     measured != null
       ? formatAmount(measured)
-      : flow && !isFloat && flow.outflowPerDay > 0
-      ? `~${formatAmount(flow.outflowPerDay)}`
+      : estimate != null
+      ? `~${formatAmount(estimate)}`
       : "—";
 
   return (
@@ -1101,7 +1102,9 @@ function CostCell({
             ? "Measured from balance history net of top-ups, so gas burned as fees is included and money passing through to users is not."
             : isFloat
             ? "No cost measured yet. Gross outflow is not shown here because on this asset it is a user's money leaving, not ours."
-            : "Estimated from transfers out only — gas spent as fees is not counted, so this is optimistic."
+            : estimate != null
+            ? "Estimated from transfers out only — gas spent as fees is not counted, so this is optimistic."
+            : "No cost measured yet."
         }
       >
         {cost}
@@ -1180,8 +1183,9 @@ function RunwayCell({
   // Same read as the chip above it, which already quotes days of cover on
   // anything inside a week. Two different runways for one asset on one screen
   // is the contradiction this page exists to remove.
-  const snapshotCount = plan?.snapshotCount ?? flow?.snapshotCount;
-  const basis = plan?.runwayBasis ?? flow?.runwayBasis;
+  const reading = assetReading(plan, flow);
+  const snapshotCount = reading?.snapshotCount;
+  const basis = reading?.runwayBasis;
 
   if (runwayDays == null) {
     if (snapshotCount == null) return <span className="text-gray-400">—</span>;

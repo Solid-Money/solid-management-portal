@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   WALLET_ASSETS,
+  assetCostPerDay,
   assetOwedNow,
   assetReading,
   assetRefillPlan,
@@ -114,5 +115,38 @@ describe("an asset's figures come from one read", () => {
     expect(assetRefillPlan(undefined, flow)).toBe(refill);
     expect(assetRunwayDays(undefined, flow)).toBe(2);
     expect(assetReading(undefined, flow)?.balance).toBe("10000");
+  });
+});
+
+describe("an asset's daily cost", () => {
+  const flow = {
+    realCostPerDay: 1000,
+    outflowPerDay: 400,
+    isFloat: false,
+  } as WalletAssetFlow;
+
+  it("is the plan's, and a plan with none quotes none", () => {
+    // History too short for a cost: the runway says "not draining", so an
+    // older flow's cost or outflow must not appear beside it.
+    const plan = { snapshotCount: 3, isFloat: false } as WalletAssetPlan;
+    expect(assetCostPerDay(plan, flow)).toEqual({
+      measured: undefined,
+      estimate: undefined,
+      isFloat: false,
+    });
+    expect(
+      assetCostPerDay({ ...plan, realCostPerDay: 27 } as WalletAssetPlan, flow)
+        .measured
+    ).toBe(27);
+  });
+
+  it("comes from the flow only when there is no plan", () => {
+    expect(assetCostPerDay(undefined, flow).measured).toBe(1000);
+    const unmeasured = { ...flow, realCostPerDay: undefined };
+    expect(assetCostPerDay(undefined, unmeasured).estimate).toBe(400);
+    // On a float, outflow is a user's money leaving: never a cost estimate.
+    expect(
+      assetCostPerDay(undefined, { ...unmeasured, isFloat: true }).estimate,
+    ).toBeUndefined();
   });
 });
