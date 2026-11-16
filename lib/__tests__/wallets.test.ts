@@ -1,10 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   WALLET_ASSETS,
+  assetCostPerDay,
+  assetOwedNow,
+  assetReading,
+  assetRefillPlan,
+  assetRunwayDays,
   monitoredAssets,
   readChainAsset,
 } from "@/lib/wallets";
-import type { ChainBalance } from "@/types";
+import type {
+  ChainBalance,
+  WalletAssetFlow,
+  WalletAssetPlan,
+  WalletOwedNow,
+  WalletRefillPlan,
+} from "@/types";
 
 // `@/lib/wallets` imports the API client, which starts Firebase on load; the
 // helpers under test never call it. (Hoisted above the imports by vitest.)
@@ -69,5 +80,73 @@ describe("soEUR on a chain row", () => {
       "gas",
       "soEUR",
     ]);
+  });
+});
+
+describe("an asset's figures come from one read", () => {
+  const owed: WalletOwedNow = {
+    kind: "card-refunds",
+    count: 1,
+    amount: 8000,
+    clearAmount: 0,
+    failedCount: 0,
+    unpricedCount: 0,
+  };
+  const refill = { refillAmount: 18000 } as WalletRefillPlan;
+  // An older flow read, taken while a refund was still queued.
+  const flow = {
+    balance: "10000",
+    owedNow: owed,
+    plan: refill,
+    daysOfRunway: 2,
+  } as WalletAssetFlow;
+  // The board-wide plan, read after the refund paid: nothing owed, no refill.
+  const plan = { balance: "2000", verdict: "OK" } as WalletAssetPlan;
+
+  it("does not fill a plan's empty fields from the flow", () => {
+    expect(assetOwedNow(plan, flow)).toBeUndefined();
+    expect(assetRefillPlan(plan, flow)).toBeUndefined();
+    expect(assetRunwayDays(plan, flow)).toBeUndefined();
+    expect(assetReading(plan, flow)?.balance).toBe("2000");
+  });
+
+  it("falls back to the flow only when there is no plan", () => {
+    expect(assetOwedNow(undefined, flow)).toBe(owed);
+    expect(assetRefillPlan(undefined, flow)).toBe(refill);
+    expect(assetRunwayDays(undefined, flow)).toBe(2);
+    expect(assetReading(undefined, flow)?.balance).toBe("10000");
+  });
+});
+
+describe("an asset's daily cost", () => {
+  const flow = {
+    realCostPerDay: 1000,
+    outflowPerDay: 400,
+    isFloat: false,
+  } as WalletAssetFlow;
+
+  it("is the plan's, and a plan with none quotes none", () => {
+    // History too short for a cost: the runway says "not draining", so an
+    // older flow's cost or outflow must not appear beside it.
+    const plan = { snapshotCount: 3, isFloat: false } as WalletAssetPlan;
+    expect(assetCostPerDay(plan, flow)).toEqual({
+      measured: undefined,
+      estimate: undefined,
+      isFloat: false,
+    });
+    expect(
+      assetCostPerDay({ ...plan, realCostPerDay: 27 } as WalletAssetPlan, flow)
+        .measured
+    ).toBe(27);
+  });
+
+  it("comes from the flow only when there is no plan", () => {
+    expect(assetCostPerDay(undefined, flow).measured).toBe(1000);
+    const unmeasured = { ...flow, realCostPerDay: undefined };
+    expect(assetCostPerDay(undefined, unmeasured).estimate).toBe(400);
+    // On a float, outflow is a user's money leaving: never a cost estimate.
+    expect(
+      assetCostPerDay(undefined, { ...unmeasured, isFloat: true }).estimate,
+    ).toBeUndefined();
   });
 });
