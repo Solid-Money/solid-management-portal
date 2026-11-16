@@ -21,12 +21,14 @@ import {
   formatCashbackRate,
   formatMonthlyCap,
 } from "@/lib/cashback-percentage";
-import { formatUsd } from "@/lib/utils";
+import { formatCurrency, formatUsd } from "@/lib/utils";
 import CashbackRateDialog from "@/components/cashback/cashback-rate-dialog";
 import { Button } from "@/components/ui/button";
 import {
   cardFeeStatusVariant,
   cardStatusVariant,
+  cashbackCurrencyOf,
+  cashbackPayoutLink,
   cashbackStatusVariant,
   chargedFeeTotal,
   describeCardFee,
@@ -188,13 +190,10 @@ export default function CardTransactionsTable({
     });
   };
 
-  const formatAmount = (amount?: string, currency?: string) => {
-    if (!amount) return "-";
-    const num = parseFloat(amount);
-    return `${num < 0 ? "-" : ""}$${Math.abs(num).toFixed(2)} ${
-      currency || ""
-    }`;
-  };
+  // In the purchase's own currency — a euro purchase reads "€12.00", not
+  // "$12.00 EUR".
+  const formatAmount = (amount?: string, currency?: string) =>
+    formatCurrency(amount, currency || "USD") ?? "-";
 
   const renderSortIcon = (field: string) => {
     if (filters.sort !== field) {
@@ -250,20 +249,21 @@ export default function CardTransactionsTable({
   const renderCashback = (tx: CardTransaction) => {
     const amount = formatCashbackAmount(tx.cashback);
     if (!amount) return <span className="text-gray-400">—</span>;
+    const payout = cashbackPayoutLink(tx.cashback);
 
     return (
       <div>
         <span className="font-medium">{amount.amount}</span>
-        {amount.usd && (
-          <span className="ml-1 text-xs text-gray-500">{amount.usd}</span>
+        {amount.value && (
+          <span className="ml-1 text-xs text-gray-500">{amount.value}</span>
         )}
-        {tx.cashback?.payoutTxHash && (
+        {payout && (
           <a
-            href={`https://explorer.fuse.io/tx/${tx.cashback.payoutTxHash}`}
+            href={payout.href}
             target="_blank"
             rel="noopener noreferrer"
             className="ml-2 text-indigo-600 hover:text-indigo-800"
-            title="View payout on Fuse explorer"
+            title={payout.title}
           >
             <ExternalLink className="h-3 w-3 inline" />
           </a>
@@ -287,7 +287,11 @@ export default function CardTransactionsTable({
     const source = tx.cashback?.cashbackPercentageSource;
     // The cap frozen with the rate — what explains a trial member's purchase
     // paying past their current tier's cap after the trial ended.
-    const cap = formatMonthlyCap(tx.cashback?.monthlyCapUsd);
+    // A euro row is held to its euro cap, shown in euros.
+    const cap =
+      cashbackCurrencyOf(tx.cashback) === "EUR"
+        ? formatMonthlyCap(tx.cashback?.monthlyCapEur, "EUR")
+        : formatMonthlyCap(tx.cashback?.monthlyCapUsd);
 
     return (
       <div className="space-y-1">

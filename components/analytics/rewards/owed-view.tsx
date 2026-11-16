@@ -16,7 +16,13 @@ import { MetricLabel } from "@/components/analytics/metric-label";
 import { NotInstrumented } from "@/components/analytics/not-instrumented";
 import { Panel } from "@/components/analytics/panel";
 import { useRewardsOwed } from "@/hooks/use-analytics";
-import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
+import {
+  formatDateTime,
+  formatEur,
+  formatNumber,
+  formatUsd,
+} from "@/lib/utils";
+import type { CashbackCurrency } from "@/types";
 import type { LiabilityBucket } from "@/types/analytics";
 
 /** Bars for the next month; beyond that the forecast is not worth the width. */
@@ -28,14 +34,25 @@ export function RewardsOwedView() {
   const referrals = data?.referrals;
   const cashback = data?.cashback;
   const points = data?.points;
+  // Euro cashback owed, in EUR. Never added to the dollar figures — it has its
+  // own KPI, overdue line and credit-date series.
+  const cashbackEur = cashback?.eur;
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${
+          cashbackEur ? "xl:grid-cols-5" : "xl:grid-cols-4"
+        }`}
+      >
         <AnalyticsKpiCard
           title="Committed"
           value={data ? formatUsd(data.totals.committedUsd) : undefined}
-          scope="Qualified referrals + accrued cashback. Money already earned."
+          scope={
+            cashbackEur
+              ? "Qualified referrals + accrued USD cashback. Money already earned. Euro cashback is separate."
+              : "Qualified referrals + accrued cashback. Money already earned."
+          }
           source="database"
           updatedAt={data?.generatedAt}
           // A liability going up is not good news, so the trend colours invert.
@@ -62,6 +79,17 @@ export function RewardsOwedView() {
           updatedAt={cashback?.meta.updatedAt}
           invertTrendColor
         />
+        {cashbackEur ? (
+          <AnalyticsKpiCard
+            title="Accrued cashback (EUR)"
+            metric="accruedCashback"
+            value={formatEur(cashbackEur.accruedEur)}
+            scope="Euro cardholders, paid in soEUR on Base. Not in the USD totals."
+            source={cashback?.meta.source}
+            updatedAt={cashback?.meta.updatedAt}
+            invertTrendColor
+          />
+        ) : null}
         <AnalyticsKpiCard
           title="Points outstanding"
           metric="pointsLiability"
@@ -88,6 +116,7 @@ export function RewardsOwedView() {
       <OverdueStrip
         referralOverdue={referrals?.qualifiedUnpaid.overdue}
         cashbackOverdue={cashback?.overdue}
+        cashbackOverdueEur={cashbackEur?.overdueEur}
       />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -164,6 +193,40 @@ export function RewardsOwedView() {
           ) : null}
         </Panel>
       </div>
+
+      {cashbackEur ? (
+        <Panel
+          title="Euro cashback credit dates"
+          question="When does accrued euro cashback reach euro cardholders?"
+          source={cashback?.meta.source}
+          updatedAt={cashback?.meta.updatedAt}
+          isLoading={isLoading}
+          error={error}
+        >
+          <LiabilityBars
+            buckets={cashbackEur.byCreditDate}
+            currency="EUR"
+            emptyLabel="No euro cashback is scheduled to credit in this window."
+          />
+          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4 text-sm sm:grid-cols-3">
+            <Stat label="Accrued" value={formatEur(cashbackEur.accruedEur)} />
+            <Stat
+              label="Scheduled"
+              value={formatEur(
+                cashbackEur.byCreditDate.reduce((sum, b) => sum + b.eur, 0)
+              )}
+            />
+            <Stat
+              label="Overdue"
+              value={
+                cashbackEur.overdueEur > 0
+                  ? formatEur(cashbackEur.overdueEur)
+                  : "—"
+              }
+            />
+          </dl>
+        </Panel>
+      ) : null}
 
       <Panel
         title="Pending referrals by deadline"
@@ -278,23 +341,32 @@ export function RewardsOwedView() {
 function OverdueStrip({
   referralOverdue,
   cashbackOverdue,
+  cashbackOverdueEur,
 }: {
   referralOverdue?: LiabilityBucket;
   cashbackOverdue?: LiabilityBucket;
+  /** Euro cashback overdue, in EUR; its own line, never added to the USD one. */
+  cashbackOverdueEur?: number;
 }) {
-  const items = [
+  const items: { label: string; count?: number; amount: string }[] = [
     referralOverdue && referralOverdue.count > 0
       ? {
           label: "referral payouts past their due date",
           count: referralOverdue.count,
-          usd: referralOverdue.usd,
+          amount: formatUsd(referralOverdue.usd),
         }
       : null,
     cashbackOverdue && cashbackOverdue.count > 0
       ? {
           label: "cashback escrows matured and not swept",
           count: cashbackOverdue.count,
-          usd: cashbackOverdue.usd,
+          amount: formatUsd(cashbackOverdue.usd),
+        }
+      : null,
+    cashbackOverdueEur && cashbackOverdueEur > 0
+      ? {
+          label: "Euro cashback escrows matured and not swept",
+          amount: formatEur(cashbackOverdueEur),
         }
       : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
@@ -312,8 +384,10 @@ function OverdueStrip({
           <p className="font-medium">Payouts are running late</p>
           {items.map((item) => (
             <p key={item.label} className="text-xs">
-              {formatNumber(item.count, 0, 0)} {item.label} ·{" "}
-              {formatUsd(item.usd)}
+              {item.count !== undefined
+                ? `${formatNumber(item.count, 0, 0)} `
+                : ""}
+              {item.label} · {item.amount}
             </p>
           ))}
           <p className="pt-0.5 text-xs text-amber-700">
@@ -336,11 +410,16 @@ function OverdueStrip({
 function LiabilityBars({
   buckets,
   emptyLabel,
+  currency = "USD",
 }: {
-  buckets: LiabilityBucket[];
+  buckets: Array<{ date: string; count: number; usd?: number; eur?: number }>;
   emptyLabel: string;
+  /** Which figure the bars show: `usd` or, for euro cashback, `eur`. */
+  currency?: CashbackCurrency;
 }) {
   const data = buckets.slice(0, FORECAST_DAYS);
+  const valueKey = currency === "EUR" ? "eur" : "usd";
+  const money = currency === "EUR" ? formatEur : formatUsd;
 
   if (data.length === 0) {
     return (
@@ -368,7 +447,7 @@ function LiabilityBars({
           tick={{ fontSize: 11, fill: "#6b7280" }}
         />
         <YAxis
-          tickFormatter={(value: number) => formatUsd(value, 0)}
+          tickFormatter={(value: number) => money(value, 0)}
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 11, fill: "#6b7280" }}
@@ -385,11 +464,11 @@ function LiabilityBars({
             })
           }
           formatter={(value: number, _name, item) => [
-            `${formatUsd(value)} · ${item?.payload?.count ?? 0} rows`,
+            `${money(value)} · ${item?.payload?.count ?? 0} rows`,
             "Due",
           ]}
         />
-        <Bar dataKey="usd" radius={[3, 3, 0, 0]}>
+        <Bar dataKey={valueKey} radius={[3, 3, 0, 0]}>
           {data.map((bucket) => (
             <Cell key={bucket.date} fill="#6366f1" />
           ))}

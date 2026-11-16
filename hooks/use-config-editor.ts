@@ -173,6 +173,18 @@ export const YIELD_BOOST_DEFAULTS: YieldBoostConfig = {
 };
 
 /**
+ * Shipped euro caps (mirror the backend): what a euro cardholder's card
+ * cashback and subscription cashback are held to each month, per tier, and the
+ * grandfathered per-payment cap — in EUR, configured on their own rather than
+ * converted from the USD ones.
+ */
+export const EURO_CASHBACK_CAP_DEFAULTS = {
+  cashback: { tier1: 50, tier2: 100, tier3: 200 },
+  subscriptionDiscount: { tier1: 50, tier2: 100, tier3: 200 },
+  eligibleAmountCapEur: 50,
+} as const;
+
+/**
  * Fill in fields an older backend may not send yet, so the inputs stay
  * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
  * the working copy and the pristine copy so the defaults don't read as unsaved
@@ -183,9 +195,53 @@ export function withConfigDefaults(
 ): FullRewardsConfig {
   const fees = config.productFees;
   const boost = config.yieldBoost;
+  const cashback = config.cashback;
+  const subscription = config.subscriptionDiscount;
+  const euroCaps = EURO_CASHBACK_CAP_DEFAULTS;
 
   return {
     ...config,
+    cashback: {
+      ...cashback,
+      tier1: {
+        ...cashback.tier1,
+        monthlyCapEur:
+          cashback.tier1.monthlyCapEur ?? euroCaps.cashback.tier1,
+      },
+      tier2: {
+        ...cashback.tier2,
+        monthlyCapEur:
+          cashback.tier2.monthlyCapEur ?? euroCaps.cashback.tier2,
+      },
+      tier3: {
+        ...cashback.tier3,
+        monthlyCapEur:
+          cashback.tier3.monthlyCapEur ?? euroCaps.cashback.tier3,
+      },
+    },
+    subscriptionDiscount: {
+      ...subscription,
+      eligibleAmountCapEur:
+        subscription.eligibleAmountCapEur ?? euroCaps.eligibleAmountCapEur,
+      tier1: {
+        ...subscription.tier1,
+        monthlyCapEur:
+          subscription.tier1.monthlyCapEur ??
+          euroCaps.subscriptionDiscount.tier1,
+      },
+      tier2: {
+        ...subscription.tier2,
+        monthlyCapEur:
+          subscription.tier2.monthlyCapEur ??
+          euroCaps.subscriptionDiscount.tier2,
+      },
+      tier3: {
+        ...subscription.tier3,
+        monthlyCapEur:
+          subscription.tier3.monthlyCapEur ??
+          euroCaps.subscriptionDiscount.tier3,
+      },
+    },
     points: {
       ...config.points,
       cardBalanceEnabled: config.points.cardBalanceEnabled ?? false,
