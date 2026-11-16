@@ -343,19 +343,33 @@ export const assetVerdict = (
 export const assetRefillPlan = (
   plan?: WalletAssetPlan,
   flow?: WalletAssetFlow
-): WalletRefillPlan | undefined => plan?.plan ?? flow?.plan;
+): WalletRefillPlan | undefined => assetReading(plan, flow)?.plan;
 
 /** Payouts queued behind this balance, from the same read as the verdict. */
 export const assetOwedNow = (
   plan?: WalletAssetPlan,
   flow?: WalletAssetFlow
-): WalletOwedNow | undefined => plan?.owedNow ?? flow?.owedNow;
+): WalletOwedNow | undefined => assetReading(plan, flow)?.owedNow;
 
 /** Days of cover to quote, from the same read as the verdict and the floor. */
 export const assetRunwayDays = (
   plan?: WalletAssetPlan,
   flow?: WalletAssetFlow
-): number | undefined => plan?.daysOfRunway ?? flow?.daysOfRunway;
+): number | undefined => assetReading(plan, flow)?.daysOfRunway;
+
+/**
+ * The one read an asset's figures are quoted from: the board-wide plan, or
+ * the card's flow row only when there is no plan at all.
+ *
+ * Chosen once, not field by field. A plan with no queued payouts or no refill
+ * is an answer, not a gap: filling it from the flow would put an older read's
+ * obligations — a refund paid since — beside the plan's verdict. Its
+ * `balance` is the one those figures were worked out against.
+ */
+export const assetReading = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): WalletAssetPlan | WalletAssetFlow | undefined => plan ?? flow;
 
 export const chainStatuses = (chain: ChainBalance): BalanceStatus[] =>
   monitoredAssets(chain).map((reading) => reading.status);

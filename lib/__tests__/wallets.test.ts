@@ -1,10 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   WALLET_ASSETS,
+  assetOwedNow,
+  assetReading,
+  assetRefillPlan,
+  assetRunwayDays,
   monitoredAssets,
   readChainAsset,
 } from "@/lib/wallets";
-import type { ChainBalance } from "@/types";
+import type {
+  ChainBalance,
+  WalletAssetFlow,
+  WalletAssetPlan,
+  WalletOwedNow,
+  WalletRefillPlan,
+} from "@/types";
 
 // `@/lib/wallets` imports the API client, which starts Firebase on load; the
 // helpers under test never call it. (Hoisted above the imports by vitest.)
@@ -69,5 +79,40 @@ describe("soEUR on a chain row", () => {
       "gas",
       "soEUR",
     ]);
+  });
+});
+
+describe("an asset's figures come from one read", () => {
+  const owed: WalletOwedNow = {
+    kind: "card-refunds",
+    count: 1,
+    amount: 8000,
+    clearAmount: 0,
+    failedCount: 0,
+    unpricedCount: 0,
+  };
+  const refill = { refillAmount: 18000 } as WalletRefillPlan;
+  // An older flow read, taken while a refund was still queued.
+  const flow = {
+    balance: "10000",
+    owedNow: owed,
+    plan: refill,
+    daysOfRunway: 2,
+  } as WalletAssetFlow;
+  // The board-wide plan, read after the refund paid: nothing owed, no refill.
+  const plan = { balance: "2000", verdict: "OK" } as WalletAssetPlan;
+
+  it("does not fill a plan's empty fields from the flow", () => {
+    expect(assetOwedNow(plan, flow)).toBeUndefined();
+    expect(assetRefillPlan(plan, flow)).toBeUndefined();
+    expect(assetRunwayDays(plan, flow)).toBeUndefined();
+    expect(assetReading(plan, flow)?.balance).toBe("2000");
+  });
+
+  it("falls back to the flow only when there is no plan", () => {
+    expect(assetOwedNow(undefined, flow)).toBe(owed);
+    expect(assetRefillPlan(undefined, flow)).toBe(refill);
+    expect(assetRunwayDays(undefined, flow)).toBe(2);
+    expect(assetReading(undefined, flow)?.balance).toBe("10000");
   });
 });

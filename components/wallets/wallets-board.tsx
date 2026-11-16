@@ -43,6 +43,7 @@ import {
   truncateAddress,
   assetVerdict,
   assetOwedNow,
+  assetReading,
   assetRefillPlan,
   assetRunwayDays,
   walletSeverity,
@@ -436,7 +437,7 @@ function WalletCard({
   /**
    * Whether any asset has queued refunds its balance cannot pay.
    *
-   * Read from the flow as well as the plan, so the warning still shows when
+   * Read from the flow when there is no plan, so the warning still shows when
    * the board-wide plans call has failed and the card's own flow says
    * refunds are waiting — a live status can read OK while they are.
    */
@@ -942,10 +943,14 @@ function TopUpInstruction({
             };
             // The least that clears the floor, beside the cover target: one
             // "24,974 for ten days" read as the minimum when 4,768 was enough
-            // to stop it being urgent. Net of queued payouts, as the floor is.
+            // to stop it being urgent. Net of queued payouts, as the floor is,
+            // and against the balance the plan was worked out from: the live
+            // status can have moved on, refunds paid, while the plan's owed
+            // amount has not.
+            const planned = assetReading(assetPlan, flow)?.balance;
             const toFloor =
               refill.floorAmount -
-              (Number(reading.balance) - (refill.owedAmount ?? 0));
+              (Number(planned ?? reading.balance) - (refill.owedAmount ?? 0));
             return Number.isFinite(toFloor) &&
               toFloor > 0 &&
               toFloor < refill.refillAmount
