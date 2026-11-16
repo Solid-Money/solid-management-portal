@@ -15,6 +15,16 @@ export type AiApiChargeFailure =
 
 export type AiApiCashbackStatus = "none" | "pending" | "paid" | "failed";
 
+/** Tokens by how they are priced. */
+export interface AiApiTokenSplit {
+  input: number;
+  /** Input read from the prompt cache. */
+  cachedInput: number;
+  /** Input written to the prompt cache. */
+  cacheWrite: number;
+  output: number;
+}
+
 /** GET /admin/v1/ai-api — totals over a date range. */
 export interface AiApiAdminOverview {
   from: string;
@@ -48,6 +58,18 @@ export interface AiApiAdminOverview {
     tokens: number;
     costUsd: number;
     billedUsd: number;
+    /**
+     * Average output tokens per second while streaming, over the range's
+     * streamed requests. Null when too few ran to say; absent from older
+     * backends.
+     */
+    tokensPerSecond?: number | null;
+    /**
+     * Average time from the request to the first generated output (text,
+     * reasoning or tool arguments), ms, over the same requests. Null when too
+     * few ran; absent from older backends.
+     */
+    timeToFirstTokenMs?: number | null;
   }[];
   byDay: { day: string; requests: number; billedUsd: number; users: number }[];
 }
@@ -61,6 +83,23 @@ export interface AiApiAdminUserRow {
   requestsThisMonth: number;
   paused: boolean;
   pausedReason: AiApiPauseReason | null;
+  /** The user's active keys' monthly limits added up, USD. Absent from older backends. */
+  limitUsd?: number;
+  /**
+   * The active key that has used the largest share of its monthly limit this
+   * month. Null when there is none; absent from older backends.
+   */
+  closestKey?: AiApiClosestKey | null;
+}
+
+/** A key's spend this month against its monthly limit. */
+export interface AiApiClosestKey {
+  keyId: string;
+  name: string;
+  spentUsd: number;
+  limitUsd: number;
+  /** `spentUsd / limitUsd`: 0.82 is 82%. */
+  usedShare: number;
 }
 
 export interface AiApiAdminUsersPage {
@@ -76,6 +115,8 @@ export interface AiApiAdminKey {
   spentThisMonthUsd: number;
   cashbackThisMonthUsd: number;
   requestsThisMonth: number;
+  /** This month's tokens through the key. Absent from older backends. */
+  tokensThisMonth?: AiApiTokenSplit;
   status: AiApiKeyStatus;
   lastUsedAt: string | null;
   createdAt: string;
@@ -131,6 +172,8 @@ export interface AiApiAdminUser {
     spentUsd: number;
     cashbackUsd: number;
     requests: number;
+    /** Tokens across all the user's keys this month. Absent from older backends. */
+    tokens?: AiApiTokenSplit;
     resetsAt: string;
   };
   daily: { day: string; spentUsd: number }[];

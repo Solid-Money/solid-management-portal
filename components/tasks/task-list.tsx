@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, MessageSquare, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useTaskBoards, useTaskList, useTaskPeople } from "@/hooks/use-tasks";
 import { cn } from "@/lib/utils";
 import { PersonPicker, PriorityPicker } from "@/components/tasks/task-pickers";
@@ -68,7 +67,7 @@ function Row({
     <tr
       onClick={onOpen}
       tabIndex={0}
-      aria-label={`T-${row.number}: ${row.title}`}
+      aria-label={row.title}
       onKeyDown={(event) => {
         // Keys pressed on a control inside the row (a label) are that control's.
         if (event.target !== event.currentTarget) return;
@@ -150,7 +149,7 @@ function Row({
       <td className="hidden px-3 py-2.5 md:table-cell">
         <DueLabel date={row.dueDate} closed={closed} />
       </td>
-      <td className="hidden px-3 py-2.5 lg:table-cell">
+      <td className="hidden overflow-hidden px-3 py-2.5 lg:table-cell">
         <TaskSource row={row} people={people} />
       </td>
       <td className="hidden whitespace-nowrap px-3 py-2.5 pr-4 text-xs text-gray-500 xl:table-cell">
@@ -186,7 +185,7 @@ function Table({
           <th className="hidden w-[9.5rem] px-3 py-2 font-medium sm:table-cell">Status</th>
           <th className="hidden w-[6.5rem] px-3 py-2 font-medium md:table-cell">Priority</th>
           <th className="hidden w-[8.5rem] px-3 py-2 font-medium md:table-cell">Due</th>
-          <th className="hidden w-[11rem] px-3 py-2 font-medium lg:table-cell">Opened by</th>
+          <th className="hidden w-[8rem] px-3 py-2 font-medium lg:table-cell">Opened by</th>
           <th className="hidden w-[8.5rem] px-3 py-2 pr-4 font-medium xl:table-cell">{done ? "Closed" : "Last update"}</th>
         </tr>
       </thead>
@@ -253,7 +252,7 @@ function Group({
 /**
  * Every task the team has, open ones grouped by status. Views pick whose
  * (all, mine, mentions, the AI's); filters narrow by owner, priority and
- * label; search takes words or a task number.
+ * label. Search is the one box at the top of Tasks, across every board.
  */
 export default function TaskList({
   filters,
@@ -270,7 +269,6 @@ export default function TaskList({
 }) {
   const { data: people = [] } = useTaskPeople();
   const list = useTaskList(filters);
-  const [search, setSearch] = useState(filters.q ?? "");
   const rows = useMemo(() => list.data?.pages.flatMap((page) => page.rows) ?? [], [list.data]);
   const liveCounts = list.data?.pages[0]?.counts ?? counts;
   const groups = useMemo(
@@ -328,24 +326,6 @@ export default function TaskList({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <form
-          className="relative w-full sm:w-72"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onFilters({ q: search.trim() || undefined });
-          }}
-        >
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              if (!event.target.value) onFilters({ q: undefined });
-            }}
-            placeholder="Search titles or T-number"
-            className="h-8 pl-8 text-sm"
-          />
-        </form>
         <PersonPicker
           people={people}
           value={filters.owner && filters.owner !== "none" ? filters.owner : null}
@@ -371,10 +351,7 @@ export default function TaskList({
             variant="ghost"
             size="sm"
             className="text-gray-500"
-            onClick={() => {
-              setSearch("");
-              onFilters({ owner: undefined, priority: undefined, label: undefined, q: undefined });
-            }}
+            onClick={() => onFilters({ owner: undefined, priority: undefined, label: undefined, q: undefined })}
           >
             Clear filters
           </Button>

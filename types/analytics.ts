@@ -65,6 +65,17 @@ export interface ReferralLiability {
   meta: SeriesMeta;
 }
 
+/**
+ * Euro cashback owed: EUR rows only, every figure in EUR. Never added to the
+ * USD figures beside it.
+ */
+export interface CashbackLiabilityEur {
+  accruedEur: number;
+  overdueEur: number;
+  byCreditDate: Array<{ date: string; count: number; eur: number }>;
+}
+
+/** The USD fields count USD rows only; euro cashback is in `eur`. */
 export interface CashbackLiability {
   accruedUsd: number;
   count: number;
@@ -72,6 +83,8 @@ export interface CashbackLiability {
   byCreditDate: LiabilityBucket[];
   overdue: LiabilityBucket;
   unscheduled: { count: number; usd: number };
+  /** Absent from a backend that predates euro cashback. */
+  eur?: CashbackLiabilityEur;
   meta: SeriesMeta;
 }
 
@@ -110,10 +123,15 @@ export interface RewardsPaidResponse {
   /**
    * Cashback credited per day, keyed on when it paid rather than when it was
    * earned — this is the series the payout wallet's outflow is matched against.
+   *
+   * `usd`/`totalUsd` count USD rows (soUSD on Fuse) only; `eur`/`totalEur`
+   * count EUR rows (soEUR on Base) only. Never added together. The EUR fields
+   * are absent from a backend that predates euro cashback.
    */
   cashback: {
-    byDay: Array<{ date: string; usd: number; count: number }>;
+    byDay: Array<{ date: string; usd: number; eur?: number; count: number }>;
     totalUsd: number;
+    totalEur?: number;
     count: number;
     meta: SeriesMeta;
   };

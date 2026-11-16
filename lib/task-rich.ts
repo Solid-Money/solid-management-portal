@@ -98,7 +98,12 @@ let hooked = false;
  * key that isn't attached shows nothing), and links to other sites open in
  * a new tab.
  */
-export function renderableHtml(html: string, urls: Map<string, string>): string {
+export function renderableHtml(
+  html: string,
+  urls: Map<string, string>,
+  /** Images not inside a link become keyboard controls that open a preview. */
+  options: { previewable?: boolean } = {},
+): string {
   if (typeof window === "undefined") return "";
   if (!hooked) {
     DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -125,6 +130,11 @@ export function renderableHtml(html: string, urls: Map<string, string>): string 
     if (url) {
       img.setAttribute("src", url);
       img.setAttribute("loading", "lazy");
+      if (options.previewable && !img.closest("a")) {
+        img.setAttribute("tabindex", "0");
+        img.setAttribute("role", "button");
+        img.setAttribute("aria-label", `View ${img.getAttribute("alt") || "the image"} larger`);
+      }
     } else img.remove();
   }
   const box = document.createElement("div");

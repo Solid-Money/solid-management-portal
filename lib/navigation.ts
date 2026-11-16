@@ -1,5 +1,6 @@
 import {
   Activity,
+  BadgePercent,
   AlertTriangle,
   BarChart2,
   BellRing,
@@ -249,6 +250,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ArrowRightLeft,
       },
       {
+        href: "/fee-promotions",
+        label: "Fee Promotions",
+        description:
+          "Time-boxed free fees, e.g. each user's first SEPA deposits to the euro account",
+        icon: BadgePercent,
+      },
+      {
         href: "/costs-config",
         label: "Costs",
         description: "KYC, card and rail costs behind every margin number",
@@ -258,7 +266,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/anti-abuse",
         label: "Anti-abuse",
         description:
-          "Merchants excluded from cashback and referrals, and referral spend rules",
+          "Merchants excluded from cashback and referrals, referral spend rules, and known service wallets",
         icon: ShieldAlert,
       },
       {

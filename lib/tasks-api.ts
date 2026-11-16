@@ -19,6 +19,7 @@ import type {
   TaskCampaignColor,
   TaskCampaignInput,
   TaskMarketingOverview,
+  TaskSearchPage,
 } from "@/types/tasks";
 
 /**
@@ -46,6 +47,10 @@ export const getTasks = async (filters: TaskListFilters, page = 0) =>
       },
     })
   ).data;
+
+/** One search across every board, open and closed: words, "a phrase", or a task number. */
+export const searchTasks = async (q: string) =>
+  (await api.get<TaskSearchPage>(`${base}/search`, { params: { q } })).data;
 
 /** A week's sprint (any day in it; this week's when absent) and the backlog. */
 export const getTaskSprint = async (start?: string) =>

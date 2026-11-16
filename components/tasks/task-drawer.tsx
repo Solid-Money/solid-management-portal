@@ -134,9 +134,15 @@ function Field({
 const fieldButton =
   "inline-flex h-7 max-w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-sm text-gray-800 hover:bg-gray-100";
 
-/** Updates in the order they were written: the newest last. */
+/**
+ * Updates in the order they were written, the newest last, as one stream:
+ * replies posted before replying went away (or by Claude, or through the
+ * connector) take their place by time.
+ */
 function oldestFirst(updates: TaskUpdate[]): TaskUpdate[] {
-  return [...updates].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  return updates
+    .flatMap((update) => [update, ...update.replies])
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
 function linkHref(link: TaskLink): string | null {
@@ -529,6 +535,7 @@ function TaskBody({
   const boards = boardList?.boards ?? [];
   const boardName = task.board ? (boards.find((b) => b.key === task.board)?.name ?? task.board) : null;
   const [following, setFollowing] = useState<boolean | null>(null);
+  const [scrolled, setScrolled] = useState(false);
   const isFollowing = following ?? task.following;
   const closed = task.status === "done" || task.status === "cancelled";
 
@@ -554,10 +561,19 @@ function TaskBody({
   };
 
   // One scroll for the whole task: the fields go up with the description and
-  // updates instead of staying pinned and leaving a small window below.
+  // updates instead of staying pinned and leaving a small window below. Only
+  // the title (and who opened it, and its actions) stays at the top.
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="border-b border-gray-200 px-6 pb-4 pt-5">
+    <div
+      className="min-h-0 flex-1 overflow-y-auto"
+      onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
+    >
+      <div
+        className={cn(
+          "sticky top-0 z-10 border-b bg-white px-6 pb-2 pt-5",
+          scrolled ? "border-gray-200 shadow-[0_4px_12px_-8px_rgba(0,0,0,0.15)]" : "border-transparent",
+        )}
+      >
         <div className="mb-2 flex items-center gap-2 pr-8 text-xs text-gray-500">
           {task.visibility === "restricted" && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5">
@@ -565,13 +581,16 @@ function TaskBody({
             </span>
           )}
           {/* Who opened it and when: a person, Solid AI, the radar or Claude. */}
-          <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
-            {task.source.kind !== "manual" || task.createdBy.bot || !task.createdBy.email ? (
-              <BotAvatar size={16} />
-            ) : (
-              <Avatar email={task.createdBy.email} people={people} size={16} />
-            )}
-            <span className="truncate">
+          {/* Wraps rather than clips, so a long chat label reads in full on a phone. */}
+          <span className="inline-flex min-w-0 items-start gap-1.5">
+            <span className="mt-px shrink-0">
+              {task.source.kind !== "manual" || task.createdBy.bot || !task.createdBy.email ? (
+                <BotAvatar size={16} />
+              ) : (
+                <Avatar email={task.createdBy.email} people={people} size={16} />
+              )}
+            </span>
+            <span className="min-w-0 break-words">
               Opened by {authorName(task.createdBy, people)}
               {task.source.kind !== "manual" && task.source.label && (
                 <span className="text-gray-400"> · {task.source.label}</span>
@@ -609,9 +628,11 @@ function TaskBody({
         </div>
 
         <TitleEditor task={task} onSave={(title) => patch.mutate({ title })} />
+      </div>
+      <div className="border-b border-gray-200 px-6 pb-4">
         <SheetDescription className="sr-only">Task T-{task.number}</SheetDescription>
 
-        <div className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 sm:grid-cols-[5rem_minmax(0,1fr)_5rem_minmax(0,1fr)]">
+        <div className="mt-1 grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 sm:grid-cols-[5rem_minmax(0,1fr)_5rem_minmax(0,1fr)]">
           {piece ? (
             <Field icon={CircleDot} label="Status">
               <StagePicker value={piece.stage} onChange={(stage) => void patchPiece({ stage })}>
@@ -722,7 +743,9 @@ function TaskBody({
                 </button>
               </CampaignPicker>
             </Field>
-          ) : (
+          ) : null}
+          {/* A piece shows its sprint only when it's in one, so it can be taken out. */}
+          {(!piece || task.sprint) && (
             <Field icon={Timer} label="Sprint">
               <SprintPicker value={task.sprint} onChange={(sprint) => patch.mutate({ sprint })}>
                 <button type="button" className={fieldButton}>
