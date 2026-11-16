@@ -20,6 +20,9 @@ import type {
   TaskCampaignInput,
   TaskMarketingOverview,
   TaskSearchPage,
+  TaskTeamPage,
+  TaskTeamScope,
+  TaskArea,
 } from "@/types/tasks";
 
 /**
@@ -44,6 +47,18 @@ export const getTasks = async (filters: TaskListFilters, page = 0) =>
         ...(filters.board ? { board: filters.board } : {}),
         ...(filters.area ? { area: filters.area } : {}),
         ...(page ? { page } : {}),
+      },
+    })
+  ).data;
+
+/** The Team tab: what everyone is on, by status. */
+export const getTeam = async (params: { scope: TaskTeamScope; area: TaskArea | null; helpers: boolean }) =>
+  (
+    await api.get<TaskTeamPage>(`${base}/team`, {
+      params: {
+        scope: params.scope,
+        ...(params.area ? { area: params.area } : {}),
+        ...(params.helpers ? {} : { helpers: "false" }),
       },
     })
   ).data;

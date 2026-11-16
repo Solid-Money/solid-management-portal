@@ -157,6 +157,44 @@ export interface TaskLastUpdate {
   at: string;
 }
 
+/** The Team tab: `sprint` = all work in progress, stuck, waiting or in review, plus this sprint's To do; `open` = every open task. */
+export type TaskTeamScope = "sprint" | "open";
+
+export interface TaskTeamCard {
+  task: TaskRow;
+  /** On this person's row as a helper, not the owner. */
+  helping: boolean;
+  /** Days without an update from a person while in progress, stuck, waiting or in review (3+); else null. */
+  quietDays: number | null;
+}
+
+export interface TaskTeamColumns {
+  working: TaskTeamCard[];
+  blocked: TaskTeamCard[];
+  review: TaskTeamCard[];
+  next: TaskTeamCard[];
+  done: TaskTeamCard[];
+}
+
+export interface TaskTeamPerson {
+  /** null: tasks nobody owns. */
+  email: string | null;
+  lastActiveAt: string | null;
+  updatesThisWeek: number;
+  /** Open tasks they own, whatever the scope. */
+  open: number;
+  columns: TaskTeamColumns;
+}
+
+export interface TaskTeamPage {
+  scope: TaskTeamScope;
+  area: TaskArea | null;
+  sprint: TaskSprint;
+  people: TaskTeamPerson[];
+  summary: { people: number; working: number; blocked: number; review: number; quiet: number; doneThisWeek: number };
+  truncated: boolean;
+}
+
 /** Where a search found its words. */
 export type TaskSearchField =
   | "number"
