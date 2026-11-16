@@ -161,6 +161,7 @@ export function usePatchTask(id: string) {
       void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "team"] });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
     },
@@ -190,6 +191,7 @@ export function useRefreshTask() {
     void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
+    void queryClient.invalidateQueries({ queryKey: ["tasks", "team"] });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
   };

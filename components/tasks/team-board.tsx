@@ -240,7 +240,8 @@ export default function TeamBoard({
         Show tasks they help on
       </label>
       <span className="ml-auto text-xs text-gray-500">
-        {data && `Updated ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · sorted by work in progress`}
+        {data &&
+          `${isError ? "Couldn't refresh · showing" : "Updated"} ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · sorted by work in progress`}
       </span>
     </div>
   );
@@ -254,7 +255,8 @@ export default function TeamBoard({
         </div>
       </div>
     );
-  if (isError || !data)
+  // A failed refresh keeps the last board on screen (the line above says so).
+  if (!data)
     return (
       <div className="space-y-4">
         {toolbar}
