@@ -1122,7 +1122,7 @@ export default function RewardsConfigPage() {
         <ConfigSection
           id="card-cashback"
           title="Cashback on Card Transactions"
-          description="Users earn FUSE tokens back on card purchases based on their tier"
+          description="Users earn cashback in soUSD on card purchases based on their tier, paid from Base first and Fuse as the fallback"
           icon={<Percent className="h-5 w-5 text-green-600" />}
         >
           <div className="flex items-center justify-between mb-4">

@@ -6,6 +6,7 @@ import { ExternalLink, Loader2, Percent } from "lucide-react";
 import { getUserCashback, getUserTierTrials } from "@/lib/api";
 import { CashbackEntry, CashbackHistory, TierTrialView } from "@/types";
 import { cashbackStatusVariant } from "@/lib/card-transactions";
+import { cashbackPayoutLink } from "@/lib/cashback-payout";
 import {
   formatCashbackRate,
   formatMonthlyCap,
@@ -28,6 +29,27 @@ function payoutOf(entry: CashbackEntry): string {
   if (fuse > 0) return `${fuse.toFixed(4)} FUSE`;
 
   return "—";
+}
+
+/**
+ * The payout transfer on the explorer of the chain it went out on — Base or
+ * Fuse; a row paid before the chain was recorded was paid on Fuse. Nothing for
+ * a row that sent nothing (unpaid, or netted against debt).
+ */
+function PayoutLink({ entry }: { entry: CashbackEntry }) {
+  const payout = cashbackPayoutLink(entry.payoutTxHash, entry.payoutChainId);
+  if (!payout) return null;
+  return (
+    <a
+      href={payout.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="ml-1 inline-block text-indigo-600 hover:text-indigo-800"
+      title={`View payout on ${payout.chainName} explorer`}
+    >
+      <ExternalLink className="inline h-3 w-3" />
+    </a>
+  );
 }
 
 /**
@@ -191,17 +213,7 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                         </td>
                         <td className="px-3 py-2 text-right whitespace-nowrap font-medium text-gray-900">
                           {payoutOf(entry)}
-                          {entry.payoutTxHash && (
-                            <a
-                              href={`https://explorer.fuse.io/tx/${entry.payoutTxHash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ml-1 inline-block text-indigo-600 hover:text-indigo-800"
-                              title="View payout on Fuse explorer"
-                            >
-                              <ExternalLink className="inline h-3 w-3" />
-                            </a>
-                          )}
+                          <PayoutLink entry={entry} />
                         </td>
                         <td className="px-3 py-2">
                           <Badge variant={cashbackStatusVariant(entry.status)}>

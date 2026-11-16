@@ -104,6 +104,8 @@ export interface AiApiAdminCharge {
   cashbackPayoutAt: string | null;
   cashbackPaidAt: string | null;
   cashbackTxHash: string | null;
+  /** The chain `cashbackTxHash` is on: Base (8453) or Fuse (122). Optional for older backends. */
+  cashbackChainId?: number | null;
   cashbackLastError: string | null;
 }
 

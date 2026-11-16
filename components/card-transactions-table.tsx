@@ -22,6 +22,7 @@ import {
   formatMonthlyCap,
 } from "@/lib/cashback-percentage";
 import { formatUsd } from "@/lib/utils";
+import { cashbackPayoutLink } from "@/lib/cashback-payout";
 import CashbackRateDialog from "@/components/cashback/cashback-rate-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -250,6 +251,10 @@ export default function CardTransactionsTable({
   const renderCashback = (tx: CardTransaction) => {
     const amount = formatCashbackAmount(tx.cashback);
     if (!amount) return <span className="text-gray-400">—</span>;
+    const payout = cashbackPayoutLink(
+      tx.cashback?.payoutTxHash,
+      tx.cashback?.payoutChainId,
+    );
 
     return (
       <div>
@@ -257,13 +262,13 @@ export default function CardTransactionsTable({
         {amount.usd && (
           <span className="ml-1 text-xs text-gray-500">{amount.usd}</span>
         )}
-        {tx.cashback?.payoutTxHash && (
+        {payout && (
           <a
-            href={`https://explorer.fuse.io/tx/${tx.cashback.payoutTxHash}`}
+            href={payout.url}
             target="_blank"
             rel="noopener noreferrer"
             className="ml-2 text-indigo-600 hover:text-indigo-800"
-            title="View payout on Fuse explorer"
+            title={`View payout on ${payout.chainName} explorer`}
           >
             <ExternalLink className="h-3 w-3 inline" />
           </a>

@@ -690,9 +690,10 @@ export interface ChainBalance {
   usdtThreshold?: string;
   usdtStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   usdtAddress?: string;
-  // soUSD is the reward payout asset (cashback, bonuses) on Fuse. Referral
-  // cashback pays in soFUSE instead, so on the referral payout wallet the
-  // soUSD balance only covers rewards earned before that switch.
+  // soUSD is the reward payout asset (cashback, bonuses). The cashback wallet
+  // holds it on Base, where payouts go first, and on Fuse, the fallback.
+  // Referral cashback pays in soFUSE instead, so on the referral payout wallet
+  // the soUSD balance only covers rewards earned before that switch.
   soUsdBalance?: string;
   soUsdThreshold?: string;
   soUsdStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
@@ -1183,6 +1184,8 @@ export interface CardTransactionCashback {
   /** @deprecated Companion to `fuseAmount`. */
   fuseUsdPrice?: string;
   payoutTxHash?: string;
+  /** The chain `payoutTxHash` is on: Base (8453) or Fuse (122). Absent → Fuse. */
+  payoutChainId?: number;
   fiatAmount: string;
   fiatCurrency: string;
   /** "Cashback" or "SubscriptionDiscount". */
@@ -3078,6 +3081,8 @@ export interface CashbackEntry {
   merchantName?: string;
   subscriptionCategory?: string;
   payoutTxHash?: string;
+  /** The chain `payoutTxHash` is on: Base (8453) or Fuse (122). Absent → Fuse. */
+  payoutChainId?: number;
   payoutAt?: string;
   createdAt: string;
   lastError?: string;

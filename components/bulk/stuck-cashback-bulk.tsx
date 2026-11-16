@@ -53,13 +53,13 @@ const CAUSES: Record<
   { label: string; hint: string; variant: BadgeVariant }
 > = {
   rpc_unavailable: {
-    label: "Fuse RPC refused",
-    hint: "The payout wallet's balance could not be read (RPC 403), so nothing was sent.",
+    label: "Payout RPC refused",
+    hint: "The payout wallet's balance could not be read on Base or Fuse (RPC 403), so nothing was sent.",
     variant: "warning",
   },
   wallet_underfunded: {
     label: "Payout wallet empty",
-    hint: "The payout wallet could not cover the soUSD or the gas.",
+    hint: "Neither chain's payout float (Base first, then Fuse) could cover the soUSD or the gas.",
     variant: "warning",
   },
   transfer_reverted: {
