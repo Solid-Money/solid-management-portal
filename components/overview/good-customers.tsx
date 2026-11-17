@@ -115,11 +115,11 @@ export function GoodCustomersView({ data }: { data: GoodCustomersResponse }) {
         together. Real customer = holds a card and has put in their own money or made a settled
         purchase. Qualified = {d.minSpendDays}+ spend days and ${d.minSpendUsd}+ in the trailing{" "}
         {d.windowDays} days. High-value = qualified plus ${d.highValueSpendUsd}+ spend, $
-        {d.highValueMoneyInUsd}+ of their own money in, or active Prime. Tier = Prime or Ultra at the
-        range end, by the best route a person holds: a paid Prime subscription, FUSE locked for a
+        {d.highValueMoneyInUsd}+ of their own money in, or an active paid membership. Tier = Prime or
+        Ultra at the range end, by the best route a person holds: a paid membership, FUSE locked for a
         year, a free trial, or the legacy FUSE route kept from before tiers v3. Bought = subscription
-        or lock. Revenue is fees plus Prime, as on the Revenue tile; treasury interest and partner
-        card markups are not included.
+        or lock. Revenue is fees plus memberships, as on the Revenue tile; treasury interest and
+        partner card markups are not included.
       </p>
     </div>
   );
@@ -315,7 +315,7 @@ function LadderCard({ data }: { data: GoodCustomersResponse }) {
     },
     {
       label: "High-value",
-      hint: `+$${d.highValueSpendUsd} spend, $${d.highValueMoneyInUsd} in, or Prime`,
+      hint: `+$${d.highValueSpendUsd} spend, $${d.highValueMoneyInUsd} in, or a membership`,
       value: ladder.highValue,
       color: LADDER_DEEP,
     },

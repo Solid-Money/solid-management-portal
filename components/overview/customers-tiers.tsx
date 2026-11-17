@@ -56,8 +56,8 @@ export function TiersSection({ data }: { data: GoodCustomersResponse }) {
           <h2 className="text-[17px] font-semibold text-gray-900">Tiers</h2>
           <p className="mt-1 text-[12.5px] text-gray-500">
             Prime and Ultra members on {dayLabel(data.asOf)}, and how they used the card in the{" "}
-            {data.definition.windowDays} days to {dayLabel(data.asOf)}. Bought = paid for Prime or
-            locked FUSE for a year.
+            {data.definition.windowDays} days to {dayLabel(data.asOf)}. Bought = paid for a membership
+            or locked FUSE for a year.
             {tiers?.source === "records"
               ? " Read from stored records for this day, so legacy members are an upper bound."
               : ""}
@@ -112,7 +112,7 @@ function TierTiles({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodCu
             {bought.lastWeek > 0 ? `+${formatCount(bought.lastWeek)} this week` : "None this week"}
           </Chip>
         }
-        context={`${formatCount(bought.paid)} paid $${bought.primeAnnualUsd} for Prime. ${formatCount(
+        context={`${formatCount(bought.paid)} paid for a membership. ${formatCount(
           locked,
         )} locked FUSE for a year: ${formatCount(bought.lockPrime)} for Prime, ${formatCount(
           bought.lockUltra,
@@ -120,7 +120,7 @@ function TierTiles({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodCu
       >
         <SplitBar
           parts={[
-            { label: `Paid $${bought.primeAnnualUsd} · ${formatCount(bought.paid)}`, value: bought.paid, color: OVERVIEW_ACCENT },
+            { label: `Paid membership · ${formatCount(bought.paid)}`, value: bought.paid, color: OVERVIEW_ACCENT },
             { label: `Locked FUSE · ${formatCount(locked)}`, value: locked, color: TIER_MID },
           ]}
         />
@@ -342,7 +342,7 @@ function BuyersCard({ tiers }: { tiers: GoodCustomersTiers }) {
   const trend = buyersTrend(tiers);
   return (
     <OverviewCard className="flex h-full flex-col p-5">
-      <SectionHeader title="New tier buyers, weekly" subtitle="Paid for Prime or locked FUSE, by week to each date" />
+      <SectionHeader title="New tier buyers, weekly" subtitle="Paid for a membership or locked FUSE, by week to each date" />
       <div className="mt-4 h-[190px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={bars} margin={{ top: 18, right: 4, left: 0, bottom: 0 }}>
@@ -372,7 +372,7 @@ function BuyersCard({ tiers }: { tiers: GoodCustomersTiers }) {
         </ResponsiveContainer>
       </div>
       <div className="mt-2 flex gap-3.5 text-[11.5px] text-gray-500">
-        <Legend color={OVERVIEW_ACCENT} label={`Paid $${tiers.bought.primeAnnualUsd}`} />
+        <Legend color={OVERVIEW_ACCENT} label="Paid membership" />
         <Legend color={TIER_MID} label="Locked FUSE" />
       </div>
       {trend.recent + trend.before > 0 ? (
@@ -401,14 +401,14 @@ function BuyersTooltip({
     <div className="rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg">
       <div className="font-semibold">Week to {dayLabel(bar.date)}</div>
       <div className="mt-1">
-        {formatCount(bar.paid)} paid for Prime · {formatCount(bar.lock)} locked FUSE
+        {formatCount(bar.paid)} paid for a membership · {formatCount(bar.lock)} locked FUSE
       </div>
     </div>
   );
 }
 
 const ROUTE_LABELS: Record<GoodCustomersRouteRow["route"], string> = {
-  paid: "Paid for Prime",
+  paid: "Paid membership",
   lock: "Locked FUSE",
   legacy: "Legacy",
   trial: "Free trial",
@@ -455,7 +455,7 @@ function RoutesCard({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodC
               return (
                 <tr key={row.route} className="border-b border-[#eef0f3] last:border-b-0">
                   <td className="py-2.5 pr-3 font-medium whitespace-nowrap text-gray-900">
-                    {row.route === "paid" ? `Paid $${tiers.bought.primeAnnualUsd} for Prime` : ROUTE_LABELS[row.route]}
+                    {ROUTE_LABELS[row.route]}
                   </td>
                   <td className="w-full py-2.5 pr-3">
                     <div className="h-2 w-full min-w-[120px] overflow-hidden rounded" style={{ background: TIER_TRACK }}>
