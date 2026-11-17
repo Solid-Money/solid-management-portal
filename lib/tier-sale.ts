@@ -51,8 +51,35 @@ const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 const hasExplicitZone = (iso: string | null | undefined): boolean =>
   !iso || HAS_ZONE.test(iso.trim());
 
+/** A zoned ISO date-time, its fields captured to be checked as a calendar date. */
+const ISO_DATE_TIME =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):?(\d{2}))$/i;
+
+/**
+ * Whether every field is one a calendar has. `Date` does not check: it rolls
+ * an impossible date over — Feb 30 reads as Mar 2 — and hands back a finite
+ * time for it, so a mistyped sale boundary would open the sale on another day.
+ */
+const isCalendarDateTime = (iso: string): boolean => {
+  const fields = ISO_DATE_TIME.exec(iso.trim());
+  if (!fields) return false;
+  const [, y, mo, d, h, mi, s = "0", oh = "0", om = "0"] = fields;
+  const [year, month, day] = [Number(y), Number(mo), Number(d)];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    Number(h) < 24 &&
+    Number(mi) < 60 &&
+    Number(s) < 60 &&
+    Number(oh) < 24 &&
+    Number(om) < 60
+  );
+};
+
 const asTime = (iso: string | null | undefined): number | null => {
-  if (!iso || !hasExplicitZone(iso)) return null;
+  if (!iso || !hasExplicitZone(iso) || !isCalendarDateTime(iso)) return null;
   const at = new Date(iso).getTime();
   return Number.isFinite(at) ? at : null;
 };
@@ -97,6 +124,14 @@ export function tierPricingError(pricing: TierPricing): string | null {
     !hasExplicitZone(pricing.saleEndsAt)
   ) {
     return "Sale Starts and Sale Ends have to be UTC times (ending in Z). Set them again from the date pickers.";
+  }
+  for (const [label, iso] of [
+    ["Sale Starts", pricing.saleStartsAt],
+    ["Sale Ends", pricing.saleEndsAt],
+  ] as const) {
+    if (!isBlank(iso) && asTime(iso) === null) {
+      return `${label} isn't a real date and time. Set it again from the date picker.`;
+    }
   }
   const start = asTime(pricing.saleStartsAt);
   const end = asTime(pricing.saleEndsAt);

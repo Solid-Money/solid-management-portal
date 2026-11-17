@@ -211,6 +211,49 @@ describe("sale dates without a timezone", () => {
     ).toBeNull();
   });
 
+  /**
+   * `Date` rolls Feb 30 over to Mar 2 and calls it a valid time, so the sale
+   * would open two days after the date on the config.
+   */
+  it("refuses an impossible calendar date rather than rolling it over", () => {
+    for (const saleStartsAt of [
+      "2026-02-30T00:00:00.000Z",
+      "2026-04-31T00:00:00Z",
+      "2026-11-27T24:00:00Z",
+      "2026-11-27T00:60:00Z",
+      "2026-11-27T00:00:00+24:00",
+    ]) {
+      expect(
+        tierPricingError(
+          blackFriday({ saleStartsAt, saleEndsAt: "2026-12-04T00:00:00.000Z" }),
+        ),
+      ).toMatch(/Sale Starts isn't a real date/);
+    }
+    expect(
+      tierPricingError(blackFriday({ saleEndsAt: "2027-02-29T00:00:00Z" })),
+    ).toMatch(/Sale Ends isn't a real date/);
+    expect(
+      tierSaleStatus(
+        blackFriday({
+          saleStartsAt: "2026-02-30T00:00:00.000Z",
+          saleEndsAt: "2026-03-04T00:00:00.000Z",
+        }),
+        Date.parse("2026-03-03T00:00:00Z"),
+      ).kind,
+    ).toBe("none");
+  });
+
+  it("still accepts a leap day and a time without seconds", () => {
+    expect(
+      tierPricingError(
+        blackFriday({
+          saleStartsAt: "2028-02-29T00:00Z",
+          saleEndsAt: "2028-03-01T00:00:00.000+0000",
+        }),
+      ),
+    ).toBeNull();
+  });
+
   it("reads a zoneless date as no sale window at all", () => {
     expect(
       tierSaleStatus(
