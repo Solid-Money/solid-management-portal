@@ -8,6 +8,7 @@ import {
   formatCashbackMoney,
   formatCashbackTotals,
 } from "@/lib/card-transactions";
+import { lifetimeCashbackValue } from "@/lib/lifetime-cashback";
 import { tierTrialRemaining } from "@/lib/tier-trial";
 import { CashbackCurrency, UserRewardsData } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -85,21 +86,6 @@ function monthCashbackValue(
   return month.currency === "EUR"
     ? formatCashbackTotals(rewards.cashbackThisMonth, month.thisMonth)
     : formatCashbackMoney(month.thisMonth, "USD");
-}
-
-/**
- * The app's "Lifetime cashback": paid on every card the user has held, plus
- * what is still pending — dollars and euros side by side, never summed.
- * Undefined until the backend sends a lifetime figure, which hides the stat.
- */
-function lifetimeCashbackValue(rewards: UserRewardsData): string | undefined {
-  const usd = rewards.cashbackLifetime;
-  const eur = rewards.cashbackEur?.cashbackLifetime;
-  if (typeof usd !== "number" && typeof eur !== "number") return undefined;
-  return formatCashbackTotals(
-    typeof usd === "number" ? usd : 0,
-    typeof eur === "number" ? eur : 0
-  );
 }
 
 /**
