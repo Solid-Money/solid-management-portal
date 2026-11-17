@@ -544,8 +544,19 @@ function TaskBody({
   const scroller = useRef<HTMLDivElement>(null);
   const header = useRef<HTMLDivElement>(null);
   // The linked update stays lit until FOCUS_MS after it was scrolled to.
-  const [faded, setFaded] = useState<string | null>(null);
-  const lit = focusUpdate && faded !== focusUpdate ? focusUpdate : null;
+  // Every new link starts lit, even back to one that has faded already.
+  const [faded, setFaded] = useState(false);
+  const [focusFor, setFocusFor] = useState(focusUpdate);
+  if (focusFor !== focusUpdate) {
+    setFocusFor(focusUpdate);
+    setFaded(false);
+  }
+  const lit = faded ? null : focusUpdate;
+  // A link to an update written since the task loaded waits for the refresh
+  // that brings it, then scrolls (and only then: not on every refresh).
+  const focusLoaded =
+    !!focusUpdate &&
+    task.updates.some((u) => u.id === focusUpdate || u.replies.some((reply) => reply.id === focusUpdate));
   const isFollowing = following ?? task.following;
   const closed = task.status === "done" || task.status === "cancelled";
 
@@ -575,7 +586,7 @@ function TaskBody({
   // little later, once the images above it have taken their space. An update
   // that was deleted, or is older than the ones loaded, just opens the task.
   useEffect(() => {
-    if (!focusUpdate) return;
+    if (!focusUpdate || !focusLoaded) return;
     const box = scroller.current;
     const target = document.getElementById(`update-${focusUpdate}`);
     if (!box || !target) return;
@@ -589,12 +600,12 @@ function TaskBody({
     };
     place();
     const again = window.setTimeout(place, 400);
-    const fade = window.setTimeout(() => setFaded(focusUpdate), FOCUS_MS);
+    const fade = window.setTimeout(() => setFaded(true), FOCUS_MS);
     return () => {
       window.clearTimeout(again);
       window.clearTimeout(fade);
     };
-  }, [focusUpdate]);
+  }, [focusUpdate, focusLoaded]);
 
   // One scroll for the whole task: the fields go up with the description and
   // updates instead of staying pinned and leaving a small window below. Only
