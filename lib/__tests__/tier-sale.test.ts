@@ -11,7 +11,9 @@ import {
 
 // The Black Friday sale: Fri Nov 27 – Mon Nov 30 inclusive, so the window
 // closes at the start of Dec 1.
-const blackFriday = (overrides: Partial<Record<keyof TierPricing, unknown>> = {}) =>
+const blackFriday = (
+  overrides: Partial<Record<keyof TierPricing, unknown>> = {},
+) =>
   ({
     primeAnnualUsd: 199,
     ultraAnnualUsd: 999,
@@ -93,9 +95,7 @@ describe("tierPricingError", () => {
 
   it("needs the end after the start", () => {
     expect(
-      tierPricingError(
-        blackFriday({ saleEndsAt: "2026-11-27T00:00:00.000Z" }),
-      ),
+      tierPricingError(blackFriday({ saleEndsAt: "2026-11-27T00:00:00.000Z" })),
     ).toMatch(/Sale Ends has to be after Sale Starts/);
     expect(
       tierPricingError(
@@ -146,10 +146,8 @@ describe("tierSaleStatus", () => {
     const at = Date.parse("2026-11-28T12:00:00.000Z");
     expect(tierSaleStatus(noSale(), at).kind).toBe("none");
     expect(
-      tierSaleStatus(
-        blackFriday({ primeSaleUsd: -1, ultraSaleUsd: -1 }),
-        at,
-      ).kind,
+      tierSaleStatus(blackFriday({ primeSaleUsd: -1, ultraSaleUsd: -1 }), at)
+        .kind,
     ).toBe("none");
     expect(tierSaleStatus(blackFriday({ saleEndsAt: null }), at).kind).toBe(
       "none",
@@ -170,7 +168,9 @@ describe("labels", () => {
       tierSaleStatusLabel(
         tierSaleStatus(pricing, Date.parse("2026-11-20T00:00:00.000Z")),
       ),
-    ).toBe("Scheduled: starts Nov 27, 2026, 00:00 UTC, ends Dec 1, 2026, 00:00 UTC");
+    ).toBe(
+      "Scheduled: starts Nov 27, 2026, 00:00 UTC, ends Dec 1, 2026, 00:00 UTC",
+    );
     expect(
       tierSaleStatusLabel(
         tierSaleStatus(pricing, Date.parse("2026-11-28T00:00:00.000Z")),
@@ -188,5 +188,35 @@ describe("labels", () => {
     expect(tierSaleOffersLabel(tierSaleOffers(blackFriday()))).toBe(
       "Prime $159 first year, then $199/yr · Ultra $799 first year, then $999/yr",
     );
+  });
+});
+
+describe("sale dates without a timezone", () => {
+  // Read in the browser's own zone, so the sale would open at a different
+  // instant for every admin — refused rather than guessed.
+  it("refuses a sale date with no UTC marker or offset", () => {
+    expect(
+      tierPricingError(blackFriday({ saleStartsAt: "2026-11-27T00:00:00" })),
+    ).toMatch(/UTC times/);
+  });
+
+  it("accepts an explicit offset as well as Z", () => {
+    expect(
+      tierPricingError(
+        blackFriday({
+          saleStartsAt: "2026-11-27T00:00:00+00:00",
+          saleEndsAt: "2026-12-01T02:00:00+02:00",
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("reads a zoneless date as no sale window at all", () => {
+    expect(
+      tierSaleStatus(
+        blackFriday({ saleStartsAt: "2026-11-27T00:00:00" }),
+        Date.parse("2026-11-28T00:00:00Z"),
+      ).kind,
+    ).toBe("none");
   });
 });

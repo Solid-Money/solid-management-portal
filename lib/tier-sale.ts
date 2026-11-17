@@ -40,8 +40,19 @@ function isBlank(value: unknown): boolean {
   );
 }
 
+/**
+ * Ends in `Z` or an explicit `±hh:mm` offset. A date-time without one is read
+ * in whatever timezone the browser happens to be in, so the same config would
+ * open the sale at different instants for different admins.
+ */
+const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/** Whether a stored sale date is unambiguous: a parseable time with a zone. */
+const hasExplicitZone = (iso: string | null | undefined): boolean =>
+  !iso || HAS_ZONE.test(iso.trim());
+
 const asTime = (iso: string | null | undefined): number | null => {
-  if (!iso) return null;
+  if (!iso || !hasExplicitZone(iso)) return null;
   const at = new Date(iso).getTime();
   return Number.isFinite(at) ? at : null;
 };
@@ -81,6 +92,12 @@ export function tierPricingError(pricing: TierPricing): string | null {
     }
   }
 
+  if (
+    !hasExplicitZone(pricing.saleStartsAt) ||
+    !hasExplicitZone(pricing.saleEndsAt)
+  ) {
+    return "Sale Starts and Sale Ends have to be UTC times (ending in Z). Set them again from the date pickers.";
+  }
   const start = asTime(pricing.saleStartsAt);
   const end = asTime(pricing.saleEndsAt);
   if (anySale && (start === null || end === null)) {
@@ -115,7 +132,12 @@ export function tierSaleOffers(pricing: TierPricing): TierSaleOffer[] {
 
 export type TierSaleStatus =
   | { kind: "none" }
-  | { kind: "scheduled"; startsAt: string; endsAt: string; offers: TierSaleOffer[] }
+  | {
+      kind: "scheduled";
+      startsAt: string;
+      endsAt: string;
+      offers: TierSaleOffer[];
+    }
   | { kind: "live"; endsAt: string; offers: TierSaleOffer[] }
   | { kind: "ended"; endsAt: string; offers: TierSaleOffer[] };
 

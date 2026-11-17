@@ -612,11 +612,10 @@ export default function RewardsConfigPage() {
   const runCategoryRatesMigration = async (apply: boolean) => {
     try {
       setMigratingRates(true);
-      const response =
-        await api.post<SubscriptionCategoryRatesMigrationResult>(
-          "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
-          { apply },
-        );
+      const response = await api.post<SubscriptionCategoryRatesMigrationResult>(
+        "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
+        { apply },
+      );
       setMigrationResult(response.data);
 
       if (response.data.applied) {
@@ -656,7 +655,6 @@ export default function RewardsConfigPage() {
       "cardWelcomeBonus",
     );
   };
-
 
   if (loading) {
     return (
@@ -1568,7 +1566,6 @@ export default function RewardsConfigPage() {
           </button>
         </ConfigSection>
 
-
         {/* Subscription Discount */}
         <ConfigSection
           id="subscription-discounts"
@@ -1916,9 +1913,8 @@ export default function RewardsConfigPage() {
                   {new Date(
                     config.subscriptionDiscount.legacy.cutoverAt,
                   ).toLocaleString()}{" "}
-                  at Prime{" "}
-                  {config.subscriptionDiscount.legacy.tier2 * 100}%, Ultra{" "}
-                  {config.subscriptionDiscount.legacy.tier3 * 100}%.
+                  at Prime {config.subscriptionDiscount.legacy.tier2 * 100}%,
+                  Ultra {config.subscriptionDiscount.legacy.tier3 * 100}%.
                 </>
               ) : (
                 <> Nothing pinned yet.</>
@@ -2039,7 +2035,9 @@ export default function RewardsConfigPage() {
           icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
         >
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <strong>Both purchase routes need their contract deployed first.</strong>{" "}
+            <strong>
+              Both purchase routes need their contract deployed first.
+            </strong>{" "}
             A route with no address configured stays hidden in the app whatever
             its switch says, so turning one on before its deployment is safe but
             does nothing.
@@ -2047,9 +2045,7 @@ export default function RewardsConfigPage() {
 
           {/* 1 — the v2 ladder */}
           <div className="mb-6 rounded-lg border border-gray-200 p-4">
-            <h4 className="mb-1 text-sm font-semibold text-gray-900">
-              Points
-            </h4>
+            <h4 className="mb-1 text-sm font-semibold text-gray-900">Points</h4>
             <p className="mb-3 text-xs text-gray-500">
               The v2 route, and the rollback switch for the whole of v3.
             </p>
@@ -2071,9 +2067,9 @@ export default function RewardsConfigPage() {
             <p className="mb-3 text-xs text-gray-500">
               Lock soFUSE for a term to hold a tier. These amounts are the
               lock&rsquo;s own, separate from &ldquo;FUSE Staking for Tier
-              Unlock&rdquo; above: editing one pair does not change the other.
-              A lock is graded against the amounts in force when it was opened,
-              so a change here prices new locks only.
+              Unlock&rdquo; above: editing one pair does not change the other. A
+              lock is graded against the amounts in force when it was opened, so
+              a change here prices new locks only.
             </p>
             <div className="mb-4">
               <ToggleField
@@ -2128,13 +2124,13 @@ export default function RewardsConfigPage() {
               Holding FUSE in Savings, and the points ladder, keep granting a
               tier only to users who held one through them on the launch date —
               up to the tier they had then — and only for the window below.
-              Everyone else gets v3 only, however old their account, and the
-              app shows them only the v3 routes. The list records what each
-              route would grant whatever its toggle says, so a toggle only
-              ever hides a route — for everyone on the list too — and never
-              erases the list. Both dates are read-only
-              here except the window: the launch date is stamped the first time
-              the backend needs it, so it records when v3 actually went live.
+              Everyone else gets v3 only, however old their account, and the app
+              shows them only the v3 routes. The list records what each route
+              would grant whatever its toggle says, so a toggle only ever hides
+              a route — for everyone on the list too — and never erases the
+              list. Both dates are read-only here except the window: the launch
+              date is stamped the first time the backend needs it, so it records
+              when v3 actually went live.
             </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <InputField
@@ -2249,11 +2245,11 @@ export default function RewardsConfigPage() {
                 Sale (first year only)
               </h5>
               <p className="mb-3 text-xs text-gray-500">
-                A lower price for the first year of a new membership, while
-                the window below is open. The user still signs the mandate at
-                the annual charge above and renews at it. A sale price has to
-                be below its tier&rsquo;s annual charge; -1 turns the sale off
-                for that tier.
+                A lower price for the first year of a new membership, while the
+                window below is open. The user still signs the mandate at the
+                annual charge above and renews at it. A sale price has to be
+                below its tier&rsquo;s annual charge; -1 turns the sale off for
+                that tier.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
@@ -2277,11 +2273,15 @@ export default function RewardsConfigPage() {
                   tooltip="What a new Ultra membership is charged for its first year while the sale is open. First year only: the user signs the mandate at the Ultra Annual Charge and renews at it. Must be below the Ultra Annual Charge, so Ultra has to be on sale for cash. Set -1 to turn the sale off for Ultra."
                 />
                 <div className="flex flex-col">
-                  <label className="mb-1 text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="tier-sale-starts-at"
+                    className="mb-1 text-sm font-medium text-gray-700"
+                  >
                     Sale Starts (UTC)
                     <InfoTooltip text="Typed and shown in UTC, not your local time. The sale price is offered from this minute. Required while either sale price is above 0." />
                   </label>
                   <input
+                    id="tier-sale-starts-at"
                     type="datetime-local"
                     value={isoToUtcInput(config.tierMembership.saleStartsAt)}
                     onChange={(event) =>
@@ -2295,11 +2295,15 @@ export default function RewardsConfigPage() {
                   />
                 </div>
                 <div className="flex flex-col">
-                  <label className="mb-1 text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="tier-sale-ends-at"
+                    className="mb-1 text-sm font-medium text-gray-700"
+                  >
                     Sale Ends (UTC)
                     <InfoTooltip text="Typed and shown in UTC, not your local time. Exclusive: the sale stops at this minute, so a sale meant to run through Nov 30 ends at Dec 1, 00:00. Must be after Sale Starts." />
                   </label>
                   <input
+                    id="tier-sale-ends-at"
                     type="datetime-local"
                     value={isoToUtcInput(config.tierMembership.saleEndsAt)}
                     onChange={(event) =>
