@@ -2009,19 +2009,34 @@ export interface FullRewardsConfig {
   yieldBoost: YieldBoostConfig;
 }
 
-/** A membership's lifecycle, as the backend reports it. */
+/**
+ * A membership's lifecycle, as the backend reports it. `replaced` is a
+ * membership that ended because the user upgraded (Prime → Ultra): the new one
+ * took over from it.
+ */
 export type TierSubscriptionStatus =
   | "active"
   | "past_due"
   | "cancelled"
-  | "expired";
+  | "expired"
+  | "replaced";
 
 /** The user's paid membership, if they have one. */
 export interface TierSubscriptionView {
   id: string;
   tier: string;
   status: TierSubscriptionStatus;
+  /** The annual (list) price: what the mandate is for and renewals charge. */
   priceUsd: string;
+  /**
+   * What the first year was charged, when that differed from `priceUsd` — a
+   * sale price. Null or absent otherwise, and from backends that predate it.
+   */
+  introPriceUsd?: string | null;
+  /** When an upgrade ended this membership. Null or absent otherwise. */
+  replacedAt?: string | null;
+  /** The id of the membership that replaced it. */
+  replacedBy?: string | null;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   /** When the next renewal is attempted. Null once it will not renew. */
