@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -518,15 +518,20 @@ function DeleteTask({ task, onDeleted }: { task: TaskDetail; onDeleted: () => vo
   );
 }
 
+/** How long an update opened from a link stays lit up. */
+const FOCUS_MS = 4000;
+
 function TaskBody({
   task,
   people,
   me,
+  focusUpdate,
   onDeleted,
 }: {
   task: TaskDetail;
   people: TaskPerson[];
   me: string;
+  focusUpdate: string | null;
   onDeleted: () => void;
 }) {
   const patch = usePatchTask(task.id);
@@ -536,6 +541,11 @@ function TaskBody({
   const boardName = task.board ? (boards.find((b) => b.key === task.board)?.name ?? task.board) : null;
   const [following, setFollowing] = useState<boolean | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  const header = useRef<HTMLDivElement>(null);
+  // The linked update stays lit until FOCUS_MS after it was scrolled to.
+  const [faded, setFaded] = useState<string | null>(null);
+  const lit = focusUpdate && faded !== focusUpdate ? focusUpdate : null;
   const isFollowing = following ?? task.following;
   const closed = task.status === "done" || task.status === "cancelled";
 
@@ -560,15 +570,43 @@ function TaskBody({
     }
   };
 
+  // Opened from an email or the bell (`&update=`): like monday, straight to
+  // that update, under the title, and lit up for a moment. Placed again a
+  // little later, once the images above it have taken their space. An update
+  // that was deleted, or is older than the ones loaded, just opens the task.
+  useEffect(() => {
+    if (!focusUpdate) return;
+    const box = scroller.current;
+    const target = document.getElementById(`update-${focusUpdate}`);
+    if (!box || !target) return;
+    const place = () => {
+      const top = header.current?.offsetHeight ?? 0;
+      const room = box.clientHeight - top;
+      const at = target.getBoundingClientRect();
+      // Centred in the space under the title; a long one from its top.
+      const gap = at.height < room - 24 ? (room - at.height) / 2 : 12;
+      box.scrollTop += at.top - box.getBoundingClientRect().top - top - gap;
+    };
+    place();
+    const again = window.setTimeout(place, 400);
+    const fade = window.setTimeout(() => setFaded(focusUpdate), FOCUS_MS);
+    return () => {
+      window.clearTimeout(again);
+      window.clearTimeout(fade);
+    };
+  }, [focusUpdate]);
+
   // One scroll for the whole task: the fields go up with the description and
   // updates instead of staying pinned and leaving a small window below. Only
   // the title (and who opened it, and its actions) stays at the top.
   return (
     <div
+      ref={scroller}
       className="min-h-0 flex-1 overflow-y-auto"
       onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
     >
       <div
+        ref={header}
         className={cn(
           "sticky top-0 z-10 border-b bg-white px-6 pb-2 pt-5",
           scrolled ? "border-gray-200 shadow-[0_4px_12px_-8px_rgba(0,0,0,0.15)]" : "border-transparent",
@@ -850,14 +888,22 @@ function TaskBody({
               Opened by {authorName(task.createdBy, people)} · {formatWhen(task.createdAt)}
             </p>
             {oldestFirst(task.updates).map((update) => (
-              <TaskUpdateCard
+              <div
                 key={update.id}
-                api={taskUpdateApi(task.id)}
-                update={update}
-                me={me}
-                people={people}
-                onChanged={() => refresh(task.id)}
-              />
+                id={`update-${update.id}`}
+                className={cn(
+                  "rounded-lg ring-offset-2 transition-shadow duration-700",
+                  lit === update.id ? "ring-2 ring-indigo-400" : "ring-0 ring-transparent",
+                )}
+              >
+                <TaskUpdateCard
+                  api={taskUpdateApi(task.id)}
+                  update={update}
+                  me={me}
+                  people={people}
+                  onChanged={() => refresh(task.id)}
+                />
+              </div>
             ))}
           </div>
           <TaskComposer
@@ -879,9 +925,18 @@ function TaskBody({
 /**
  * A task, over the list: its fields at the top, then the description,
  * checklist and the updates feed. Opened by `?task=<id>`, so the URL is the
- * link to share.
+ * link to share; `&update=<id>` goes to one update in it.
  */
-export default function TaskDrawer({ taskId, onClose }: { taskId: string | null; onClose: () => void }) {
+export default function TaskDrawer({
+  taskId,
+  focusUpdate = null,
+  onClose,
+}: {
+  taskId: string | null;
+  /** An update to scroll to and light up (`&update=` in the URL). */
+  focusUpdate?: string | null;
+  onClose: () => void;
+}) {
   const { user } = useAuth();
   const { data: task, isLoading, isError } = useTask(taskId);
   const { data: people = [] } = useTaskPeople();
@@ -891,7 +946,7 @@ export default function TaskDrawer({ taskId, onClose }: { taskId: string | null;
     <Sheet open={!!taskId} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="gap-0 p-0 sm:max-w-2xl">
         {task ? (
-          <TaskBody key={task.id} task={task} people={people} me={me} onDeleted={onClose} />
+          <TaskBody key={task.id} task={task} people={people} me={me} focusUpdate={focusUpdate} onDeleted={onClose} />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-gray-500">
             <SheetTitle className="sr-only">Task</SheetTitle>

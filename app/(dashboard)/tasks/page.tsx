@@ -148,6 +148,8 @@ function TasksScreen() {
     ...(params.get("q") ? { q: params.get("q")! } : {}),
   };
   const open = params.get("task");
+  // `&update=<id>` (from an email or the bell): that update, scrolled to and lit up.
+  const focusUpdate = params.get("update");
   // A sprint in the URL is a day (`YYYY-MM-DD`); anything else means this week.
   const rawSprint = params.get("sprint");
   const sprint =
@@ -184,6 +186,9 @@ function TasksScreen() {
     },
     [params, pathname, router, legacyBoard, tab],
   );
+
+  /** Opens a task (or closes it, with null); a link's update to scroll to goes with it. */
+  const openTask = (id: string | null) => update({ task: id, update: null });
 
   /** A top tab: its own board, view and filters start fresh. */
   const goTo = (next: Tab) =>
@@ -230,7 +235,7 @@ function TasksScreen() {
           </p>
         </div>
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <TaskSearch className="min-w-0 flex-1 sm:w-96 sm:flex-none" onOpen={(id) => update({ task: id })} />
+          <TaskSearch className="min-w-0 flex-1 sm:w-96 sm:flex-none" onOpen={(id) => openTask(id)} />
           <Button className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700" onClick={newTask}>
             <Plus /> {tab === "marketing" ? "New piece" : "New task"}
           </Button>
@@ -271,7 +276,7 @@ function TasksScreen() {
           start={sprint}
           onStart={(start) => update({ sprint: start })}
           selected={open}
-          onOpen={(id) => update({ task: id })}
+          onOpen={(id) => openTask(id)}
         />
       ) : tab === "team" ? (
         <TeamBoard
@@ -283,7 +288,7 @@ function TasksScreen() {
           }}
           onFilters={(next) => update(next)}
           selected={open}
-          onOpen={(id) => update({ task: id })}
+          onOpen={(id) => openTask(id)}
         />
       ) : tab === "marketing" ? (
         <MarketingBoard
@@ -299,7 +304,7 @@ function TasksScreen() {
           }}
           onFilters={(next) => update(next)}
           selected={open}
-          onOpen={(id) => update({ task: id })}
+          onOpen={(id) => openTask(id)}
           onNewPiece={setPiece}
         />
       ) : (
@@ -321,26 +326,26 @@ function TasksScreen() {
               filters={filters}
               onFilters={(next) => update(next)}
               selected={open}
-              onOpen={(id) => update({ task: id })}
+              onOpen={(id) => openTask(id)}
               counts={counts}
             />
           )}
         </>
       )}
 
-      <TaskDrawer taskId={open} onClose={() => update({ task: null })} />
+      <TaskDrawer taskId={open} focusUpdate={focusUpdate} onClose={() => openTask(null)} />
       <NewTaskDialog
         open={creating !== null}
         defaultBoard={tab === "support" ? supportBoard : productBoard && productBoard !== "none" ? productBoard : null}
         defaultSprint={creating?.sprint ?? null}
         onOpenChange={(next) => !next && setCreating(null)}
-        onCreated={(id) => update({ task: id })}
+        onCreated={(id) => openTask(id)}
       />
       <NewPieceDialog
         open={piece !== null}
         defaults={piece}
         onOpenChange={(next) => !next && setPiece(null)}
-        onCreated={(id) => update({ task: id })}
+        onCreated={(id) => openTask(id)}
       />
     </div>
   );

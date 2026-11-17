@@ -43,7 +43,8 @@ export default function TaskBell() {
     if (!item.read) markRead.mutate({ ids: [item.id] });
     // Old Team feed mentions have no task, and the feed is gone: reading
     // one here is all there is to do.
-    if (item.taskId) router.push(`/tasks?task=${item.taskId}`);
+    // Straight to the update itself, like monday.
+    if (item.taskId) router.push(`/tasks?task=${item.taskId}${item.updateId ? `&update=${item.updateId}` : ""}`);
   };
 
   return (
