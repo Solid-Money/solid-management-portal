@@ -1,4 +1,5 @@
-import { CASHBACK_PERCENTAGE_SOURCE_LABELS } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+import { CASHBACK_PERCENTAGE_SOURCE_LABELS, CashbackCurrency } from "@/types";
 
 /**
  * Cashback rates are stored as fractions everywhere — 0.03 is 3%, the same way
@@ -61,13 +62,22 @@ export function describeCashbackRate(
 }
 
 /**
- * The monthly cap frozen on a cashback row — "$100/mo cap" — or `undefined`
- * for a row from before the cap was stored, which is capped by whatever tier
- * the user holds on payout day.
+ * The monthly cap frozen on a cashback row — "$100/mo cap", or "€50/mo cap"
+ * for a euro row's `monthlyCapEur` — or `undefined` for a row from before the
+ * cap was stored, which is capped by whatever tier the user holds on payout
+ * day.
  */
-export function formatMonthlyCap(usd?: number | null): string | undefined {
-  if (usd === null || usd === undefined || !Number.isFinite(usd) || usd < 0)
+export function formatMonthlyCap(
+  cap?: number | null,
+  currency: CashbackCurrency = "USD"
+): string | undefined {
+  if (cap === null || cap === undefined || !Number.isFinite(cap) || cap < 0)
     return undefined;
 
-  return `$${Number(usd.toFixed(2))}/mo cap`;
+  // Whole amounts drop their cents, as caps are configured: "$100", not "$100.00".
+  const amount = formatCurrency(Number(cap.toFixed(2)), currency, {
+    minimum: 0,
+  });
+
+  return `${amount}/mo cap`;
 }

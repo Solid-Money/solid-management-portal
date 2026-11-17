@@ -55,6 +55,42 @@ export function formatWhen(iso: string, now = new Date()): string {
   return `${MONTHS[at.getMonth()]} ${at.getDate()}${year}, ${time}`;
 }
 
+/** How long ago, short: `now`, `5m`, `3h`, `2d`, `3w`, then the date (`Nov 7`, `Nov 7 2025`). */
+export function formatAgo(iso: string, now = new Date()): string {
+  const at = new Date(iso);
+  const minutes = Math.floor((now.getTime() - at.getTime()) / 60_000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  if (days < 28) return `${Math.floor(days / 7)}w`;
+  const year = at.getFullYear() === now.getFullYear() ? "" : ` ${at.getFullYear()}`;
+  return `${MONTHS[at.getMonth()]} ${at.getDate()}${year}`;
+}
+
+/** The words a search looks for, as the API reads them: lower case, "a phrase" kept whole. */
+export function searchWords(q: string): string[] {
+  const words: string[] = [];
+  for (const match of q.matchAll(/"([^"]+)"|(\S+)/g)) {
+    const word = (match[1] ?? match[2] ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (word && !words.includes(word)) words.push(word);
+  }
+  return words;
+}
+
+/** Text split around the words searched for, to mark them. */
+export function splitMatches(text: string, words: string[]): Array<{ text: string; match: boolean }> {
+  const parts = words.filter(Boolean).map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!parts.length) return [{ text, match: false }];
+  const pattern = new RegExp(`(${parts.sort((a, b) => b.length - a.length).join("|")})`, "gi");
+  return text
+    .split(pattern)
+    .filter(Boolean)
+    .map((piece) => ({ text: piece, match: words.includes(piece.toLowerCase()) }));
+}
+
 /** The names a mention can appear under in text: full name and first name, longest first. */
 export function mentionNames(mentions: string[], people?: TaskPerson[]): string[] {
   return mentions

@@ -711,6 +711,13 @@ export interface ChainBalance {
   eurcThreshold?: string;
   eurcStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
   eurcAddress?: string;
+  // soEUR (the soEURC vault share) on Base: the euro cashback payout float of
+  // the Cashback Payout Wallet, which pays euro cardholders. Kept apart from
+  // soUSD on Fuse — the two are never added together. Gas is ETH.
+  soEurBalance?: string;
+  soEurThreshold?: string;
+  soEurStatus?: "OK" | "LOW" | "CRITICAL" | "N/A";
+  soEurAddress?: string;
   needsTopUp: boolean;
   topUpRecommendation?: string;
 }
@@ -754,10 +761,21 @@ export type WalletFailureSource =
   | "referral_payout"
   | "user_activity";
 
-export type WalletForecastSource = "cashback" | "referral";
+export type WalletForecastSource =
+  | "cashback"
+  | "referral"
+  // The Card Refund Payout Wallet: its forecast is the unpaid refund queue.
+  | "card_refund";
 
-/** The six assets the page tracks, as the backend names them. */
-export type WalletAsset = "gas" | "USDC" | "USDT" | "soUSD" | "soFUSE" | "EURC";
+/** The seven assets the page tracks, as the backend names them. */
+export type WalletAsset =
+  | "gas"
+  | "USDC"
+  | "USDT"
+  | "soUSD"
+  | "soFUSE"
+  | "EURC"
+  | "soEUR";
 
 export interface WalletInfo {
   name: string;
@@ -859,9 +877,88 @@ export interface WalletRefillPlan {
    */
   floorBasis?: "days" | "minimum";
   targetAmount: number;
-  /** What to actually send now. Zero when the balance already covers it. */
+  /**
+   * What to actually send now. Zero when the balance already covers it.
+   * Counts `owedAmount` first: money already owed out is not cover.
+   */
   refillAmount: number;
+  /** Payouts already queued against this balance, reserved before cover. */
+  owedAmount?: number;
   belowFloor: boolean;
+}
+
+/**
+ * A transfer the daily rate leaves out as a one-off — one 2,900 USDC credit
+ * among dozens of ordinary refunds is not what the wallet spends each day.
+ */
+export interface WalletExcludedOneOff {
+  amount: number;
+  /** Its share of everything that left in the window, 0–1. */
+  share: number;
+  timestamp: string;
+  hash: string;
+  explorerUrl: string;
+}
+
+/**
+ * Payouts already queued behind this balance — card refunds waiting on a
+ * top-up. `clearAmount` is the least that gets them paid.
+ */
+export interface WalletOwedNow {
+  kind: "card-refunds";
+  count: number;
+  amount: number;
+  oldestAt?: string;
+  clearAmount: number;
+  /** Stopped retrying and waiting on an operator; not in `amount`. */
+  failedCount: number;
+  /** Queued but not convertible to this asset right now; not in `amount`. */
+  unpricedCount: number;
+}
+
+/** One card refund, chargeback or credit adjustment not yet paid out. */
+export interface RefundQueueItem {
+  uniqueOperationId: string;
+  transactionId?: string;
+  userId?: string;
+  status: "PENDING" | "APPROVED" | "PAYING" | "FAILED";
+  /** Wirex's reason — Refund, Reversal, OriginalCredit, … */
+  reason?: string;
+  amountUsd: number;
+  currency: "USD" | "EUR";
+  symbol: "USDC" | "EURC";
+  /** Roughly what will be sent in `symbol`; absent when it could not be priced. */
+  tokenAmount?: number;
+  createdAt?: string;
+  attempts: number;
+  nextAttemptAt?: string;
+  lastError?: string;
+  attributedToBalance: boolean;
+  /** False when it waits on an operator rather than on a top-up. */
+  autoPayable: boolean;
+}
+
+export interface RefundQueueCurrencyTotals {
+  count: number;
+  usd: number;
+  tokenAmount: number;
+  unpricedCount: number;
+}
+
+export interface RefundQueueResponse {
+  items: RefundQueueItem[];
+  owed: {
+    count: number;
+    usd: number;
+    byCurrency: Record<"USD" | "EUR", RefundQueueCurrencyTotals>;
+    oldestAt?: string;
+  };
+  failed: { count: number; usd: number };
+  /** More rows than the list carries; the totals still cover every one. */
+  truncated: boolean;
+  /** More payable refunds than could be read: `owed` is a floor. */
+  owedIncomplete?: boolean;
+  generatedAt: string;
 }
 
 /** The verdict to render: one rule, computed server-side. */
@@ -880,7 +977,9 @@ export type WalletVerdictBasis =
   | "estimated"
   | "configured"
   | "residue"
-  | "warming-up";
+  | "warming-up"
+  // Payouts are queued against this balance and it cannot pay them.
+  | "queued";
 
 /**
  * One asset's verdict and refill plan, for every wallet at once.
@@ -909,6 +1008,10 @@ export interface WalletAssetPlan {
   runwayBasis?: "measured" | "outflow";
   snapshotCount: number;
   plan?: WalletRefillPlan;
+  /** Payouts already queued behind this balance, when there are any. */
+  owedNow?: WalletOwedNow;
+  /** A transfer left out of the daily rate as a one-off. */
+  excludedOneOff?: WalletExcludedOneOff;
   verdict: WalletVerdict;
   verdictBasis: WalletVerdictBasis;
   verdictReason: string;
@@ -1037,6 +1140,15 @@ export interface WalletAssetFlow {
   /** Which figure the runway was computed from. */
   runwayBasis?: "measured" | "outflow";
   plan?: WalletRefillPlan;
+  /** Payouts already queued behind this balance, when there are any. */
+  owedNow?: WalletOwedNow;
+  /** A transfer left out of the daily rate as a one-off. */
+  excludedOneOff?: WalletExcludedOneOff;
+  /**
+   * Days of history the rates were taken over: the window, or less when the
+   * wallet has not been watched that long.
+   */
+  observedDays?: number;
   /**
    * The verdict to render. Optional only so a page deployed ahead of the
    * backend keeps working — it falls back to `status`, which is what it
@@ -1075,6 +1187,8 @@ export interface WalletForecastResponse {
     shortfallUsd?: number;
     coversUntil?: string;
   };
+  /** The unpaid refunds themselves, on the Card Refund Payout Wallet. */
+  refundQueue?: RefundQueueResponse;
   note?: string;
   generatedAt: string;
 }
@@ -1172,8 +1286,48 @@ export const WALLET_FILTERS = [
   { value: "all", label: "All" },
 ] as const;
 
+/**
+ * The currency a cashback row is earned, capped and paid in. EUR rows belong
+ * to cardholders whose Wirex main currency is EUR and are paid in soEUR on
+ * Base; USD rows are paid in soUSD on Fuse. The two are never added together
+ * or converted into each other. Absent on a row means USD.
+ */
+export type CashbackCurrency = "USD" | "EUR";
+
+/**
+ * The euro-cashback fields every cashback row can carry. All absent on a USD
+ * row, which keeps its `soUsd…`/`…Usd` fields.
+ */
+export interface CashbackRowCurrencyFields {
+  /** Absent = USD. */
+  currency?: CashbackCurrency;
+  /** soEUR shares paid (EUR rows), before debt/refund rewrites. 6dp. */
+  soEurAmount?: string;
+  /** EUR per soEUR share at payout. EUR value = soEurAmount * soEurRate. */
+  soEurRate?: string;
+  /** soEUR actually moved by the payout transfer. 6dp. */
+  sentSoEurAmount?: string;
+  /** A subscription discount's amount in EUR. 2dp. */
+  discountEur?: string;
+  /** The tier's euro monthly cap frozen on the row at purchase. */
+  monthlyCapEur?: number;
+  /**
+   * The chain `payoutTxHash` is on: 8453 (Base) for a soEUR payout, and for a
+   * soUSD one the Base float covered; 122 (Fuse) for soUSD it did not.
+   * Absent = Fuse (122): soUSD paid before the chain was recorded.
+   */
+  payoutChainId?: number;
+  /**
+   * Set only when a euro cardholder's purchase was billed in another
+   * currency and converted to EUR once, at accrual. Kept for audit.
+   */
+  billedAmount?: string;
+  billedCurrency?: string;
+  billedToEurRate?: number;
+}
+
 // Card Transactions
-export interface CardTransactionCashback {
+export interface CardTransactionCashback extends CashbackRowCurrencyFields {
   status: string;
   /** Current payout asset. Cashback moved to soUSD; FUSE below is historical. */
   soUsdAmount?: string;
@@ -1183,6 +1337,7 @@ export interface CardTransactionCashback {
   /** @deprecated Companion to `fuseAmount`. */
   fuseUsdPrice?: string;
   payoutTxHash?: string;
+  /** In `fiatCurrency` — EUR on a EUR row, the amount it is earned on. */
   fiatAmount: string;
   fiatCurrency: string;
   /** "Cashback" or "SubscriptionDiscount". */
@@ -1199,7 +1354,7 @@ export interface CardTransactionCashback {
    * The monthly cap frozen on the row with that rate, in USD. The payout holds
    * the purchase to the larger of this and the cap of the tier held on payout
    * day, so a trial that ended in between keeps its cap. Absent on rows from
-   * before the cap was stored.
+   * before the cap was stored. A EUR row carries `monthlyCapEur` instead.
    */
   monthlyCapUsd?: number;
 }
@@ -1411,7 +1566,13 @@ export interface TierThresholds {
 
 export interface TierCashbackConfig {
   percentage: number;
+  /** Most card cashback a USD cardholder on this tier earns a month, in USD. */
   monthlyCap: number;
+  /**
+   * The same cap for a euro cardholder, in EUR (Core €50, Prime €100, Ultra
+   * €200). Configured on its own, never converted from the USD one.
+   */
+  monthlyCapEur: number;
 }
 
 export interface CashbackConfig {
@@ -1453,6 +1614,11 @@ export interface TierSubscriptionDiscountConfig {
    * Caps the cashback, not the charge it is earned on.
    */
   monthlyCap: number;
+  /**
+   * The same cap for a euro cardholder, in EUR (Core €50, Prime €100, Ultra
+   * €200). Configured on its own, never converted from the USD one.
+   */
+  monthlyCapEur: number;
 }
 
 /**
@@ -1520,6 +1686,8 @@ export interface SubscriptionDiscountConfig {
    * `monthlyCap`. The name is left from an earlier reading.
    */
   eligibleAmountCap: number;
+  /** The same per-payment cap for a euro cardholder, in EUR (€50). */
+  eligibleAmountCapEur: number;
   tier1: TierSubscriptionDiscountConfig;
   tier2: TierSubscriptionDiscountConfig;
   tier3: TierSubscriptionDiscountConfig;
@@ -2914,9 +3082,10 @@ export interface UserRewardsData {
   /** This month's cashback still in escrow, already held to the cap. */
   cashbackPendingThisMonth?: number;
   /**
-   * The app's "Lifetime cashback": everything paid on every card the user has
-   * held, plus what is still in escrow. Absent on older backends, or when the
-   * paid total couldn't be read.
+   * The app's "Lifetime cashback" in dollars: everything paid on every card the
+   * user has held, plus what is still in escrow. Euro cashback has its own in
+   * `cashbackEur`. Absent on older backends, or when the paid total couldn't
+   * be read.
    */
   cashbackLifetime?: number;
   /** The monthly cap of the tier held now. */
@@ -2929,6 +3098,28 @@ export interface UserRewardsData {
   cashbackCapThisMonth?: number;
   /** What a purchase made now can still earn this month. */
   cashbackHeadroomThisMonth?: number;
+  /**
+   * The cardholder's cashback currency — EUR when their Wirex main currency
+   * is EUR. The top-level cashback figures above count USD rows only; a euro
+   * cardholder's month is in `cashbackEur`. Absent from an older backend,
+   * which reads as USD.
+   */
+  cashbackCurrency?: CashbackCurrency;
+  /** Present when `cashbackCurrency` is EUR. Every figure is in EUR. */
+  cashbackEur?: {
+    cashbackThisMonth: number;
+    cashbackPendingThisMonth: number;
+    cashbackLastMonth: number;
+    /** The tier's euro monthly cap. */
+    maxCashbackMonthly: number;
+    cashbackCapThisMonth: number;
+    cashbackHeadroomThisMonth: number;
+    /**
+     * The app's "Lifetime cashback" in euros: paid on every card plus still
+     * pending. Absent on older backends.
+     */
+    cashbackLifetime?: number;
+  };
   referralPoints: number;
   hasCard: boolean;
   hasOptedIn: boolean;
@@ -3090,9 +3281,10 @@ export interface BatchIssueTierTrialResult {
   summary: Record<TierTrialBatchOutcome, number>;
 }
 
-export interface CashbackEntry {
+export interface CashbackEntry extends CashbackRowCurrencyFields {
   _id: string;
   transactionId: string;
+  /** In `fiatCurrency` — EUR on a EUR row, the amount it is earned on. */
   fiatAmount: string;
   fiatCurrency: string;
   soUsdAmount?: string;
@@ -3114,12 +3306,24 @@ export interface CashbackEntry {
   monthlyCapUsd?: number;
 }
 
-/** Cashback rows plus the totals support is usually actually after. */
+/**
+ * Cashback rows plus the totals support is usually actually after.
+ *
+ * Totals are per currency and never added together: the USD ones count USD
+ * rows only, the EUR ones EUR rows only. The EUR ones are absent from a
+ * backend that predates euro cashback.
+ */
 export interface CashbackHistory {
   entries: CashbackEntry[];
   totalPaidSoUsd: number;
   totalPaidUsd: number;
   totalQualifyingSpend: number;
+  /** soEUR shares paid on EUR rows. */
+  totalPaidSoEur?: number;
+  /** EUR value paid on EUR rows. */
+  totalPaidEur?: number;
+  /** Euro spend the EUR rows were earned on. */
+  totalQualifyingSpendEur?: number;
   pendingCount: number;
   failedCount: number;
 }
@@ -3178,12 +3382,15 @@ export interface StuckCashbackRow {
   type: string;
   fiatAmount: string;
   fiatCurrency: string;
+  /** The row's cashback currency. Absent = USD. */
+  currency?: CashbackCurrency;
   /** The rate frozen on the row, as a fraction. Absent on older rows. */
   cashbackPercentage?: number;
   /**
-   * USD owed before the monthly cap: the row's own figure, else spend times its
+   * Owed before the monthly cap: the row's own figure, else spend times its
    * frozen rate. Null for a row older than the stored rate — the payout prices
-   * it at the cardholder's rate on the day.
+   * it at the cardholder's rate on the day. In the row's `currency` — a EUR
+   * row's figure is euros, despite the name.
    */
   owedUsd: number | null;
   cause: StuckCashbackCause;
@@ -3248,6 +3455,11 @@ export interface PartialRefundVoidedRow {
   merchantCategoryCode?: string;
   purchasedAt: string;
   voidedAt: string;
+  /**
+   * The row's cashback currency. Absent = USD. The `…Usd` amounts below are in
+   * this currency — a EUR row's figures are euros, despite the names.
+   */
+  currency?: CashbackCurrency;
   /** What the purchase was recorded at, in USD — for a hold, what was held. */
   purchaseUsd: number;
   /** What every refund credit on the purchase returned, in USD. */
@@ -3338,8 +3550,13 @@ export interface TrialCorrectionRow {
   status: string;
   trialId: string;
   action: TrialCorrectionAction;
-  from: { percentage?: number; monthlyCapUsd?: number };
-  to: { percentage?: number; monthlyCapUsd: number };
+  /**
+   * The row's cashback currency. Absent = USD. The `…Usd` amounts below are in
+   * this currency, and a EUR row's caps are `monthlyCapEur`.
+   */
+  currency?: CashbackCurrency;
+  from: { percentage?: number; monthlyCapUsd?: number; monthlyCapEur?: number };
+  to: { percentage?: number; monthlyCapUsd: number; monthlyCapEur?: number };
   /** What the purchase earns on the trial's terms, before the monthly cap. */
   owedUsd: number;
   /** What it has paid so far, corrections included. Paid rows only. */
@@ -3353,7 +3570,9 @@ export type TrialCorrectionSkipReason =
   | "refunded"
   | "canceled_other"
   | "ineligible"
-  | "claimed_correction";
+  | "claimed_correction"
+  /** Euro cashback: the correction pays soUSD at dollar caps, so it skips euro rows. */
+  | "euro_cashback";
 
 /** What "Apply trial terms" would change for one user. */
 export interface TrialCashbackCorrectionPlan {

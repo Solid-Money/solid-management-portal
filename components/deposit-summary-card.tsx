@@ -20,7 +20,11 @@ import {
   Radio,
 } from "lucide-react";
 import TemporalWorkflowLink from "@/components/temporal-workflow-link";
-import { formatNumber, tokenFractionDigits } from "@/lib/utils";
+import {
+  formatNumber,
+  getExplorerTxUrl,
+  tokenFractionDigits,
+} from "@/lib/utils";
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString("en-US", {
@@ -42,26 +46,6 @@ function formatDate(dateStr: string): string {
 
 function truncateHash(hash: string): string {
   return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
-}
-
-const EXPLORER_URLS: Record<number, string> = {
-  1: "https://etherscan.io",
-  // BSC is a supported bridge chain, so its deposits need an explorer too —
-  // without it they silently fell back to the Fuse explorer, which cannot
-  // resolve a BSC hash.
-  56: "https://bscscan.com",
-  122: "https://explorer.fuse.io",
-  137: "https://polygonscan.com",
-  8453: "https://basescan.org",
-  42161: "https://arbiscan.io",
-  // Optimism takes deposits to the Safe (OP, USDC, ...), so a deposit there must
-  // not link to the Fuse explorer either.
-  10: "https://optimistic.etherscan.io",
-};
-
-function getExplorerTxUrl(hash: string, chainId: number | null): string {
-  const base = EXPLORER_URLS[chainId ?? 122] ?? EXPLORER_URLS[122];
-  return `${base}/tx/${hash}`;
 }
 
 const statusColors: Record<string, string> = {
