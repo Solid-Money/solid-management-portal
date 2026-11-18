@@ -83,7 +83,7 @@ const SOURCE_STYLE: Record<RainRtfSettingSource, string> = {
  * editing the layer that is being overridden — the change saves, the badge
  * still says Environment, and nothing happens.
  */
-function SourceBadge({ setting }: { setting: RainRtfSetting }) {
+export function SourceBadge({ setting }: { setting: RainRtfSetting }) {
   const hint =
     setting.source === "database"
       ? "Set here. Clear it to fall back to the deployment's environment."
@@ -102,7 +102,7 @@ function SourceBadge({ setting }: { setting: RainRtfSetting }) {
 }
 
 /** The layers this value is not currently taking, so the fallback is visible. */
-function FallbackNote({ setting }: { setting: RainRtfSetting }) {
+export function FallbackNote({ setting }: { setting: RainRtfSetting }) {
   if (setting.source !== "database") return null;
   const fallback = setting.environment ?? setting.publishedDefault;
   if (!fallback) return null;

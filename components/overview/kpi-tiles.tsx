@@ -94,7 +94,7 @@ export function KpiTiles({
       >
         <SplitBar
           parts={[
-            { label: `Prime ${compactUsd(kpis.revenue.primeUsd.current)}`, value: kpis.revenue.primeUsd.current, color: OVERVIEW_ACCENT },
+            { label: `Memberships ${compactUsd(kpis.revenue.primeUsd.current)}`, value: kpis.revenue.primeUsd.current, color: OVERVIEW_ACCENT },
             { label: `Fees ${compactUsd(kpis.revenue.feesUsd.current)}`, value: kpis.revenue.feesUsd.current, color: "#a3a7ee" },
           ]}
         />

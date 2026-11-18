@@ -17,6 +17,12 @@ import {
   getPartialRefundVoidedCashback,
   restorePartialRefundVoidedCashback,
 } from "@/lib/api";
+import {
+  cashbackCurrencyOf,
+  formatCashbackMoney,
+  formatCashbackTotals,
+  sumByCashbackCurrency,
+} from "@/lib/card-transactions";
 import { formatDateTime, formatUsd } from "@/lib/utils";
 import {
   PartialRefundRestoreResult,
@@ -250,6 +256,8 @@ export default function PartialRefundCashbackBulk({ open }: { open: boolean }) {
   }
 
   const { summary, total, truncated, generatedAt } = query.data;
+  // The backend's summary counts USD rows only; euro rows are listed in euros.
+  const hasEuroRows = rows.some((row) => cashbackCurrencyOf(row) === "EUR");
 
   return (
     <div className="space-y-4">
@@ -276,6 +284,12 @@ export default function PartialRefundCashbackBulk({ open }: { open: boolean }) {
             Priced at each user&apos;s cashback rate today: the rate a purchase
             accrued at was cleared when its cashback was cancelled.
           </p>
+          {hasEuroRows && (
+            <p className="text-xs text-gray-500">
+              These totals count USD rows only. Euro rows are shown in euros
+              and never added in.
+            </p>
+          )}
           {truncated && (
             <p className="text-xs text-amber-700">
               Showing the newest {rows.length} of {total}. Restore these and
@@ -349,7 +363,11 @@ export default function PartialRefundCashbackBulk({ open }: { open: boolean }) {
                   </span>{" "}
                   · {selectedTotals.users} user
                   {selectedTotals.users === 1 ? "" : "s"} ·{" "}
-                  {formatUsd(selectedTotals.owedUsd)} cashback
+                  {formatCashbackTotals(
+                    selectedTotals.owedUsd,
+                    selectedTotals.owedEur,
+                  )}{" "}
+                  cashback
                   {selectedTotals.unpricedRows > 0 &&
                     ` + ${selectedTotals.unpricedRows} priced when restored`}
                   {hiddenSelectedCount > 0 &&
@@ -451,7 +469,10 @@ export default function PartialRefundCashbackBulk({ open }: { open: boolean }) {
             <li>
               About{" "}
               <span className="font-semibold text-gray-900">
-                {formatUsd(selectedTotals.owedUsd)}
+                {formatCashbackTotals(
+                  selectedTotals.owedUsd,
+                  selectedTotals.owedEur,
+                )}
               </span>{" "}
               at each user&apos;s rate today, before monthly caps.
             </li>
@@ -518,6 +539,10 @@ function VoidedRow({
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
+  // A euro row's figures are euros; shown as such, never as dollars.
+  const money = (value: number) =>
+    formatCashbackMoney(value, cashbackCurrencyOf(row));
+
   return (
     <TableRow data-state={checked ? "selected" : undefined}>
       <TableCell>
@@ -547,7 +572,7 @@ function VoidedRow({
             When restored
           </span>
         ) : (
-          formatUsd(row.owedUsd)
+          money(row.owedUsd)
         )}
         {row.percentage !== null && (
           <div className="text-xs font-normal text-gray-500">
@@ -556,13 +581,13 @@ function VoidedRow({
         )}
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        <div className="text-gray-900">{formatUsd(row.keptUsd)}</div>
+        <div className="text-gray-900">{money(row.keptUsd)}</div>
         <div className="text-xs text-gray-500">
-          of {formatUsd(row.purchaseUsd)}
+          of {money(row.purchaseUsd)}
         </div>
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        <div className="text-gray-900">{formatUsd(row.refundedUsd)}</div>
+        <div className="text-gray-900">{money(row.refundedUsd)}</div>
         <div className="flex flex-wrap justify-end gap-1 pt-0.5">
           {row.refundReasons.map((key) => (
             <Badge key={key} variant="muted" title={REFUND_REASONS[key]?.hint}>
@@ -675,10 +700,14 @@ function RestoreResult({
   );
 }
 
+/** Owed is summed per currency — a euro row's figure is never added to the dollars. */
 function totalsOf(rows: PartialRefundVoidedRow[]) {
+  const owed = sumByCashbackCurrency(rows, (row) => row.owedUsd);
+
   return {
     users: unique(rows.map((row) => row.userId)).length,
-    owedUsd: rows.reduce((sum, row) => sum + (row.owedUsd ?? 0), 0),
+    owedUsd: owed.usd,
+    owedEur: owed.eur,
     unpricedRows: rows.filter((row) => row.owedUsd === null).length,
   };
 }

@@ -28,6 +28,7 @@ import {
 } from "@/lib/ai-api";
 import { formatCashbackRate } from "@/lib/cashback-percentage";
 import { formatDateTime, formatUsd } from "@/lib/utils";
+import { cashbackPayoutLink } from "@/lib/card-transactions";
 import type {
   AiApiAccountAction,
   AiApiAdminCharge,
@@ -37,8 +38,8 @@ import type {
 
 /** Billing runs on Base: the module, the Safe it charges, and each charge. */
 const BILLING_EXPLORER = "https://basescan.org";
-/** Cashback is paid in soUSD on Fuse, the payout card cashback already uses. */
-const CASHBACK_EXPLORER = "https://explorer.fuse.io";
+// Cashback is paid in soUSD by the payout card cashback uses — from Base first,
+// Fuse as the fallback — so its link follows the charge's `cashbackChainId`.
 
 type PendingAction =
   | { kind: "key"; key: AiApiAdminKey; action: AiApiKeyAction }
@@ -226,6 +227,9 @@ export default function AiApiUserPage({
 
   const liveKeys = view.keys.filter((key) => !key.revokedAt);
   const deletedKeys = view.keys.filter((key) => key.revokedAt);
+  // Cache write gets a column only when a key wrote to the cache this month.
+  const showCacheWrite = liveKeys.some((key) => (key.tokensThisMonth?.cacheWrite ?? 0) > 0);
+  const keyColumns = showCacheWrite ? 11 : 10;
 
   return (
     <div className="space-y-6 pb-24">
@@ -390,7 +394,10 @@ export default function AiApiUserPage({
         />
       </Card>
 
-      <Card title="Keys" description="Limits can only be lowered here. Raising one needs a mandate only the user can sign.">
+      <Card
+        title="Keys"
+        description="Limits can only be lowered here. Raising one needs a mandate only the user can sign. Tokens are this month's."
+      >
         <div className="overflow-x-auto rounded-md border border-gray-200">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -399,6 +406,10 @@ export default function AiApiUserPage({
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2 text-right">This month</th>
                 <th className="px-4 py-2 text-right">Requests</th>
+                <th className="px-4 py-2 text-right">Input</th>
+                <th className="px-4 py-2 text-right">Cached input</th>
+                {showCacheWrite ? <th className="px-4 py-2 text-right">Cache write</th> : null}
+                <th className="px-4 py-2 text-right">Output</th>
                 <th className="px-4 py-2">Last used</th>
                 <th className="px-4 py-2">Created</th>
                 <th className="px-4 py-2" aria-label="Actions" />
@@ -407,7 +418,7 @@ export default function AiApiUserPage({
             <tbody className="divide-y divide-gray-100">
               {liveKeys.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan={keyColumns} className="px-4 py-6 text-center text-gray-500">
                     No live keys.
                   </td>
                 </tr>
@@ -431,6 +442,20 @@ export default function AiApiUserPage({
                     {formatUsd(key.spentThisMonthUsd)} / {formatUsd(key.monthlyLimitUsd, 0)}
                   </td>
                   <td className="px-4 py-2 text-right">{key.requestsThisMonth.toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right">
+                    {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.input) : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.cachedInput) : "—"}
+                  </td>
+                  {showCacheWrite ? (
+                    <td className="px-4 py-2 text-right">
+                      {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.cacheWrite) : "—"}
+                    </td>
+                  ) : null}
+                  <td className="px-4 py-2 text-right">
+                    {key.tokensThisMonth ? formatTokens(key.tokensThisMonth.output) : "—"}
+                  </td>
                   <td className="px-4 py-2 text-gray-600">
                     {key.lastUsedAt ? formatDateTime(key.lastUsedAt) : "Never"}
                   </td>
@@ -615,16 +640,23 @@ export default function AiApiUserPage({
                         Charge <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : null}
-                    {charge.cashbackTxHash ? (
-                      <a
-                        href={`${CASHBACK_EXPLORER}/tx/${charge.cashbackTxHash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 flex items-center gap-1 text-indigo-600 hover:underline"
-                      >
-                        Cashback <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : null}
+                    {(() => {
+                      const payout = cashbackPayoutLink({
+                        payoutTxHash: charge.cashbackTxHash ?? undefined,
+                        payoutChainId: charge.cashbackChainId ?? undefined,
+                      });
+                      return payout ? (
+                        <a
+                          href={payout.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={payout.title}
+                          className="mt-1 flex items-center gap-1 text-indigo-600 hover:underline"
+                        >
+                          Cashback <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : null;
+                    })()}
                     {charge.chargedAt ? (
                       <div className="mt-1 text-gray-500">{formatDateTime(charge.chargedAt)}</div>
                     ) : null}

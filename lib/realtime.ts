@@ -58,6 +58,27 @@ export function isSupportQueueChange(value: unknown): value is SupportQueueChang
   );
 }
 
+/** `tasks_updated`: a task was created, changed or got an update. */
+export interface TaskChange {
+  taskId: string;
+  number: number;
+  reason: "created" | "changed" | "update";
+}
+
+const TASK_REASONS = new Set(["created", "changed", "update"]);
+
+export function isTaskChange(value: unknown): value is TaskChange {
+  if (!value || typeof value !== "object") return false;
+  const change = value as Record<string, unknown>;
+  return (
+    typeof change.taskId === "string" &&
+    /^[a-f0-9]{24}$/i.test(change.taskId) &&
+    typeof change.number === "number" &&
+    typeof change.reason === "string" &&
+    TASK_REASONS.has(change.reason)
+  );
+}
+
 /**
  * The socket's origin and path, from the same base URL the API client uses.
  * Socket.IO reads a path in the URL as a namespace, so any path the API is

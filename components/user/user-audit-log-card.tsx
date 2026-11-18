@@ -28,6 +28,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
     recovery_code_sent: { label: "Recovery code sent", variant: "info" },
     account_email_set: { label: "Recovery email changed", variant: "danger" },
     two_factor_reset: { label: "2FA reset", variant: "warning" },
+    push_campaign_test_sent: { label: "Test push sent", variant: "muted" },
     card_frozen: { label: "Card frozen", variant: "warning" },
     card_unfrozen: { label: "Card unfrozen", variant: "success" },
     card_issued: { label: "Card issued", variant: "info" },
@@ -61,6 +62,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
     referral_reward_rejected: {
       label: "Referral reward rejected",
       variant: "danger",
+    },
+    referral_reward_goodwill_approved: {
+      label: "Referral reward approved as goodwill",
+      variant: "success",
     },
     referral_reward_rechecked: {
       label: "Referral reward re-checked",
@@ -143,6 +148,10 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       variant: "warning",
     },
     activity_resynced: { label: "Activity re-synced", variant: "info" },
+    hidden_activity_restored: {
+      label: "Hidden activity restored",
+      variant: "info",
+    },
   };
 
 /** How the audit trail names a referral v4 reward step. */
@@ -181,6 +190,16 @@ const stringField = (entry: AdminAuditEntry, key: string): string | null => {
 
 /** The one or two facts that make an entry readable without opening Mongo. */
 function detailFor(entry: AdminAuditEntry): string | null {
+  if (entry.action === "push_campaign_test_sent") {
+    // The copy that reached this user's phone, one title per variant.
+    const variants = entry.metadata?.variants;
+    if (!Array.isArray(variants)) return null;
+    const titles = variants
+      .map((v: unknown) => (v as { title?: unknown })?.title)
+      .filter((title): title is string => typeof title === "string");
+    return titles.length ? titles.map((t) => `“${t}”`).join(" · ") : null;
+  }
+
   if (entry.action === "account_recovered") {
     const closedAt = stringField(entry, "closedAt");
     const stillBlocked = stringField(entry, "remainingSpendBlockReason");
@@ -236,6 +255,12 @@ function detailFor(entry: AdminAuditEntry): string | null {
     return referralReevaluationDetail(entry);
   }
 
+  if (entry.action === "hidden_activity_restored") {
+    const restored = entry.metadata?.restored;
+    if (typeof restored !== "number") return null;
+    return `${restored} row${restored === 1 ? "" : "s"} put back in Activity`;
+  }
+
   if (entry.action === "activity_resynced") {
     const synced = entry.metadata?.synced;
     const errors = entry.metadata?.errors;
@@ -276,6 +301,31 @@ function detailFor(entry: AdminAuditEntry): string | null {
     const parts = [
       from && to ? `${from} → ${to}` : null,
       entry.metadata?.friendOnly === true ? "friend paid only" : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  if (entry.action === "referral_reward_goodwill_approved") {
+    const from = stringField(entry, "previousStatus");
+    const to = stringField(entry, "status");
+    const bar = entry.metadata?.spendTargetUsd;
+    const previousBar = entry.metadata?.previousSpendTargetUsd;
+    const referrer = entry.metadata?.referrerRewardUsd;
+    const friend = entry.metadata?.newUserRewardUsd;
+    const token = stringField(entry, "payoutToken");
+    const parts = [
+      from && to ? `${from} → ${to}` : null,
+      entry.metadata?.originalTerms === true ? "original terms" : null,
+      typeof bar === "number"
+        ? typeof previousBar === "number" && previousBar !== bar
+          ? `bar ${formatUsd(previousBar, 0)} → ${formatUsd(bar, 0)}`
+          : `bar ${formatUsd(bar, 0)}`
+        : null,
+      typeof referrer === "number" && typeof friend === "number"
+        ? `${formatUsd(referrer, 0)} + ${formatUsd(friend, 0)}${
+            token ? ` in ${token}` : ""
+          }`
+        : null,
     ].filter(Boolean);
     return parts.length ? parts.join(" · ") : null;
   }

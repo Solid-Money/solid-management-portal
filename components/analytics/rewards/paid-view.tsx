@@ -17,7 +17,12 @@ import { AnalyticsKpiCard } from "@/components/analytics/kpi-card";
 import { Panel } from "@/components/analytics/panel";
 import { useAnalyticsFilters } from "@/components/analytics/analytics-filters";
 import { useRewardsPaid } from "@/hooks/use-analytics";
-import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
+import {
+  formatDateTime,
+  formatEur,
+  formatNumber,
+  formatUsd,
+} from "@/lib/utils";
 
 export function RewardsPaidView() {
   const { queryString, filters } = useAnalyticsFilters();
@@ -65,14 +70,36 @@ export function RewardsPaidView() {
     ? data.cashback.totalUsd + data.referrals.totalUsd
     : undefined;
 
+  /**
+   * Euro cashback (soEUR on Base), on its own. It is never added to the
+   * dollar totals above, so it gets its own KPI and its own daily series.
+   * Absent from a backend that predates euro cashback.
+   */
+  const totalEur = data?.cashback.totalEur;
+  const eurByDay = useMemo(
+    () =>
+      (data?.cashback.byDay ?? [])
+        .filter((row) => (row.eur ?? 0) > 0)
+        .map((row) => ({ date: row.date, eur: row.eur ?? 0 })),
+    [data]
+  );
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${
+          totalEur !== undefined ? "xl:grid-cols-5" : "xl:grid-cols-4"
+        }`}
+      >
         <AnalyticsKpiCard
           title="Total incentive paid"
           metric="incentiveCost"
           value={totalPaid === undefined ? undefined : formatUsd(totalPaid)}
-          scope={`Cashback + referral payouts, ${scope}`}
+          scope={
+            totalEur !== undefined
+              ? `USD cashback + referral payouts, ${scope}. Euro cashback is separate.`
+              : `Cashback + referral payouts, ${scope}`
+          }
           source="derived"
           updatedAt={data?.generatedAt}
           invertTrendColor
@@ -89,6 +116,16 @@ export function RewardsPaidView() {
           updatedAt={data?.cashback.meta.updatedAt}
           invertTrendColor
         />
+        {totalEur !== undefined ? (
+          <AnalyticsKpiCard
+            title="Cashback paid (EUR)"
+            value={formatEur(totalEur)}
+            scope="Euro cardholders, paid in soEUR on Base. Not in the USD totals."
+            source={data?.cashback.meta.source}
+            updatedAt={data?.cashback.meta.updatedAt}
+            invertTrendColor
+          />
+        ) : null}
         <AnalyticsKpiCard
           title="Referral payouts"
           value={data ? formatUsd(data.referrals.totalUsd) : undefined}
@@ -181,6 +218,53 @@ export function RewardsPaidView() {
           </ResponsiveContainer>
         )}
       </Panel>
+
+      {eurByDay.length > 0 ? (
+        <Panel
+          title="Euro cashback paid per day"
+          question="What are we paying euro cardholders, in euros?"
+          source={data?.cashback.meta.source}
+          updatedAt={data?.cashback.meta.updatedAt}
+          isLoading={isLoading}
+          error={error}
+        >
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={eurByDay}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#f0f0f0"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(value: string) => formatDay(value)}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+              />
+              <YAxis
+                tickFormatter={(value: number) => formatEur(value, 0)}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+                width={70}
+              />
+              <Tooltip
+                contentStyle={{ fontSize: 12, borderRadius: 6 }}
+                labelFormatter={(value) => formatDay(value as string, true)}
+                formatter={(value: number) => [
+                  formatEur(value),
+                  "Euro cashback",
+                ]}
+              />
+              <Bar dataKey="eur" fill="#6366f1" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
+      ) : null}
 
       <Panel
         title="Points issued per day"

@@ -77,11 +77,13 @@ export default function WriteOffReferralV4DebtDialog({
             <DialogDescription>
               {formatUsd(debt.remainingUsd)} of {formatUsd(debt.amountUsd)} is
               still owed for a reversed{" "}
-              {referralV4StepLabel(debt.step).toLowerCase()} bonus ({side} side,
-              friend{" "}
+              {debt.step === "legacy"
+                ? "cashback reward, reversed after it was paid"
+                : `${referralV4StepLabel(debt.step).toLowerCase()} bonus`}{" "}
+              ({side} side, friend{" "}
               <span className="font-medium text-gray-900">{friend}</span>).
               Writing it off stops recovering it from this user&apos;s future
-              bonuses and spend share now, instead of on{" "}
+              referral payouts now, instead of on{" "}
               {formatUtcDay(debt.writeOffAt)}. This can&apos;t be undone from
               here.
             </DialogDescription>

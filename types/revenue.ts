@@ -142,7 +142,17 @@ export type RevenueBusinessLine =
   | 'card'
   | 'banking'
   | 'stocks'
-  | 'buy_crypto';
+  | 'buy_crypto'
+  | 'memberships';
+
+/**
+ * Prime and Ultra membership charges. Not a ledger `RevenueType`: the backend
+ * adds this row to the business-line view from the subscription records.
+ */
+export const TIER_SUBSCRIPTION_LINE = 'tier_subscription' as const;
+
+/** One row of the business-line view: a revenue type, or memberships. */
+export type RevenueLineType = RevenueType | typeof TIER_SUBSCRIPTION_LINE;
 
 // Product Revenue Response
 export interface ProductRevenue {
@@ -159,7 +169,7 @@ export interface ProductRevenue {
   trend: string;
   changePercent: number | null;
   previousRevenue: number;
-  revenueType: RevenueType;
+  revenueType: RevenueLineType;
   businessLine: RevenueBusinessLine;
 }
 
@@ -167,12 +177,94 @@ export interface ProductRevenueResponse {
   products: ProductRevenue[];
   totalRevenue: number;
   previousTotalRevenue: number;
+  /**
+   * Lines that could not be read this time: missing from the rows and both
+   * totals. Absent when nothing is missing.
+   */
+  missingLines?: RevenueLineType[];
   period: {
     startDate: string;
     endDate: string;
     previousStartDate: string;
     previousEndDate: string;
   };
+}
+
+// ============================================
+// Revenue collection: where each line's money lands
+// ============================================
+// Mirrors `revenue.types.ts` in the backend's libs/common.
+
+export type RevenueCollectionKind = 'onchain' | 'offchain';
+
+/** One asset a destination received over the window. */
+export interface RevenueCollectionAsset {
+  symbol: string;
+  /** Token contract; absent for a native coin or when the rows did not say. */
+  tokenAddress?: string;
+  collectedUsd: number;
+  count: number;
+}
+
+/** One place a revenue line's money lands. */
+export interface RevenueCollectionDestination {
+  key: string;
+  /** What the address is, e.g. 'Revenue wallet'. */
+  label: string;
+  kind: RevenueCollectionKind;
+  /** Lowercased. Null off-chain, or when the address is not configured. */
+  address: string | null;
+  /** Null when the money is off-chain or the chain varies per fee. */
+  chainId: number | null;
+  chainName: string | null;
+  explorerUrl: string | null;
+  note?: string;
+  collectedUsd: number;
+  collectedCount: number;
+  /** Recorded in the window but not collected yet. */
+  outstandingUsd: number;
+  outstandingCount: number;
+  assets: RevenueCollectionAsset[];
+}
+
+export interface RevenueCollectionLine {
+  revenueType: RevenueLineType;
+  destinations: RevenueCollectionDestination[];
+  note?: string;
+}
+
+/** One vault accountant's performance fees, read on-chain, all-time. */
+export interface VaultFeeAccountant {
+  vault: string;
+  chainId: number;
+  chainName: string | null;
+  accountant: string;
+  accountantExplorerUrl: string | null;
+  payoutAddress: string | null;
+  payoutExplorerUrl: string | null;
+  asset: { symbol: string; address: string | null; decimals: number };
+  /** Asset units as a decimal string; null when it could not be read. */
+  unclaimed: string | null;
+  claimed: string | null;
+  claimCount: number | null;
+  lastClaimAt: string | null;
+  lastClaimTxHash: string | null;
+  lastClaimExplorerUrl: string | null;
+  usdPrice: number | null;
+  unclaimedUsd: number | null;
+  claimedUsd: number | null;
+  errors?: string[];
+}
+
+export interface VaultFeeCollectionResponse {
+  accountants: VaultFeeAccountant[];
+  readAt: string;
+}
+
+/** Fee lines and memberships. Vault fees come from `/revenue/vault-fees`. */
+export interface RevenueCollectionResponse {
+  lines: RevenueCollectionLine[];
+  period: { startDate: string; endDate: string };
 }
 
 // Investor Report Response
@@ -220,6 +312,8 @@ export const REVENUE_QUERY_KEYS = {
   dailyFlow: (start: string, end: string) => ['revenue', 'daily-flow', start, end],
   byUser: (page: number, limit: number) => ['revenue', 'users', page, limit],
   byProduct: (start: string, end: string) => ['revenue', 'products', start, end],
+  collection: (start: string, end: string) => ['revenue', 'collection', start, end],
+  vaultFees: ['revenue', 'vault-fees'],
   investorReport: (month: string) => ['revenue', 'investor', month],
   treasuryInterest: (start: string, end: string) => ['revenue', 'treasury-interest', start, end],
 } as const;

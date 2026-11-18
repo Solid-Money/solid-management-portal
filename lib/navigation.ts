@@ -1,7 +1,9 @@
 import {
   Activity,
+  BadgePercent,
   AlertTriangle,
   BarChart2,
+  BellRing,
   Headphones,
   Inbox,
   LayoutDashboard,
@@ -19,6 +21,7 @@ import {
   Image,
   Layers,
   LayoutTemplate,
+  ListTodo,
   Megaphone,
   Percent,
   Receipt,
@@ -50,6 +53,8 @@ export interface NavGroup {
   icon: LucideIcon;
   /** Shows the count of support cases waiting on a human. */
   supportBadge?: boolean;
+  /** Shows the count of tasks with something new for the admin. */
+  tasksBadge?: boolean;
   /** Present for a top-level link with no submenu. */
   href?: string;
   items?: NavLink[];
@@ -73,6 +78,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Overview",
     icon: LayoutDashboard,
     href: "/overview",
+  },
+  {
+    label: "Tasks",
+    icon: ListTodo,
+    tasksBadge: true,
+    href: "/tasks",
   },
   {
     label: "Users",
@@ -239,6 +250,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ArrowRightLeft,
       },
       {
+        href: "/fee-promotions",
+        label: "Fee Promotions",
+        description:
+          "Time-boxed free fees, e.g. each user's first SEPA deposits to the euro account",
+        icon: BadgePercent,
+      },
+      {
         href: "/costs-config",
         label: "Costs",
         description: "KYC, card and rail costs behind every margin number",
@@ -248,7 +266,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/anti-abuse",
         label: "Anti-abuse",
         description:
-          "Merchants excluded from cashback and referrals, and referral spend rules",
+          "Merchants excluded from cashback and referrals, referral spend rules, and known service wallets",
         icon: ShieldAlert,
       },
       {
@@ -302,6 +320,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Cohorts",
         description: "User segments and email exports for lifecycle sends",
         icon: UsersRound,
+      },
+      {
+        href: "/push-notifications",
+        label: "Push notifications",
+        description:
+          "Targeted pushes and A/B tests to an uploaded user list, opening any screen",
+        icon: BellRing,
       },
       {
         href: "/referrals",

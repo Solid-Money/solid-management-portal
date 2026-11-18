@@ -406,27 +406,34 @@ export type ReferralV4DebtStatus =
   /** Closed: the remainder fell below the waive threshold. */
   | "waived"
   /** Closed unrecovered: by age, or by an admin. */
-  | "written_off";
+  | "written_off"
+  /** Closed: never owed after all — the reversal was undone (reinstated). */
+  | "cancelled";
 
 export interface ReferralV4DebtRecovery {
   at: string;
   usd: number;
-  /** Taken from a later v4 bonus, or from a weekly spend-share payout. */
-  via: "bonus" | "spend_share";
+  /**
+   * Taken from a later v4 bonus, from a weekly spend-share payout, or from a
+   * leg of a referral cashback payout.
+   */
+  via: "bonus" | "spend_share" | "referral_leg";
   /** The reward or payout it was taken from. */
   ref: string;
 }
 
 /**
- * What this user owes for a credited bonus that was reversed. Recovered from
- * their future v4 bonuses (before the card credit is granted) and weekly spend
- * share (before the transfer) — never from the card credit balance.
+ * What this user owes for a credited bonus that was reversed — or, with
+ * `step: "legacy"`, for a referral cashback reward reversed after it was
+ * paid. Recovered from their future v4 bonuses (before the card credit is
+ * granted), weekly spend share (before the transfer) and cashback payouts
+ * (before each leg is sent) — never from the card credit balance or wallet.
  */
 export interface AdminReferralV4Debt {
   id: string;
   /** The side this user was on in the referral. */
   side: "referrer" | "friend";
-  step: "welcome" | "big_spender";
+  step: "welcome" | "big_spender" | "legacy";
   /** The reversed reward. */
   rewardId: string;
   friend: { id: string; username: string };

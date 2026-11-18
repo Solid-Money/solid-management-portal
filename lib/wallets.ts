@@ -10,6 +10,7 @@ import {
   WalletFlowResponse,
   WalletForecastResponse,
   WalletInfo,
+  WalletOwedNow,
   WalletPlansResponse,
   WalletRefillPlan,
   WalletRole,
@@ -179,12 +180,13 @@ export const WALLET_ASSETS: WalletAsset[] = [
   "USDC",
   "USDT",
   "EURC",
+  "soEUR",
 ];
 
 /**
  * Read one asset off a chain row.
  *
- * `ChainBalance` stores six assets as six parallel triples of fields, so any
+ * `ChainBalance` stores seven assets as seven parallel triples of fields, so any
  * code that wants "the soFUSE numbers" has to know three field names and get
  * all three right. Spelling that out per call site is how soFUSE ended up
  * missing from four of the five severity checks this page used to run.
@@ -246,6 +248,15 @@ export function readChainAsset(
         threshold: chain.eurcThreshold ?? "0",
         status: chain.eurcStatus ?? "N/A",
         tokenAddress: chain.eurcAddress,
+      };
+    case "soEUR":
+      return {
+        asset,
+        label: "soEUR",
+        balance: chain.soEurBalance ?? "0",
+        threshold: chain.soEurThreshold ?? "0",
+        status: chain.soEurStatus ?? "N/A",
+        tokenAddress: chain.soEurAddress,
       };
   }
 }
@@ -332,13 +343,57 @@ export const assetVerdict = (
 export const assetRefillPlan = (
   plan?: WalletAssetPlan,
   flow?: WalletAssetFlow
-): WalletRefillPlan | undefined => plan?.plan ?? flow?.plan;
+): WalletRefillPlan | undefined => assetReading(plan, flow)?.plan;
+
+/** Payouts queued behind this balance, from the same read as the verdict. */
+export const assetOwedNow = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): WalletOwedNow | undefined => assetReading(plan, flow)?.owedNow;
 
 /** Days of cover to quote, from the same read as the verdict and the floor. */
 export const assetRunwayDays = (
   plan?: WalletAssetPlan,
   flow?: WalletAssetFlow
-): number | undefined => plan?.daysOfRunway ?? flow?.daysOfRunway;
+): number | undefined => assetReading(plan, flow)?.daysOfRunway;
+
+/**
+ * The one read an asset's figures are quoted from: the board-wide plan, or
+ * the card's flow row only when there is no plan at all.
+ *
+ * Chosen once, not field by field. A plan with no queued payouts or no refill
+ * is an answer, not a gap: filling it from the flow would put an older read's
+ * obligations — a refund paid since — beside the plan's verdict. Its
+ * `balance` is the one those figures were worked out against.
+ */
+export const assetReading = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): WalletAssetPlan | WalletAssetFlow | undefined => plan ?? flow;
+
+/**
+ * What to quote as an asset's daily cost, from the same read as its runway
+ * and floor.
+ *
+ * `measured` is that read's cost. `estimate` — gross transfers out, which
+ * miss gas — is offered only when there is no plan: beside a plan that
+ * measured no cost, the runway says "not draining", and an older flow's
+ * outflow next to it would contradict it. Never on a float, where outflow is
+ * a user's money leaving, not ours.
+ */
+export const assetCostPerDay = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): { measured?: number; estimate?: number; isFloat: boolean } => {
+  const reading = assetReading(plan, flow);
+  const isFloat = reading?.isFloat ?? false;
+  const measured = reading?.realCostPerDay;
+  const estimate =
+    measured == null && !plan && flow && !isFloat && flow.outflowPerDay > 0
+      ? flow.outflowPerDay
+      : undefined;
+  return { measured, estimate, isFloat };
+};
 
 export const chainStatuses = (chain: ChainBalance): BalanceStatus[] =>
   monitoredAssets(chain).map((reading) => reading.status);
@@ -422,6 +477,20 @@ export function formatAmount(value: string | number): string {
   const abs = Math.abs(amount);
   const decimals = abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.001 ? 4 : 8;
   return formatNumber(amount, decimals, 0);
+}
+
+/**
+ * A minimum to send, rounded *up* at the precision it is shown at.
+ *
+ * `formatAmount` rounds to nearest, which is right for a balance and wrong for
+ * "send at least": 2,123.40 shown as 2,123 is a send that leaves a refund a
+ * fraction short and still queued.
+ */
+export function formatAtLeast(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return formatAmount(value);
+  const decimals = value >= 1000 ? 0 : value >= 1 ? 2 : value >= 0.001 ? 4 : 8;
+  const step = 10 ** decimals;
+  return formatAmount(Math.ceil(value * step - 1e-9) / step);
 }
 
 /** A USD figure, or an em dash when there is nothing to price. */

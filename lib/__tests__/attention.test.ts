@@ -67,10 +67,10 @@ describe("attention card rules", () => {
         lastCheckAt: "2026-11-02T11:30:00.000Z",
       }),
     ).toBe(
-      "No spike this week in card declines, card spend or sign-ups · checks every 5 min · last check 11:30 UTC · escalations go to #solid",
+      "No spike this week in card declines, card spend or sign-ups · checks every 5 min · last check 11:30 UTC · escalations open a task",
     );
     expect(footerLine({ quiet: [], lastCheckAt: null })).toBe(
-      "checks every 5 min · not checked yet · escalations go to #solid",
+      "checks every 5 min · not checked yet · escalations open a task",
     );
   });
 

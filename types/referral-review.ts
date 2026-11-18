@@ -22,7 +22,14 @@ export type ReferralDecisionAction =
   | "hold"
   | "approve"
   | "approve_friend_only"
+  | "approve_goodwill"
   | "reject";
+
+/**
+ * What a goodwill approval pays: `keep` the reward's own terms, or the
+ * `original` ones ($75 bar, $15 each side in soUSD). Never a typed amount.
+ */
+export type ReferralGoodwillTerms = "keep" | "original";
 
 /** The review table's status filter; `unpaid` is pending + qualified + under review. */
 export type ReferralReviewStatusFilter =
@@ -55,6 +62,9 @@ export interface ReferralReviewRow {
   heldBy?: string;
   reviewApprovedAt?: string;
   reviewApprovedBy?: string;
+  /** Approved as a goodwill exception: pays without the spend checks. */
+  spendCheckWaivedAt?: string;
+  spendCheckWaivedBy?: string;
   reversedAt?: string;
   reversalReason?: string;
   reversedBy?: string;

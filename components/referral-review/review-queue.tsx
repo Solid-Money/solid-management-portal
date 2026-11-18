@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 
 import { useReferralReviewPage } from "@/hooks/use-referral-review";
+import { useReferralV4Access } from "@/hooks/use-referral-v4";
 import {
   BLOCK_MODES,
   referralStatus,
@@ -41,6 +42,7 @@ const STATUS_FILTERS: {
     counts: ["pending", "qualified", "under_review"],
   },
   { value: "reversed", label: "Reversed", counts: ["reversed"] },
+  { value: "expired", label: "Expired", counts: ["expired"] },
 ];
 
 const REASON_FILTERS = [
@@ -49,17 +51,41 @@ const REASON_FILTERS = [
   "velocity_over_monthly_threshold",
 ];
 
-/** Which decisions make sense for the rewards a filter shows. */
+/**
+ * Which decisions make sense for the rewards a filter shows. Goodwill approve
+ * is dropped for admins without the referral-admin permission.
+ */
 const ACTIONS_FOR: Record<ReferralReviewStatusFilter, ReferralDecisionAction[]> =
   {
-    under_review: ["approve", "approve_friend_only", "reject"],
-    qualified: ["hold", "approve_friend_only", "reject", "approve"],
+    under_review: ["approve", "approve_friend_only", "approve_goodwill", "reject"],
+    qualified: [
+      "hold",
+      "approve_friend_only",
+      "reject",
+      "approve",
+      "approve_goodwill",
+    ],
     pending: ["approve_friend_only", "reject"],
-    unpaid: ["approve", "approve_friend_only", "hold", "reject"],
-    reversed: ["approve", "approve_friend_only"],
-    expired: [],
+    unpaid: [
+      "approve",
+      "approve_friend_only",
+      "approve_goodwill",
+      "hold",
+      "reject",
+    ],
+    reversed: ["approve", "approve_friend_only", "approve_goodwill"],
+    expired: ["approve_goodwill"],
     paid: [],
   };
+
+/** Every decision, for a pasted list of users. */
+const ALL_ACTIONS: ReferralDecisionAction[] = [
+  "hold",
+  "approve",
+  "approve_friend_only",
+  "approve_goodwill",
+  "reject",
+];
 
 const shortDate = (value?: string) =>
   value
@@ -95,6 +121,11 @@ export function ReviewQueue() {
     labels: string[];
   } | null>(null);
   const [pasted, setPasted] = useState("");
+  // Goodwill pays what the rules would not, so the backend limits it to the
+  // admins in REFERRAL_ADMIN_EMAILS; offer it only to them.
+  const canGoodwill = useReferralV4Access().data?.canReview === true;
+  const allowed = (actions: ReferralDecisionAction[]) =>
+    actions.filter((action) => action !== "approve_goodwill" || canGoodwill);
 
   const query = useReferralReviewPage({
     status,
@@ -237,7 +268,7 @@ export function ReviewQueue() {
           <span className="px-2 font-medium text-indigo-900">
             {selected.size} selected
           </span>
-          {ACTIONS_FOR[status].map((action) => (
+          {allowed(ACTIONS_FOR[status]).map((action) => (
             <Button
               key={action}
               size="sm"
@@ -381,14 +412,7 @@ export function ReviewQueue() {
           <span className="text-xs text-gray-500">
             {pastedUsers.length} user{pastedUsers.length === 1 ? "" : "s"}
           </span>
-          {(
-            [
-              "hold",
-              "approve",
-              "approve_friend_only",
-              "reject",
-            ] as ReferralDecisionAction[]
-          ).map((action) => (
+          {allowed(ALL_ACTIONS).map((action) => (
             <Button
               key={action}
               size="sm"
@@ -492,10 +516,18 @@ function ReviewRow({
             {row.reversedBy ? ` · by ${row.reversedBy}` : ""}
           </p>
         )}
-        {row.reviewApprovedBy && row.status !== "reversed" && (
+        {row.spendCheckWaivedAt && row.status !== "reversed" ? (
           <p className="text-[11px] text-emerald-700">
-            Approved by {row.reviewApprovedBy}
+            Goodwill · by {row.spendCheckWaivedBy ?? "an admin"} ·{" "}
+            {shortDate(row.spendCheckWaivedAt)}
           </p>
+        ) : (
+          row.reviewApprovedBy &&
+          row.status !== "reversed" && (
+            <p className="text-[11px] text-emerald-700">
+              Approved by {row.reviewApprovedBy}
+            </p>
+          )
         )}
         {row.payoutInFlight && (
           <p className="text-[11px] text-amber-700">Payout in flight</p>

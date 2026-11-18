@@ -147,9 +147,16 @@ export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
   legacyGrandfatherUntil: "",
   subscriptionEnabled: false,
   primeAnnualUsd: 199,
-  // -1, not 0: Ultra is held by locking FUSE, and a price of zero would read
-  // as "free" both here and to anyone reading the config later.
+  // -1, not 0: Ultra ships not for sale (the FUSE lock is its only route until
+  // a price is set), and a price of zero would read as "free" both here and to
+  // anyone reading the config later.
   ultraAnnualUsd: TIER_PRICE_NOT_PURCHASABLE,
+  // No sale until one is set up: -1 for the same reason as above, and no
+  // window.
+  primeSaleUsd: TIER_PRICE_NOT_PURCHASABLE,
+  ultraSaleUsd: TIER_PRICE_NOT_PURCHASABLE,
+  saleStartsAt: null,
+  saleEndsAt: null,
   graceDays: 7,
   renewalNoticeDays: 7,
   // The backend's default: live Base -> Fuse quotes cost well under 1%, and a
@@ -173,6 +180,18 @@ export const YIELD_BOOST_DEFAULTS: YieldBoostConfig = {
 };
 
 /**
+ * Shipped euro caps (mirror the backend): what a euro cardholder's card
+ * cashback and subscription cashback are held to each month, per tier, and the
+ * grandfathered per-payment cap — in EUR, configured on their own rather than
+ * converted from the USD ones.
+ */
+export const EURO_CASHBACK_CAP_DEFAULTS = {
+  cashback: { tier1: 50, tier2: 100, tier3: 200 },
+  subscriptionDiscount: { tier1: 50, tier2: 100, tier3: 200 },
+  eligibleAmountCapEur: 50,
+} as const;
+
+/**
  * Fill in fields an older backend may not send yet, so the inputs stay
  * controlled and a save never posts `undefined`/`NaN` for them. Applied to both
  * the working copy and the pristine copy so the defaults don't read as unsaved
@@ -183,9 +202,53 @@ export function withConfigDefaults(
 ): FullRewardsConfig {
   const fees = config.productFees;
   const boost = config.yieldBoost;
+  const cashback = config.cashback;
+  const subscription = config.subscriptionDiscount;
+  const euroCaps = EURO_CASHBACK_CAP_DEFAULTS;
 
   return {
     ...config,
+    cashback: {
+      ...cashback,
+      tier1: {
+        ...cashback.tier1,
+        monthlyCapEur:
+          cashback.tier1.monthlyCapEur ?? euroCaps.cashback.tier1,
+      },
+      tier2: {
+        ...cashback.tier2,
+        monthlyCapEur:
+          cashback.tier2.monthlyCapEur ?? euroCaps.cashback.tier2,
+      },
+      tier3: {
+        ...cashback.tier3,
+        monthlyCapEur:
+          cashback.tier3.monthlyCapEur ?? euroCaps.cashback.tier3,
+      },
+    },
+    subscriptionDiscount: {
+      ...subscription,
+      eligibleAmountCapEur:
+        subscription.eligibleAmountCapEur ?? euroCaps.eligibleAmountCapEur,
+      tier1: {
+        ...subscription.tier1,
+        monthlyCapEur:
+          subscription.tier1.monthlyCapEur ??
+          euroCaps.subscriptionDiscount.tier1,
+      },
+      tier2: {
+        ...subscription.tier2,
+        monthlyCapEur:
+          subscription.tier2.monthlyCapEur ??
+          euroCaps.subscriptionDiscount.tier2,
+      },
+      tier3: {
+        ...subscription.tier3,
+        monthlyCapEur:
+          subscription.tier3.monthlyCapEur ??
+          euroCaps.subscriptionDiscount.tier3,
+      },
+    },
     points: {
       ...config.points,
       cardBalanceEnabled: config.points.cardBalanceEnabled ?? false,
@@ -231,6 +294,11 @@ export function withConfigDefaults(
     tierMembership: {
       ...TIER_MEMBERSHIP_DEFAULTS,
       ...config.tierMembership,
+      // The backend spells "no window" as null or "". One spelling here, so a
+      // date cleared in the form (null) does not read as an unsaved change
+      // against a stored "".
+      saleStartsAt: config.tierMembership?.saleStartsAt || null,
+      saleEndsAt: config.tierMembership?.saleEndsAt || null,
     },
     yieldBoost: {
       ...YIELD_BOOST_DEFAULTS,
@@ -266,11 +334,12 @@ export interface ConfigEditor {
    *
    * A plain record is a value too: the onboarding fees carry a map of country
    * to amount, which is edited and saved whole rather than field by field.
+   * Null clears an optional date, such as the tier sale window.
    */
   updateConfig: (
     section: keyof FullRewardsConfig,
     field: string,
-    value: string | number | boolean | string[] | Record<string, number>,
+    value: string | number | boolean | string[] | Record<string, number> | null,
   ) => void;
   /** Set a numeric field, optionally converting a percentage to a fraction. */
   handleNumericUpdate: (
@@ -359,7 +428,7 @@ export function useConfigEditor(): ConfigEditor {
     (
       section: keyof FullRewardsConfig,
       field: string,
-      value: string | number | boolean | string[] | Record<string, number>,
+      value: string | number | boolean | string[] | Record<string, number> | null,
     ) => {
       setConfig((prev) => {
         if (!prev) return prev;

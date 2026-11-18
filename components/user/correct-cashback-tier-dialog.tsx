@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { correctCashbackTier, previewCashbackTierCorrection } from "@/lib/api";
+import { cashbackCurrencyOf } from "@/lib/card-transactions";
 import {
   describeCashbackRate,
   formatCashbackRate,
@@ -45,6 +46,9 @@ const tierLabel = (tier: string) =>
 export function isTierCorrectable(entry: CashbackEntry): boolean {
   return (
     !entry.transactionId.includes(":") &&
+    // A euro purchase is earned, capped and paid in euros; the correction works
+    // in dollars, so the backend refuses it and support corrects it by hand.
+    cashbackCurrencyOf(entry) !== "EUR" &&
     entry.type !== "SubscriptionDiscount" &&
     (entry.cashbackPercentageSource === undefined ||
       entry.cashbackPercentageSource === "Tier") &&

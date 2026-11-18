@@ -118,6 +118,8 @@ export const REFERRAL_V4_STEP_LABELS: Record<ReferralV4Step, string> = {
 
 export function referralV4StepLabel(step: string | undefined): string {
   if (!step) return "—";
+  // A debt for a referral cashback reward reversed after payout.
+  if (step === "legacy") return "Cashback (legacy)";
   return REFERRAL_V4_STEP_LABELS[step as ReferralV4Step] ?? step;
 }
 
@@ -130,6 +132,7 @@ export const REFERRAL_V4_DEBT_STATUS: Record<
   recovered: { label: "Recovered", variant: "success" },
   waived: { label: "Waived", variant: "muted" },
   written_off: { label: "Written off", variant: "danger" },
+  cancelled: { label: "Cancelled (reinstated)", variant: "muted" },
 };
 
 export function referralV4DebtStatus(status: string | null | undefined) {
@@ -148,6 +151,7 @@ export const DEBT_RECOVERY_VIA_LABELS: Record<
 > = {
   bonus: "From a later bonus",
   spend_share: "From spend share",
+  referral_leg: "From a cashback payout",
 };
 
 /** The numeric fields of the v4 config. */

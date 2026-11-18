@@ -6,11 +6,18 @@ import { ExternalLink, Loader2, Percent } from "lucide-react";
 
 import { getUserCashback, getUserTierTrials } from "@/lib/api";
 import { CashbackEntry, CashbackHistory, TierTrialView } from "@/types";
-import { cashbackStatusVariant } from "@/lib/card-transactions";
+import {
+  cashbackCurrencyOf,
+  cashbackPayoutLink,
+  cashbackStatusVariant,
+  formatCashbackAmount,
+  formatCashbackTotals,
+} from "@/lib/card-transactions";
 import {
   formatCashbackRate,
   formatMonthlyCap,
 } from "@/lib/cashback-percentage";
+import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,15 +31,33 @@ import WithholdCashbackDialog from "@/components/user/withhold-cashback-dialog";
 /** Rows a cron will still pay — what "Withhold unpaid" cancels. */
 const UNPAID_STATUSES = new Set(["Escrowed", "Pending", "Failed"]);
 
-/** What a row actually paid out, in the asset it was paid in. */
-function payoutOf(entry: CashbackEntry): string {
-  const soUsd = Number(entry.soUsdAmount ?? 0);
-  if (soUsd > 0) return `${soUsd.toFixed(4)} soUSD`;
+/** The monthly cap frozen on a row, in the row's own currency. */
+function capOf(entry: CashbackEntry): string | undefined {
+  return cashbackCurrencyOf(entry) === "EUR"
+    ? formatMonthlyCap(entry.monthlyCapEur, "EUR")
+    : formatMonthlyCap(entry.monthlyCapUsd);
+}
 
-  const fuse = Number(entry.fuseAmount ?? 0);
-  if (fuse > 0) return `${fuse.toFixed(4)} FUSE`;
+/**
+ * The payout transaction on its chain's explorer — Basescan for soEUR and for
+ * soUSD paid from Base, the Fuse explorer for soUSD paid from Fuse — or
+ * nothing when there is no transaction.
+ */
+function PayoutTxLink({ entry }: { entry: CashbackEntry }) {
+  const link = cashbackPayoutLink(entry);
+  if (!link) return null;
 
-  return "—";
+  return (
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="ml-1 inline-block text-indigo-600 hover:text-indigo-800"
+      title={link.title}
+    >
+      <ExternalLink className="inline h-3 w-3" />
+    </a>
+  );
 }
 
 /**
@@ -69,6 +94,11 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
   const unpaidCount = entries.filter((entry) =>
     UNPAID_STATUSES.has(entry.status),
   ).length;
+  // Euro cashback is totalled on its own and shown beside the dollar totals,
+  // never added to them. Absent from a backend that predates it.
+  const paidEur = history?.totalPaidEur ?? 0;
+  const paidSoEur = history?.totalPaidSoEur ?? 0;
+  const spendEur = history?.totalQualifyingSpendEur ?? 0;
 
   return (
     <Card className="@container">
@@ -88,7 +118,7 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
             {hadTrial && <TrialCashbackTermsDialog userId={userId} />}
             <WithholdCashbackDialog userId={userId} unpaidCount={unpaidCount} />
             <span className="text-sm font-semibold text-gray-900">
-              ${history.totalPaidUsd.toFixed(2)}
+              {formatCashbackTotals(history.totalPaidUsd, paidEur)}
             </span>
           </div>
         )}
@@ -105,14 +135,22 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
             <div className="grid grid-cols-2 gap-3 @lg:grid-cols-4">
               <div>
                 <p className="text-xs uppercase text-gray-500">Paid</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {history.totalPaidSoUsd.toFixed(4)} soUSD
-                </p>
+                {/* A euro-only cardholder's "0.0000 soUSD" says nothing. */}
+                {(history.totalPaidSoUsd > 0 || paidSoEur === 0) && (
+                  <p className="text-sm font-semibold text-gray-900">
+                    {history.totalPaidSoUsd.toFixed(4)} soUSD
+                  </p>
+                )}
+                {paidSoEur > 0 && (
+                  <p className="text-sm font-semibold text-gray-900">
+                    {paidSoEur.toFixed(4)} soEUR
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">On spend of</p>
                 <p className="text-sm font-semibold text-gray-900">
-                  ${history.totalQualifyingSpend.toFixed(2)}
+                  {formatCashbackTotals(history.totalQualifyingSpend, spendEur)}
                 </p>
               </div>
               <div>
@@ -183,17 +221,28 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                         <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700">
                           {Number(entry.fiatAmount || 0).toFixed(2)}{" "}
                           {entry.fiatCurrency}
+                          {/* A euro purchase the network billed in another
+                              currency, converted to EUR once at accrual. */}
+                          {entry.billedAmount && entry.billedCurrency && (
+                            <p className="mt-0.5 text-[10px] text-gray-500">
+                              billed{" "}
+                              {formatCurrency(
+                                entry.billedAmount,
+                                entry.billedCurrency,
+                              ) ?? entry.billedAmount}
+                            </p>
+                          )}
                           {/* The terms the row was made on: what it pays,
                               and the monthly cap it is held to even after
                               the tier it was made on (a trial) has ended. */}
                           {(entry.cashbackPercentage !== undefined ||
-                            entry.monthlyCapUsd !== undefined) && (
+                            capOf(entry) !== undefined) && (
                             <p className="mt-0.5 text-[10px] text-gray-500">
                               {[
                                 entry.cashbackPercentage !== undefined
                                   ? formatCashbackRate(entry.cashbackPercentage)
                                   : undefined,
-                                formatMonthlyCap(entry.monthlyCapUsd),
+                                capOf(entry),
                               ]
                                 .filter(Boolean)
                                 .join(" · ")}
@@ -201,18 +250,8 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                           )}
                         </td>
                         <td className="px-3 py-2 text-right whitespace-nowrap font-medium text-gray-900">
-                          {payoutOf(entry)}
-                          {entry.payoutTxHash && (
-                            <a
-                              href={`https://explorer.fuse.io/tx/${entry.payoutTxHash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ml-1 inline-block text-indigo-600 hover:text-indigo-800"
-                              title="View payout on Fuse explorer"
-                            >
-                              <ExternalLink className="inline h-3 w-3" />
-                            </a>
-                          )}
+                          {formatCashbackAmount(entry)?.amount ?? "—"}
+                          <PayoutTxLink entry={entry} />
                         </td>
                         <td className="px-3 py-2">
                           <Badge variant={cashbackStatusVariant(entry.status)}>

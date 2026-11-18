@@ -95,6 +95,84 @@ export function formatUsd(value: number, fractionDigits = 2): string {
 }
 
 /**
+ * Money in its own currency — `€12.73`, `$1,234.56` — or null when the amount
+ * is missing or unreadable.
+ *
+ * For any figure that is not necessarily dollars: a Wirex card's spendable
+ * balance, a euro cardholder's cashback. Locked to en-US like
+ * {@link formatUsd}, so only the symbol follows the currency.
+ *
+ * Deliberately tolerant of a figure that is not there, because callers render
+ * whatever the backend sends: an empty string reads as missing rather than as
+ * nothing (`Number("")` is 0), and a code Intl does not know still shows as
+ * `12.73 XYZ` rather than throwing inside render.
+ *
+ * `fractionDigits` defaults to the currency's own (two for USD and EUR).
+ */
+export function formatCurrency(
+  amount: string | number | null | undefined,
+  currency: string,
+  fractionDigits?: { minimum?: number; maximum?: number }
+): string | null {
+  if (amount === null || amount === undefined) return null;
+  if (typeof amount === "string" && !amount.trim()) return null;
+
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return null;
+
+  try {
+    return value.toLocaleString("en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: fractionDigits?.minimum,
+      maximumFractionDigits: fractionDigits?.maximum,
+    });
+  } catch {
+    // Not a currency code Intl knows; still worth showing.
+    return `${amount} ${currency}`;
+  }
+}
+
+/**
+ * A EUR amount, always `€1,234.56` — the euro twin of {@link formatUsd}, for a
+ * figure that is euros end to end (euro cashback). Never a conversion: a euro
+ * figure is shown in euros, a dollar one in dollars, and the two are not
+ * added together.
+ */
+export function formatEur(value: number, fractionDigits = 2): string {
+  return (
+    formatCurrency(Number.isFinite(value) ? value : 0, "EUR", {
+      minimum: fractionDigits,
+      maximum: fractionDigits,
+    }) ?? "—"
+  );
+}
+
+const EXPLORER_URLS: Record<number, string> = {
+  1: "https://etherscan.io",
+  // BSC is a supported bridge chain, so its deposits need an explorer too —
+  // without it they silently fell back to the Fuse explorer, which cannot
+  // resolve a BSC hash.
+  56: "https://bscscan.com",
+  122: "https://explorer.fuse.io",
+  137: "https://polygonscan.com",
+  8453: "https://basescan.org",
+  42161: "https://arbiscan.io",
+  // Optimism takes deposits to the Safe (OP, USDC, ...), so a deposit there must
+  // not link to the Fuse explorer either.
+  10: "https://optimistic.etherscan.io",
+};
+
+/** A transaction on its chain's explorer. No chain, or an unknown one, reads as Fuse. */
+export function getExplorerTxUrl(
+  hash: string,
+  chainId: number | null | undefined
+): string {
+  const base = EXPLORER_URLS[chainId ?? 122] ?? EXPLORER_URLS[122];
+  return `${base}/tx/${hash}`;
+}
+
+/**
  * A date and time in en-US, for the same reason as {@link formatUsd}: a
  * timestamp that reads `9/8/2026` for one operator and `08/09/2026` for another
  * is a support call waiting to happen.

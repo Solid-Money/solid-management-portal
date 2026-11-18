@@ -210,8 +210,9 @@ export default function FeesConfigPage() {
           what happens when a user is short: an on-chain fee cannot fail, a
           withheld fee never touches a balance, and a billed fee can push one
           negative. Fees apply only at the edges, so holding a card and spending
-          in USD is free on every tier, Core included. Rates taper to zero at
-          Ultra, so staking FUSE genuinely drops every fee to zero.
+          in USD is free on every tier, Core included. Rates taper down the
+          tiers, so at Ultra every fee drops to zero, however the tier was
+          reached.
         </p>
       </div>
 

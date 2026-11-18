@@ -97,7 +97,7 @@ function Choice({
         "flex-1 cursor-pointer rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         selected
           ? "border-indigo-500 bg-indigo-50 text-indigo-900"
-          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
       )}
     >
       {children}
@@ -137,7 +137,13 @@ const isClosedAtIssuer = (context: CardIssuanceContext) =>
     (context.provider === "wirex" ? "Closed" : "canceled");
 
 /** The card being replaced, spelled out so support sees what they are acting on. */
-function CurrentCardSummary({ context }: { context: CardIssuanceContext }) {
+function CurrentCardSummary({
+  context,
+  heading = "Card being replaced",
+}: {
+  context: CardIssuanceContext;
+  heading?: string;
+}) {
   const card = context.currentCard;
 
   if (!card) {
@@ -154,7 +160,7 @@ function CurrentCardSummary({ context }: { context: CardIssuanceContext }) {
     <div className="space-y-1.5 rounded-md border border-gray-200 bg-gray-50 p-3">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold uppercase text-gray-500">
-          Card being replaced
+          {heading}
         </h4>
         <Badge variant={canceled ? "muted" : "info"}>
           {card.issuerStatus ?? card.status ?? "unknown"}
@@ -212,10 +218,10 @@ function IssueCardForm({
   const [displayName, setDisplayName] = useState(defaults.displayName ?? "");
   const [withLimit, setWithLimit] = useState(!!defaults.limit);
   const [limitDollars, setLimitDollars] = useState(
-    centsToDollars(defaults.limit?.amount)
+    centsToDollars(defaults.limit?.amount),
   );
   const [limitFrequency, setLimitFrequency] = useState<CardLimitFrequency>(
-    (defaults.limit?.frequency as CardLimitFrequency) ?? "per30DayPeriod"
+    (defaults.limit?.frequency as CardLimitFrequency) ?? "per30DayPeriod",
   );
   const [shipping, setShipping] = useState<CardShippingAddress>({
     ...EMPTY_SHIPPING,
@@ -264,7 +270,7 @@ function IssueCardForm({
                 : {}),
               ...(type === "physical" ? { shipping } : {}),
               ...(reason.trim() ? { reason: reason.trim() } : {}),
-            }
+            },
       ),
     onMutate: () => onSavingChange(true),
     onSettled: () => onSavingChange(false),
@@ -275,7 +281,9 @@ function IssueCardForm({
           (issued.last4 ? ` (•••• ${issued.last4})` : "") +
           // Wirex opens a virtual card by itself, normally within seconds; the
           // cardholder is notified when it does.
-          (issued.status === "pending" ? " — the issuer is still opening it" : "")
+          (issued.status === "pending"
+            ? " — the issuer is still opening it"
+            : ""),
       );
       onIssued();
       // The card panel, its history and the balances all move together.
@@ -284,6 +292,8 @@ function IssueCardForm({
         "user-card-audit-history",
         "user-balances",
         "user-card-issuance-context",
+        // The Rain sunset card reports the Rain card's retirement/cancellation.
+        "user-rain-sunset",
       ]) {
         void queryClient.invalidateQueries({ queryKey: [key, userId] });
       }
@@ -404,8 +414,9 @@ function IssueCardForm({
                 disabled={busy}
               />
               <p className="text-muted-foreground text-[11px]">
-                Embossed on physical cards, ignored for virtual ones. Latin letters,
-                digits, spaces, periods and hyphens only — 26 characters at most.
+                Embossed on physical cards, ignored for virtual ones. Latin
+                letters, digits, spaces, periods and hyphens only — 26
+                characters at most.
               </p>
             </Field>
 
@@ -441,7 +452,9 @@ function IssueCardForm({
                       id="issue-limit-frequency"
                       value={limitFrequency}
                       onChange={(event) =>
-                        setLimitFrequency(event.target.value as CardLimitFrequency)
+                        setLimitFrequency(
+                          event.target.value as CardLimitFrequency,
+                        )
                       }
                       disabled={busy}
                       className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
@@ -556,9 +569,9 @@ function IssueCardForm({
                   </Field>
                 </div>
                 <p className="text-muted-foreground text-[11px]">
-                  Latin characters only — the issuer rejects accents on a physical
-                  order. Pre-filled from their verified identity check; check it
-                  against what the cardholder has told you.
+                  Latin characters only — the issuer rejects accents on a
+                  physical order. Pre-filled from their verified identity check;
+                  check it against what the cardholder has told you.
                 </p>
               </div>
             )}
@@ -607,6 +620,121 @@ function IssueCardForm({
             : cancelExisting && context.currentCard
               ? "Cancel & issue new card"
               : "Issue card"}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+/**
+ * Rain sunset: cancel the Rain card a user holds, with no replacement. New Rain
+ * cards are closed, so a leaked card can only be stopped — a freeze would leave
+ * the number able to come back. The cardholder gets a card again by moving to
+ * Wirex from the app, where Wirex serves their country.
+ */
+function CancelCardOnlyForm({
+  userId,
+  username,
+  context,
+  onSavingChange,
+  onDone,
+  onCancel,
+}: {
+  userId: string;
+  username: string;
+  context: CardIssuanceContext;
+  onSavingChange: (saving: boolean) => void;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [reason, setReason] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      issueUserCard(userId, {
+        type: "virtual",
+        cancelExisting: true,
+        cancelOnly: true,
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
+      }),
+    onMutate: () => onSavingChange(true),
+    onSettled: () => onSavingChange(false),
+    onSuccess: () => {
+      toast.success(`Card cancelled for ${username} — no replacement issued`);
+      onDone();
+      for (const key of [
+        "user-card",
+        "user-card-audit-history",
+        "user-balances",
+        "user-card-issuance-context",
+        // The Rain sunset card reports the Rain card's retirement/cancellation.
+        "user-rain-sunset",
+      ]) {
+        void queryClient.invalidateQueries({ queryKey: [key, userId] });
+      }
+    },
+    onError: () => {
+      // The API layer already surfaces the server's message as a toast; this
+      // only keeps the dialog open so the operator can retry.
+    },
+  });
+
+  const busy = mutation.isPending;
+
+  return (
+    <>
+      <div className="space-y-4">
+        <CurrentCardSummary context={context} heading="Card to cancel" />
+
+        <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{context.blockedReason}</span>
+        </div>
+
+        <p className="text-xs text-gray-600">
+          Cancelling stops this card for good, at Rain — it cannot be undone,
+          and no new card is issued. A freeze would only block it, and the
+          cardholder can unfreeze it, so a leaked number stays live until it is
+          cancelled here.
+        </p>
+
+        <div className="space-y-2">
+          <Label htmlFor="cancel-reason">
+            Reason <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <Textarea
+            id="cancel-reason"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={500}
+            placeholder="e.g. Cardholder reported their card details were exposed"
+            disabled={busy}
+          />
+          <p className="text-muted-foreground text-xs">
+            Recorded in the audit trail and posted to Slack with your name and
+            the user&apos;s.
+          </p>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          disabled={busy}
+          className="cursor-pointer"
+        >
+          Close
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={() => mutation.mutate()}
+          disabled={busy}
+          className="cursor-pointer"
+        >
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          Cancel card permanently
         </Button>
       </DialogFooter>
     </>
@@ -689,12 +817,14 @@ export default function IssueCardDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-gray-400" />
-              Issue a new card for {username}
+              {issuance?.cancelOnly
+                ? `Cancel ${username}'s card`
+                : `Issue a new card for ${username}`}
             </DialogTitle>
             <DialogDescription>
-              Pre-filled from the card they hold and the details their issuer
-              already has. Change what has actually changed — everything you do
-              here is recorded against your name.
+              {issuance?.cancelOnly
+                ? "New cards from this issuer are closed, so the card they hold can be cancelled but not replaced. Everything you do here is recorded against your name."
+                : "Pre-filled from the card they hold and the details their issuer already has. Change what has actually changed — everything you do here is recorded against your name."}
             </DialogDescription>
           </DialogHeader>
 
@@ -709,6 +839,15 @@ export default function IssueCardDialog({
                 </p>
               )}
             </div>
+          ) : !issuance.canIssue && issuance.cancelOnly ? (
+            <CancelCardOnlyForm
+              userId={userId}
+              username={username}
+              context={issuance}
+              onSavingChange={setSaving}
+              onDone={() => setOpen(false)}
+              onCancel={() => setOpen(false)}
+            />
           ) : !issuance.canIssue ? (
             <>
               <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">

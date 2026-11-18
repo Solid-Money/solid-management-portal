@@ -1,0 +1,570 @@
+{
+ "range": {
+  "from": "2026-10-26",
+  "to": "2026-11-01",
+  "previousFrom": "2026-10-19",
+  "previousTo": "2026-10-25",
+  "days": 7,
+  "chartFrom": "2026-10-03",
+  "chartTo": "2026-11-01",
+  "today": "2026-11-08",
+  "includesToday": false
+ },
+ "definition": {
+  "version": 1,
+  "timezone": "UTC",
+  "weekStartsOn": "monday"
+ },
+ "generatedAt": "2026-11-08T12:00:00.000Z",
+ "totals": {
+  "sent": {
+   "current": 10658.93,
+   "previous": 6243.39
+  },
+  "sentSplit": {
+   "cashback": 7348.24,
+   "referrals": 2860,
+   "other": 450.69
+  },
+  "lateCashbackInSentUsd": 1376.41,
+  "earned": {
+   "current": 9906.16,
+   "previous": 8760.51
+  },
+  "earnedSplit": {
+   "cashback": 5443.27,
+   "referrals": 4300,
+   "other": 162.89
+  },
+  "earnedPaysOn": {
+   "cashback": {
+    "from": "2026-11-09",
+    "to": "2026-11-15"
+   },
+   "referrals": {
+    "from": "2026-11-25",
+    "to": "2026-12-01"
+   }
+  },
+  "cardSpend": {
+   "current": 167310.97,
+   "previous": 142349.81
+  },
+  "cardSpendPerIncentiveDollar": {
+   "current": 16.89,
+   "previous": 16.25,
+   "average13Weeks": 14.95
+  },
+  "earnedShareOfCardSpend": 0.0592
+ },
+ "programs": [
+  {
+   "key": "cashback_3",
+   "label": "Cashback 3% · Core",
+   "status": "live",
+   "sentUsd": 3621.31,
+   "earnedUsd": 3257.07,
+   "payments": 3321
+  },
+  {
+   "key": "cashback_4",
+   "label": "Cashback 4% · Prime",
+   "status": "live",
+   "sentUsd": 2902.24,
+   "earnedUsd": 1482.96,
+   "payments": 1508
+  },
+  {
+   "key": "cashback_5",
+   "label": "Cashback 5% · Ultra",
+   "status": "live",
+   "sentUsd": 733.55,
+   "earnedUsd": 703.24,
+   "payments": 245
+  },
+  {
+   "key": "cashback_other",
+   "label": "Cashback, other rates",
+   "status": "live",
+   "sentUsd": 0,
+   "earnedUsd": 0,
+   "payments": 0
+  },
+  {
+   "key": "referrals",
+   "label": "Referral rewards",
+   "status": "live",
+   "sentUsd": 2860,
+   "earnedUsd": 4300,
+   "payments": 116
+  },
+  {
+   "key": "subscription_perks",
+   "label": "Subscription perks",
+   "status": "live",
+   "sentUsd": 373.75,
+   "earnedUsd": 70.39,
+   "payments": 45
+  },
+  {
+   "key": "yield_boost",
+   "label": "Yield boost",
+   "status": "live",
+   "sentUsd": 76.94,
+   "earnedUsd": 92.5,
+   "payments": 172
+  },
+  {
+   "key": "payout_corrections",
+   "label": "Payout corrections",
+   "status": "live",
+   "sentUsd": 91.14,
+   "earnedUsd": null,
+   "payments": null
+  }
+ ],
+ "weekly": [
+  {
+   "weekStart": "2026-08-03",
+   "weekEnd": "2026-08-09",
+   "partial": false,
+   "sent": {
+    "cashback": 72.18,
+    "referrals": 0,
+    "perks": 0,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 72.18
+   },
+   "earned": {
+    "cashback": 189.54,
+    "referrals": 30,
+    "perks": 0,
+    "yieldBoost": 0,
+    "total": 219.54
+   },
+   "cardSpend": 1895.36
+  },
+  {
+   "weekStart": "2026-08-10",
+   "weekEnd": "2026-08-16",
+   "partial": false,
+   "sent": {
+    "cashback": 148.01,
+    "referrals": 0,
+    "perks": 0,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 148.01
+   },
+   "earned": {
+    "cashback": 646.21,
+    "referrals": 50,
+    "perks": 0,
+    "yieldBoost": 0,
+    "total": 696.21
+   },
+   "cardSpend": 7288.61
+  },
+  {
+   "weekStart": "2026-08-17",
+   "weekEnd": "2026-08-23",
+   "partial": false,
+   "sent": {
+    "cashback": 205.5,
+    "referrals": 30,
+    "perks": 0,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 235.5
+   },
+   "earned": {
+    "cashback": 3029.53,
+    "referrals": 3730,
+    "perks": 0,
+    "yieldBoost": 0,
+    "total": 6759.53
+   },
+   "cardSpend": 51135.28
+  },
+  {
+   "weekStart": "2026-08-24",
+   "weekEnd": "2026-08-30",
+   "partial": false,
+   "sent": {
+    "cashback": 399.57,
+    "referrals": 60,
+    "perks": 0,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 459.57
+   },
+   "earned": {
+    "cashback": 343.82,
+    "referrals": 1480,
+    "perks": 0,
+    "yieldBoost": 0,
+    "total": 1823.82
+   },
+   "cardSpend": 12297.5
+  },
+  {
+   "weekStart": "2026-08-31",
+   "weekEnd": "2026-09-06",
+   "partial": false,
+   "sent": {
+    "cashback": 3917.72,
+    "referrals": 30,
+    "perks": 0,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 3947.72
+   },
+   "earned": {
+    "cashback": 1532.98,
+    "referrals": 890,
+    "perks": 60.96,
+    "yieldBoost": 0,
+    "total": 2483.94
+   },
+   "cardSpend": 27931.67
+  },
+  {
+   "weekStart": "2026-09-07",
+   "weekEnd": "2026-09-13",
+   "partial": false,
+   "sent": {
+    "cashback": 1407.39,
+    "referrals": 50,
+    "perks": 0,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 1457.39
+   },
+   "earned": {
+    "cashback": 2876.48,
+    "referrals": 420,
+    "perks": 212.14,
+    "yieldBoost": 0,
+    "total": 3508.62
+   },
+   "cardSpend": 59296.18
+  },
+  {
+   "weekStart": "2026-09-14",
+   "weekEnd": "2026-09-20",
+   "partial": false,
+   "sent": {
+    "cashback": 796.75,
+    "referrals": 450,
+    "perks": 60.96,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 1307.71
+   },
+   "earned": {
+    "cashback": 2251.53,
+    "referrals": 1725,
+    "perks": 533.52,
+    "yieldBoost": 0,
+    "total": 4510.05
+   },
+   "cardSpend": 64992.56
+  },
+  {
+   "weekStart": "2026-09-21",
+   "weekEnd": "2026-09-27",
+   "partial": false,
+   "sent": {
+    "cashback": 1820.21,
+    "referrals": 4250,
+    "perks": 212.14,
+    "yieldBoost": 0,
+    "corrections": 0,
+    "total": 6282.35
+   },
+   "earned": {
+    "cashback": 2637.83,
+    "referrals": 2450,
+    "perks": 212.85,
+    "yieldBoost": 0,
+    "total": 5300.68
+   },
+   "cardSpend": 73267.15
+  },
+  {
+   "weekStart": "2026-09-28",
+   "weekEnd": "2026-10-04",
+   "partial": false,
+   "sent": {
+    "cashback": 2097.75,
+    "referrals": 1070,
+    "perks": 504.87,
+    "yieldBoost": 29.58,
+    "corrections": 0,
+    "total": 3702.2
+   },
+   "earned": {
+    "cashback": 3904.45,
+    "referrals": 3385,
+    "perks": 591.84,
+    "yieldBoost": 66.39,
+    "total": 7947.68
+   },
+   "cardSpend": 119286.12
+  },
+  {
+   "weekStart": "2026-10-05",
+   "weekEnd": "2026-10-11",
+   "partial": false,
+   "sent": {
+    "cashback": 2753.86,
+    "referrals": 620,
+    "perks": 241.5,
+    "yieldBoost": 83.44,
+    "corrections": 0,
+    "total": 3698.8
+   },
+   "earned": {
+    "cashback": 4115.12,
+    "referrals": 4000,
+    "perks": 432.29,
+    "yieldBoost": 103.49,
+    "total": 8650.9
+   },
+   "cardSpend": 163585.49
+  },
+  {
+   "weekStart": "2026-10-12",
+   "weekEnd": "2026-10-18",
+   "partial": false,
+   "sent": {
+    "cashback": 3831.11,
+    "referrals": 0,
+    "perks": 591.84,
+    "yieldBoost": 78.1,
+    "corrections": 0,
+    "total": 4501.05
+   },
+   "earned": {
+    "cashback": 5794.96,
+    "referrals": 5550,
+    "perks": 308.22,
+    "yieldBoost": 102.41,
+    "total": 11755.59
+   },
+   "cardSpend": 190905.09
+  },
+  {
+   "weekStart": "2026-10-19",
+   "weekEnd": "2026-10-25",
+   "partial": false,
+   "sent": {
+    "cashback": 2959.95,
+    "referrals": 2850,
+    "perks": 364.36,
+    "yieldBoost": 69.08,
+    "corrections": 0,
+    "total": 6243.39
+   },
+   "earned": {
+    "cashback": 4234.21,
+    "referrals": 4250,
+    "perks": 182.61,
+    "yieldBoost": 93.69,
+    "total": 8760.51
+   },
+   "cardSpend": 142349.81
+  },
+  {
+   "weekStart": "2026-10-26",
+   "weekEnd": "2026-11-01",
+   "partial": false,
+   "sent": {
+    "cashback": 7257.1,
+    "referrals": 2860,
+    "perks": 373.75,
+    "yieldBoost": 76.94,
+    "corrections": 91.14,
+    "total": 10658.93
+   },
+   "earned": {
+    "cashback": 5443.27,
+    "referrals": 4300,
+    "perks": 70.39,
+    "yieldBoost": 92.5,
+    "total": 9906.16
+   },
+   "cardSpend": 167310.97
+  }
+ ],
+ "weeklyTotals13": {
+  "sent": 42714.8,
+  "earned": 72323.23
+ },
+ "comingDue": {
+  "asOf": "2026-11-08T12:00:00.000Z",
+  "rates": {
+   "cashback": 0.9502,
+   "referrals": 0.332
+  },
+  "totalAll": 32137.11,
+  "totalExpected": 17689.13,
+  "cashbackAll": 11357.11,
+  "referralsAll": 20780,
+  "overdueReferralsUsd": 1380,
+  "weeks": [
+   {
+    "from": "2026-11-08",
+    "to": "2026-11-08",
+    "cashbackAll": 339.78,
+    "cashbackExpected": 322.85,
+    "referralsAll": 0,
+    "referralsExpected": 0
+   },
+   {
+    "from": "2026-11-09",
+    "to": "2026-11-15",
+    "cashbackAll": 5513.66,
+    "cashbackExpected": 5238.91,
+    "referralsAll": 7480,
+    "referralsExpected": 2483
+   },
+   {
+    "from": "2026-11-16",
+    "to": "2026-11-22",
+    "cashbackAll": 5503.67,
+    "cashbackExpected": 5229.42,
+    "referralsAll": 4750,
+    "referralsExpected": 1576.77
+   },
+   {
+    "from": "2026-11-23",
+    "to": "2026-11-29",
+    "cashbackAll": 0,
+    "cashbackExpected": 0,
+    "referralsAll": 4350,
+    "referralsExpected": 1443.99
+   },
+   {
+    "from": "2026-11-30",
+    "to": "2026-12-06",
+    "cashbackAll": 0,
+    "cashbackExpected": 0,
+    "referralsAll": 3400,
+    "referralsExpected": 1128.64
+   },
+   {
+    "from": "2026-12-07",
+    "to": "2026-12-08",
+    "cashbackAll": 0,
+    "cashbackExpected": 0,
+    "referralsAll": 800,
+    "referralsExpected": 265.56
+   }
+  ],
+  "newCashbackPerWeekUsd": 5145.27
+ },
+ "checks": [
+  {
+   "key": "onchain_match",
+   "label": "Payouts on record vs on-chain",
+   "value": 0.9914,
+   "unit": "percent",
+   "status": "watch",
+   "detail": "Oct 26 – Nov 1. $91 was paid beyond the recorded amounts."
+  },
+  {
+   "key": "cashback_cut",
+   "label": "Cashback cut before payout",
+   "value": 0.0498,
+   "unit": "percent",
+   "status": "watch",
+   "detail": "Monthly caps and refunds, last 4 payout weeks. 8.1% in the latest week."
+  },
+  {
+   "key": "referrals_paid_rate",
+   "label": "Referral rewards paid when due",
+   "value": 0.332,
+   "unit": "percent",
+   "status": "watch",
+   "detail": "Due in the last 4 weeks; the rest failed the spend check or wait on a review."
+  },
+  {
+   "key": "referrals_under_review",
+   "label": "Referral rewards waiting on a review",
+   "value": 26,
+   "unit": "count",
+   "status": "off_track",
+   "detail": "Velocity holds, 5–14 days overdue. No decision since Oct 21."
+  }
+ ],
+ "notIncluded": [
+  {
+   "key": "waived_fees",
+   "label": "Waived fees (FX, off-ramp, TransFi)",
+   "size": "on $259K of spend since Oct 5",
+   "why": "Revenue we don't charge; no money leaves"
+  },
+  {
+   "key": "tier_fx_pricing",
+   "label": "Tier FX pricing on Wirex (on since Nov 6)",
+   "size": "about $125–130 a week in cash, plus $290–400 not charged",
+   "why": "Open decision: count the cash part as an incentive"
+  },
+  {
+   "key": "free_trials",
+   "label": "Free Prime and Ultra trials",
+   "size": "already in the totals",
+   "why": "Their cost is the extra 1–2% in 4% and 5% cashback"
+  },
+  {
+   "key": "gas_sponsorship",
+   "label": "Gas sponsorship",
+   "size": "about $40–60 a week recorded; the Pimlico bill isn’t",
+   "why": "Cost of running the app"
+  },
+  {
+   "key": "bridge_shortfall",
+   "label": "Bridge shortfall Solid covers",
+   "size": "about $150–200 a week",
+   "why": "Cost of running the app"
+  },
+  {
+   "key": "card_credit",
+   "label": "Card credit (V4 referrals, admin grants)",
+   "size": "$5 granted to a team member, $0 spent",
+   "why": "Team accounts only; counted when spent at a card purchase"
+  },
+  {
+   "key": "referral_spend_share",
+   "label": "V4 spend share",
+   "size": "$0",
+   "why": "Counted as sent once the Thursday soFUSE payout goes out"
+  },
+  {
+   "key": "ai_cashback",
+   "label": "AI-agent cashback",
+   "size": "$0, live but unused",
+   "why": "Pays from the cashback wallet, so it shows as a payout correction until it has its own row"
+  },
+  {
+   "key": "deposit_bonus",
+   "label": "Old deposit bonus",
+   "size": "$0, switched off",
+   "why": "Pays from the bonus wallet, which is off"
+  },
+  {
+   "key": "points",
+   "label": "Points, spins, weekly giveaway",
+   "size": "$0 in cash",
+   "why": "Not money unless a giveaway pays out"
+  },
+  {
+   "key": "wirex_refunds",
+   "label": "Wirex refunds in USDC.e from the cashback wallet",
+   "size": "about $10.8K in Oct 26 – Nov 1",
+   "why": "Users' own money coming back"
+  }
+ ]
+}
