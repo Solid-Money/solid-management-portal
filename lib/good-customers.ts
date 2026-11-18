@@ -175,20 +175,20 @@ export function share(part: number, whole: number): number | null {
   return whole > 0 ? part / whole : null;
 }
 
-/** Fees and Prime minus cashback, per qualified customer, over the economics window. */
+/** Fees and memberships minus cashback, per qualified customer, over the economics window. */
 export function netPerQualified(data: GoodCustomersResponse): number | null {
   const { economics, ladder } = data;
   if (ladder.qualified === 0) return null;
   return (economics.feesUsd + economics.primeUsd - economics.cashbackUsd) / ladder.qualified;
 }
 
-/** Qualified people's cashback over what they paid in fees and Prime. */
+/** Qualified people's cashback over what they paid in fees and memberships. */
 export function qualifiedCashbackMultiple(data: GoodCustomersResponse): number | null {
   const paid = data.economics.feesUsd + data.economics.primeUsd;
   return paid > 0 ? data.economics.cashbackUsd / paid : null;
 }
 
-/** Everyone's cashback over tracked revenue (fees + Prime), 90 days. */
+/** Everyone's cashback over tracked revenue (fees + memberships), 90 days. */
 export function cashbackToRevenue(data: GoodCustomersResponse): number | null {
   if (data.feeRevenueUsd90 === null) return null;
   const revenue = data.feeRevenueUsd90 + data.allCustomers90.primeUsd;
@@ -252,7 +252,7 @@ export function guardrails(data: GoodCustomersResponse): Guardrail[] {
           ? `${usd(allCustomers90.cashbackUsd)} of cashback; fee revenue could not be read`
           : `${usd(allCustomers90.cashbackUsd)} of cashback against ${usd(
               data.feeRevenueUsd90 + allCustomers90.primeUsd,
-            )} of fees and Prime`,
+            )} of fees and memberships`,
       value: ratio === null ? "—" : `${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}×`,
       status:
         ratio === null ? "unknown" : ratio > GUARDRAIL_LIMITS.cashbackToRevenue ? "off" : "ok",
@@ -260,7 +260,7 @@ export function guardrails(data: GoodCustomersResponse): Guardrail[] {
     {
       key: "covering",
       title: "Qualified customers who cover their cashback",
-      detail: "Fees and Prime they paid, against the cashback they earned",
+      detail: "Fees and memberships they paid, against the cashback they earned",
       value: `${count.format(economics.coveringOwnCashback)} of ${count.format(ladder.qualified)}`,
       status:
         covering === null ? "unknown" : covering < GUARDRAIL_LIMITS.coveringShare ? "off" : "ok",

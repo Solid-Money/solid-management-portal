@@ -1892,10 +1892,31 @@ export interface TierMembershipConfig {
   legacyGrandfatherUntil: string;
   /** Whether a tier can be bought with an annual fee. */
   subscriptionEnabled: boolean;
-  /** Annual price of Prime, in USD. 0 means it is not sold for cash. */
+  /**
+   * Annual (list) price of Prime, in USD: what the user signs the mandate for
+   * and what every renewal charges. -1 (`TIER_PRICE_NOT_PURCHASABLE`), or any
+   * value at or below 0, means Prime is not sold for cash.
+   */
   primeAnnualUsd: number;
-  /** Annual price of Ultra, in USD. 0 by default — Ultra is FUSE-only. */
+  /**
+   * Annual (list) price of Ultra, in USD. -1 by default: not sold for cash,
+   * so the FUSE lock is its only route. A positive price sells it for cash
+   * alongside the lock.
+   */
   ultraAnnualUsd: number;
+  /**
+   * Prime's first-year price while the sale window is open, in USD. Must be
+   * below `primeAnnualUsd`. Only the first charge of a new membership gets it:
+   * the mandate is signed at, and renews at, the annual price. At or below 0
+   * (default -1) means no sale for Prime.
+   */
+  primeSaleUsd: number;
+  /** Ultra's first-year price while the sale is open. See `primeSaleUsd`. */
+  ultraSaleUsd: number;
+  /** When the sale opens, ISO-8601 UTC. Null (or "") means no window. */
+  saleStartsAt: string | null;
+  /** When the sale closes, ISO-8601 UTC, exclusive. Null (or "") means no window. */
+  saleEndsAt: string | null;
   /** Days a membership keeps its tier after a renewal charge first fails. */
   graceDays: number;
   /** How far ahead of a renewal the user is told about it. */
@@ -1988,19 +2009,34 @@ export interface FullRewardsConfig {
   yieldBoost: YieldBoostConfig;
 }
 
-/** A membership's lifecycle, as the backend reports it. */
+/**
+ * A membership's lifecycle, as the backend reports it. `replaced` is a
+ * membership that ended because the user upgraded (Prime → Ultra): the new one
+ * took over from it.
+ */
 export type TierSubscriptionStatus =
   | "active"
   | "past_due"
   | "cancelled"
-  | "expired";
+  | "expired"
+  | "replaced";
 
 /** The user's paid membership, if they have one. */
 export interface TierSubscriptionView {
   id: string;
   tier: string;
   status: TierSubscriptionStatus;
+  /** The annual (list) price: what the mandate is for and renewals charge. */
   priceUsd: string;
+  /**
+   * What the first year was charged, when that differed from `priceUsd` — a
+   * sale price. Null or absent otherwise, and from backends that predate it.
+   */
+  introPriceUsd?: string | null;
+  /** When an upgrade ended this membership. Null or absent otherwise. */
+  replacedAt?: string | null;
+  /** The id of the membership that replaced it. */
+  replacedBy?: string | null;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   /** When the next renewal is attempted. Null once it will not renew. */
