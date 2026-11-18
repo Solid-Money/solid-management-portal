@@ -92,6 +92,8 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     term: "Incentive cost",
     definition:
       "Cashback plus referral payouts plus subscription cashback plus points valued at the configured conversion rate, at USD value on the payment date.",
+    caveat:
+      "Dollar cashback only: euro cardholders' cashback (paid in soEUR) is never converted into it and is reported on its own, in EUR.",
   },
   cac: {
     term: "CAC (fully loaded)",
@@ -207,7 +209,7 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     definition:
       "Payout wallet balance ÷ its trailing 7-day average daily outflow, in days.",
     caveat:
-      "The cashback wallet also receives Wirex card spend, so its inflows and outflows are shown separately.",
+      "The cashback wallet also receives Wirex card spend, so its inflows and outflows are shown separately. Its soEUR float pays euro cashback and has its own runway, in EUR.",
   },
   qualificationRate: {
     term: "Qualification rate",

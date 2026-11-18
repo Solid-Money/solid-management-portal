@@ -19,6 +19,10 @@ import type {
   TaskCampaignColor,
   TaskCampaignInput,
   TaskMarketingOverview,
+  TaskSearchPage,
+  TaskTeamPage,
+  TaskTeamScope,
+  TaskArea,
 } from "@/types/tasks";
 
 /**
@@ -46,6 +50,22 @@ export const getTasks = async (filters: TaskListFilters, page = 0) =>
       },
     })
   ).data;
+
+/** The Team tab: what everyone is on, by status. */
+export const getTeam = async (params: { scope: TaskTeamScope; area: TaskArea | null; helpers: boolean }) =>
+  (
+    await api.get<TaskTeamPage>(`${base}/team`, {
+      params: {
+        scope: params.scope,
+        ...(params.area ? { area: params.area } : {}),
+        ...(params.helpers ? {} : { helpers: "false" }),
+      },
+    })
+  ).data;
+
+/** One search across every board, open and closed: words, "a phrase", or a task number. */
+export const searchTasks = async (q: string) =>
+  (await api.get<TaskSearchPage>(`${base}/search`, { params: { q } })).data;
 
 /** A week's sprint (any day in it; this week's when absent) and the backlog. */
 export const getTaskSprint = async (start?: string) =>

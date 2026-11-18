@@ -18,10 +18,12 @@ import {
   getMarketing,
   getTaskSprint,
   getTasks,
+  searchTasks,
+  getTeam,
   markTaskNotificationsRead,
   patchTask,
 } from "@/lib/tasks-api";
-import type { TaskDetail, TaskListFilters, TaskPatchInput } from "@/types/tasks";
+import type { TaskArea, TaskDetail, TaskListFilters, TaskPatchInput, TaskTeamScope } from "@/types/tasks";
 import { claudeLookingIn } from "@/lib/task-rich";
 
 /** Every tasks query sits under this key: a live event refreshes them all. */
@@ -33,6 +35,8 @@ export const TASK_KEYS = {
   partners: ["tasks", "partners"] as const,
   list: (filters: TaskListFilters) => ["tasks", "list", filters] as const,
   sprint: (start: string | null) => ["tasks", "sprint", start ?? "current"] as const,
+  search: (q: string) => ["tasks", "search", q] as const,
+  team: (scope: string, area: string | null, helpers: boolean) => ["tasks", "team", scope, area ?? "all", helpers] as const,
   task: (id: string) => ["tasks", "task", id] as const,
   notifications: ["tasks", "notifications"] as const,
   marketing: (range: { from: string; to: string } | null) =>
@@ -96,6 +100,28 @@ export function useTaskSprint(start: string | null, enabled = true) {
   });
 }
 
+/** The Team tab, kept fresh every minute; the last answer stays while the next loads. */
+export function useTeam(scope: TaskTeamScope, area: TaskArea | null, helpers: boolean) {
+  return useQuery({
+    queryKey: TASK_KEYS.team(scope, area, helpers),
+    queryFn: () => getTeam({ scope, area, helpers }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+  });
+}
+
+/** The central search (two characters or more, or a number), the last results kept while the next load. */
+export function useTaskSearch(q: string) {
+  const term = q.trim();
+  return useQuery({
+    queryKey: TASK_KEYS.search(term),
+    queryFn: () => searchTasks(term),
+    enabled: term.length >= 2 || /^\d+$/.test(term),
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+  });
+}
+
 export function useTaskList(filters: TaskListFilters) {
   return useInfiniteQuery({
     queryKey: TASK_KEYS.list(filters),
@@ -135,6 +161,7 @@ export function usePatchTask(id: string) {
       void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
       void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "team"] });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
       void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
     },
@@ -164,6 +191,7 @@ export function useRefreshTask() {
     void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
+    void queryClient.invalidateQueries({ queryKey: ["tasks", "team"] });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.counts });
     void queryClient.invalidateQueries({ queryKey: TASK_KEYS.boards });
   };

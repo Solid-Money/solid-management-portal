@@ -17,6 +17,7 @@ import api, { getUserCard } from "@/lib/api";
 import { Activity, Balance, User, UserCardOverview } from "@/types";
 import ActivityList from "@/components/activity-list";
 import ResyncActivityDialog from "@/components/user/resync-activity-dialog";
+import RestoreHiddenActivityDialog from "@/components/user/restore-hidden-activity-dialog";
 import BalancesCard from "@/components/balances-card";
 import CardTransactionsTable from "@/components/card-transactions-table";
 import DepositSummaryCard from "@/components/deposit-summary-card";
@@ -30,6 +31,7 @@ import UserErrorsCard from "@/components/user/user-errors-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserSupportCard from "@/components/user/user-support-card";
 import UserKycCard from "@/components/user/user-kyc-card";
+import UserRainSunsetCard from "@/components/user/user-rain-sunset-card";
 import UserVirtualAccountOnboardingCard from "@/components/user/user-virtual-account-onboarding-card";
 import UserProfileCard from "@/components/user/user-profile-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
@@ -281,7 +283,8 @@ export default function UserDetailPage({
         <TabsContent value="activity" className="space-y-3">
           {/* "A transfer is missing from my history": the app's sync only
               reads what is new, so support re-reads the wallet from here. */}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <RestoreHiddenActivityDialog userId={id} />
             <ResyncActivityDialog userId={id} />
           </div>
           {activityLoading ? (
@@ -307,6 +310,12 @@ export default function UserDetailPage({
               exist, and the reason codes here are what answer them. */}
           <SectionAnchor id="user-kyc">
             <UserKycCard userId={id} username={displayName} />
+          </SectionAnchor>
+          {/* Rain sunset: "my card is closing, what do I do?" — whether this
+              user can move to Wirex, and how far the move got. Renders
+              nothing for a user the sunset does not touch. */}
+          <SectionAnchor id="user-rain-sunset">
+            <UserRainSunsetCard userId={id} />
           </SectionAnchor>
           {/* The USD virtual account has its own verification and its own Rain
               review, so it gets stuck in places the card's KYC card does not
@@ -363,7 +372,7 @@ export default function UserDetailPage({
             <UserRewardsCard userId={id} />
           </SectionAnchor>
           {/* Directly under the tier it can override: a running trial is why
-              the tier above may not match the points next to it. */}
+              the tier above may not match the user's lock or membership. */}
           <SectionAnchor id="user-tier">
             <UserTierMembershipCard userId={id} />
           </SectionAnchor>

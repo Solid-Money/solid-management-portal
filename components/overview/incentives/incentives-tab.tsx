@@ -138,7 +138,7 @@ function Footer({ data }: { data: IncentivesResponse }) {
   return (
     <p className="text-[11px] leading-[15px] text-gray-400">
       Definition v{data.definition.version}, data as of {asOf}. Sent = soUSD and soFUSE that left the cashback
-      (0x8678…646c), referral (0x5de4…e30c) and yield boost (0x521b…d9e1) wallets, valued at the rate when sent.
+      (0x8678…646c, on Base and Fuse), referral (0x5de4…e30c) and yield boost (0x521b…d9e1) wallets, valued at the rate when sent.
       Earned = owed for the range&apos;s activity, minus anything already cancelled. Weeks {weekDays(data)}{" "}
       {data.definition.timezone}. Card spend uses the Summary tab&apos;s rule. Revenue is on the Summary tab.
     </p>

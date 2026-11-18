@@ -13,7 +13,11 @@ import {
   stillHappening,
 } from "@/lib/attention";
 import { formatCount } from "@/lib/overview-format";
-import { useAttentionAction, useAttentionItem } from "@/hooks/use-attention";
+import {
+  useAttentionAction,
+  useAttentionItem,
+  useMarkKnownService,
+} from "@/hooks/use-attention";
 import { AttentionAccounts } from "@/components/overview/attention-accounts";
 import type {
   AttentionItemView,
@@ -87,7 +91,14 @@ function Detail({
   onDone: () => void;
 }) {
   const action = useAttentionAction();
+  const markKnown = useMarkKnownService();
   const [closing, setClosing] = useState<"dismiss" | "resolve" | null>(null);
+  const [naming, setNaming] = useState(false);
+  // A shared cash-out wallet can be an exchange or a bridge many honest
+  // users pay: "Known service" closes it and leaves the address out.
+  const cashout =
+    (item.signals ?? []).length > 0 &&
+    (item.signals ?? []).every((s) => s.detector === "shared_cashout_wallet");
   const now = new Date().toISOString();
   const live = item.status !== "resolved" && stillHappening(item, now);
   const badge = levelBadge(item);
@@ -349,6 +360,11 @@ function Detail({
           <ActionButton onClick={() => setClosing("resolve")}>
             {item.fixedOfferedAt ? "Mark fixed" : "Resolve…"}
           </ActionButton>
+          {cashout ? (
+            <ActionButton onClick={() => setNaming(true)}>
+              Known service…
+            </ActionButton>
+          ) : null}
           <ActionButton onClick={() => setClosing("dismiss")}>
             Dismiss…
           </ActionButton>
@@ -360,6 +376,31 @@ function Detail({
         </p>
       ) : null}
 
+      <ReasonDialog
+        open={naming}
+        title="Mark as a known service"
+        description="The radar leaves this wallet out from its next check (5 minutes) and closes this item. Undo it in Config → Anti-abuse."
+        label="Which service is it?"
+        placeholder="Binance deposit address"
+        minLength={2}
+        maxLength={80}
+        confirmLabel="Mark known service"
+        pending={markKnown.isPending}
+        onCancel={() => setNaming(false)}
+        onConfirm={(name) =>
+          markKnown.mutate(
+            { id: item.id, name },
+            {
+              onSuccess: () => {
+                toast.success(`Marked as a known service: ${name}`);
+                setNaming(false);
+                onDone();
+              },
+              onError: (e) => toast.error(describeApiError(e)),
+            },
+          )
+        }
+      />
       <ReasonDialog
         open={closing !== null}
         title={

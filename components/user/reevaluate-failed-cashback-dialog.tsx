@@ -116,9 +116,10 @@ export default function ReevaluateFailedCashbackDialog({
               <ul className="space-y-1.5 text-xs text-gray-600">
                 <li>
                   Use it when the payout gave up because of our side — the error
-                  reads &ldquo;Failed to transfer soUSD&rdquo; or
-                  &ldquo;insufficient funds&rdquo;. Check the payout wallet is
-                  funded first.
+                  reads &ldquo;Failed to transfer soUSD&rdquo; (soEUR for a
+                  euro cardholder) or &ldquo;insufficient funds&rdquo;. Check
+                  the payout wallet is funded first — soUSD on Fuse, or soEUR
+                  on Base for euro rows.
                 </li>
                 <li>
                   The retry job pays each row within 30 minutes at the rate it

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Calendar,
   Coins,
@@ -37,8 +37,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { useConfigEditor } from "@/hooks/use-config-editor";
 import api from "@/lib/api";
+import { isoToUtcInput, utcInputToIso } from "@/lib/referral-v4";
+import {
+  type TierPricing,
+  type TierSaleStatus,
+  tierPricingError,
+  tierSaleOffersLabel,
+  tierSaleStatus,
+  tierSaleStatusLabel,
+} from "@/lib/tier-sale";
 import {
   SubscriptionCategoryRatesMigrationResult,
   SubscriptionDiscountCategory,
@@ -105,6 +115,59 @@ function describeAccrualRun(result: YieldBoostRunResult): string {
   return outcome === "partial"
     ? `${earned} ${stats.incomplete} Safes could not be read and are retried hourly.`
     : earned;
+}
+
+const SALE_STATUS_VARIANT: Record<
+  TierSaleStatus["kind"],
+  "muted" | "info" | "success"
+> = {
+  none: "muted",
+  scheduled: "info",
+  live: "success",
+  ended: "muted",
+};
+
+/**
+ * Where the tier sale stands, read from the form as it is now — so the admin
+ * sees what a save would publish, not only what is already live.
+ *
+ * Keeps its own clock so a page left open moves from Scheduled to Live to
+ * Ended on time.
+ */
+function TierSaleStatusLine({
+  pricing,
+  subscriptionEnabled,
+  unsaved,
+}: {
+  pricing: TierPricing;
+  subscriptionEnabled: boolean;
+  unsaved: boolean;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const status = tierSaleStatus(pricing, now);
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+      <Badge variant={SALE_STATUS_VARIANT[status.kind]}>
+        {tierSaleStatusLabel(status)}
+      </Badge>
+      {status.kind !== "none" && (
+        <span>{tierSaleOffersLabel(status.offers)}</span>
+      )}
+      {unsaved && <span className="text-amber-700">Not saved yet.</span>}
+      {!subscriptionEnabled &&
+        (status.kind === "scheduled" || status.kind === "live") && (
+          <span className="text-amber-700">
+            Annual Charge is switched off, so nobody can buy at any price.
+          </span>
+        )}
+    </div>
+  );
 }
 
 export default function RewardsConfigPage() {
@@ -219,6 +282,18 @@ export default function RewardsConfigPage() {
   const saveCashbackConfig = async () => {
     if (!config) return;
 
+    // A cleared euro cap would go out as 0 and stop every euro cardholder on
+    // that tier earning card cashback, so it is refused instead.
+    const euroCaps = [
+      config.cashback.tier1.monthlyCapEur,
+      config.cashback.tier2.monthlyCapEur,
+      config.cashback.tier3.monthlyCapEur,
+    ];
+    if (euroCaps.some((cap) => (cap as unknown) === "" || Number(cap) < 0)) {
+      toast.error("Every euro monthly cap needs a value of €0 or more");
+      return;
+    }
+
     await saveSection(
       "Cashback",
       "cashback",
@@ -231,6 +306,9 @@ export default function RewardsConfigPage() {
         tier2MonthlyCap: Number(config.cashback.tier2.monthlyCap),
         tier3Percentage: Number(config.cashback.tier3.percentage),
         tier3MonthlyCap: Number(config.cashback.tier3.monthlyCap),
+        tier1MonthlyCapEur: Number(config.cashback.tier1.monthlyCapEur),
+        tier2MonthlyCapEur: Number(config.cashback.tier2.monthlyCapEur),
+        tier3MonthlyCapEur: Number(config.cashback.tier3.monthlyCapEur),
       },
       "cashback",
     );
@@ -244,13 +322,17 @@ export default function RewardsConfigPage() {
       config.subscriptionDiscount.tier1.monthlyCap,
       config.subscriptionDiscount.tier2.monthlyCap,
       config.subscriptionDiscount.tier3.monthlyCap,
+      config.subscriptionDiscount.eligibleAmountCapEur,
+      config.subscriptionDiscount.tier1.monthlyCapEur,
+      config.subscriptionDiscount.tier2.monthlyCapEur,
+      config.subscriptionDiscount.tier3.monthlyCapEur,
     ];
 
     // A cleared box would go out as 0 and quietly switch a tier's subscription
     // cashback — or the grandfathered rate — off, so it is refused instead. A
     // negative cap is refused for the same reason.
     if (caps.some((cap) => (cap as unknown) === "" || Number(cap) < 0)) {
-      toast.error("Every subscription cap needs a value of $0 or more");
+      toast.error("Every subscription cap needs a value of 0 or more");
       return;
     }
 
@@ -278,6 +360,18 @@ export default function RewardsConfigPage() {
           config.subscriptionDiscount.tier3.categoryLimit,
         ),
         tier3MonthlyCap: Number(config.subscriptionDiscount.tier3.monthlyCap),
+        eligibleAmountCapEur: Number(
+          config.subscriptionDiscount.eligibleAmountCapEur,
+        ),
+        tier1MonthlyCapEur: Number(
+          config.subscriptionDiscount.tier1.monthlyCapEur,
+        ),
+        tier2MonthlyCapEur: Number(
+          config.subscriptionDiscount.tier2.monthlyCapEur,
+        ),
+        tier3MonthlyCapEur: Number(
+          config.subscriptionDiscount.tier3.monthlyCapEur,
+        ),
       },
       "subscriptionDiscount",
     );
@@ -328,6 +422,14 @@ export default function RewardsConfigPage() {
       toast.error("Bridge Fee Cover must be between 0 and 20%");
       return;
     }
+    // The prices and the sale, checked by the backend's rules: a blank list
+    // price would go out as 0 and quietly stop selling the tier, and a sale
+    // price must sit below its list price inside a well-formed window.
+    const pricingError = tierPricingError(config.tierMembership);
+    if (pricingError) {
+      toast.error(pricingError);
+      return;
+    }
 
     if (hasChanges("fuseStaking")) await saveFuseStakingConfig();
 
@@ -345,6 +447,10 @@ export default function RewardsConfigPage() {
         subscriptionEnabled: config.tierMembership.subscriptionEnabled,
         primeAnnualUsd: Number(config.tierMembership.primeAnnualUsd),
         ultraAnnualUsd: Number(config.tierMembership.ultraAnnualUsd),
+        primeSaleUsd: Number(config.tierMembership.primeSaleUsd),
+        ultraSaleUsd: Number(config.tierMembership.ultraSaleUsd),
+        saleStartsAt: config.tierMembership.saleStartsAt || null,
+        saleEndsAt: config.tierMembership.saleEndsAt || null,
         graceDays: Number(config.tierMembership.graceDays),
         renewalNoticeDays: Number(config.tierMembership.renewalNoticeDays),
         bridgeFeeCoverPct,
@@ -488,11 +594,10 @@ export default function RewardsConfigPage() {
   const runCategoryRatesMigration = async (apply: boolean) => {
     try {
       setMigratingRates(true);
-      const response =
-        await api.post<SubscriptionCategoryRatesMigrationResult>(
-          "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
-          { apply },
-        );
+      const response = await api.post<SubscriptionCategoryRatesMigrationResult>(
+        "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
+        { apply },
+      );
       setMigrationResult(response.data);
 
       if (response.data.applied) {
@@ -532,7 +637,6 @@ export default function RewardsConfigPage() {
       "cardWelcomeBonus",
     );
   };
-
 
   if (loading) {
     return (
@@ -1072,7 +1176,7 @@ export default function RewardsConfigPage() {
         <ConfigSection
           id="card-cashback"
           title="Cashback on Card Transactions"
-          description="Users earn FUSE tokens back on card purchases based on their tier"
+          description="Users earn cashback on card purchases based on their tier, in their card's currency: USD cardholders are paid in soUSD (from Base first, Fuse as the fallback) and held to the USD monthly caps; euro cardholders (Wirex main currency EUR) earn on the euro amount, are held to the euro monthly caps and are paid in soEUR on Base. The two are never converted or added together."
           icon={<Percent className="h-5 w-5 text-green-600" />}
         >
           <div className="flex items-center justify-between mb-4">
@@ -1108,7 +1212,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="0.1"
-                tooltip="Percentage of card transaction returned as FUSE tokens"
+                tooltip="Percentage of card transaction returned as cashback — soUSD for USD cardholders, soEUR for euro cardholders"
               />
               <InputField
                 label="Monthly Cap"
@@ -1118,7 +1222,17 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="$"
-                tooltip="Maximum cashback amount user can earn per month"
+                tooltip="Maximum cashback a USD cardholder can earn per month, in USD"
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.cashback.tier1.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate("cashback", "tier1.monthlyCapEur", v)
+                }
+                type="number"
+                suffix="€"
+                tooltip="Maximum cashback a euro cardholder can earn per month, in EUR. Set on its own — never converted from the USD cap."
               />
             </TierCard>
             <TierCard tier="Tier 2">
@@ -1135,7 +1249,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="0.1"
-                tooltip="Percentage of card transaction returned as FUSE tokens"
+                tooltip="Percentage of card transaction returned as cashback — soUSD for USD cardholders, soEUR for euro cardholders"
               />
               <InputField
                 label="Monthly Cap"
@@ -1145,7 +1259,17 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="$"
-                tooltip="Maximum cashback amount user can earn per month"
+                tooltip="Maximum cashback a USD cardholder can earn per month, in USD"
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.cashback.tier2.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate("cashback", "tier2.monthlyCapEur", v)
+                }
+                type="number"
+                suffix="€"
+                tooltip="Maximum cashback a euro cardholder can earn per month, in EUR. Set on its own — never converted from the USD cap."
               />
             </TierCard>
             <TierCard tier="Tier 3">
@@ -1162,7 +1286,7 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="%"
                 step="0.1"
-                tooltip="Percentage of card transaction returned as FUSE tokens"
+                tooltip="Percentage of card transaction returned as cashback — soUSD for USD cardholders, soEUR for euro cardholders"
               />
               <InputField
                 label="Monthly Cap"
@@ -1172,7 +1296,17 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="$"
-                tooltip="Maximum cashback amount user can earn per month"
+                tooltip="Maximum cashback a USD cardholder can earn per month, in USD"
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.cashback.tier3.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate("cashback", "tier3.monthlyCapEur", v)
+                }
+                type="number"
+                suffix="€"
+                tooltip="Maximum cashback a euro cardholder can earn per month, in EUR. Set on its own — never converted from the USD cap."
               />
             </TierCard>
           </TierGrid>
@@ -1382,12 +1516,11 @@ export default function RewardsConfigPage() {
           </button>
         </ConfigSection>
 
-
         {/* Subscription Discount */}
         <ConfigSection
           id="subscription-discounts"
           title="Category-based Subscription Discounts"
-          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins). Each tier has its own monthly cap on subscription cashback across all categories together (Core $50, Prime $100, Ultra $200) — there is no per-service cap, except on grandfathered subscriptions still paid at the old flat rate. Paid as soUSD and also drawn from the card cashback monthly cap."
+          description="Cashback on eligible card spend, priced per category: Prime earns 10% on AI, Streaming and Music and 8% on Rides; Ultra earns 20%, 10% on Rides and 10% on Airlines. A category with no rates of its own falls back to the tier default. Prime unlocks 2 categories/month, Ultra unlocks 4 — one subscription per category per month (first-paid-wins). Each tier has its own monthly cap on subscription cashback across all categories together (Core $50, Prime $100, Ultra $200; for euro cardholders €50, €100, €200) — there is no per-service cap, except on grandfathered subscriptions still paid at the old flat rate. Paid as soUSD on Fuse — soEUR on Base for euro cardholders, against the euro caps — and also drawn from the card cashback monthly cap."
           icon={<Calendar className="h-5 w-5 text-purple-600" />}
         >
           <ToggleField
@@ -1396,7 +1529,7 @@ export default function RewardsConfigPage() {
             onChange={(v) => updateConfig("subscriptionDiscount", "enabled", v)}
             tooltip="Enable or disable subscription discounts for all users"
           />
-          <div className="mt-4 max-w-xs">
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <InputField
               label="Grandfathered Cap / Payment"
               value={config.subscriptionDiscount.eligibleAmountCap}
@@ -1410,6 +1543,20 @@ export default function RewardsConfigPage() {
               type="number"
               suffix="$"
               tooltip="Applies ONLY to grandfathered subscriptions — ones a member was already being paid on before the category rates took effect, which keep the old flat rate (Prime 25%, Ultra 50%). Most cashback one such payment can earn at that rate (e.g. $50). If the category rate pays more on the charge, the member gets that instead. Category-rate charges are not capped per payment, only by each tier's Monthly Cap below. Rewards Terms §6 promises $50 per payment — changing it changes what the published terms owe."
+            />
+            <InputField
+              label="Grandfathered Cap / Payment (EUR)"
+              value={config.subscriptionDiscount.eligibleAmountCapEur}
+              onChange={(v) =>
+                handleNumericUpdate(
+                  "subscriptionDiscount",
+                  "eligibleAmountCapEur",
+                  v,
+                )
+              }
+              type="number"
+              suffix="€"
+              tooltip="The same per-payment cap for euro cardholders, in EUR (e.g. €50). Set on its own — never converted from the USD cap."
             />
           </div>
           <div className="mt-4 space-y-3">
@@ -1540,6 +1687,20 @@ export default function RewardsConfigPage() {
                 suffix="$"
                 tooltip="Most subscription cashback Core can earn in a calendar month, across all its categories together — not per service (default $50). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
               />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.subscriptionDiscount.tier1.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier1.monthlyCapEur",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="€"
+                tooltip="The same monthly cap for euro cardholders on Core, in EUR (default €50). Set on its own — never converted from the USD cap."
+              />
             </TierCard>
             <TierCard tier="Tier 2">
               <InputField
@@ -1588,6 +1749,20 @@ export default function RewardsConfigPage() {
                 type="number"
                 suffix="$"
                 tooltip="Most subscription cashback Prime can earn in a calendar month, across all its categories together — not per service (default $100). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
+              />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.subscriptionDiscount.tier2.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier2.monthlyCapEur",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="€"
+                tooltip="The same monthly cap for euro cardholders on Prime, in EUR (default €100). Set on its own — never converted from the USD cap."
               />
             </TierCard>
             <TierCard tier="Tier 3">
@@ -1638,6 +1813,20 @@ export default function RewardsConfigPage() {
                 suffix="$"
                 tooltip="Most subscription cashback Ultra can earn in a calendar month, across all its categories together — not per service (default $200). Caps the cashback, not the charge. A charge that would cross it earns what is left; once it is used up, eligible charges earn regular card cashback instead. Rewards Terms §5 publishes this figure — changing it changes what the published terms owe."
               />
+              <InputField
+                label="Monthly Cap (EUR)"
+                value={config.subscriptionDiscount.tier3.monthlyCapEur}
+                onChange={(v) =>
+                  handleNumericUpdate(
+                    "subscriptionDiscount",
+                    "tier3.monthlyCapEur",
+                    v,
+                  )
+                }
+                type="number"
+                suffix="€"
+                tooltip="The same monthly cap for euro cardholders on Ultra, in EUR (default €200). Set on its own — never converted from the USD cap."
+              />
             </TierCard>
           </TierGrid>
           {/*
@@ -1674,9 +1863,8 @@ export default function RewardsConfigPage() {
                   {new Date(
                     config.subscriptionDiscount.legacy.cutoverAt,
                   ).toLocaleString()}{" "}
-                  at Prime{" "}
-                  {config.subscriptionDiscount.legacy.tier2 * 100}%, Ultra{" "}
-                  {config.subscriptionDiscount.legacy.tier3 * 100}%.
+                  at Prime {config.subscriptionDiscount.legacy.tier2 * 100}%,
+                  Ultra {config.subscriptionDiscount.legacy.tier3 * 100}%.
                 </>
               ) : (
                 <> Nothing pinned yet.</>
@@ -1797,7 +1985,9 @@ export default function RewardsConfigPage() {
           icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
         >
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <strong>Both purchase routes need their contract deployed first.</strong>{" "}
+            <strong>
+              Both purchase routes need their contract deployed first.
+            </strong>{" "}
             A route with no address configured stays hidden in the app whatever
             its switch says, so turning one on before its deployment is safe but
             does nothing.
@@ -1823,9 +2013,9 @@ export default function RewardsConfigPage() {
             <p className="mb-3 text-xs text-gray-500">
               Lock soFUSE for a term to hold a tier. These amounts are the
               lock&rsquo;s own, separate from &ldquo;FUSE Staking for Tier
-              Unlock&rdquo; above: editing one pair does not change the other.
-              A lock is graded against the amounts in force when it was opened,
-              so a change here prices new locks only.
+              Unlock&rdquo; above: editing one pair does not change the other. A
+              lock is graded against the amounts in force when it was opened, so
+              a change here prices new locks only.
             </p>
             <div className="mb-4">
               <ToggleField
@@ -1947,7 +2137,7 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="USD"
-                tooltip="Set -1 (or any value at or below 0) to stop selling Prime for cash, leaving the FUSE lock as its only route. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
+                tooltip="The list price: what the user signs the mandate for and what every renewal charges, sale or not. Set -1 (or any value at or below 0) to stop selling Prime for cash, leaving the FUSE lock as its only route. A price change does not re-price anyone already subscribed: their mandate is signed at the price they agreed to, and a higher one asks them to sign again."
               />
               <InputField
                 label="Ultra Annual Charge"
@@ -1957,7 +2147,7 @@ export default function RewardsConfigPage() {
                 }
                 type="number"
                 suffix="USD"
-                tooltip="-1 by default, meaning not for sale: Ultra is held by locking FUSE, not by paying. Enter a positive price to sell it for cash too, and the app shows both routes. Anything at or below 0 means not sold, and the app hides the cash route entirely rather than showing a $0 offer."
+                tooltip="The list price: what the user signs the mandate for and what every renewal charges, sale or not. -1 means Ultra is not sold for cash, and the FUSE lock is its only route. A positive price sells it for cash alongside the FUSE lock, and the app shows both routes. Anything at or below 0 means not sold, and the app hides the cash route entirely rather than showing a $0 offer. A price change does not re-price anyone already subscribed."
               />
               <InputField
                 label="Grace Period"
@@ -1989,7 +2179,101 @@ export default function RewardsConfigPage() {
                 min={0}
                 max={20}
                 suffix="%"
-                tooltip="When a user pays from another chain (USDC on Base, ETH on Ethereum…), the bridge and swap take a cut on the way to Fuse. The first charge absorbs that cut, up to this share of the price, so sending $199 still buys a $199 tier. Only what the transfer actually lost is covered — never money the user did not send — and renewals always charge the full price. 0 turns it off. Capped at 20."
+                tooltip="When a user pays from another chain (USDC on Base, ETH on Ethereum…), the bridge and swap take a cut on the way to Fuse. The first charge absorbs that cut, up to this share of the price, so a user who sends a tier's price still gets that tier. Only what the transfer actually lost is covered — never money the user did not send — and renewals always charge the full price. 0 turns it off. Capped at 20."
+              />
+            </div>
+
+            {/* The time-boxed first-year price, e.g. Black Friday. */}
+            <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+              <h5 className="mb-1 text-sm font-semibold text-gray-900">
+                Sale (first year only)
+              </h5>
+              <p className="mb-3 text-xs text-gray-500">
+                A lower price for the first year of a new membership, while the
+                window below is open. The user still signs the mandate at the
+                annual charge above and renews at it. A sale price has to be
+                below its tier&rsquo;s annual charge; -1 turns the sale off for
+                that tier.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField
+                  label="Prime Sale Price"
+                  value={config.tierMembership.primeSaleUsd}
+                  onChange={(v) =>
+                    handleNumericUpdate("tierMembership", "primeSaleUsd", v)
+                  }
+                  type="number"
+                  suffix="USD"
+                  tooltip="What a new Prime membership is charged for its first year while the sale is open. First year only: the user signs the mandate at the Prime Annual Charge and renews at it. Must be below the Prime Annual Charge. Set -1 to turn the sale off for Prime."
+                />
+                <InputField
+                  label="Ultra Sale Price"
+                  value={config.tierMembership.ultraSaleUsd}
+                  onChange={(v) =>
+                    handleNumericUpdate("tierMembership", "ultraSaleUsd", v)
+                  }
+                  type="number"
+                  suffix="USD"
+                  tooltip="What a new Ultra membership is charged for its first year while the sale is open. First year only: the user signs the mandate at the Ultra Annual Charge and renews at it. Must be below the Ultra Annual Charge, so Ultra has to be on sale for cash. Set -1 to turn the sale off for Ultra."
+                />
+                <div className="flex flex-col">
+                  <label
+                    htmlFor="tier-sale-starts-at"
+                    className="mb-1 text-sm font-medium text-gray-700"
+                  >
+                    Sale Starts (UTC)
+                    <InfoTooltip text="Typed and shown in UTC, not your local time. The sale price is offered from this minute. Required while either sale price is above 0." />
+                  </label>
+                  <input
+                    id="tier-sale-starts-at"
+                    type="datetime-local"
+                    value={isoToUtcInput(config.tierMembership.saleStartsAt)}
+                    onChange={(event) =>
+                      updateConfig(
+                        "tierMembership",
+                        "saleStartsAt",
+                        utcInputToIso(event.target.value),
+                      )
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label
+                    htmlFor="tier-sale-ends-at"
+                    className="mb-1 text-sm font-medium text-gray-700"
+                  >
+                    Sale Ends (UTC)
+                    <InfoTooltip text="Typed and shown in UTC, not your local time. Exclusive: the sale stops at this minute, so a sale meant to run through Nov 30 ends at Dec 1, 00:00. Must be after Sale Starts." />
+                  </label>
+                  <input
+                    id="tier-sale-ends-at"
+                    type="datetime-local"
+                    value={isoToUtcInput(config.tierMembership.saleEndsAt)}
+                    onChange={(event) =>
+                      updateConfig(
+                        "tierMembership",
+                        "saleEndsAt",
+                        utcInputToIso(event.target.value),
+                      )
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                </div>
+              </div>
+              <TierSaleStatusLine
+                pricing={config.tierMembership}
+                subscriptionEnabled={config.tierMembership.subscriptionEnabled}
+                unsaved={(
+                  [
+                    "primeAnnualUsd",
+                    "ultraAnnualUsd",
+                    "primeSaleUsd",
+                    "ultraSaleUsd",
+                    "saleStartsAt",
+                    "saleEndsAt",
+                  ] as const
+                ).some((field) => hasChanges("tierMembership", field))}
               />
             </div>
           </div>

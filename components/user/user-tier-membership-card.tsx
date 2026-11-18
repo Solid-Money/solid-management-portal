@@ -25,13 +25,15 @@ const TIER_VARIANT: Record<string, "info" | "success"> = {
  *
  * `cancelled` and `past_due` both still grant the tier, which is the part that
  * surprises people — so they are labelled by what they mean for the user rather
- * than by the enum value.
+ * than by the enum value. `replaced` is neutral: the user upgraded, and the
+ * membership that replaced it is the one that bills now.
  */
 const STATUS_LABEL: Record<TierSubscriptionStatus, string> = {
   active: "Active",
   past_due: "Payment failed — in grace",
   cancelled: "Ends at period end",
   expired: "Ended",
+  replaced: "Replaced by upgrade",
 };
 
 const STATUS_VARIANT: Record<
@@ -42,7 +44,30 @@ const STATUS_VARIANT: Record<
   past_due: "warning",
   cancelled: "muted",
   expired: "destructive",
+  replaced: "muted",
 };
+
+/**
+ * What the membership costs: "$199/yr", or "First year $159, then $199/yr"
+ * when the first year was sold at a different (sale) price.
+ */
+function priceLabel(subscription: TierSubscriptionView): string {
+  return subscription.introPriceUsd
+    ? `First year $${subscription.introPriceUsd}, then $${subscription.priceUsd}/yr`
+    : `$${subscription.priceUsd}/yr`;
+}
+
+/** "Replaced <when> by ultra", or null when it was not replaced. */
+function replacedLabel(
+  subscription: TierSubscriptionView,
+  replacementTier?: string,
+): string | null {
+  if (!subscription.replacedAt) return null;
+  const when = formatDateTime(subscription.replacedAt);
+  return replacementTier
+    ? `Replaced ${when} by ${replacementTier}`
+    : `Replaced ${when}`;
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -97,20 +122,29 @@ const formatFuse = (amount: number) =>
   `${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })} FUSE`;
 
 /** One past membership, for the history list. */
-function SubscriptionRow({ subscription }: { subscription: TierSubscriptionView }) {
+function SubscriptionRow({
+  subscription,
+  replacementTier,
+}: {
+  subscription: TierSubscriptionView;
+  /** The tier of the membership that replaced this one, when known. */
+  replacementTier?: string;
+}) {
+  const replaced = replacedLabel(subscription, replacementTier);
   return (
     <li className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-gray-100 py-2 text-xs">
       <Badge variant={TIER_VARIANT[subscription.tier] ?? "muted"}>
         {subscription.tier}
       </Badge>
-      <Badge variant={STATUS_VARIANT[subscription.status]}>
-        {STATUS_LABEL[subscription.status]}
+      <Badge variant={STATUS_VARIANT[subscription.status] ?? "muted"}>
+        {STATUS_LABEL[subscription.status] ?? subscription.status}
       </Badge>
-      <span className="text-gray-900">${subscription.priceUsd}/yr</span>
+      <span className="text-gray-900">{priceLabel(subscription)}</span>
       <span className="text-gray-500">
         {formatDateTime(subscription.currentPeriodStart)} →{" "}
         {formatDateTime(subscription.currentPeriodEnd)}
       </span>
+      {replaced && <span className="text-gray-500">{replaced}</span>}
       {subscription.failedAttempts > 0 && (
         <span className="text-amber-700">
           {subscription.failedAttempts} failed charge
@@ -153,6 +187,13 @@ export default function UserTierMembershipCard({
   const state = membership?.state;
   const subscription = state?.subscription;
   const lock = state?.lock;
+  // Every membership's tier by id, so a replaced one can name the tier it was
+  // upgraded to.
+  const replacementTiers = new Map<string, string>(
+    [...(membership?.history ?? []), ...(subscription ? [subscription] : [])].map(
+      (row) => [row.id, row.tier],
+    ),
+  );
 
   return (
     <Card className="@container">
@@ -248,13 +289,13 @@ export default function UserTierMembershipCard({
               <div className="rounded-md border border-gray-200 p-3">
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
                   Paid membership
-                  <Badge variant={STATUS_VARIANT[subscription.status]}>
-                    {STATUS_LABEL[subscription.status]}
+                  <Badge variant={STATUS_VARIANT[subscription.status] ?? "muted"}>
+                    {STATUS_LABEL[subscription.status] ?? subscription.status}
                   </Badge>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-4">
                   <Stat label="Tier" value={subscription.tier} />
-                  <Stat label="Price" value={`$${subscription.priceUsd}/yr`} />
+                  <Stat label="Price" value={priceLabel(subscription)} />
                   <Stat
                     label="Paid through"
                     value={formatDateTime(subscription.currentPeriodEnd)}
@@ -276,6 +317,14 @@ export default function UserTierMembershipCard({
                     }
                   />
                 </dl>
+                {subscription.replacedAt && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    {`${replacedLabel(
+                      subscription,
+                      replacementTiers.get(subscription.replacedBy ?? ""),
+                    )}.`}
+                  </p>
+                )}
                 {subscription.funding && (
                   <FundingNote funding={subscription.funding} />
                 )}
@@ -299,7 +348,13 @@ export default function UserTierMembershipCard({
                 </h4>
                 <ul>
                   {membership.history.map((row) => (
-                    <SubscriptionRow key={row.id} subscription={row} />
+                    <SubscriptionRow
+                      key={row.id}
+                      subscription={row}
+                      replacementTier={replacementTiers.get(
+                        row.replacedBy ?? "",
+                      )}
+                    />
                   ))}
                 </ul>
               </div>

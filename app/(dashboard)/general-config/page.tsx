@@ -1,9 +1,10 @@
 "use client";
 
-import { CreditCard, Loader2 } from "lucide-react";
+import { CloudRain, CreditCard, Loader2 } from "lucide-react";
 
 import { ConfigSection } from "@/components/config/config-fields";
 import { RainRtfConfigSection } from "@/components/config/rain-rtf-config";
+import { RainSunsetConfigSection } from "@/components/config/rain-sunset-config";
 import { useGeneralConfig } from "@/hooks/use-general-config";
 
 /**
@@ -44,6 +45,18 @@ export default function GeneralConfigPage() {
         <div className="flex h-48 items-center justify-center rounded-lg border border-gray-200 bg-white">
           <Loader2 className="h-5 w-5 animate-spin text-gray-400" aria-hidden />
         </div>
+      ) : null}
+
+      {data?.rainSunset ? (
+        <ConfigSection
+          id="rain-sunset"
+          title="Rain sunset"
+          description="No new Rain cards or accounts, and Rain users moving to Wirex"
+          icon={<CloudRain className="h-5 w-5 text-indigo-600" />}
+          defaultOpen
+        >
+          <RainSunsetConfigSection config={data.rainSunset} />
+        </ConfigSection>
       ) : null}
 
       {data ? (

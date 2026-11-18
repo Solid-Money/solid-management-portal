@@ -217,8 +217,17 @@ export interface AttentionListResponse {
   generatedAt: string;
 }
 
+/** An outside address many honest users pay (an exchange); the cash-out check leaves it out. */
+export interface RadarKnownService {
+  address: string;
+  name: string;
+  addedBy: string;
+  addedAt: string;
+}
+
 export const ATTENTION_QUERY_KEYS = {
   all: ["attention"] as const,
+  knownServices: ["attention", "known-services"] as const,
   list: (tab: RadarTab) => ["attention", "list", tab] as const,
   item: (id: string) => ["attention", "item", id] as const,
 };

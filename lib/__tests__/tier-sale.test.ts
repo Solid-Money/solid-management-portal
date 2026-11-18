@@ -1,0 +1,265 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  type TierPricing,
+  tierPricingError,
+  tierSaleOffers,
+  tierSaleOffersLabel,
+  tierSaleStatus,
+  tierSaleStatusLabel,
+} from "@/lib/tier-sale";
+
+// The Black Friday sale: Fri Nov 27 – Mon Nov 30 inclusive, so the window
+// closes at the start of Dec 1.
+const blackFriday = (
+  overrides: Partial<Record<keyof TierPricing, unknown>> = {},
+) =>
+  ({
+    primeAnnualUsd: 199,
+    ultraAnnualUsd: 999,
+    primeSaleUsd: 159,
+    ultraSaleUsd: 799,
+    saleStartsAt: "2026-11-27T00:00:00.000Z",
+    saleEndsAt: "2026-12-01T00:00:00.000Z",
+    ...overrides,
+  }) as TierPricing;
+
+const noSale = (overrides: Partial<Record<keyof TierPricing, unknown>> = {}) =>
+  blackFriday({
+    primeSaleUsd: -1,
+    ultraSaleUsd: -1,
+    saleStartsAt: null,
+    saleEndsAt: null,
+    ...overrides,
+  });
+
+describe("tierPricingError", () => {
+  it("accepts the Black Friday sale", () => {
+    expect(tierPricingError(blackFriday())).toBeNull();
+  });
+
+  it("accepts no sale at all, with no window", () => {
+    expect(tierPricingError(noSale())).toBeNull();
+    expect(tierPricingError(noSale({ ultraAnnualUsd: -1 }))).toBeNull();
+  });
+
+  it("accepts a sale on one tier only", () => {
+    expect(tierPricingError(blackFriday({ ultraSaleUsd: -1 }))).toBeNull();
+    expect(tierPricingError(blackFriday({ ultraSaleUsd: 0 }))).toBeNull();
+  });
+
+  it("refuses a blank list price rather than reading it as 0 (not for sale)", () => {
+    expect(tierPricingError(noSale({ primeAnnualUsd: "" }))).toMatch(
+      /Set the Prime Annual Charge/,
+    );
+    expect(tierPricingError(noSale({ ultraAnnualUsd: "" }))).toMatch(
+      /Set the Ultra Annual Charge/,
+    );
+  });
+
+  it("refuses a blank sale price", () => {
+    expect(tierPricingError(blackFriday({ primeSaleUsd: "" }))).toMatch(
+      /Set the Prime Sale Price/,
+    );
+    expect(tierPricingError(blackFriday({ ultraSaleUsd: "" }))).toMatch(
+      /Set the Ultra Sale Price/,
+    );
+  });
+
+  it("refuses a sale price at or above the list price", () => {
+    expect(tierPricingError(blackFriday({ primeSaleUsd: 199 }))).toMatch(
+      /Prime Sale Price \(\$199\) has to be below the Prime Annual Charge \(\$199\)/,
+    );
+    expect(tierPricingError(blackFriday({ ultraSaleUsd: 1200 }))).toMatch(
+      /Ultra Sale Price/,
+    );
+  });
+
+  it("refuses a sale price on a tier that is not sold for cash", () => {
+    expect(
+      tierPricingError(blackFriday({ ultraAnnualUsd: -1, ultraSaleUsd: 799 })),
+    ).toMatch(/Ultra is not sold for cash/);
+    expect(
+      tierPricingError(blackFriday({ ultraAnnualUsd: 0, ultraSaleUsd: 799 })),
+    ).toMatch(/Ultra is not sold for cash/);
+  });
+
+  it("needs both dates once any sale price is set", () => {
+    expect(tierPricingError(blackFriday({ saleStartsAt: null }))).toMatch(
+      /needs both Sale Starts and Sale Ends/,
+    );
+    expect(tierPricingError(blackFriday({ saleEndsAt: "" }))).toMatch(
+      /needs both Sale Starts and Sale Ends/,
+    );
+  });
+
+  it("needs the end after the start", () => {
+    expect(
+      tierPricingError(blackFriday({ saleEndsAt: "2026-11-27T00:00:00.000Z" })),
+    ).toMatch(/Sale Ends has to be after Sale Starts/);
+    expect(
+      tierPricingError(
+        noSale({
+          saleStartsAt: "2026-12-01T00:00:00.000Z",
+          saleEndsAt: "2026-11-27T00:00:00.000Z",
+        }),
+      ),
+    ).toMatch(/Sale Ends has to be after Sale Starts/);
+  });
+});
+
+describe("tierSaleOffers", () => {
+  it("lists the tiers whose sale price would be charged", () => {
+    expect(tierSaleOffers(blackFriday())).toEqual([
+      { tier: "Prime", saleUsd: 159, listUsd: 199 },
+      { tier: "Ultra", saleUsd: 799, listUsd: 999 },
+    ]);
+  });
+
+  it("leaves out a tier with no sale, an invalid one, or no cash price", () => {
+    expect(tierSaleOffers(blackFriday({ ultraSaleUsd: -1 }))).toEqual([
+      { tier: "Prime", saleUsd: 159, listUsd: 199 },
+    ]);
+    expect(tierSaleOffers(blackFriday({ primeSaleUsd: 250 }))).toEqual([
+      { tier: "Ultra", saleUsd: 799, listUsd: 999 },
+    ]);
+    expect(tierSaleOffers(blackFriday({ ultraAnnualUsd: -1 }))).toEqual([
+      { tier: "Prime", saleUsd: 159, listUsd: 199 },
+    ]);
+    expect(tierSaleOffers(blackFriday({ primeSaleUsd: "" }))).toEqual([
+      { tier: "Ultra", saleUsd: 799, listUsd: 999 },
+    ]);
+  });
+});
+
+describe("tierSaleStatus", () => {
+  it.each([
+    ["2026-11-26T23:59:59.000Z", "scheduled"],
+    ["2026-11-27T00:00:00.000Z", "live"],
+    ["2026-11-30T23:59:59.000Z", "live"],
+    ["2026-12-01T00:00:00.000Z", "ended"],
+  ])("at %s is %s", (at, expected) => {
+    expect(tierSaleStatus(blackFriday(), Date.parse(at)).kind).toBe(expected);
+  });
+
+  it("is no sale without a tier on offer or without a well-formed window", () => {
+    const at = Date.parse("2026-11-28T12:00:00.000Z");
+    expect(tierSaleStatus(noSale(), at).kind).toBe("none");
+    expect(
+      tierSaleStatus(blackFriday({ primeSaleUsd: -1, ultraSaleUsd: -1 }), at)
+        .kind,
+    ).toBe("none");
+    expect(tierSaleStatus(blackFriday({ saleEndsAt: null }), at).kind).toBe(
+      "none",
+    );
+    expect(
+      tierSaleStatus(
+        blackFriday({ saleEndsAt: "2026-11-26T00:00:00.000Z" }),
+        at,
+      ).kind,
+    ).toBe("none");
+  });
+});
+
+describe("labels", () => {
+  it("reads the status in UTC", () => {
+    const pricing = blackFriday();
+    expect(
+      tierSaleStatusLabel(
+        tierSaleStatus(pricing, Date.parse("2026-11-20T00:00:00.000Z")),
+      ),
+    ).toBe(
+      "Scheduled: starts Nov 27, 2026, 00:00 UTC, ends Dec 1, 2026, 00:00 UTC",
+    );
+    expect(
+      tierSaleStatusLabel(
+        tierSaleStatus(pricing, Date.parse("2026-11-28T00:00:00.000Z")),
+      ),
+    ).toBe("Live until Dec 1, 2026, 00:00 UTC");
+    expect(
+      tierSaleStatusLabel(
+        tierSaleStatus(pricing, Date.parse("2026-12-02T00:00:00.000Z")),
+      ),
+    ).toBe("Ended Dec 1, 2026, 00:00 UTC");
+    expect(tierSaleStatusLabel({ kind: "none" })).toBe("No sale");
+  });
+
+  it("spells out first year and renewal", () => {
+    expect(tierSaleOffersLabel(tierSaleOffers(blackFriday()))).toBe(
+      "Prime $159 first year, then $199/yr · Ultra $799 first year, then $999/yr",
+    );
+  });
+});
+
+describe("sale dates without a timezone", () => {
+  // Read in the browser's own zone, so the sale would open at a different
+  // instant for every admin — refused rather than guessed.
+  it("refuses a sale date with no UTC marker or offset", () => {
+    expect(
+      tierPricingError(blackFriday({ saleStartsAt: "2026-11-27T00:00:00" })),
+    ).toMatch(/UTC times/);
+  });
+
+  it("accepts an explicit offset as well as Z", () => {
+    expect(
+      tierPricingError(
+        blackFriday({
+          saleStartsAt: "2026-11-27T00:00:00+00:00",
+          saleEndsAt: "2026-12-01T02:00:00+02:00",
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  /**
+   * `Date` rolls Feb 30 over to Mar 2 and calls it a valid time, so the sale
+   * would open two days after the date on the config.
+   */
+  it("refuses an impossible calendar date rather than rolling it over", () => {
+    for (const saleStartsAt of [
+      "2026-02-30T00:00:00.000Z",
+      "2026-04-31T00:00:00Z",
+      "2026-11-27T24:00:00Z",
+      "2026-11-27T00:60:00Z",
+      "2026-11-27T00:00:00+24:00",
+    ]) {
+      expect(
+        tierPricingError(
+          blackFriday({ saleStartsAt, saleEndsAt: "2026-12-04T00:00:00.000Z" }),
+        ),
+      ).toMatch(/Sale Starts isn't a real date/);
+    }
+    expect(
+      tierPricingError(blackFriday({ saleEndsAt: "2027-02-29T00:00:00Z" })),
+    ).toMatch(/Sale Ends isn't a real date/);
+    expect(
+      tierSaleStatus(
+        blackFriday({
+          saleStartsAt: "2026-02-30T00:00:00.000Z",
+          saleEndsAt: "2026-03-04T00:00:00.000Z",
+        }),
+        Date.parse("2026-03-03T00:00:00Z"),
+      ).kind,
+    ).toBe("none");
+  });
+
+  it("still accepts a leap day and a time without seconds", () => {
+    expect(
+      tierPricingError(
+        blackFriday({
+          saleStartsAt: "2028-02-29T00:00Z",
+          saleEndsAt: "2028-03-01T00:00:00.000+0000",
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("reads a zoneless date as no sale window at all", () => {
+    expect(
+      tierSaleStatus(
+        blackFriday({ saleStartsAt: "2026-11-27T00:00:00" }),
+        Date.parse("2026-11-28T00:00:00Z"),
+      ).kind,
+    ).toBe("none");
+  });
+});
