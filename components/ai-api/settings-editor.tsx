@@ -173,11 +173,15 @@ const priceLimit = (text: string): number | null => {
 function parseAutoPricing(
   row: ModelDraft,
   label: string,
+  before?: ModelDraft,
 ): { autoPricing?: AiApiAutoPricing } | { error: string } {
   const parsed = readAutoPricing(row, label);
-  // Off, the markup and limits are hidden: a bad one is nothing to keep, and
-  // must not block saving the fixed prices. Good ones are kept for next time.
-  return "error" in parsed && !row.autoEnabled ? {} : parsed;
+  if (!("error" in parsed) || row.autoEnabled) return parsed;
+  // Off, the markup and limits are hidden, so a bad edit to them must not
+  // block saving the fixed prices: keep what they were before this edit, off,
+  // or nothing when that wasn't valid either. Good ones are kept as typed.
+  const kept = before ? readAutoPricing({ ...before, autoEnabled: false }, label) : {};
+  return "error" in kept ? {} : kept;
 }
 
 function readAutoPricing(
@@ -319,7 +323,11 @@ function parseDraft(
     if (provider.length > 40) {
       return { error: `${label}: the provider can be 40 characters at most.` };
     }
-    const auto = parseAutoPricing(row, label);
+    const auto = parseAutoPricing(
+      row,
+      label,
+      base.models.find((entry) => entry.id.trim() === id),
+    );
     if ("error" in auto) return auto;
     models.push({
       id,
