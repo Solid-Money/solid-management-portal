@@ -263,13 +263,15 @@ const modelsTurnedOff = (draft: Draft, base: Draft): string[] => {
 
 /**
  * The models whose AntSeed key the draft changes: priced to free moves a model
- * to the free-only key, free to priced moves it to the paid key.
+ * to the free-only key, free to priced moves it to the paid key. Only models
+ * left on: a model the save switches off takes no requests on either key.
  */
-const keyChanges = (draft: Draft, base: Draft): { toFree: string[]; toPaid: string[] } => {
-  const before = new Map(base.models.map((model) => [model.id.trim(), isFreeModelPrices(model)]));
+const keyChanges = (draft: Draft, saved: Draft): { toFree: string[]; toPaid: string[] } => {
+  const before = new Map(saved.models.map((model) => [model.id.trim(), isFreeModelPrices(model)]));
   const toFree: string[] = [];
   const toPaid: string[] = [];
   for (const model of draft.models) {
+    if (!model.enabled) continue;
     const id = model.id.trim();
     const wasFree = before.get(id);
     if (wasFree === undefined) continue;
@@ -356,13 +358,26 @@ export default function AiApiSettingsEditor() {
   const error = parsed && "error" in parsed ? parsed.error : null;
   const turningOff = saved.enabled && !draft.enabled;
   const modelsOff = modelsTurnedOff(draft, base);
-  const { toFree, toPaid } = keyChanges(draft, base);
-  // False only when the backend says the free-only key is missing; an older
-  // backend doesn't say, and nothing is claimed about it.
+  const savedDraft = toDraft(saved);
+  // Whether the backend reports the free-only key at all. An older one
+  // doesn't, and then nothing is claimed about which key a model goes under.
+  const keySplitKnown = saved.freeUpstreamConfigured !== undefined;
   const freeKeyMissing = saved.freeUpstreamConfigured === false;
-  const freeModelsOn = draft.models
-    .filter((model) => model.enabled && isFreeModelPrices(model))
-    .map((model) => model.id.trim() || model.name.trim() || "A new model");
+  // Against what is live rather than the edit-start snapshot: a save made by
+  // another admin since is part of what this save replaces.
+  const { toFree, toPaid } = keySplitKnown
+    ? keyChanges(draft, savedDraft)
+    : { toFree: [], toPaid: [] };
+  const freeModelsOn = (models: ModelDraft[]) =>
+    models
+      .filter((model) => model.enabled && isFreeModelPrices(model))
+      .map((model) => model.id.trim() || model.name.trim() || "A new model");
+  // Refused now is what is saved, not what is typed; what the draft would
+  // change is said separately, as the effect of saving.
+  const refusedNow = freeModelsOn(savedDraft.models);
+  const refusedAfterSave = freeModelsOn(draft.models);
+  const refusalChanges =
+    isDirty && JSON.stringify(refusedAfterSave) !== JSON.stringify(refusedNow);
 
   const updateTier = (index: number, patch: Partial<TierDraft>) =>
     setDraft({
@@ -601,12 +616,14 @@ export default function AiApiSettingsEditor() {
               what the app&apos;s price list shows; official prices give the
               &ldquo;vs official price&rdquo; discount.
             </p>
-            <p className="mt-1 text-xs text-gray-500">
-              A model priced 0 everywhere is free: it goes to AntSeed only
-              under the free-only key, which can&apos;t be charged, so if its
-              sellers start charging it stops instead of costing us. Any price
-              above 0 sends it under the paid key.
-            </p>
+            {keySplitKnown ? (
+              <p className="mt-1 text-xs text-gray-500">
+                A model priced 0 everywhere is free: it goes to AntSeed only
+                under the free-only key, which can&apos;t be charged, so if its
+                sellers start charging it stops instead of costing us. Any
+                price above 0 sends it under the paid key.
+              </p>
+            ) : null}
           </div>
           <div className="flex shrink-0 gap-2">
             <Button
@@ -656,13 +673,25 @@ export default function AiApiSettingsEditor() {
           </div>
         </div>
 
-        {freeKeyMissing && freeModelsOn.length > 0 ? (
-          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            {freeModelsOn.join(", ")} {freeModelsOn.length === 1 ? "is" : "are"}{" "}
-            free, and every request for {freeModelsOn.length === 1 ? "it" : "them"} is
-            refused: AI_API_UPSTREAM_FREE_API_KEY isn&apos;t set on
-            accounts-service. Free models never fall back to the paid key, so
-            add the free-only AntSeed key to Vault, or give the model a price.
+        {freeKeyMissing && (refusedNow.length > 0 || refusalChanges) ? (
+          <div className="space-y-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {refusedNow.length > 0 ? (
+              <p>
+                {refusedNow.join(", ")} {refusedNow.length === 1 ? "is" : "are"}{" "}
+                free, and every request for {refusedNow.length === 1 ? "it" : "them"}{" "}
+                is refused: AI_API_UPSTREAM_FREE_API_KEY isn&apos;t set on
+                accounts-service. Free models never fall back to the paid key,
+                so add the free-only AntSeed key to Vault, or give the model a
+                price.
+              </p>
+            ) : null}
+            {refusalChanges ? (
+              <p>
+                {refusedAfterSave.length > 0
+                  ? `After saving, requests for ${refusedAfterSave.join(", ")} are refused until the free-only key is set.`
+                  : "After saving, no model is refused for the missing free-only key."}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -800,7 +829,7 @@ export default function AiApiSettingsEditor() {
                           Not listed on AntSeed right now
                         </span>
                       ) : null}
-                      {isFreeModelPrices(model) ? (
+                      {keySplitKnown && isFreeModelPrices(model) ? (
                         <span
                           className={`mt-1 block text-[11px] ${
                             freeKeyMissing ? "text-red-700" : "text-emerald-700"
@@ -811,12 +840,15 @@ export default function AiApiSettingsEditor() {
                             : "Free: sent under the free-only key"}
                         </span>
                       ) : null}
-                      {isFreeModelPrices(model) &&
+                      {keySplitKnown &&
+                      isFreeModelPrices(model) &&
                       offer &&
                       (offer.inputUsdPerMTok > 0 || offer.outputUsdPerMTok > 0) ? (
                         <span className="mt-1 block text-[11px] text-amber-700">
-                          Cheapest seller listed charges: the free-only key
-                          may be refused
+                          {/* A pinned model is served by that seller alone, cheaper ones or not. */}
+                          {model.upstreamModel.includes("@")
+                            ? "The pinned seller charges: the free-only key may be refused"
+                            : "Cheapest seller listed charges: the free-only key may be refused"}
                         </span>
                       ) : null}
                     </td>
