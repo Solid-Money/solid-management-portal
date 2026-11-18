@@ -310,9 +310,12 @@ export function AntseedModelPicker({
               Cashback is paid on what users pay, so below 2× every dollar of
               usage under the cap loses money. Cache-write prices aren&apos;t
               listed by AntSeed and stay as typed. Kept at a multiple, the
-              price follows the typical seller&apos;s rate rather than the one
-              chosen above, and the prices filled in now apply only until
-              AntSeed&apos;s rates are first read.
+              price follows{" "}
+              {seller === CHEAPEST
+                ? "the typical seller's rate rather than the cheapest one above"
+                : "this pinned seller's own rate"}
+              , and the prices filled in now apply only until AntSeed&apos;s
+              rates are first read.
             </p>
           </div>
         ) : null}
