@@ -19,7 +19,12 @@ import {
   useAiApiUpstreamModels,
   useSaveAiApiSettings,
 } from "@/hooks/use-ai-api";
-import { antseedOfferFor, formatRate, priceMultiple } from "@/lib/ai-api";
+import {
+  antseedOfferFor,
+  formatRate,
+  isFreeModelPrices,
+  priceMultiple,
+} from "@/lib/ai-api";
 import { fromPercentInput, toPercentInput } from "@/lib/cashback-percentage";
 import type {
   AiApiModelConfig,
@@ -256,6 +261,25 @@ const modelsTurnedOff = (draft: Draft, base: Draft): string[] => {
     .map((model) => model.id.trim());
 };
 
+/**
+ * The models whose AntSeed key the draft changes: priced to free moves a model
+ * to the free-only key, free to priced moves it to the paid key.
+ */
+const keyChanges = (draft: Draft, base: Draft): { toFree: string[]; toPaid: string[] } => {
+  const before = new Map(base.models.map((model) => [model.id.trim(), isFreeModelPrices(model)]));
+  const toFree: string[] = [];
+  const toPaid: string[] = [];
+  for (const model of draft.models) {
+    const id = model.id.trim();
+    const wasFree = before.get(id);
+    if (wasFree === undefined) continue;
+    const free = isFreeModelPrices(model);
+    if (free && !wasFree) toFree.push(id);
+    if (!free && wasFree) toPaid.push(id);
+  }
+  return { toFree, toPaid };
+};
+
 function Field({
   label,
   hint,
@@ -332,6 +356,13 @@ export default function AiApiSettingsEditor() {
   const error = parsed && "error" in parsed ? parsed.error : null;
   const turningOff = saved.enabled && !draft.enabled;
   const modelsOff = modelsTurnedOff(draft, base);
+  const { toFree, toPaid } = keyChanges(draft, base);
+  // False only when the backend says the free-only key is missing; an older
+  // backend doesn't say, and nothing is claimed about it.
+  const freeKeyMissing = saved.freeUpstreamConfigured === false;
+  const freeModelsOn = draft.models
+    .filter((model) => model.enabled && isFreeModelPrices(model))
+    .map((model) => model.id.trim() || model.name.trim() || "A new model");
 
   const updateTier = (index: number, patch: Partial<TierDraft>) =>
     setDraft({
@@ -405,10 +436,23 @@ export default function AiApiSettingsEditor() {
           </div>
         </div>
         <div>
-          <div className="text-gray-500">Gateway key</div>
-          <Badge variant={saved.upstreamConfigured ? "success" : "danger"}>
-            {saved.upstreamConfigured ? "Configured" : "Missing"}
-          </Badge>
+          <div className="text-gray-500">Gateway keys</div>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge
+              variant={saved.upstreamConfigured ? "success" : "danger"}
+              title="AI_API_UPSTREAM_API_KEY: every model priced above 0"
+            >
+              Paid {saved.upstreamConfigured ? "configured" : "missing"}
+            </Badge>
+            {saved.freeUpstreamConfigured !== undefined ? (
+              <Badge
+                variant={saved.freeUpstreamConfigured ? "success" : "danger"}
+                title="AI_API_UPSTREAM_FREE_API_KEY: free models only, can't be charged"
+              >
+                Free-only {saved.freeUpstreamConfigured ? "configured" : "missing"}
+              </Badge>
+            ) : null}
+          </div>
         </div>
         <div>
           <div className="text-gray-500">Base URL users see</div>
@@ -557,6 +601,12 @@ export default function AiApiSettingsEditor() {
               what the app&apos;s price list shows; official prices give the
               &ldquo;vs official price&rdquo; discount.
             </p>
+            <p className="mt-1 text-xs text-gray-500">
+              A model priced 0 everywhere is free: it goes to AntSeed only
+              under the free-only key, which can&apos;t be charged, so if its
+              sellers start charging it stops instead of costing us. Any price
+              above 0 sends it under the paid key.
+            </p>
           </div>
           <div className="flex shrink-0 gap-2">
             <Button
@@ -605,6 +655,16 @@ export default function AiApiSettingsEditor() {
             </Button>
           </div>
         </div>
+
+        {freeKeyMissing && freeModelsOn.length > 0 ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {freeModelsOn.join(", ")} {freeModelsOn.length === 1 ? "is" : "are"}{" "}
+            free, and every request for {freeModelsOn.length === 1 ? "it" : "them"} is
+            refused: AI_API_UPSTREAM_FREE_API_KEY isn&apos;t set on
+            accounts-service. Free models never fall back to the paid key, so
+            add the free-only AntSeed key to Vault, or give the model a price.
+          </div>
+        ) : null}
 
         {showRates && catalog.isError ? (
           <p className="text-xs text-red-600">
@@ -740,6 +800,25 @@ export default function AiApiSettingsEditor() {
                           Not listed on AntSeed right now
                         </span>
                       ) : null}
+                      {isFreeModelPrices(model) ? (
+                        <span
+                          className={`mt-1 block text-[11px] ${
+                            freeKeyMissing ? "text-red-700" : "text-emerald-700"
+                          }`}
+                        >
+                          {freeKeyMissing
+                            ? "Free: refused until the free-only key is set"
+                            : "Free: sent under the free-only key"}
+                        </span>
+                      ) : null}
+                      {isFreeModelPrices(model) &&
+                      offer &&
+                      (offer.inputUsdPerMTok > 0 || offer.outputUsdPerMTok > 0) ? (
+                        <span className="mt-1 block text-[11px] text-amber-700">
+                          Cheapest seller listed charges: the free-only key
+                          may be refused
+                        </span>
+                      ) : null}
                     </td>
                     {field(
                       "input",
@@ -832,6 +911,14 @@ export default function AiApiSettingsEditor() {
             : `${
                 modelsOff.length
                   ? `Requests for ${modelsOff.join(", ")} are refused within 5 minutes. `
+                  : ""
+              }${
+                toFree.length
+                  ? `${toFree.join(", ")} become${toFree.length === 1 ? "s" : ""} free and move${toFree.length === 1 ? "s" : ""} to the free-only AntSeed key: refused if no seller serves ${toFree.length === 1 ? "it" : "them"} free. `
+                  : ""
+              }${
+                toPaid.length
+                  ? `${toPaid.join(", ")} get${toPaid.length === 1 ? "s" : ""} a price and move${toPaid.length === 1 ? "s" : ""} to the paid AntSeed key: we pay whatever ${toPaid.length === 1 ? "its" : "their"} sellers charge. `
                   : ""
               }New prices apply to requests made after the change. What has already been used keeps the price it was metered at.`
         }

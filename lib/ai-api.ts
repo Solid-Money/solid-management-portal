@@ -121,6 +121,28 @@ export function antseedOfferFor(
   return model?.offers[0] ?? null;
 }
 
+/**
+ * Whether a model row's typed prices make it free, by the backend's test:
+ * input and output 0, and cached input and cache write 0 or empty (empty
+ * falls back to the input price). A free model goes to AntSeed only under the
+ * free-only key; any price above 0 sends it under the paid key.
+ */
+export function isFreeModelPrices(prices: {
+  input: string;
+  output: string;
+  cachedInput: string;
+  cacheWrite: string;
+}): boolean {
+  const zero = (text: string) => text.trim() !== "" && Number(text) === 0;
+  const zeroOrEmpty = (text: string) => text.trim() === "" || Number(text) === 0;
+  return (
+    zero(prices.input) &&
+    zero(prices.output) &&
+    zeroOrEmpty(prices.cachedInput) &&
+    zeroOrEmpty(prices.cacheWrite)
+  );
+}
+
 /** A rate times a multiple, as a price to type: no float noise, at most 6 decimals. */
 export const scaledPrice = (rate: number, multiple: number): string =>
   String(Number((rate * multiple).toFixed(6)));
