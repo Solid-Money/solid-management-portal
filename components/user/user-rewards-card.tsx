@@ -129,9 +129,14 @@ function monthCashbackHint(
 }
 
 /**
- * What the next tier would take: the FUSE still to lock, when the lock route
- * can take them there. Points are deprecated and never reach a tier, so they
- * are never quoted here.
+ * What the next tier would take.
+ *
+ * The lock is quoted only when the backend gives the FUSE still to lock
+ * (`fuseToNextTier` > 0). Without that figure no route is named, because any
+ * of these can be the reason: the lock is off or doesn't reach that tier, it
+ * couldn't be read, or an older backend sent nothing. The hint points to the
+ * Tier membership card, which lists the routes this user is actually offered.
+ * Points are deprecated and never reach a tier, so they are never quoted.
  */
 function nextTierHint(rewards: UserRewardsData): string {
   if (!rewards.nextTier) return "Top tier";
@@ -139,7 +144,7 @@ function nextTierHint(rewards: UserRewardsData): string {
   if (typeof fuse === "number" && fuse > 0) {
     return `Lock ${Math.ceil(fuse).toLocaleString("en-US")} more FUSE for ${rewards.nextTier}`;
   }
-  return `${rewards.nextTier} by FUSE lock or annual membership`;
+  return `Routes to ${rewards.nextTier}: see Tier membership`;
 }
 
 /**
