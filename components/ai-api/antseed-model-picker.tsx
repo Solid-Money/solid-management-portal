@@ -26,6 +26,8 @@ export interface AntseedPick {
   name: string;
   /** Our prices at the chosen multiple, or null to leave the row's as they are. */
   prices: { input: string; output: string; cachedInput: string } | null;
+  /** The multiple to keep pricing it at as AntSeed's rates move, or null to keep the prices as typed. */
+  followMarkup: string | null;
 }
 
 /** The gateway routes a request naming only a model to the cheapest trusted seller. */
@@ -36,7 +38,8 @@ const DEFAULT_MULTIPLE = "4";
 /**
  * AntSeed's models, to fill a row's gateway model from and price it as a
  * multiple of what a seller charges. The rates are AntSeed's now; they move as
- * sellers come and go, so prices are set once here and stay as typed.
+ * sellers come and go, so prices set here stay as typed unless the row is
+ * also set to keep following AntSeed at that multiple.
  */
 export function AntseedModelPicker({
   open,
@@ -54,6 +57,7 @@ export function AntseedModelPicker({
   const [seller, setSeller] = useState(CHEAPEST);
   const [multiple, setMultiple] = useState(DEFAULT_MULTIPLE);
   const [setPrices, setSetPrices] = useState(true);
+  const [follow, setFollow] = useState(false);
 
   // Only models a seller prices: the backend leaves out the rest, and the rows
   // below read the cheapest offer, so none must slip through without one.
@@ -90,6 +94,7 @@ export function AntseedModelPicker({
     setSeller(CHEAPEST);
     setMultiple(DEFAULT_MULTIPLE);
     setSetPrices(true);
+    setFollow(false);
   };
 
   const choose = (model: AiApiUpstreamModel) => {
@@ -116,6 +121,7 @@ export function AntseedModelPicker({
                 : scaledPrice(offer.cachedInputUsdPerMTok, times),
           }
         : null,
+      followMarkup: setPrices && follow ? multiple.trim() : null,
     });
     onOpenChange(false);
     reset();
@@ -281,10 +287,21 @@ export function AntseedModelPicker({
                 </span>
               ) : null}
             </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                checked={setPrices && follow}
+                disabled={!setPrices}
+                onCheckedChange={(checked) => setFollow(checked === true)}
+              />
+              Keep it at this multiple as AntSeed&apos;s rates move
+            </label>
             <p className="text-xs text-gray-500">
               Cashback is paid on what users pay, so below 2× every dollar of
               usage under the cap loses money. Cache-write prices aren&apos;t
-              listed by AntSeed and stay as typed.
+              listed by AntSeed and stay as typed. Kept at a multiple, the
+              price follows the typical seller&apos;s rate rather than the one
+              chosen above, and the prices filled in now apply only until
+              AntSeed&apos;s rates are first read.
             </p>
           </div>
         ) : null}

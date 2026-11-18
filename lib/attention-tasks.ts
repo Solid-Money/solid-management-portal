@@ -35,6 +35,7 @@ const GROUPED: ReadonlySet<RadarDetector> = new Set([
   "spend_drop",
   "support_ai_off_model",
   "rewards_above_revenue",
+  "ai_api_pricing",
 ]);
 const FAILURES: ReadonlySet<RadarDetector> = new Set([
   "flow_failure",

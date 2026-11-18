@@ -60,6 +60,7 @@ export const RADAR_DETECTORS = [
   "card_decline_spike",
   "support_cluster",
   "rewards_above_revenue",
+  "ai_api_pricing",
 ] as const;
 export type RadarDetector = (typeof RADAR_DETECTORS)[number];
 

@@ -3,11 +3,13 @@ import type {
   AiApiChargeFailure,
   AiApiChargeStatus,
   AiApiKeyStatus,
+  AiApiModelPriceState,
   AiApiPauseReason,
+  AiApiTokenRates,
   AiApiUpstreamModel,
   AiApiUpstreamOffer,
 } from "@/types/ai-api";
-import { formatNumber } from "@/lib/utils";
+import { formatDateTime, formatNumber } from "@/lib/utils";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "muted";
 
@@ -135,3 +137,68 @@ export function priceMultiple(price: string, rate: number): string | null {
 /** A per-million-token rate: `$2.40`, `$0.0003`. */
 export const formatRate = (usd: number): string =>
   usd >= 1 ? `$${usd.toFixed(2)}` : `$${Number(usd.toPrecision(3))}`;
+
+/** Three rates as one line: `in $0.08 · out $0.60 · cached $0.04`. */
+export const formatRates = (rates: AiApiTokenRates): string =>
+  `in ${formatRate(rates.inputUsdPerMTok)} · out ${formatRate(
+    rates.outputUsdPerMTok,
+  )} · cached ${formatRate(rates.cachedInputUsdPerMTok)}`;
+
+/**
+ * What a markup is worth to us after the most generous tier's cashback, as a
+ * multiple of AntSeed's rate: 4× with 50% back nets 2×. Under 1 loses money
+ * on every request a capped user makes.
+ */
+export const netMultiple = (markup: number, cashbackRates: number[]): number =>
+  markup * (1 - Math.min(1, Math.max(0, ...cashbackRates)));
+
+/**
+ * What the row under a model priced from AntSeed says about its price: what
+ * users pay now and AntSeed's typical rate, or why the fixed prices still
+ * apply. `live` is whether the saved model is priced from AntSeed, at this
+ * gateway model: the draft may have just turned it on.
+ */
+export function autoPriceStatus(
+  state: AiApiModelPriceState | undefined,
+  upstreamModel: string,
+  live: boolean,
+): { text: string; warn: boolean } {
+  const same =
+    !!state &&
+    state.upstreamModel.trim().toLowerCase() ===
+      upstreamModel.trim().toLowerCase();
+  if (!live || !same) {
+    return {
+      text: "Priced from AntSeed as soon as this is saved. The fixed prices above apply until its rates are read.",
+      warn: false,
+    };
+  }
+  if (!state.listed) {
+    return {
+      text: `Not on AntSeed's model list${
+        state.unlistedSince ? ` since ${formatDateTime(state.unlistedSince)}` : ""
+      }: ${state.prices ? "it keeps its last price" : "the fixed prices above apply"}.`,
+      warn: true,
+    };
+  }
+  const reference = state.reference;
+  const typical = !reference
+    ? ""
+    : reference.sellers === 0
+      ? " Every AntSeed seller gives it away right now, so it keeps its last price."
+      : ` AntSeed's typical rate: ${formatRates(reference)}, across ${reference.sellers} seller${
+          reference.sellers === 1 ? "" : "s"
+        }.`;
+  if (!state.prices) {
+    return {
+      text: `Waiting for a paid AntSeed rate; the fixed prices above apply.${typical}`,
+      warn: false,
+    };
+  }
+  return {
+    text: `Users pay ${formatRates(state.prices)}${
+      state.pricedAt ? `, set ${formatDateTime(state.pricedAt)}` : ""
+    }.${typical}`,
+    warn: false,
+  };
+}
