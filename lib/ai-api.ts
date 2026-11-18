@@ -143,6 +143,74 @@ export function isFreeModelPrices(prices: {
   );
 }
 
+/** A model row as the settings page edits it: switched on or off, prices as typed. */
+export interface ModelPriceRow {
+  id: string;
+  name: string;
+  enabled: boolean;
+  input: string;
+  output: string;
+  cachedInput: string;
+  cacheWrite: string;
+}
+
+/** The free models that are on, by id (or name, for a row not named yet). */
+const freeModelsOn = (rows: ModelPriceRow[]): string[] =>
+  rows
+    .filter((row) => row.enabled && isFreeModelPrices(row))
+    .map((row) => row.id.trim() || row.name.trim() || "A new model");
+
+/**
+ * What saving the models table changes about the AntSeed keys, for the
+ * settings page's notices and its save confirmation.
+ *
+ * The page saves the table whole, and only when its rows differ from `base`,
+ * the settings as they stood when editing began. So an edit elsewhere on the
+ * page saves no models even when `saved` (refetched since) differs: then the
+ * save moves nothing and refuses nothing new. When the table is saved, the
+ * moves are against `saved`, which is what the save replaces, and only for
+ * models left on: a model switched off takes no requests on either key.
+ */
+export function modelSaveEffects<Row extends ModelPriceRow>({
+  draft,
+  base,
+  saved,
+}: {
+  draft: Row[];
+  base: Row[];
+  saved: Row[];
+}): {
+  savesModels: boolean;
+  /** Priced before, free after: moving to the free-only key. */
+  toFree: string[];
+  /** Free before, priced after: moving to the paid key. */
+  toPaid: string[];
+  /** Free models on now: refused while the free-only key is missing. */
+  refusedNow: string[];
+  /** The same, once this draft is saved. */
+  refusedAfterSave: string[];
+} {
+  const savesModels = JSON.stringify(draft) !== JSON.stringify(base);
+  const refusedNow = freeModelsOn(saved);
+  if (!savesModels) {
+    return { savesModels, toFree: [], toPaid: [], refusedNow, refusedAfterSave: refusedNow };
+  }
+
+  const wasFree = new Map(saved.map((row) => [row.id.trim(), isFreeModelPrices(row)]));
+  const toFree: string[] = [];
+  const toPaid: string[] = [];
+  for (const row of draft) {
+    if (!row.enabled) continue;
+    const id = row.id.trim();
+    const before = wasFree.get(id);
+    if (before === undefined) continue;
+    const free = isFreeModelPrices(row);
+    if (free && !before) toFree.push(id);
+    if (!free && before) toPaid.push(id);
+  }
+  return { savesModels, toFree, toPaid, refusedNow, refusedAfterSave: freeModelsOn(draft) };
+}
+
 /** A rate times a multiple, as a price to type: no float noise, at most 6 decimals. */
 export const scaledPrice = (rate: number, multiple: number): string =>
   String(Number((rate * multiple).toFixed(6)));

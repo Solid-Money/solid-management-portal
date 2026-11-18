@@ -23,6 +23,7 @@ import {
   antseedOfferFor,
   formatRate,
   isFreeModelPrices,
+  modelSaveEffects,
   priceMultiple,
 } from "@/lib/ai-api";
 import { fromPercentInput, toPercentInput } from "@/lib/cashback-percentage";
@@ -261,27 +262,6 @@ const modelsTurnedOff = (draft: Draft, base: Draft): string[] => {
     .map((model) => model.id.trim());
 };
 
-/**
- * The models whose AntSeed key the draft changes: priced to free moves a model
- * to the free-only key, free to priced moves it to the paid key. Only models
- * left on: a model the save switches off takes no requests on either key.
- */
-const keyChanges = (draft: Draft, saved: Draft): { toFree: string[]; toPaid: string[] } => {
-  const before = new Map(saved.models.map((model) => [model.id.trim(), isFreeModelPrices(model)]));
-  const toFree: string[] = [];
-  const toPaid: string[] = [];
-  for (const model of draft.models) {
-    if (!model.enabled) continue;
-    const id = model.id.trim();
-    const wasFree = before.get(id);
-    if (wasFree === undefined) continue;
-    const free = isFreeModelPrices(model);
-    if (free && !wasFree) toFree.push(id);
-    if (!free && wasFree) toPaid.push(id);
-  }
-  return { toFree, toPaid };
-};
-
 function Field({
   label,
   hint,
@@ -358,26 +338,21 @@ export default function AiApiSettingsEditor() {
   const error = parsed && "error" in parsed ? parsed.error : null;
   const turningOff = saved.enabled && !draft.enabled;
   const modelsOff = modelsTurnedOff(draft, base);
-  const savedDraft = toDraft(saved);
   // Whether the backend reports the free-only key at all. An older one
   // doesn't, and then nothing is claimed about which key a model goes under.
   const keySplitKnown = saved.freeUpstreamConfigured !== undefined;
   const freeKeyMissing = saved.freeUpstreamConfigured === false;
-  // Against what is live rather than the edit-start snapshot: a save made by
-  // another admin since is part of what this save replaces.
-  const { toFree, toPaid } = keySplitKnown
-    ? keyChanges(draft, savedDraft)
-    : { toFree: [], toPaid: [] };
-  const freeModelsOn = (models: ModelDraft[]) =>
-    models
-      .filter((model) => model.enabled && isFreeModelPrices(model))
-      .map((model) => model.id.trim() || model.name.trim() || "A new model");
-  // Refused now is what is saved, not what is typed; what the draft would
-  // change is said separately, as the effect of saving.
-  const refusedNow = freeModelsOn(savedDraft.models);
-  const refusedAfterSave = freeModelsOn(draft.models);
-  const refusalChanges =
-    isDirty && JSON.stringify(refusedAfterSave) !== JSON.stringify(refusedNow);
+  // Refused now is what is saved, not what is typed; a save that writes the
+  // models table says separately what it changes. One that doesn't (an edit
+  // elsewhere on the page) changes nothing here, whatever was refetched.
+  const effects = modelSaveEffects({
+    draft: draft.models,
+    base: base.models,
+    saved: toDraft(saved).models,
+  });
+  const { refusedNow, refusedAfterSave } = effects;
+  const { toFree, toPaid } = keySplitKnown ? effects : { toFree: [], toPaid: [] };
+  const refusalChanges = JSON.stringify(refusedAfterSave) !== JSON.stringify(refusedNow);
 
   const updateTier = (index: number, patch: Partial<TierDraft>) =>
     setDraft({

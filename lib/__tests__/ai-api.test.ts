@@ -3,6 +3,7 @@ import {
   formatFirstToken,
   formatTokensPerSecond,
   isFreeModelPrices,
+  modelSaveEffects,
   NEAR_LIMIT_PERCENT,
   usedPercent,
 } from "@/lib/ai-api";
@@ -70,5 +71,71 @@ describe("free models", () => {
     ["text that isn't a price", prices("free", "0")],
   ])("is not free with %s", (_, row) => {
     expect(isFreeModelPrices(row)).toBe(false);
+  });
+});
+
+describe("what saving the models table changes", () => {
+  const row = (id: string, input: string, output: string, enabled = true) => ({
+    id,
+    name: id,
+    enabled,
+    input,
+    output,
+    cachedInput: "",
+    cacheWrite: "",
+  });
+  const opusPaid = row("claude-opus-5-5", "0.38", "1.2");
+  const opusFree = row("claude-opus-5-5", "0", "0");
+  const deepseek = row("deepseek", "0", "0");
+
+  it("changes nothing when another admin's save was refetched during an unrelated edit", () => {
+    // Editing began with Opus priced; another admin made it free since. This
+    // admin changed only cashback, so the models table isn't saved.
+    const effects = modelSaveEffects({
+      draft: [opusPaid, deepseek],
+      base: [opusPaid, deepseek],
+      saved: [opusFree, deepseek],
+    });
+    expect(effects.savesModels).toBe(false);
+    expect(effects.toFree).toEqual([]);
+    expect(effects.toPaid).toEqual([]);
+    expect(effects.refusedNow).toEqual(["claude-opus-5-5", "deepseek"]);
+    expect(effects.refusedAfterSave).toEqual(effects.refusedNow);
+  });
+
+  it("names the key moves and new refusals when the table is saved", () => {
+    const effects = modelSaveEffects({
+      draft: [opusFree, deepseek],
+      base: [opusPaid, deepseek],
+      saved: [opusPaid, deepseek],
+    });
+    expect(effects.savesModels).toBe(true);
+    expect(effects.toFree).toEqual(["claude-opus-5-5"]);
+    expect(effects.toPaid).toEqual([]);
+    expect(effects.refusedNow).toEqual(["deepseek"]);
+    expect(effects.refusedAfterSave).toEqual(["claude-opus-5-5", "deepseek"]);
+  });
+
+  it("compares against what is saved now, which the save replaces", () => {
+    // Another admin made Opus free; this admin edited DeepSeek, so the save
+    // writes the whole table and puts Opus's price back.
+    const deepseekPriced = row("deepseek", "0.1", "0.3");
+    const effects = modelSaveEffects({
+      draft: [opusPaid, deepseekPriced],
+      base: [opusPaid, deepseek],
+      saved: [opusFree, deepseek],
+    });
+    expect(effects.toPaid).toEqual(["claude-opus-5-5", "deepseek"]);
+    expect(effects.refusedAfterSave).toEqual([]);
+  });
+
+  it("announces no move for a model the save switches off", () => {
+    const effects = modelSaveEffects({
+      draft: [row("claude-opus-5-5", "0", "0", false)],
+      base: [opusPaid],
+      saved: [opusPaid],
+    });
+    expect(effects.toFree).toEqual([]);
+    expect(effects.refusedAfterSave).toEqual([]);
   });
 });
