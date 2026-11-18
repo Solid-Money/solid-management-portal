@@ -87,6 +87,10 @@ export function AntseedModelPicker({
   const times = Number(multiple);
   const multipleValid =
     multiple.trim() !== "" && Number.isFinite(times) && times > 0;
+  // Following AntSeed takes the markup the settings take: 1× to 50×.
+  const following = setPrices && follow;
+  const followValid =
+    !following || (multipleValid && times >= 1 && times <= 50);
 
   const reset = () => {
     setSearch("");
@@ -103,7 +107,9 @@ export function AntseedModelPicker({
   };
 
   const apply = () => {
-    if (!selected || !offer || (setPrices && !multipleValid)) return;
+    if (!selected || !offer || (setPrices && !multipleValid) || !followValid) {
+      return;
+    }
     onPick({
       upstreamModel:
         seller === CHEAPEST
@@ -295,6 +301,11 @@ export function AntseedModelPicker({
               />
               Keep it at this multiple as AntSeed&apos;s rates move
             </label>
+            {!followValid ? (
+              <p className="text-xs text-red-600">
+                To keep following AntSeed, the multiple must be 1× to 50×.
+              </p>
+            ) : null}
             <p className="text-xs text-gray-500">
               Cashback is paid on what users pay, so below 2× every dollar of
               usage under the cap loses money. Cache-write prices aren&apos;t
@@ -319,7 +330,12 @@ export function AntseedModelPicker({
           </Button>
           <Button
             onClick={apply}
-            disabled={!selected || !offer || (setPrices && !multipleValid)}
+            disabled={
+              !selected ||
+              !offer ||
+              (setPrices && !multipleValid) ||
+              !followValid
+            }
             className="cursor-pointer"
           >
             Use this model

@@ -23,8 +23,10 @@ import {
   antseedOfferFor,
   autoPriceStatus,
   formatRate,
+  lowestNetAtReference,
   netMultiple,
   priceMultiple,
+  sameUpstream,
 } from "@/lib/ai-api";
 import { fromPercentInput, toPercentInput } from "@/lib/cashback-percentage";
 import { formatDateTime } from "@/lib/utils";
@@ -169,6 +171,16 @@ const priceLimit = (text: string): number | null => {
  * Off with no markup is no settings; off with one keeps it for next time.
  */
 function parseAutoPricing(
+  row: ModelDraft,
+  label: string,
+): { autoPricing?: AiApiAutoPricing } | { error: string } {
+  const parsed = readAutoPricing(row, label);
+  // Off, the markup and limits are hidden: a bad one is nothing to keep, and
+  // must not block saving the fixed prices. Good ones are kept for next time.
+  return "error" in parsed && !row.autoEnabled ? {} : parsed;
+}
+
+function readAutoPricing(
   row: ModelDraft,
   label: string,
 ): { autoPricing?: AiApiAutoPricing } | { error: string } {
@@ -480,8 +492,12 @@ export default function AiApiSettingsEditor() {
       ...(row.id.trim() ? {} : { id: pick.id }),
       ...(row.name.trim() ? {} : { name: pick.name }),
       ...(pick.prices ?? {}),
-      ...(pick.followMarkup
-        ? { autoEnabled: true, markup: pick.followMarkup }
+      // Prices picked without following AntSeed are fixed prices: the row
+      // stops following. A pick that leaves the prices alone leaves the mode.
+      ...(pick.prices
+        ? pick.followMarkup
+          ? { autoEnabled: true, markup: pick.followMarkup }
+          : { autoEnabled: false }
         : {}),
     });
   };
@@ -685,7 +701,7 @@ export default function AiApiSettingsEditor() {
                   ? "AntSeed's rates haven't been read since the API last started; they're read four times an hour."
                   : pricingRun.ok
                     ? `AntSeed's rates last read ${formatDateTime(pricingRun.at)}${
-                        pricingRun.repriced.length
+                        pricingRun.repriced?.length
                           ? `; repriced ${pricingRun.repriced.join(", ")}`
                           : ""
                       }.`
@@ -810,8 +826,12 @@ export default function AiApiSettingsEditor() {
                     model.upstreamModel.trim().toLowerCase();
                 const state = autoPrices[model.id.trim()];
                 const status = autoPriceStatus(state, model.upstreamModel, live);
+                // What users pay now: the saved model's auto prices, whatever
+                // the draft says, until a save changes them.
                 const livePrices =
-                  model.autoEnabled && live && state?.prices
+                  savedModel?.autoPricing?.enabled &&
+                  state?.prices &&
+                  sameUpstream(state.upstreamModel, savedModel.upstreamModel)
                     ? state.prices
                     : null;
                 const liveHint = (rate: number | undefined) =>
@@ -821,8 +841,41 @@ export default function AiApiSettingsEditor() {
                     </span>
                   ) : null;
                 const markup = Number(model.markup);
+                const markupSet =
+                  model.markup.trim() !== "" && Number.isFinite(markup);
+                const typed = (text: string) => {
+                  const value = Number(text);
+                  return text.trim() !== "" && Number.isFinite(value)
+                    ? value
+                    : undefined;
+                };
+                // At AntSeed's typical rate with the row's limits applied,
+                // when it is known for this gateway model; otherwise the
+                // markup alone, before any minimum or maximum.
+                const reference =
+                  state?.reference &&
+                  state.reference.sellers > 0 &&
+                  sameUpstream(state.upstreamModel, model.upstreamModel)
+                    ? state.reference
+                    : null;
+                const lowest =
+                  markupSet && reference
+                    ? lowestNetAtReference(
+                        reference,
+                        markup,
+                        {
+                          minInput: typed(model.minInput),
+                          minOutput: typed(model.minOutput),
+                          maxInput: typed(model.maxInput),
+                          maxOutput: typed(model.maxOutput),
+                          officialInput: typed(model.officialInput),
+                          officialOutput: typed(model.officialOutput),
+                        },
+                        cashbackRates,
+                      )
+                    : null;
                 const net =
-                  model.markup.trim() !== "" && Number.isFinite(markup)
+                  markupSet && !reference
                     ? netMultiple(markup, cashbackRates)
                     : null;
                 const topCashback = Math.max(0, ...cashbackRates);
@@ -1007,19 +1060,36 @@ export default function AiApiSettingsEditor() {
                               model.officialOutput.trim() ? "Official" : "None",
                             )}
                           </div>
+                          <p className="mt-2 text-xs text-gray-500">
+                            Blank maximum: the official price, or no ceiling
+                            when there&apos;s none. A minimum above that ceiling
+                            wins; a minimum above a maximum you set can&apos;t
+                            be saved.
+                          </p>
                           <p
-                            className={`mt-2 text-xs ${
+                            className={`mt-1 text-xs ${
                               status.warn ? "text-amber-700" : "text-gray-500"
                             }`}
                           >
                             {status.text}
                           </p>
+                          {lowest && lowest.net < 1 ? (
+                            <p className="mt-1 text-xs text-amber-700">
+                              At AntSeed&apos;s typical rate, with{" "}
+                              {Math.round(topCashback * 100)}% cashback and
+                              these limits, {lowest.token} nets{" "}
+                              {lowest.net.toFixed(2)}× what it costs us: users
+                              under their cashback cap cost us more than they
+                              pay.
+                            </p>
+                          ) : null}
                           {net !== null && net < 1 ? (
                             <p className="mt-1 text-xs text-amber-700">
                               With {Math.round(topCashback * 100)}% cashback,{" "}
                               {model.markup.trim()}× nets {net.toFixed(2)}×
-                              AntSeed&apos;s rate: users under their cashback
-                              cap cost us more than they pay.
+                              AntSeed&apos;s rate before any minimum or maximum:
+                              users under their cashback cap cost us more than
+                              they pay.
                             </p>
                           ) : null}
                         </td>
