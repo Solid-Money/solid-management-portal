@@ -694,9 +694,10 @@ export default function AiApiSettingsEditor() {
               &ldquo;vs official price&rdquo; discount. Turn on From AntSeed
               to price a model at a multiple of what AntSeed&apos;s sellers
               typically charge, read four times an hour: its prices go up as
-              soon as AntSeed&apos;s do, come down gradually, never go above
-              the official price unless you set a maximum, and stay put when
-              AntSeed can&apos;t be read. The fixed prices apply until its
+              soon as AntSeed&apos;s do, come down gradually, and stay put when
+              AntSeed can&apos;t be read. They stay under the maximum you set,
+              or the official price when you set none, unless a minimum you
+              set is higher: the minimum wins. The fixed prices apply until its
               rates are first read.
             </p>
             {anyAuto || pricingRun ? (
