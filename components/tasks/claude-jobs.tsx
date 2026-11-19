@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -65,17 +65,41 @@ export default function ClaudeJobs({
   className?: string;
 }) {
   const shown = shownClaudeJobs(jobs);
+  // The job whose Ship dialog is open. Finished or cancelled meanwhile, it
+  // leaves the list and its row and dialog go with it: say why, since the
+  // row's own note has nowhere left to show. Only that: closing the task or
+  // opening another one takes this whole list away and says nothing.
+  const reviewingId = useRef<string | null>(null);
+  const onReviewing = useCallback((id: string | null) => {
+    reviewingId.current = id;
+  }, []);
+  useEffect(() => {
+    const id = reviewingId.current;
+    if (!id || shown.some((job) => job.id === id)) return;
+    reviewingId.current = null;
+    // Still one of this task's jobs, only no longer an open one.
+    if (jobs?.some((job) => job.id === id))
+      toast.message("Claude's job changed while you were looking at it, so nothing was approved.");
+  }, [jobs, shown]);
   if (!shown.length) return null;
   return (
     <div className={cn("space-y-1.5", className)}>
       {shown.map((job) => (
-        <JobRow key={job.id} job={job} onChanged={onChanged} />
+        <JobRow key={job.id} job={job} onChanged={onChanged} onReviewing={onReviewing} />
       ))}
     </div>
   );
 }
 
-function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
+function JobRow({
+  job,
+  onChanged,
+  onReviewing,
+}: {
+  job: ClaudeJob;
+  onChanged: () => void;
+  onReviewing: (id: string | null) => void;
+}) {
   // The job as it was when the Ship dialog opened. The dialog shows this
   // and approves this revision, never the live job: a poll can bring a newer
   // one (another commit, other pull requests) while it is open.
@@ -89,20 +113,12 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
     setReviewing(null);
     setMoved(true);
   }
-  // A job that is finished or cancelled meanwhile leaves the list, and this
-  // row and its dialog with it: say why the dialog went, since the note
-  // below has no row left to show in.
-  const watching = useRef(false);
+  // The list is told which job is being looked at: it speaks up if that job
+  // leaves it (see above).
+  const open = !!reviewing && busy !== "ship";
   useEffect(() => {
-    watching.current = !!reviewing && busy !== "ship";
-  }, [reviewing, busy]);
-  useEffect(
-    () => () => {
-      if (watching.current)
-        toast.message("Claude's job changed while you were looking at it, so nothing was approved.");
-    },
-    [],
-  );
+    onReviewing(open ? job.id : null);
+  }, [open, job.id, onReviewing]);
   const chip = claudeJobChip(job);
   const { production, other } = splitClaudePrs(job.prs);
   const shown = reviewing ? splitClaudePrs(reviewing.prs) : null;
