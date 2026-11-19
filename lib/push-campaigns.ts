@@ -155,15 +155,17 @@ export function sameIds(a: readonly string[], b: readonly string[]): boolean {
 
 /** The slug a campaign name becomes; mirrors accounts-service. */
 export function campaignSlug(name: string): string {
-  return name
-    .normalize("NFKD")
-    // The accents NFKD split off: "crème" is one word, not "cre_me".
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 32)
-    .replace(/_+$/g, "");
+  return (
+    name
+      .normalize("NFKD")
+      // The accents NFKD split off: "crème" is one word, not "cre_me".
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 32)
+      .replace(/_+$/g, "")
+  );
 }
 
 /** `data.type` / FCM analytics label of one variant's pushes. */
@@ -189,8 +191,10 @@ export function expectedSplit(
 ): ExpectedSplit {
   const control = Math.round((reachable * controlPercent) / 100);
   const rest = Math.max(0, reachable - control);
-  const arms = Array.from({ length: variantCount }, (_, k) =>
-    Math.floor(rest / variantCount) + (k < rest % variantCount ? 1 : 0),
+  const arms = Array.from(
+    { length: variantCount },
+    (_, k) =>
+      Math.floor(rest / variantCount) + (k < rest % variantCount ? 1 : 0),
   );
   return { control, arms };
 }
@@ -213,7 +217,10 @@ export interface VariantDraft {
   title: string;
   body: string;
   destinationId: string;
-  /** Page of the active What's New, as a string from its `<select>`. */
+  /**
+   * Page of the active What's New, as a string from its `<select>`. Stays
+   * blank for a single image or video, which has no pages.
+   */
   whatsNewStep: string;
   /**
    * The announcement that page was picked from. Sent with it, so the backend
@@ -235,7 +242,7 @@ export const emptyVariant = (): VariantDraft => ({
 export function variantProblem(
   draft: VariantDraft,
   destinations: readonly PushDestination[],
-  whatsNew: { id: string; steps: unknown[] } | null,
+  whatsNew: { id: string; format?: string; steps: unknown[] } | null,
   limits: Pick<PushCampaignLimits, "titleMaxLength" | "bodyMaxLength">,
 ): string | null {
   const title = draft.title.trim();
@@ -249,6 +256,15 @@ export function variantProblem(
   const destination = destinations.find((d) => d.id === draft.destinationId);
   if (!destination) return "Choose where the push opens.";
   if (destination.needsWhatsNewStep) {
+    // A single image or video opens as it is: no page to choose. A page still
+    // on the draft was picked while it was a carousel, and the backend refuses
+    // a page for a single, so it is chosen again (which clears the page).
+    if (whatsNew?.format === "single") {
+      return draft.whatsNewStep !== "" ||
+        (draft.whatsNewId && draft.whatsNewId !== whatsNew.id)
+        ? "The What's New announcement changed. Choose it again."
+        : null;
+    }
     if (!whatsNew || whatsNew.steps.length === 0) {
       return "There is no active What's New announcement to open.";
     }
@@ -281,8 +297,11 @@ export function toVariantInput(
     destinationId: draft.destinationId,
     ...(destination?.needsWhatsNewStep
       ? {
-          whatsNewId: draft.whatsNewId,
-          whatsNewStep: Number(draft.whatsNewStep),
+          ...(draft.whatsNewId ? { whatsNewId: draft.whatsNewId } : {}),
+          // None for a single image or video.
+          ...(draft.whatsNewStep !== ""
+            ? { whatsNewStep: Number(draft.whatsNewStep) }
+            : {}),
         }
       : {}),
   };
