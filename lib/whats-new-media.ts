@@ -49,7 +49,7 @@ export interface VideoFacts {
   width: number;
   height: number;
   durationSec: number;
-  /** A JPG of the first frame. */
+  /** A JPG of the frame a second in. */
   poster: Blob;
 }
 
@@ -65,10 +65,12 @@ export const readVideo = async (file: File): Promise<VideoFacts> => {
     video.src = url;
     await metadata;
 
-    // A tiny seek makes Safari paint the first frame before it is drawn.
+    // The poster is taken a second in (or halfway through a shorter clip):
+    // videos often open on a black frame, which made a black poster. Seeking
+    // also makes Safari paint the frame before it is drawn.
     if (video.duration > 0) {
       const seeked = loadEvent(video, "seeked");
-      video.currentTime = 0.001;
+      video.currentTime = Math.min(1, video.duration / 2);
       await seeked;
     }
 
