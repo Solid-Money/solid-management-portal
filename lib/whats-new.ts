@@ -23,7 +23,16 @@ export const VIDEO_TYPE = "video/mp4";
 /** Hard limit: the upload route refuses anything bigger. */
 export const VIDEO_MAX_BYTES = 20 * 1024 * 1024;
 const VIDEO_TARGET_BYTES = 8 * 1024 * 1024;
-const VIDEO_MAX_SECONDS = 60;
+/**
+ * Longest video either format takes (Eli, T-68: a few seconds of eye candy on
+ * app open). Kept in sync with WHATS_NEW_VIDEO_MAX_SECONDS in solid-backend,
+ * which refuses anything longer.
+ */
+export const VIDEO_MAX_SECONDS = 10;
+
+/** Whether a video is too long to upload at all. */
+export const isVideoTooLong = (durationSec: number): boolean =>
+  durationSec > VIDEO_MAX_SECONDS + 0.05;
 const IMAGE_MAX_BYTES = 1024 * 1024;
 /** 1080 × 1350 (4:5) is the recommended size for both. */
 export const RECOMMENDED_WIDTH = 1080;
@@ -101,12 +110,9 @@ export const mediaWarnings = (
       );
     }
   } else {
-    if (
-      media.durationSec !== undefined &&
-      media.durationSec > VIDEO_MAX_SECONDS
-    ) {
+    if (media.durationSec !== undefined && isVideoTooLong(media.durationSec)) {
       warnings.push(
-        `${Math.round(media.durationSec)} s is over the 60 s guideline.`,
+        `${Math.round(media.durationSec)} s is over the ${VIDEO_MAX_SECONDS} s limit. Saving will fail: upload a shorter video.`,
       );
     }
     if (
@@ -117,6 +123,49 @@ export const mediaWarnings = (
         `${megabytes(media.sizeBytes)}: aim for under 8 MB so it starts quickly on mobile data.`,
       );
     }
+  }
+
+  return warnings;
+};
+
+/**
+ * Carousel slides (Jayant's layout, T-68) show their media in a fixed frame:
+ * 16:9 on desktop, 5:4 on phones, filled edge to edge. A 16:9 file fits the
+ * desktop exactly and loses some of each side on a phone.
+ */
+export const SLIDE_RECOMMENDED_WIDTH = 1920;
+export const SLIDE_RECOMMENDED_HEIGHT = 1080;
+const SLIDE_RATIO = SLIDE_RECOMMENDED_HEIGHT / SLIDE_RECOMMENDED_WIDTH;
+const SLIDE_MIN_WIDTH = 1280;
+
+/** What doesn't match the slide guidelines. Warnings, not errors. */
+export const slideMediaWarnings = (media: MediaFacts): string[] => {
+  const warnings: string[] = [];
+  const ratio = media.height / media.width;
+
+  if (Math.abs(ratio - SLIDE_RATIO) > 0.03) {
+    warnings.push(
+      `${media.width} × ${media.height} isn't 16:9. The slide fills a 16:9 frame on desktop and 5:4 on phones, so parts of it will be cropped.`,
+    );
+  }
+  if (media.width < SLIDE_MIN_WIDTH) {
+    warnings.push(
+      `${media.width}px wide may look soft on desktop; ${SLIDE_RECOMMENDED_WIDTH} × ${SLIDE_RECOMMENDED_HEIGHT} is best.`,
+    );
+  }
+  if (media.type === "image") {
+    if (media.sizeBytes !== undefined && media.sizeBytes > IMAGE_MAX_BYTES) {
+      warnings.push(
+        `${megabytes(media.sizeBytes)} is over the 1 MB guideline, so it will be slower to appear.`,
+      );
+    }
+  } else if (
+    media.sizeBytes !== undefined &&
+    media.sizeBytes > VIDEO_TARGET_BYTES
+  ) {
+    warnings.push(
+      `${megabytes(media.sizeBytes)}: aim for under 8 MB so it starts quickly on mobile data.`,
+    );
   }
 
   return warnings;
