@@ -4160,7 +4160,8 @@ export type InternalTeamFeatureKey =
   | "spend_modes"
   | "deposit_tokens"
   | "ai_api"
-  | "referral_v4";
+  | "referral_v4"
+  | "wallet_topup";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;
