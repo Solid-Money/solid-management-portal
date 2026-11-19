@@ -127,13 +127,20 @@ export function VariantCard({
             <select
               id={id("destination")}
               value={draft.destinationId}
-              onChange={(e) =>
+              onChange={(e) => {
+                const next = destinations.find((d) => d.id === e.target.value);
                 set({
                   destinationId: e.target.value,
                   whatsNewStep: "",
-                  whatsNewId: "",
-                })
-              }
+                  // A single image or video has no page to pick, so the
+                  // announcement is pinned here: the backend refuses the push
+                  // if it is replaced before sending.
+                  whatsNewId:
+                    next?.needsWhatsNewStep && whatsNew?.format === "single"
+                      ? whatsNew.id
+                      : "",
+                });
+              }}
               className={SELECT_CLASS}
               disabled={disabled}
             >
@@ -167,7 +174,16 @@ export function VariantCard({
             ) : null}
           </div>
 
-          {destination?.needsWhatsNewStep && whatsNew ? (
+          {destination?.needsWhatsNewStep && whatsNew?.format === "single" ? (
+            <p className="text-xs text-gray-500">
+              The active What&apos;s New is a single image or video. The push
+              opens it as it is; there is no page to choose.
+            </p>
+          ) : null}
+
+          {destination?.needsWhatsNewStep &&
+          whatsNew &&
+          whatsNew.format !== "single" ? (
             <div className="space-y-2">
               <Label htmlFor={id("whats-new-step")}>What&apos;s New page</Label>
               <select

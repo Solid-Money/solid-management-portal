@@ -213,7 +213,10 @@ export interface VariantDraft {
   title: string;
   body: string;
   destinationId: string;
-  /** Page of the active What's New, as a string from its `<select>`. */
+  /**
+   * Page of the active What's New, as a string from its `<select>`. Stays
+   * blank for a single image or video, which has no pages.
+   */
   whatsNewStep: string;
   /**
    * The announcement that page was picked from. Sent with it, so the backend
@@ -235,7 +238,7 @@ export const emptyVariant = (): VariantDraft => ({
 export function variantProblem(
   draft: VariantDraft,
   destinations: readonly PushDestination[],
-  whatsNew: { id: string; steps: unknown[] } | null,
+  whatsNew: { id: string; format?: string; steps: unknown[] } | null,
   limits: Pick<PushCampaignLimits, "titleMaxLength" | "bodyMaxLength">,
 ): string | null {
   const title = draft.title.trim();
@@ -249,6 +252,12 @@ export function variantProblem(
   const destination = destinations.find((d) => d.id === draft.destinationId);
   if (!destination) return "Choose where the push opens.";
   if (destination.needsWhatsNewStep) {
+    // A single image or video opens as it is: no page to choose.
+    if (whatsNew?.format === "single") {
+      return draft.whatsNewId && draft.whatsNewId !== whatsNew.id
+        ? "The What's New announcement changed. Choose it again."
+        : null;
+    }
     if (!whatsNew || whatsNew.steps.length === 0) {
       return "There is no active What's New announcement to open.";
     }
@@ -281,8 +290,11 @@ export function toVariantInput(
     destinationId: draft.destinationId,
     ...(destination?.needsWhatsNewStep
       ? {
-          whatsNewId: draft.whatsNewId,
-          whatsNewStep: Number(draft.whatsNewStep),
+          ...(draft.whatsNewId ? { whatsNewId: draft.whatsNewId } : {}),
+          // None for a single image or video.
+          ...(draft.whatsNewStep !== ""
+            ? { whatsNewStep: Number(draft.whatsNewStep) }
+            : {}),
         }
       : {}),
   };

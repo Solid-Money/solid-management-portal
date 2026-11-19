@@ -227,6 +227,39 @@ describe("variantProblem", () => {
   });
 });
 
+describe("a single image or video What's New", () => {
+  const single = { id: whatsNew.id, format: "single", steps: [] };
+  const draft = {
+    ...emptyVariant(),
+    title: "New",
+    destinationId: "whats_new",
+    whatsNewId: whatsNew.id,
+  };
+
+  it("needs no page", () => {
+    expect(variantProblem(draft, destinations, single, limits)).toBeNull();
+  });
+
+  it("refuses it once the announcement has been replaced", () => {
+    expect(
+      variantProblem(
+        { ...draft, whatsNewId: "eeeeeeeeeeeeeeeeeeeeeeee" },
+        destinations,
+        single,
+        limits,
+      ),
+    ).toBe("The What's New announcement changed. Choose it again.");
+  });
+
+  it("sends the announcement without a page", () => {
+    expect(toVariantInput(draft, destinations)).toEqual({
+      title: "New",
+      destinationId: "whats_new",
+      whatsNewId: whatsNew.id,
+    });
+  });
+});
+
 describe("toVariantInput", () => {
   it("trims the copy and drops an empty body", () => {
     expect(
