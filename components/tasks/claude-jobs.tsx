@@ -87,7 +87,7 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
       if (what === "ship") {
         // Approval is for the job exactly as this dialog shows it: the
         // backend refuses if it moved since (another commit, other PRs).
-        await shipClaudeJob(job.id, job.updatedAt);
+        await shipClaudeJob(job.id, job.rev);
         toast.success("Approved. Claude ships it on the next hourly run.");
       } else {
         await cancelClaudeJob(job.id);

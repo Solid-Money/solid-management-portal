@@ -202,11 +202,11 @@ export const getClaudeJobs = async (taskId: string) =>
 
 /**
  * Ship to production: the backend lets only people on the ship list, and only
- * for the job as it was shown (`seen`, its `updatedAt`). If the job moved
- * since (another commit, other pull requests) it answers 409.
+ * for the job as it was shown (its `rev`). If the job moved since (another
+ * commit, other pull requests) it answers 409.
  */
-export const shipClaudeJob = async (jobId: string, seen: string) =>
-  (await api.post<ClaudeJob>(`${base}/claude/jobs/${jobId}/go`, { seen })).data;
+export const shipClaudeJob = async (jobId: string, rev: number) =>
+  (await api.post<ClaudeJob>(`${base}/claude/jobs/${jobId}/go`, { rev })).data;
 
 /** The asker takes a job back while no run is on it. */
 export const cancelClaudeJob = async (jobId: string) =>

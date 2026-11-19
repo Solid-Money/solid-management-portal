@@ -581,8 +581,12 @@ export interface ClaudeJob {
   canShip: boolean;
   /** The signed-in admin may cancel it now. */
   canCancel: boolean;
+  /**
+   * Goes up on every change to the job a person could review. Ship to
+   * production sends back the one shown and is refused if the job moved.
+   */
+  rev: number;
   createdAt: string;
-  /** Moves on every change to the job; Ship to production sends back the one shown. */
   updatedAt: string;
 }
 

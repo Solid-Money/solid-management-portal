@@ -31,6 +31,7 @@ function job(state: ClaudeJobState, createdAt: string, updatedAt = createdAt): C
     go: null,
     canShip: false,
     canCancel: false,
+    rev: 0,
     createdAt,
     updatedAt,
   };
