@@ -155,9 +155,11 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
           </Button>
         )}
       </span>
-      {moved && job.canShip && (
+      {moved && (
         <span className="basis-full text-amber-800">
-          This changed while you were looking at it. Check it again before shipping.
+          {job.canShip
+            ? "This changed while you were looking at it. Check it again before shipping."
+            : "This changed while you were looking at it, so nothing was approved. It is not waiting to ship any more."}
         </span>
       )}
       <Dialog open={!!reviewing} onOpenChange={(next) => !busy && !next && setReviewing(null)}>
