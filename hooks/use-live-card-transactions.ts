@@ -120,6 +120,8 @@ export function useLiveCardTransactions(enabled: boolean): void {
       void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });
       for (const id of changedTasks) {
         void queryClient.invalidateQueries({ queryKey: ["tasks", "task", id] });
+        // Claude's jobs on it (the chip in its drawer) move with the task.
+        void queryClient.invalidateQueries({ queryKey: ["tasks", "claude-jobs", id] });
       }
       changedTasks.clear();
     };

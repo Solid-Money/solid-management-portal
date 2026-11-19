@@ -383,6 +383,7 @@ export default function TaskComposer({
   minRows = 3,
   hideSubmit = false,
   askClaude = false,
+  claudeQueued = false,
   onSubmit,
   onCancel,
   onChange,
@@ -400,6 +401,8 @@ export default function TaskComposer({
   hideSubmit?: boolean;
   /** Offer @Claude in the @ list: it answers updates and replies on a task. */
   askClaude?: boolean;
+  /** @Claude is a job for the hourly run here, not answered at once. */
+  claudeQueued?: boolean;
   onSubmit?: (input: Required<TaskBodyInput>) => Promise<unknown>;
   onCancel?: () => void;
   onChange?: (value: ComposerValue) => void;
@@ -420,6 +423,7 @@ export default function TaskComposer({
   // refs; they're set after each commit (below), not during render.
   const peopleRef = useRef(people);
   const claudeRef = useRef(askClaude);
+  const placeholderRef = useRef(placeholder);
   const mentionKeys = useRef<(props: SuggestionKeyDownProps) => boolean>(() => false);
   const sendRef = useRef<() => void>(() => undefined);
   const cancelRef = useRef(onCancel);
@@ -443,7 +447,8 @@ export default function TaskComposer({
       TableHeader,
       TableCell,
       TaskImage.configure({ inline: false, allowBase64: false }),
-      Placeholder.configure({ placeholder }),
+      // Read through a ref: the words can change after the editor is built.
+      Placeholder.configure({ placeholder: () => placeholderRef.current }),
       Mention.configure({
         renderText: ({ node }) => `@${node.attrs.label ?? node.attrs.id}`,
         renderHTML: ({ options, node }) => [
@@ -563,6 +568,17 @@ export default function TaskComposer({
     // The arrays are derived each render; html and the counts say what changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [html, mentions.join(), attachmentIds.join(), uploading]);
+
+  // The placeholder can change after the editor is built (the drawer learns
+  // that @Claude is queued once the task's jobs load). The installed plugin
+  // reads the words through the ref; it redraws on a selection, so the same
+  // selection is set again. The draft and its history are untouched.
+  useEffect(() => {
+    const changed = placeholderRef.current !== placeholder;
+    placeholderRef.current = placeholder;
+    if (!changed || !editor || editor.isDestroyed) return;
+    editor.view.dispatch(editor.state.tr.setSelection(editor.state.selection).setMeta("addToHistory", false));
+  }, [editor, placeholder]);
 
   const addFiles = useCallback(
     (incoming: File[], inline: boolean) => {
@@ -745,7 +761,11 @@ export default function TaskComposer({
                 {mentionLabel(person)}
               </span>
               <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
-                {person.email === CLAUDE_MENTION_ID ? "AI · looks into this task" : person.email}
+                {person.email === CLAUDE_MENTION_ID
+                  ? claudeQueued
+                    ? "AI · does this on the next hourly run"
+                    : "AI · looks into this task"
+                  : person.email}
               </span>
             </button>
           ))}

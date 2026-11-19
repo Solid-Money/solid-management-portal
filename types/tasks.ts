@@ -528,3 +528,70 @@ export interface TaskNotifications {
   unread: number;
 }
 
+
+// ---- Claude's jobs -----------------------------------------------------------
+
+/**
+ * A job an admin left by tagging @Claude on a task (when the backend queues
+ * them for the hourly run). waiting → working → done | stuck; a code job
+ * goes on through in_review and ready_to_ship, then shipping once someone
+ * on the ship list presses Ship to production.
+ */
+export type ClaudeJobState =
+  | "waiting"
+  | "working"
+  | "in_review"
+  | "ready_to_ship"
+  | "shipping"
+  | "done"
+  | "stuck"
+  | "cancelled";
+
+export type ClaudeJobKind = "question" | "design" | "admin" | "reply" | "code";
+
+export interface ClaudeJobPr {
+  /** `owner/name`. */
+  repo: string;
+  number: number;
+  url: string;
+  /** The branch it merges into (`master`, `main`, `qa`). */
+  base: string;
+  /** The commit reviewed and tried on QA; set on production PRs once ready to ship. */
+  head: string | null;
+}
+
+export interface ClaudeJob {
+  id: string;
+  taskId: string;
+  taskNumber: number;
+  taskTitle: string;
+  threadId: string;
+  state: ClaudeJobState;
+  kind: ClaudeJobKind | null;
+  ask: string;
+  askedBy: { email: string; name: string | null };
+  allowed: { code: boolean };
+  attempts: number;
+  note: string | null;
+  links: Array<{ label: string; url: string }>;
+  prs: ClaudeJobPr[];
+  /** Who approved shipping, when, and the exact commits they approved. */
+  go: { by: string; at: string; prs: Array<{ repo: string; number: number; head: string }> } | null;
+  /** The signed-in admin may press Ship to production on it now. */
+  canShip: boolean;
+  /** The signed-in admin may cancel it now. */
+  canCancel: boolean;
+  /**
+   * Goes up on every change to the job a person could review. Ship to
+   * production sends back the one shown and is refused if the job moved.
+   */
+  rev: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClaudeJobs {
+  jobs: ClaudeJob[];
+  /** @Claude is queued for the hourly run (not answered at once). */
+  queue: boolean;
+}
