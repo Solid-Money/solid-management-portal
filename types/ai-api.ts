@@ -347,7 +347,14 @@ export interface AiApiSettings {
   pricingRun?: AiApiPricingRun | null;
   /** From the environment; read-only here. */
   cohortOnly: boolean;
+  /** The paid AntSeed key, which every model priced above 0 goes under. */
   upstreamConfigured: boolean;
+  /**
+   * The free-only AntSeed key (spend limits 0), which free models alone go
+   * under. Without it free models are refused; they never fall back to the
+   * paid key. Absent from older backends.
+   */
+  freeUpstreamConfigured?: boolean;
   upstreamBaseUrl: string;
   publicBaseUrl: string | null;
 }

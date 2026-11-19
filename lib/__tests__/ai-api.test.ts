@@ -4,7 +4,10 @@ import {
   formatFirstToken,
   formatRates,
   formatTokensPerSecond,
+  isFreeModelPrices,
+  isFreeModelRow,
   lowestNetAtReference,
+  modelSaveEffects,
   NEAR_LIMIT_PERCENT,
   netMultiple,
   sameUpstream,
@@ -48,6 +51,159 @@ describe("AI API formatting", () => {
   it("flags a key from 80% of its limit", () => {
     expect(usedPercent(0.8) >= NEAR_LIMIT_PERCENT).toBe(true);
     expect(usedPercent(0.79) >= NEAR_LIMIT_PERCENT).toBe(false);
+  });
+});
+
+describe("free models", () => {
+  const prices = (input: string, output: string, cachedInput = "", cacheWrite = "") => ({
+    input,
+    output,
+    cachedInput,
+    cacheWrite,
+  });
+
+  it("is free by the backend's test: everything 0, empty cached prices falling back to input", () => {
+    expect(isFreeModelPrices(prices("0", "0"))).toBe(true);
+    expect(isFreeModelPrices(prices("0", "0", "0", "0"))).toBe(true);
+    expect(isFreeModelPrices(prices(" 0.00 ", "0", "0"))).toBe(true);
+  });
+
+  it.each([
+    ["an input price", prices("0.01", "0")],
+    ["an output price", prices("0", "0.4")],
+    ["a cached price", prices("0", "0", "0.001")],
+    ["a cache-write price", prices("0", "0", "", "0.1")],
+    ["an empty input", prices("", "0")],
+    ["text that isn't a price", prices("free", "0")],
+  ])("is not free with %s", (_, row) => {
+    expect(isFreeModelPrices(row)).toBe(false);
+  });
+});
+
+describe("what saving the models table changes", () => {
+  const row = (id: string, input: string, output: string, enabled = true) => ({
+    id,
+    name: id,
+    enabled,
+    input,
+    output,
+    cachedInput: "",
+    cacheWrite: "",
+  });
+  const opusPaid = row("claude-opus-5-5", "0.38", "1.2");
+  const opusFree = row("claude-opus-5-5", "0", "0");
+  const deepseek = row("deepseek", "0", "0");
+
+  it("changes nothing when another admin's save was refetched during an unrelated edit", () => {
+    // Editing began with Opus priced; another admin made it free since. This
+    // admin changed only cashback, so the models table isn't saved.
+    const effects = modelSaveEffects({
+      draft: [opusPaid, deepseek],
+      base: [opusPaid, deepseek],
+      saved: [opusFree, deepseek],
+    });
+    expect(effects.savesModels).toBe(false);
+    expect(effects.toFree).toEqual([]);
+    expect(effects.toPaid).toEqual([]);
+    expect(effects.refusedNow).toEqual(["claude-opus-5-5", "deepseek"]);
+    expect(effects.refusedAfterSave).toEqual(effects.refusedNow);
+  });
+
+  it("names the key moves and new refusals when the table is saved", () => {
+    const effects = modelSaveEffects({
+      draft: [opusFree, deepseek],
+      base: [opusPaid, deepseek],
+      saved: [opusPaid, deepseek],
+    });
+    expect(effects.savesModels).toBe(true);
+    expect(effects.toFree).toEqual(["claude-opus-5-5"]);
+    expect(effects.toPaid).toEqual([]);
+    expect(effects.refusedNow).toEqual(["deepseek"]);
+    expect(effects.refusedAfterSave).toEqual(["claude-opus-5-5", "deepseek"]);
+  });
+
+  it("compares against what is saved now, which the save replaces", () => {
+    // Another admin made Opus free; this admin edited DeepSeek, so the save
+    // writes the whole table and puts Opus's price back.
+    const deepseekPriced = row("deepseek", "0.1", "0.3");
+    const effects = modelSaveEffects({
+      draft: [opusPaid, deepseekPriced],
+      base: [opusPaid, deepseek],
+      saved: [opusFree, deepseek],
+    });
+    expect(effects.toPaid).toEqual(["claude-opus-5-5", "deepseek"]);
+    expect(effects.refusedAfterSave).toEqual([]);
+  });
+
+  it("announces no move for a model the save switches off", () => {
+    const effects = modelSaveEffects({
+      draft: [row("claude-opus-5-5", "0", "0", false)],
+      base: [opusPaid],
+      saved: [opusPaid],
+    });
+    expect(effects.toFree).toEqual([]);
+    expect(effects.refusedAfterSave).toEqual([]);
+  });
+
+  it("counts a model priced from AntSeed by its auto prices, not the fixed ones typed", () => {
+    // Fixed at 0, but the pass priced it: the backend serves and routes it paid.
+    const autoGlm = { ...row("glm", "0", "0"), upstreamModel: "glm-5.3", autoEnabled: true };
+    const autoPrices = {
+      glm: {
+        upstreamModel: "glm-5.3",
+        prices: { inputUsdPerMTok: 0.08, outputUsdPerMTok: 0.3, cachedInputUsdPerMTok: 0.02 },
+      },
+    };
+    const effects = modelSaveEffects({
+      draft: [autoGlm, deepseek],
+      base: [autoGlm, deepseek],
+      saved: [autoGlm, deepseek],
+      autoPrices,
+    });
+    expect(effects.refusedNow).toEqual(["deepseek"]);
+    // Turning auto pricing off puts it back on its fixed 0 prices: free.
+    const fixedGlm = { ...autoGlm, autoEnabled: false };
+    const off = modelSaveEffects({
+      draft: [fixedGlm, deepseek],
+      base: [autoGlm, deepseek],
+      saved: [autoGlm, deepseek],
+      autoPrices,
+    });
+    expect(off.toFree).toEqual(["glm"]);
+    expect(off.refusedAfterSave).toEqual(["glm", "deepseek"]);
+  });
+});
+
+describe("served prices", () => {
+  const base = {
+    id: "glm",
+    name: "GLM",
+    enabled: true,
+    input: "0",
+    output: "0",
+    cachedInput: "",
+    cacheWrite: "",
+    upstreamModel: "glm-5.3",
+    autoEnabled: true,
+  };
+  const priced = {
+    glm: {
+      upstreamModel: "GLM-5.3 ",
+      prices: { inputUsdPerMTok: 0.08, outputUsdPerMTok: 0.3, cachedInputUsdPerMTok: 0.02 },
+    },
+  };
+
+  it("is paid once AntSeed pricing has set a price for its gateway model", () => {
+    expect(isFreeModelRow(base, priced)).toBe(false);
+  });
+
+  it.each([
+    ["auto pricing is off", { ...base, autoEnabled: false }, priced],
+    ["no price was set yet", base, { glm: { upstreamModel: "glm-5.3" } }],
+    ["the price was read for another gateway model", { ...base, upstreamModel: "glm-6" }, priced],
+    ["no pricing state came back", base, undefined],
+  ])("stays on its fixed prices when %s", (_, row, autoPrices) => {
+    expect(isFreeModelRow(row, autoPrices)).toBe(true);
   });
 });
 

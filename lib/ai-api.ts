@@ -123,6 +123,142 @@ export function antseedOfferFor(
   return model?.offers[0] ?? null;
 }
 
+/**
+ * Whether a model row's typed prices make it free, by the backend's test:
+ * input and output 0, and cached input and cache write 0 or empty (empty
+ * falls back to the input price). A free model goes to AntSeed only under the
+ * free-only key; any price above 0 sends it under the paid key.
+ */
+export function isFreeModelPrices(prices: {
+  input: string;
+  output: string;
+  cachedInput: string;
+  cacheWrite: string;
+}): boolean {
+  const zero = (text: string) => text.trim() !== "" && Number(text) === 0;
+  const zeroOrEmpty = (text: string) => text.trim() === "" || Number(text) === 0;
+  return (
+    zero(prices.input) &&
+    zero(prices.output) &&
+    zeroOrEmpty(prices.cachedInput) &&
+    zeroOrEmpty(prices.cacheWrite)
+  );
+}
+
+/** A model row as the settings page edits it: switched on or off, prices as typed. */
+export interface ModelPriceRow {
+  id: string;
+  name: string;
+  enabled: boolean;
+  input: string;
+  output: string;
+  cachedInput: string;
+  cacheWrite: string;
+  /** The gateway model; auto prices count only when read for this one. */
+  upstreamModel?: string;
+  /** Priced from AntSeed's rates. */
+  autoEnabled?: boolean;
+}
+
+/** What the pricing pass last set, by model id, as the settings return it. */
+export type AutoPriceStates =
+  | Record<string, Pick<AiApiModelPriceState, "upstreamModel" | "prices">>
+  | undefined;
+
+/**
+ * The prices a model row is served at, as the backend lays them over the
+ * saved list: a model priced from AntSeed whose rates were read for its
+ * gateway model is served at the prices the pass set (cache write stays as
+ * typed); any other model at its typed prices. The pass never sets a price
+ * of 0 and every limit is above 0, so a model it priced is never free.
+ */
+export function servedPrices(
+  row: ModelPriceRow,
+  autoPrices: AutoPriceStates,
+): Pick<ModelPriceRow, "input" | "output" | "cachedInput" | "cacheWrite"> {
+  const state = row.autoEnabled ? autoPrices?.[row.id.trim()] : undefined;
+  if (state?.prices && sameUpstream(state.upstreamModel, row.upstreamModel ?? "")) {
+    return {
+      input: String(state.prices.inputUsdPerMTok),
+      output: String(state.prices.outputUsdPerMTok),
+      cachedInput: String(state.prices.cachedInputUsdPerMTok),
+      cacheWrite: row.cacheWrite,
+    };
+  }
+  return row;
+}
+
+/** Whether a model row is free at the prices it is served at. */
+export const isFreeModelRow = (row: ModelPriceRow, autoPrices: AutoPriceStates): boolean =>
+  isFreeModelPrices(servedPrices(row, autoPrices));
+
+/** The free models that are on, by id (or name, for a row not named yet). */
+const freeModelsOn = (rows: ModelPriceRow[], autoPrices: AutoPriceStates): string[] =>
+  rows
+    .filter((row) => row.enabled && isFreeModelRow(row, autoPrices))
+    .map((row) => row.id.trim() || row.name.trim() || "A new model");
+
+/**
+ * What saving the models table changes about the AntSeed keys, for the
+ * settings page's notices and its save confirmation.
+ *
+ * The page saves the table whole, and only when its rows differ from `base`,
+ * the settings as they stood when editing began. So an edit elsewhere on the
+ * page saves no models even when `saved` (refetched since) differs: then the
+ * save moves nothing and refuses nothing new. When the table is saved, the
+ * moves are against `saved`, which is what the save replaces, and only for
+ * models left on: a model switched off takes no requests on either key.
+ * Free means free at the prices served (`servedPrices`), so a model priced
+ * from AntSeed counts by the prices the pass set, not the fixed ones typed.
+ */
+export function modelSaveEffects<Row extends ModelPriceRow>({
+  draft,
+  base,
+  saved,
+  autoPrices,
+}: {
+  draft: Row[];
+  base: Row[];
+  saved: Row[];
+  autoPrices?: AutoPriceStates;
+}): {
+  savesModels: boolean;
+  /** Priced before, free after: moving to the free-only key. */
+  toFree: string[];
+  /** Free before, priced after: moving to the paid key. */
+  toPaid: string[];
+  /** Free models on now: refused while the free-only key is missing. */
+  refusedNow: string[];
+  /** The same, once this draft is saved. */
+  refusedAfterSave: string[];
+} {
+  const savesModels = JSON.stringify(draft) !== JSON.stringify(base);
+  const refusedNow = freeModelsOn(saved, autoPrices);
+  if (!savesModels) {
+    return { savesModels, toFree: [], toPaid: [], refusedNow, refusedAfterSave: refusedNow };
+  }
+
+  const wasFree = new Map(saved.map((row) => [row.id.trim(), isFreeModelRow(row, autoPrices)]));
+  const toFree: string[] = [];
+  const toPaid: string[] = [];
+  for (const row of draft) {
+    if (!row.enabled) continue;
+    const id = row.id.trim();
+    const before = wasFree.get(id);
+    if (before === undefined) continue;
+    const free = isFreeModelRow(row, autoPrices);
+    if (free && !before) toFree.push(id);
+    if (!free && before) toPaid.push(id);
+  }
+  return {
+    savesModels,
+    toFree,
+    toPaid,
+    refusedNow,
+    refusedAfterSave: freeModelsOn(draft, autoPrices),
+  };
+}
+
 /** A rate times a multiple, as a price to type: no float noise, at most 6 decimals. */
 export const scaledPrice = (rate: number, multiple: number): string =>
   String(Number((rate * multiple).toFixed(6)));

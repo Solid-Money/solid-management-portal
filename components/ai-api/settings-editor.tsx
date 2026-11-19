@@ -23,7 +23,9 @@ import {
   antseedOfferFor,
   autoPriceStatus,
   formatRate,
+  isFreeModelRow,
   lowestNetAtReference,
+  modelSaveEffects,
   netMultiple,
   priceMultiple,
   sameUpstream,
@@ -451,6 +453,24 @@ export default function AiApiSettingsEditor() {
   const modelsOff = modelsTurnedOff(draft, base);
   const autoPrices = saved.autoPrices ?? {};
   const anyAuto = draft.models.some((model) => model.autoEnabled);
+  // Whether the backend reports the free-only key at all. An older one
+  // doesn't, and then nothing is claimed about which key a model goes under.
+  const keySplitKnown = saved.freeUpstreamConfigured !== undefined;
+  const freeKeyMissing = saved.freeUpstreamConfigured === false;
+  // Refused now is what is saved, not what is typed; a save that writes the
+  // models table says separately what it changes. One that doesn't (an edit
+  // elsewhere on the page) changes nothing here, whatever was refetched.
+  // Free is by the prices served: a model priced from AntSeed by its auto
+  // prices once they are read, not the fixed ones typed.
+  const effects = modelSaveEffects({
+    draft: draft.models,
+    base: base.models,
+    saved: toDraft(saved).models,
+    autoPrices,
+  });
+  const { refusedNow, refusedAfterSave } = effects;
+  const { toFree, toPaid } = keySplitKnown ? effects : { toFree: [], toPaid: [] };
+  const refusalChanges = JSON.stringify(refusedAfterSave) !== JSON.stringify(refusedNow);
   // Every tier's cashback as typed, so a markup is weighed against the most
   // generous one before it is saved.
   const cashbackRates = draft.tiers
@@ -541,10 +561,23 @@ export default function AiApiSettingsEditor() {
           </div>
         </div>
         <div>
-          <div className="text-gray-500">Gateway key</div>
-          <Badge variant={saved.upstreamConfigured ? "success" : "danger"}>
-            {saved.upstreamConfigured ? "Configured" : "Missing"}
-          </Badge>
+          <div className="text-gray-500">Gateway keys</div>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge
+              variant={saved.upstreamConfigured ? "success" : "danger"}
+              title="AI_API_UPSTREAM_API_KEY: every model priced above 0"
+            >
+              Paid {saved.upstreamConfigured ? "configured" : "missing"}
+            </Badge>
+            {saved.freeUpstreamConfigured !== undefined ? (
+              <Badge
+                variant={saved.freeUpstreamConfigured ? "success" : "danger"}
+                title="AI_API_UPSTREAM_FREE_API_KEY: free models only, can't be charged"
+              >
+                Free-only {saved.freeUpstreamConfigured ? "configured" : "missing"}
+              </Badge>
+            ) : null}
+          </div>
         </div>
         <div>
           <div className="text-gray-500">Base URL users see</div>
@@ -700,6 +733,16 @@ export default function AiApiSettingsEditor() {
               set is higher: the minimum wins. The fixed prices apply until its
               rates are first read.
             </p>
+            {keySplitKnown ? (
+              <p className="mt-1 text-xs text-gray-500">
+                A model priced 0 everywhere is free: it goes to AntSeed only
+                under the free-only key, which can&apos;t be charged, so if its
+                sellers start charging it stops instead of costing us. Any
+                price above 0 sends it under the paid key. AntSeed pricing
+                never sets 0, so a model priced from AntSeed is free only
+                until its rates are read with a seller charging.
+              </p>
+            ) : null}
             {anyAuto || pricingRun ? (
               <p
                 className={`mt-1 text-xs ${
@@ -768,6 +811,29 @@ export default function AiApiSettingsEditor() {
           </div>
         </div>
 
+        {freeKeyMissing && (refusedNow.length > 0 || refusalChanges) ? (
+          <div className="space-y-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {refusedNow.length > 0 ? (
+              <p>
+                {refusedNow.join(", ")} {refusedNow.length === 1 ? "is" : "are"}{" "}
+                free, and every request for {refusedNow.length === 1 ? "it" : "them"}{" "}
+                is refused: AI_API_UPSTREAM_FREE_API_KEY isn&apos;t set on
+                accounts-service. Free models never fall back to the paid key,
+                so add the free-only AntSeed key to Vault, or give the model a
+                price. A price saved in the last 5 minutes may not have reached
+                the gateway yet, so it can still route as before.
+              </p>
+            ) : null}
+            {refusalChanges ? (
+              <p>
+                {refusedAfterSave.length > 0
+                  ? `Within 5 minutes of saving, requests for ${refusedAfterSave.join(", ")} are refused until the free-only key is set.`
+                  : "Within 5 minutes of saving, no model is refused for the missing free-only key."}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         {showRates && catalog.isError ? (
           <p className="text-xs text-red-600">
             Couldn&apos;t load AntSeed&apos;s models from the gateway.
@@ -835,6 +901,8 @@ export default function AiApiSettingsEditor() {
                     model.upstreamModel.trim().toLowerCase();
                 const state = autoPrices[model.id.trim()];
                 const status = autoPriceStatus(state, model.upstreamModel, live);
+                // Free as this row will be served once saved.
+                const free = isFreeModelRow(model, autoPrices);
                 // What users pay now: the saved model's auto prices, whatever
                 // the draft says, until a save changes them.
                 const livePrices =
@@ -985,6 +1053,33 @@ export default function AiApiSettingsEditor() {
                         !offer ? (
                           <span className="mt-1 block text-[11px] text-amber-700">
                             Not listed on AntSeed right now
+                          </span>
+                        ) : null}
+                        {keySplitKnown && free ? (
+                          <span
+                            className={`mt-1 block text-[11px] ${
+                              freeKeyMissing ? "text-red-700" : "text-emerald-700"
+                            }`}
+                          >
+                            {freeKeyMissing
+                              ? "Free: refused until the free-only key is set"
+                              : model.autoEnabled
+                                ? "Free for now: under the free-only key until a seller charges and AntSeed pricing sets a price"
+                                : "Free: sent under the free-only key"}
+                          </span>
+                        ) : null}
+                        {keySplitKnown &&
+                        free &&
+                        !model.autoEnabled &&
+                        offer &&
+                        (offer.inputUsdPerMTok > 0 ||
+                          offer.outputUsdPerMTok > 0 ||
+                          (offer.cachedInputUsdPerMTok ?? 0) > 0) ? (
+                          <span className="mt-1 block text-[11px] text-amber-700">
+                            {/* A pinned model is served by that seller alone, cheaper ones or not. */}
+                            {model.upstreamModel.includes("@")
+                              ? "The pinned seller charges: the free-only key may be refused"
+                              : "Cheapest seller listed charges: the free-only key may be refused"}
                           </span>
                         ) : null}
                       </td>
@@ -1157,6 +1252,14 @@ export default function AiApiSettingsEditor() {
             : `${
                 modelsOff.length
                   ? `Requests for ${modelsOff.join(", ")} are refused within 5 minutes. `
+                  : ""
+              }${
+                toFree.length
+                  ? `${toFree.join(", ")} become${toFree.length === 1 ? "s" : ""} free and move${toFree.length === 1 ? "s" : ""} to the free-only AntSeed key: refused if no seller serves ${toFree.length === 1 ? "it" : "them"} free. `
+                  : ""
+              }${
+                toPaid.length
+                  ? `${toPaid.join(", ")} get${toPaid.length === 1 ? "s" : ""} a price and move${toPaid.length === 1 ? "s" : ""} to the paid AntSeed key: we pay whatever ${toPaid.length === 1 ? "its" : "their"} sellers charge. `
                   : ""
               }New prices apply to requests made after the change. What has already been used keeps the price it was metered at.${
                 anyAuto
