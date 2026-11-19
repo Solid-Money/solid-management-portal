@@ -70,8 +70,11 @@ export default function ClaudeJobs({
   // row's own note has nowhere left to show. Only that: closing the task or
   // opening another one takes this whole list away and says nothing.
   const reviewingId = useRef<string | null>(null);
-  const onReviewing = useCallback((id: string | null) => {
-    reviewingId.current = id;
+  // A row says when its own dialog opens or closes; closing clears the id
+  // only if it is that row's, so another row appearing does not wipe it.
+  const onReviewing = useCallback((id: string, open: boolean) => {
+    if (open) reviewingId.current = id;
+    else if (reviewingId.current === id) reviewingId.current = null;
   }, []);
   useEffect(() => {
     const id = reviewingId.current;
@@ -98,7 +101,7 @@ function JobRow({
 }: {
   job: ClaudeJob;
   onChanged: () => void;
-  onReviewing: (id: string | null) => void;
+  onReviewing: (id: string, open: boolean) => void;
 }) {
   // The job as it was when the Ship dialog opened. The dialog shows this
   // and approves this revision, never the live job: a poll can bring a newer
@@ -117,7 +120,7 @@ function JobRow({
   // leaves it (see above).
   const open = !!reviewing && busy !== "ship";
   useEffect(() => {
-    onReviewing(open ? job.id : null);
+    onReviewing(job.id, open);
   }, [open, job.id, onReviewing]);
   const chip = claudeJobChip(job);
   const { production, other } = splitClaudePrs(job.prs);
