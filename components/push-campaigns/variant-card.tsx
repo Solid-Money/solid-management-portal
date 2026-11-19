@@ -58,7 +58,8 @@ export function VariantCard({
   const destination = destinations.find((d) => d.id === draft.destinationId);
   const problem = variantProblem(draft, destinations, whatsNew, limits);
   const id = (field: string) => `variant-${variantKey}-${field}`;
-  const set = (patch: Partial<VariantDraft>) => onChange({ ...draft, ...patch });
+  const set = (patch: Partial<VariantDraft>) =>
+    onChange({ ...draft, ...patch });
 
   return (
     <Card>
@@ -175,10 +176,28 @@ export function VariantCard({
           </div>
 
           {destination?.needsWhatsNewStep && whatsNew?.format === "single" ? (
-            <p className="text-xs text-gray-500">
-              The active What&apos;s New is a single image or video. The push
-              opens it as it is; there is no page to choose.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">
+                The active What&apos;s New is a single image or video. The push
+                opens it as it is; there is no page to choose.
+              </p>
+              {draft.whatsNewStep !== "" ||
+              (draft.whatsNewId && draft.whatsNewId !== whatsNew.id) ? (
+                // Picked for a carousel or for an announcement since replaced:
+                // one click points it at the current single, with no page.
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={() =>
+                    set({ whatsNewId: whatsNew.id, whatsNewStep: "" })
+                  }
+                >
+                  Open the current one
+                </Button>
+              ) : null}
+            </div>
           ) : null}
 
           {destination?.needsWhatsNewStep &&
@@ -212,9 +231,7 @@ export function VariantCard({
             </div>
           ) : null}
 
-          {problem ? (
-            <p className="text-xs text-amber-700">{problem}</p>
-          ) : null}
+          {problem ? <p className="text-xs text-amber-700">{problem}</p> : null}
         </div>
 
         <NotificationPreview title={draft.title} body={draft.body} />
