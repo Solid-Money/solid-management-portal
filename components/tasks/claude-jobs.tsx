@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -84,10 +84,25 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
   const [busy, setBusy] = useState<"ship" | "cancel" | null>(null);
   // It changed under the open dialog: close it, so nothing is approved that
   // was not read there. Shipping needs a fresh look and a fresh confirm.
-  if (reviewing && reviewing.rev !== job.rev) {
+  // (Not while this person's own Ship is on its way: that changes it too.)
+  if (reviewing && reviewing.rev !== job.rev && busy !== "ship") {
     setReviewing(null);
     setMoved(true);
   }
+  // A job that is finished or cancelled meanwhile leaves the list, and this
+  // row and its dialog with it: say why the dialog went, since the note
+  // below has no row left to show in.
+  const watching = useRef(false);
+  useEffect(() => {
+    watching.current = !!reviewing && busy !== "ship";
+  }, [reviewing, busy]);
+  useEffect(
+    () => () => {
+      if (watching.current)
+        toast.message("Claude's job changed while you were looking at it, so nothing was approved.");
+    },
+    [],
+  );
   const chip = claudeJobChip(job);
   const { production, other } = splitClaudePrs(job.prs);
   const shown = reviewing ? splitClaudePrs(reviewing.prs) : null;
