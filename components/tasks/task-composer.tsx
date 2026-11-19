@@ -383,6 +383,7 @@ export default function TaskComposer({
   minRows = 3,
   hideSubmit = false,
   askClaude = false,
+  claudeQueued = false,
   onSubmit,
   onCancel,
   onChange,
@@ -400,6 +401,8 @@ export default function TaskComposer({
   hideSubmit?: boolean;
   /** Offer @Claude in the @ list: it answers updates and replies on a task. */
   askClaude?: boolean;
+  /** @Claude is a job for the hourly run here, not answered at once. */
+  claudeQueued?: boolean;
   onSubmit?: (input: Required<TaskBodyInput>) => Promise<unknown>;
   onCancel?: () => void;
   onChange?: (value: ComposerValue) => void;
@@ -745,7 +748,11 @@ export default function TaskComposer({
                 {mentionLabel(person)}
               </span>
               <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
-                {person.email === CLAUDE_MENTION_ID ? "AI · looks into this task" : person.email}
+                {person.email === CLAUDE_MENTION_ID
+                  ? claudeQueued
+                    ? "AI · does this on the next hourly run"
+                    : "AI · looks into this task"
+                  : person.email}
               </span>
             </button>
           ))}

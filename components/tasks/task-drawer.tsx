@@ -45,6 +45,7 @@ import {
   useRefreshTask,
   TASK_KEYS,
   useMarketing,
+  useClaudeJobs,
   useTask,
   useTaskBoards,
   useTaskPeople,
@@ -59,6 +60,7 @@ import {
 } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import TaskComposer from "@/components/tasks/task-composer";
+import ClaudeJobs from "@/components/tasks/claude-jobs";
 import TaskUpdateCard, {
   Attachments,
   TaskText,
@@ -536,6 +538,9 @@ function TaskBody({
 }) {
   const patch = usePatchTask(task.id);
   const refresh = useRefreshTask();
+  const claude = useClaudeJobs(task.id);
+  // When the backend queues @Claude for the hourly run, the composer says so.
+  const claudeQueued = claude.data?.queue === true;
   const { data: boardList } = useTaskBoards();
   const boards = boardList?.boards ?? [];
   const boardName = task.board ? (boards.find((b) => b.key === task.board)?.name ?? task.board) : null;
@@ -677,6 +682,15 @@ function TaskBody({
         </div>
 
         <TitleEditor task={task} onSave={(title) => patch.mutate({ title })} />
+        {/* Where Claude's jobs on this task stand; Ship to production lives here. */}
+        <ClaudeJobs
+          className="mt-2"
+          jobs={claude.data?.jobs}
+          onChanged={() => {
+            void claude.refetch();
+            refresh(task.id);
+          }}
+        />
       </div>
       <div className="border-b border-gray-200 px-6 pb-4">
         <SheetDescription className="sr-only">Task T-{task.number}</SheetDescription>
@@ -920,8 +934,13 @@ function TaskBody({
           <TaskComposer
             className="mt-4"
             people={people}
-            placeholder="Write an update… @ to mention, @Claude to ask AI to look into it"
+            placeholder={
+              claudeQueued
+                ? "Write an update… @ to mention, @Claude to hand it to AI (done on the next hourly run)"
+                : "Write an update… @ to mention, @Claude to ask AI to look into it"
+            }
             askClaude
+            claudeQueued={claudeQueued}
             onSubmit={async (input) => {
               await postTaskUpdate(task.id, input);
               refresh(task.id);

@@ -528,3 +528,62 @@ export interface TaskNotifications {
   unread: number;
 }
 
+
+// ---- Claude's jobs -----------------------------------------------------------
+
+/**
+ * A job an admin left by tagging @Claude on a task (when the backend queues
+ * them for the hourly run). waiting → working → done | stuck; a code job
+ * goes on through in_review and ready_to_ship, then shipping once someone
+ * on the ship list presses Ship to production.
+ */
+export type ClaudeJobState =
+  | "waiting"
+  | "working"
+  | "in_review"
+  | "ready_to_ship"
+  | "shipping"
+  | "done"
+  | "stuck"
+  | "cancelled";
+
+export type ClaudeJobKind = "question" | "design" | "admin" | "reply" | "code";
+
+export interface ClaudeJobPr {
+  /** `owner/name`. */
+  repo: string;
+  number: number;
+  url: string;
+  /** The branch it merges into (`master`, `main`, `qa`). */
+  base: string;
+}
+
+export interface ClaudeJob {
+  id: string;
+  taskId: string;
+  taskNumber: number;
+  taskTitle: string;
+  threadId: string;
+  state: ClaudeJobState;
+  kind: ClaudeJobKind | null;
+  ask: string;
+  askedBy: { email: string; name: string | null };
+  allowed: { code: boolean };
+  attempts: number;
+  note: string | null;
+  links: Array<{ label: string; url: string }>;
+  prs: ClaudeJobPr[];
+  go: { by: string; at: string } | null;
+  /** The signed-in admin may press Ship to production on it now. */
+  canShip: boolean;
+  /** The signed-in admin may cancel it now. */
+  canCancel: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClaudeJobs {
+  jobs: ClaudeJob[];
+  /** @Claude is queued for the hourly run (not answered at once). */
+  queue: boolean;
+}

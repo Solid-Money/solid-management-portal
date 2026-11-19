@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
 import {
+  getClaudeJobs,
   getTask,
   getTaskBoards,
   getTaskCounts,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/tasks-api";
 import type { TaskArea, TaskDetail, TaskListFilters, TaskPatchInput, TaskTeamScope } from "@/types/tasks";
 import { claudeLookingIn } from "@/lib/task-rich";
+import { claudeJobsOpen } from "@/lib/claude-jobs";
 
 /** Every tasks query sits under this key: a live event refreshes them all. */
 export const TASK_KEYS = {
@@ -38,6 +40,7 @@ export const TASK_KEYS = {
   search: (q: string) => ["tasks", "search", q] as const,
   team: (scope: string, area: string | null, helpers: boolean) => ["tasks", "team", scope, area ?? "all", helpers] as const,
   task: (id: string) => ["tasks", "task", id] as const,
+  claudeJobs: (taskId: string) => ["tasks", "claude-jobs", taskId] as const,
   notifications: ["tasks", "notifications"] as const,
   marketing: (range: { from: string; to: string } | null) =>
     ["tasks", "marketing", range ? `${range.from}..${range.to}` : "live"] as const,
@@ -148,6 +151,21 @@ export function useTask(id: string | null) {
     // While Claude is looking into something, check often in case the live
     // update doesn't arrive.
     refetchInterval: (query) => (claudeLookingIn(query.state.data) ? 5_000 : 4 * 60_000),
+  });
+}
+
+/**
+ * Claude's jobs on a task. A live task event refreshes it with the rest;
+ * while a job is open it is also checked every minute, in case the event
+ * doesn't arrive. Never retried: a backend without the queue answers 404.
+ */
+export function useClaudeJobs(taskId: string | null) {
+  return useQuery({
+    queryKey: TASK_KEYS.claudeJobs(taskId ?? "none"),
+    queryFn: () => getClaudeJobs(taskId!),
+    enabled: isTaskId(taskId),
+    retry: false,
+    refetchInterval: (query) => (claudeJobsOpen(query.state.data?.jobs) ? 60_000 : 4 * 60_000),
   });
 }
 

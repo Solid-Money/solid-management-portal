@@ -1,5 +1,7 @@
 import api from "@/lib/api";
 import type {
+  ClaudeJob,
+  ClaudeJobs,
   TaskBoards,
   TaskPartners,
   TaskCreateInput,
@@ -190,3 +192,18 @@ export const patchCampaign = async (id: string, input: TaskCampaignInput) =>
 /** `request` asks the piece's approvers; `approve` signs it off. */
 export const taskApproval = async (id: string, action: "request" | "approve") =>
   (await api.post<TaskDetail>(`${base}/${id}/approval`, { action })).data;
+
+/**
+ * Claude's jobs on one task (the chip in its drawer). Read quietly: it is a
+ * side panel, and a backend without the queue has no such route.
+ */
+export const getClaudeJobs = async (taskId: string) =>
+  (await api.get<ClaudeJobs>(`${base}/claude/jobs`, { params: { task: taskId }, quietErrors: true })).data;
+
+/** Ship to production: the backend lets only people on the ship list. */
+export const shipClaudeJob = async (jobId: string) =>
+  (await api.post<ClaudeJob>(`${base}/claude/jobs/${jobId}/go`)).data;
+
+/** The asker takes a job back while no run is on it. */
+export const cancelClaudeJob = async (jobId: string) =>
+  (await api.post<ClaudeJob>(`${base}/claude/jobs/${jobId}/cancel`)).data;
