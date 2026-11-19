@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   isValidWhatsNewLink,
+  isVideoTooLong,
   mediaWarnings,
   singleFormErrors,
   singleMediaSize,
   singlePayload,
+  slideMediaWarnings,
   whatsNewBadge,
   whatsNewDisplayName,
   whatsNewThumbnail,
@@ -131,7 +133,7 @@ describe("media guidelines", () => {
           type: "video",
           width: 1080,
           height: 1920,
-          durationSec: 20,
+          durationSec: 6,
           sizeBytes: 6_000_000,
         },
         "popup"
@@ -238,5 +240,38 @@ describe("single media size", () => {
 
   it("draws a drawer full width", () => {
     expect(singleMediaSize(phone, IMAGE, "drawer").width).toBe(390);
+  });
+});
+
+describe("video length", () => {
+  it("allows a few seconds and refuses anything over 10 s", () => {
+    expect(isVideoTooLong(4.2)).toBe(false);
+    expect(isVideoTooLong(10)).toBe(false);
+    expect(isVideoTooLong(10.04)).toBe(false);
+    expect(isVideoTooLong(12)).toBe(true);
+    expect(isVideoTooLong(41.6)).toBe(true);
+  });
+});
+
+describe("carousel slide guidelines", () => {
+  it("says nothing about a 16:9 slide in the recommended size", () => {
+    expect(
+      slideMediaWarnings({ type: "video", width: 1920, height: 1080, sizeBytes: 3_000_000 })
+    ).toEqual([]);
+    expect(slideMediaWarnings({ type: "image", width: 1280, height: 720 })).toEqual([]);
+  });
+
+  it("warns that other ratios get cropped", () => {
+    const [warning] = slideMediaWarnings({ type: "image", width: 1080, height: 1350 });
+    expect(warning).toContain("isn't 16:9");
+  });
+
+  it("warns about soft and heavy media", () => {
+    expect(
+      slideMediaWarnings({ type: "image", width: 960, height: 540, sizeBytes: 2_000_000 })
+    ).toHaveLength(2);
+    expect(
+      slideMediaWarnings({ type: "video", width: 1920, height: 1080, sizeBytes: 12 * 1024 * 1024 })
+    ).toHaveLength(1);
   });
 });

@@ -9,12 +9,14 @@ import { Switch } from "@/components/ui/switch";
 import {
   IMAGE_TYPES,
   isValidWhatsNewLink,
+  isVideoTooLong,
   mediaWarnings,
   RECOMMENDED_HEIGHT,
   RECOMMENDED_WIDTH,
   type MediaFacts,
   type SingleFormState,
   VIDEO_MAX_BYTES,
+  VIDEO_MAX_SECONDS,
   VIDEO_TYPE,
 } from "@/lib/whats-new";
 import {
@@ -102,6 +104,12 @@ export default function WhatsNewSingleForm({
     try {
       if (isVideo) {
         const video = await readVideo(file);
+        if (isVideoTooLong(video.durationSec)) {
+          toast.error(
+            `This video is ${Math.round(video.durationSec)} s. Keep it to a few seconds, ${VIDEO_MAX_SECONDS} s at most.`
+          );
+          return;
+        }
         const posterUrl = await uploadPoster(video.poster, file.name);
         const url = await uploadVideo(file, setProgress);
         onChange({
@@ -259,8 +267,8 @@ export default function WhatsNewSingleForm({
                 </p>
               ) : (
                 <p className="text-sm text-gray-700">
-                  One image (PNG, JPG or WebP, up to 1 MB) or one MP4 (up to
-                  60 s, 20 MB).
+                  One image (PNG, JPG or WebP, up to 1 MB) or one short MP4 (a
+                  few seconds, {VIDEO_MAX_SECONDS} s at most).
                 </p>
               )}
               <p className="text-xs text-gray-500">
@@ -311,8 +319,8 @@ export default function WhatsNewSingleForm({
             <div className="space-y-1">
               <span className="text-sm font-medium text-gray-700">Poster</span>
               <p className="text-xs text-gray-500">
-                Made from the first frame. Shown until the video starts, and
-                instead of it if it can&apos;t play.
+                Made from a frame a second in. Shown until the video starts,
+                and instead of it if it can&apos;t play.
               </p>
               <button
                 type="button"

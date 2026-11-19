@@ -1,16 +1,41 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Film,
+  Loader2,
+  Plus,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import WhatsNewCarouselPreview from "@/components/whats-new-carousel-preview";
 import WhatsNewSingleForm from "@/components/whats-new-single-form";
 import {
+  IMAGE_TYPES,
+  isVideoTooLong,
+  type MediaFacts,
+  SLIDE_RECOMMENDED_HEIGHT,
+  SLIDE_RECOMMENDED_WIDTH,
   singleFormErrors,
   singlePayload,
   type SingleFormState,
+  slideMediaWarnings,
+  VIDEO_MAX_BYTES,
+  VIDEO_MAX_SECONDS,
+  VIDEO_TYPE,
 } from "@/lib/whats-new";
+import {
+  readImageSize,
+  readVideo,
+  uploadImage,
+  uploadPoster,
+  uploadVideo,
+} from "@/lib/whats-new-media";
 import { WhatsNew, WhatsNewFormat, WhatsNewStep } from "@/types";
 
 interface WhatsNewModalProps {
@@ -55,44 +80,110 @@ export default function WhatsNewModal({
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  // Size and type of each slide's upload this session, for the guideline
+  // warnings. Kept in step with `steps`.
+  const [stepFacts, setStepFacts] = useState<(MediaFacts | null)[]>(() =>
+    steps.map(() => null)
+  );
+  // The slide the preview shows: the last one edited.
+  const [previewIndex, setPreviewIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Which slide the file picker is choosing for. Separate from
+  // `uploadingIndex`, which is only set while an upload runs, so cancelling
+  // the picker leaves nothing spinning.
+  const pickIndexRef = useRef<number | null>(null);
+
+  const openPicker = (index: number) => {
+    pickIndexRef.current = index;
+    fileInputRef.current?.click();
+  };
 
   const handleAddStep = () => {
     setSteps([...steps, { imageUrl: "", title: "", text: "" }]);
+    setStepFacts([...stepFacts, null]);
+    setPreviewIndex(steps.length);
   };
 
   const handleRemoveStep = (index: number) => {
     setSteps(steps.filter((_, i) => i !== index));
+    setStepFacts(stepFacts.filter((_, i) => i !== index));
+    setPreviewIndex((current) => Math.max(0, Math.min(current, steps.length - 2)));
+  };
+
+  const updateStep = (index: number, patch: Partial<WhatsNewStep>) => {
+    setSteps((current) =>
+      current.map((step, i) => (i === index ? { ...step, ...patch } : step))
+    );
   };
 
   const handleStepChange = (
     index: number,
-    field: keyof WhatsNewStep,
+    field: "title" | "text" | "eyebrow" | "buttonLabel" | "buttonLink",
     value: string
-  ) => {
-    const newSteps = [...steps];
-    newSteps[index][field] = value;
-    setSteps(newSteps);
-  };
+  ) => updateStep(index, { [field]: value });
 
-  const handleImageUpload = async (index: number, file: File) => {
+  const setFacts = (index: number, facts: MediaFacts) =>
+    setStepFacts((current) => current.map((f, i) => (i === index ? facts : f)));
+
+  /**
+   * A slide takes an image, or a short MP4 whose poster (a frame a second in)
+   * becomes its image, so older app versions still show something.
+   */
+  const handleStepMediaUpload = async (index: number, file: File) => {
+    const isVideo = file.type.startsWith("video/");
+    if (isVideo && file.type !== VIDEO_TYPE) {
+      toast.error("Videos must be MP4 (H.264).");
+      return;
+    }
+    if (isVideo && file.size > VIDEO_MAX_BYTES) {
+      toast.error("Videos can be 20 MB at most.");
+      return;
+    }
+    if (!isVideo && !file.type.startsWith("image/")) {
+      toast.error("Upload an image or an MP4 video.");
+      return;
+    }
+
     try {
       setUploadingIndex(index);
-      const response = await fetch(`/api/upload?filename=${file.name}`, {
-        method: "POST",
-        body: file,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
+      if (isVideo) {
+        const video = await readVideo(file);
+        if (isVideoTooLong(video.durationSec)) {
+          toast.error(
+            `This video is ${Math.round(video.durationSec)} s. Keep it to a few seconds, ${VIDEO_MAX_SECONDS} s at most.`
+          );
+          return;
+        }
+        const posterUrl = await uploadPoster(video.poster, file.name);
+        const url = await uploadVideo(file);
+        updateStep(index, {
+          imageUrl: posterUrl,
+          videoUrl: url,
+          videoDurationSec: Math.round(video.durationSec * 10) / 10,
+        });
+        setFacts(index, {
+          type: "video",
+          width: video.width,
+          height: video.height,
+          durationSec: video.durationSec,
+          sizeBytes: file.size,
+          mimeType: file.type,
+        });
+      } else {
+        const size = await readImageSize(file);
+        const url = await uploadImage(file, file.name);
+        updateStep(index, {
+          imageUrl: url,
+          videoUrl: undefined,
+          videoDurationSec: undefined,
+        });
+        setFacts(index, { type: "image", ...size, sizeBytes: file.size, mimeType: file.type });
       }
-
-      const blob = await response.json();
-      handleStepChange(index, "imageUrl", blob.url);
-      toast.success("Image uploaded successfully!");
+      setPreviewIndex(index);
+      toast.success(`${isVideo ? "Video" : "Image"} uploaded`);
     } catch (error) {
       console.error("Upload failed:", error);
-      toast.error("Failed to upload image.");
+      toast.error((error as Error).message || "Upload failed.");
     } finally {
       setUploadingIndex(null);
     }
@@ -146,7 +237,7 @@ export default function WhatsNewModal({
     if (isMissingImage || isMissingContent) {
       setShowErrors(true);
       if (isMissingImage) {
-        toast.error("Please upload an image for all steps.");
+        toast.error("Please upload an image or video for every step.");
       } else {
         toast.error("Please fill in the title and description for all steps.");
       }
@@ -181,7 +272,7 @@ export default function WhatsNewModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
       <div
         className={`bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col ${
-          format === "single" ? "max-w-5xl" : "max-w-4xl"
+          format === "single" ? "max-w-5xl" : "max-w-6xl"
         }`}
       >
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
@@ -264,6 +355,7 @@ export default function WhatsNewModal({
               onUploadingChange={setSingleUploading}
             />
           ) : (
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900">Steps</h3>
@@ -280,7 +372,11 @@ export default function WhatsNewModal({
               {steps.map((step, index) => (
                 <div
                   key={index}
-                  className="p-6 border border-gray-200 rounded-xl space-y-4 relative bg-white shadow-sm"
+                  onFocusCapture={() => setPreviewIndex(index)}
+                  onClick={() => setPreviewIndex(index)}
+                  className={`p-6 border rounded-xl space-y-4 relative bg-white shadow-sm ${
+                    previewIndex === index ? "border-indigo-300" : "border-gray-200"
+                  }`}
                 >
                   <button
                     type="button"
@@ -293,7 +389,7 @@ export default function WhatsNewModal({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">
-                        Step Image
+                        Image or video
                       </label>
                       <div
                         className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 h-40 bg-gray-50 overflow-hidden relative group transition-colors ${
@@ -310,13 +406,19 @@ export default function WhatsNewModal({
                               fill
                               className="object-cover rounded"
                             />
+                            {step.videoUrl ? (
+                              <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
+                                <Film className="h-3 w-3" />
+                                Video
+                                {step.videoDurationSec !== undefined
+                                  ? ` · ${step.videoDurationSec.toFixed(1)} s`
+                                  : ""}
+                              </span>
+                            ) : null}
                             <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setUploadingIndex(index);
-                                  fileInputRef.current?.click();
-                                }}
+                                onClick={() => openPicker(index)}
                                 className="p-2 bg-white rounded-full text-gray-900 cursor-pointer"
                               >
                                 <Upload className="h-5 w-5" />
@@ -326,10 +428,7 @@ export default function WhatsNewModal({
                         ) : (
                           <button
                             type="button"
-                            onClick={() => {
-                              setUploadingIndex(index);
-                              fileInputRef.current?.click();
-                            }}
+                            onClick={() => openPicker(index)}
                             className="flex flex-col items-center space-y-2 text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer"
                           >
                             {uploadingIndex === index ? (
@@ -337,15 +436,66 @@ export default function WhatsNewModal({
                             ) : (
                               <>
                                 <Upload className="h-8 w-8" />
-                                <span className="text-xs">Upload Banner</span>
+                                <span className="text-xs">Upload image or video</span>
                               </>
                             )}
                           </button>
                         )}
                       </div>
+                      <p className="text-xs text-gray-500">
+                        16:9, {SLIDE_RECOMMENDED_WIDTH} × {SLIDE_RECOMMENDED_HEIGHT}.
+                        Phones crop the sides to 5:4, so keep the important part
+                        in the middle. Video: MP4, a few seconds (
+                        {VIDEO_MAX_SECONDS} s at most), plays muted on loop.
+                      </p>
+                      {step.videoUrl ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateStep(index, {
+                              videoUrl: undefined,
+                              videoDurationSec: undefined,
+                            })
+                          }
+                          className="text-xs text-gray-500 underline hover:text-red-600 cursor-pointer"
+                        >
+                          Remove video, keep its poster as the image
+                        </button>
+                      ) : null}
+                      {stepFacts[index] && slideMediaWarnings(stepFacts[index]!).length > 0 ? (
+                        <ul className="space-y-1 rounded-md bg-amber-50 p-2">
+                          {slideMediaWarnings(stepFacts[index]!).map((warning) => (
+                            <li
+                              key={warning}
+                              className="flex items-start gap-1.5 text-xs text-amber-800"
+                            >
+                              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                              {warning}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </div>
 
                     <div className="md:col-span-2 space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-700">
+                          Label above the title{" "}
+                          <span className="font-normal text-gray-400">
+                            (optional)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={step.eyebrow ?? ""}
+                          maxLength={40}
+                          onChange={(e) =>
+                            handleStepChange(index, "eyebrow", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="e.g. Spend your crypto"
+                        />
+                      </div>
                       <div className="space-y-1">
                         <label className="text-sm font-medium text-gray-700">
                           Title
@@ -428,14 +578,23 @@ export default function WhatsNewModal({
                         </div>
                       </div>
                       <p className="text-xs text-gray-500">
-                        Add both a label and a link to show a call-to-action
-                        button below the description. Links can be an external
-                        URL (https://...) or an in-app route (e.g. /rewards).
+                        Add both to give this slide its green button. Without
+                        them the button says Next, or Done on the last slide.
+                        Links can be an external URL (https://...) or an in-app
+                        route (e.g. /rewards).
                       </p>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="lg:sticky lg:top-0 self-start">
+              <WhatsNewCarouselPreview
+                steps={steps}
+                selected={previewIndex}
+                onSelect={setPreviewIndex}
+              />
+            </div>
             </div>
           )}
         </form>
@@ -471,13 +630,15 @@ export default function WhatsNewModal({
         ref={fileInputRef}
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file && uploadingIndex !== null) {
-            handleImageUpload(uploadingIndex, file);
+          const index = pickIndexRef.current;
+          pickIndexRef.current = null;
+          if (file && index !== null) {
+            void handleStepMediaUpload(index, file);
           }
           e.target.value = ""; // Reset
         }}
         className="hidden"
-        accept="image/*"
+        accept={[...IMAGE_TYPES, VIDEO_TYPE].join(",")}
       />
     </div>
   );
