@@ -84,37 +84,44 @@ describe("What's New link", () => {
 describe("What's New list", () => {
   it("labels each format", () => {
     expect(whatsNewBadge(popup({ steps: [STEP, STEP, STEP] }))).toBe(
-      "Steps · 3"
+      "Steps · 3",
     );
     expect(
       whatsNewBadge(
-        popup({ format: "single", presentation: "popup", media: IMAGE })
-      )
+        popup({ format: "single", presentation: "popup", media: IMAGE }),
+      ),
     ).toBe("Image · Popup");
     expect(
       whatsNewBadge(
-        popup({ format: "single", presentation: "drawer", media: VIDEO })
-      )
+        popup({ format: "single", presentation: "drawer", media: VIDEO }),
+      ),
     ).toBe("Video · Drawer");
   });
 
   it("names old carousels after step 1", () => {
     expect(whatsNewDisplayName(popup({ steps: [STEP] }))).toBe(
-      "Euro cards are here"
+      "Euro cards are here",
     );
     expect(
-      whatsNewDisplayName(popup({ name: "Swap v1", format: "single" }))
+      whatsNewDisplayName(popup({ name: "Swap v1", format: "single" })),
     ).toBe("Swap v1");
     expect(whatsNewDisplayName(popup({}))).toBe("No title");
+    // A single from an older response may come without `steps` at all.
+    expect(
+      whatsNewDisplayName({
+        ...popup({}),
+        steps: undefined,
+      } as unknown as WhatsNew),
+    ).toBe("No title");
   });
 
   it("shows a video's poster, an image, or step 1's image", () => {
-    expect(
-      whatsNewThumbnail(popup({ format: "single", media: VIDEO }))
-    ).toBe(VIDEO.posterUrl);
-    expect(
-      whatsNewThumbnail(popup({ format: "single", media: IMAGE }))
-    ).toBe(IMAGE.url);
+    expect(whatsNewThumbnail(popup({ format: "single", media: VIDEO }))).toBe(
+      VIDEO.posterUrl,
+    );
+    expect(whatsNewThumbnail(popup({ format: "single", media: IMAGE }))).toBe(
+      IMAGE.url,
+    );
     expect(whatsNewThumbnail(popup({ steps: [STEP] }))).toBe(STEP.imageUrl);
   });
 });
@@ -124,8 +131,8 @@ describe("media guidelines", () => {
     expect(
       mediaWarnings(
         { type: "image", width: 1080, height: 1350, sizeBytes: 400_000 },
-        "drawer"
-      )
+        "drawer",
+      ),
     ).toEqual([]);
     expect(
       mediaWarnings(
@@ -136,8 +143,8 @@ describe("media guidelines", () => {
           durationSec: 6,
           sizeBytes: 6_000_000,
         },
-        "popup"
-      )
+        "popup",
+      ),
     ).toEqual([]);
   });
 
@@ -160,14 +167,14 @@ describe("media guidelines", () => {
         durationSec: 75,
         sizeBytes: 12 * 1024 * 1024,
       },
-      "popup"
+      "popup",
     );
     expect(warnings).toHaveLength(3);
     expect(
       mediaWarnings(
         { type: "image", width: 1080, height: 1350, sizeBytes: 2_000_000 },
-        "popup"
-      )
+        "popup",
+      ),
     ).toHaveLength(1);
   });
 });
@@ -175,14 +182,12 @@ describe("media guidelines", () => {
 describe("single form", () => {
   it("is ready with a name, media, alt text and a valid link", () => {
     expect(singleFormErrors(form())).toEqual([]);
-    expect(singleFormErrors(form({ media: VIDEO, link: "/swap" }))).toEqual(
-      []
-    );
+    expect(singleFormErrors(form({ media: VIDEO, link: "/swap" }))).toEqual([]);
   });
 
   it("lists what's missing", () => {
     expect(
-      singleFormErrors(form({ name: " ", media: null, link: "swap" }))
+      singleFormErrors(form({ name: " ", media: null, link: "swap" })),
     ).toEqual([
       "Add an internal name.",
       "Upload an image or a video.",
@@ -190,8 +195,8 @@ describe("single form", () => {
     ]);
     expect(
       singleFormErrors(
-        form({ media: { ...VIDEO, posterUrl: undefined, alt: " " } })
-      )
+        form({ media: { ...VIDEO, posterUrl: undefined, alt: " " } }),
+      ),
     ).toEqual(["The video needs a poster.", "Add alt text."]);
   });
 
@@ -209,7 +214,7 @@ describe("single form", () => {
 
   it("sends a video with its poster, rounded length and sound flag", () => {
     expect(
-      singlePayload(form({ media: VIDEO, presentation: "drawer" })).media
+      singlePayload(form({ media: VIDEO, presentation: "drawer" })).media,
     ).toEqual({ ...VIDEO, durationSec: 12.3 });
   });
 });
@@ -230,11 +235,7 @@ describe("single media size", () => {
   });
 
   it("scales a tall popup down to 85% of the screen", () => {
-    const size = singleMediaSize(
-      phone,
-      { width: 1080, height: 2400 },
-      "popup"
-    );
+    const size = singleMediaSize(phone, { width: 1080, height: 2400 }, "popup");
     expect(size.height).toBeCloseTo(844 * 0.85);
   });
 
@@ -248,6 +249,8 @@ describe("video length", () => {
     expect(isVideoTooLong(4.2)).toBe(false);
     expect(isVideoTooLong(10)).toBe(false);
     expect(isVideoTooLong(10.04)).toBe(false);
+    // Saved as 10.1 s, over the limit.
+    expect(isVideoTooLong(10.05)).toBe(true);
     expect(isVideoTooLong(12)).toBe(true);
     expect(isVideoTooLong(41.6)).toBe(true);
   });
@@ -256,22 +259,43 @@ describe("video length", () => {
 describe("carousel slide guidelines", () => {
   it("says nothing about a 16:9 slide in the recommended size", () => {
     expect(
-      slideMediaWarnings({ type: "video", width: 1920, height: 1080, sizeBytes: 3_000_000 })
+      slideMediaWarnings({
+        type: "video",
+        width: 1920,
+        height: 1080,
+        sizeBytes: 3_000_000,
+      }),
     ).toEqual([]);
-    expect(slideMediaWarnings({ type: "image", width: 1280, height: 720 })).toEqual([]);
+    expect(
+      slideMediaWarnings({ type: "image", width: 1280, height: 720 }),
+    ).toEqual([]);
   });
 
   it("warns that other ratios get cropped", () => {
-    const [warning] = slideMediaWarnings({ type: "image", width: 1080, height: 1350 });
+    const [warning] = slideMediaWarnings({
+      type: "image",
+      width: 1080,
+      height: 1350,
+    });
     expect(warning).toContain("isn't 16:9");
   });
 
   it("warns about soft and heavy media", () => {
     expect(
-      slideMediaWarnings({ type: "image", width: 960, height: 540, sizeBytes: 2_000_000 })
+      slideMediaWarnings({
+        type: "image",
+        width: 960,
+        height: 540,
+        sizeBytes: 2_000_000,
+      }),
     ).toHaveLength(2);
     expect(
-      slideMediaWarnings({ type: "video", width: 1920, height: 1080, sizeBytes: 12 * 1024 * 1024 })
+      slideMediaWarnings({
+        type: "video",
+        width: 1920,
+        height: 1080,
+        sizeBytes: 12 * 1024 * 1024,
+      }),
     ).toHaveLength(1);
   });
 });

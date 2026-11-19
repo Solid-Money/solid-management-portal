@@ -3,8 +3,13 @@ import { NextResponse } from "next/server";
 
 import { VIDEO_MAX_BYTES, VIDEO_TYPE } from "@/lib/whats-new";
 
+// The local admins service only in development; a deployment without the
+// variable refuses uploads rather than asking localhost who is an admin.
 const ADMIN_API_BASE_URL =
-  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:5009";
+  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:5009"
+    : undefined);
 
 /** Every What's New video is stored under this prefix. */
 const VIDEO_PATH_PREFIX = "whats-new/";
@@ -16,6 +21,12 @@ const VIDEO_PATH_PREFIX = "whats-new/";
  */
 const isAdmin = async (authorization: string | null): Promise<boolean> => {
   if (!authorization?.startsWith("Bearer ")) return false;
+  if (!ADMIN_API_BASE_URL) {
+    console.error(
+      "[whats-new/video-upload] NEXT_PUBLIC_ADMIN_API_BASE_URL is not set",
+    );
+    return false;
+  }
 
   try {
     const response = await fetch(`${ADMIN_API_BASE_URL}/admin/v1/whats-new`, {

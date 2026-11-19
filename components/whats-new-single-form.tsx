@@ -30,7 +30,15 @@ import type { WhatsNewPresentation } from "@/types";
 
 interface WhatsNewSingleFormProps {
   form: SingleFormState;
-  onChange: (next: Partial<SingleFormState>) => void;
+  /**
+   * A patch, or a function of the current form for changes that land after an
+   * await (an upload), so they merge into edits made in the meantime.
+   */
+  onChange: (
+    next:
+      | Partial<SingleFormState>
+      | ((current: SingleFormState) => Partial<SingleFormState>),
+  ) => void;
   showErrors: boolean;
   /** True while a file is uploading, so the modal can hold the Save button. */
   onUploadingChange: (uploading: boolean) => void;
@@ -69,7 +77,7 @@ export default function WhatsNewSingleForm({
           height: form.media.height,
           durationSec: form.media.durationSec,
         }
-      : null
+      : null,
   );
   const [busy, setBusy] = useState<"media" | "poster" | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -106,13 +114,14 @@ export default function WhatsNewSingleForm({
         const video = await readVideo(file);
         if (isVideoTooLong(video.durationSec)) {
           toast.error(
-            `This video is ${Math.round(video.durationSec)} s. Keep it to a few seconds, ${VIDEO_MAX_SECONDS} s at most.`
+            `This video is ${Math.round(video.durationSec)} s. Keep it to a few seconds, ${VIDEO_MAX_SECONDS} s at most.`,
           );
           return;
         }
         const posterUrl = await uploadPoster(video.poster, file.name);
         const url = await uploadVideo(file, setProgress);
-        onChange({
+        // Alt text and sound as they are now, not as they were when it began.
+        onChange((current) => ({
           media: {
             type: "video",
             url,
@@ -120,10 +129,13 @@ export default function WhatsNewSingleForm({
             height: video.height,
             durationSec: video.durationSec,
             posterUrl,
-            hasAudio: media?.type === "video" ? !!media.hasAudio : false,
-            alt: media?.alt ?? "",
+            hasAudio:
+              current.media?.type === "video"
+                ? !!current.media.hasAudio
+                : false,
+            alt: current.media?.alt ?? "",
           },
-        });
+        }));
         setFacts({
           type: "video",
           width: video.width,
@@ -135,15 +147,15 @@ export default function WhatsNewSingleForm({
       } else {
         const size = await readImageSize(file);
         const url = await uploadImage(file, file.name);
-        onChange({
+        onChange((current) => ({
           media: {
             type: "image",
             url,
             width: size.width,
             height: size.height,
-            alt: media?.alt ?? "",
+            alt: current.media?.alt ?? "",
           },
-        });
+        }));
         setFacts({
           type: "image",
           ...size,
@@ -165,7 +177,12 @@ export default function WhatsNewSingleForm({
     setBusyState("poster");
     try {
       const posterUrl = await uploadImage(file, file.name);
-      onChange({ media: { ...media, posterUrl } });
+      // Onto the media as it is now, keeping alt text or sound changed meanwhile.
+      onChange((current) =>
+        current.media?.type === "video"
+          ? { media: { ...current.media, posterUrl } }
+          : {},
+      );
       toast.success("Poster replaced");
     } catch (error) {
       console.error("Poster upload failed:", error);
@@ -223,9 +240,7 @@ export default function WhatsNewSingleForm({
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-500">
-            Desktop always shows a popup.
-          </p>
+          <p className="text-xs text-gray-500">Desktop always shows a popup.</p>
         </div>
 
         <div className="space-y-2">
@@ -242,7 +257,7 @@ export default function WhatsNewSingleForm({
                 // eslint-disable-next-line @next/next/no-img-element -- thumbnail of an arbitrary upload
                 <img
                   src={
-                    media.type === "video" ? media.posterUrl ?? "" : media.url
+                    media.type === "video" ? (media.posterUrl ?? "") : media.url
                   }
                   alt=""
                   className="h-full w-full object-cover"
@@ -319,8 +334,8 @@ export default function WhatsNewSingleForm({
             <div className="space-y-1">
               <span className="text-sm font-medium text-gray-700">Poster</span>
               <p className="text-xs text-gray-500">
-                Made from a frame a second in. Shown until the video starts,
-                and instead of it if it can&apos;t play.
+                Made from a frame a second in. Shown until the video starts, and
+                instead of it if it can&apos;t play.
               </p>
               <button
                 type="button"

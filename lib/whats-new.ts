@@ -30,9 +30,17 @@ const VIDEO_TARGET_BYTES = 8 * 1024 * 1024;
  */
 export const VIDEO_MAX_SECONDS = 10;
 
-/** Whether a video is too long to upload at all. */
+/** A video's length as it is saved: to a tenth of a second. */
+export const roundVideoSeconds = (durationSec: number): number =>
+  Math.round(durationSec * 10) / 10;
+
+/**
+ * Whether a video is too long to upload at all. Checked on the length as it
+ * will be saved, so 10.05 s (saved as 10.1) is refused here rather than by the
+ * backend after the upload.
+ */
 export const isVideoTooLong = (durationSec: number): boolean =>
-  durationSec > VIDEO_MAX_SECONDS + 0.05;
+  roundVideoSeconds(durationSec) > VIDEO_MAX_SECONDS;
 const IMAGE_MAX_BYTES = 1024 * 1024;
 /** 1080 × 1350 (4:5) is the recommended size for both. */
 export const RECOMMENDED_WIDTH = 1080;
@@ -115,10 +123,7 @@ export const mediaWarnings = (
         `${Math.round(media.durationSec)} s is over the ${VIDEO_MAX_SECONDS} s limit. Saving will fail: upload a shorter video.`,
       );
     }
-    if (
-      media.sizeBytes !== undefined &&
-      media.sizeBytes > VIDEO_TARGET_BYTES
-    ) {
+    if (media.sizeBytes !== undefined && media.sizeBytes > VIDEO_TARGET_BYTES) {
       warnings.push(
         `${megabytes(media.sizeBytes)}: aim for under 8 MB so it starts quickly on mobile data.`,
       );
@@ -173,7 +178,7 @@ export const slideMediaWarnings = (media: MediaFacts): string[] => {
 
 /** The name shown in the list: the internal name, else step 1's title. */
 export const whatsNewDisplayName = (popup: WhatsNew): string =>
-  popup.name?.trim() || popup.steps[0]?.title?.trim() || "No title";
+  popup.name?.trim() || popup.steps?.[0]?.title?.trim() || "No title";
 
 export const isSinglePopup = (popup: WhatsNew): boolean =>
   popup.format === "single" && !!popup.media;
@@ -246,7 +251,7 @@ export const singlePayload = (form: SingleFormState) => {
   if (type === "video") {
     media.posterUrl = posterUrl;
     if (durationSec !== undefined) {
-      media.durationSec = Math.round(durationSec * 10) / 10;
+      media.durationSec = roundVideoSeconds(durationSec);
     }
     media.hasAudio = !!hasAudio;
   }

@@ -19,6 +19,7 @@ import {
   IMAGE_TYPES,
   isVideoTooLong,
   type MediaFacts,
+  roundVideoSeconds,
   SLIDE_RECOMMENDED_HEIGHT,
   SLIDE_RECOMMENDED_WIDTH,
   singleFormErrors,
@@ -57,7 +58,7 @@ export default function WhatsNewModal({
   // New popups start as a single; saved ones keep theirs. Popups saved before
   // `format` existed are carousels.
   const [format, setFormat] = useState<WhatsNewFormat>(
-    popup ? popup.format ?? "carousel" : "single"
+    popup ? (popup.format ?? "carousel") : "single",
   );
   const [single, setSingle] = useState<SingleFormState>(() => ({
     name: popup?.name ?? "",
@@ -75,7 +76,15 @@ export default function WhatsNewModal({
   const [steps, setSteps] = useState<WhatsNewStep[]>(
     popup?.steps?.length
       ? popup.steps
-      : [{ imageUrl: "", title: "", text: "", buttonLabel: "", buttonLink: "" }]
+      : [
+          {
+            imageUrl: "",
+            title: "",
+            text: "",
+            buttonLabel: "",
+            buttonLink: "",
+          },
+        ],
   );
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -83,7 +92,7 @@ export default function WhatsNewModal({
   // Size and type of each slide's upload this session, for the guideline
   // warnings. Kept in step with `steps`.
   const [stepFacts, setStepFacts] = useState<(MediaFacts | null)[]>(() =>
-    steps.map(() => null)
+    steps.map(() => null),
   );
   // The slide the preview shows: the last one edited.
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -93,7 +102,13 @@ export default function WhatsNewModal({
   // the picker leaves nothing spinning.
   const pickIndexRef = useRef<number | null>(null);
 
+  // One upload at a time. While it runs, other uploads, removing a slide
+  // (which would shift the slide it lands on) and switching format (which
+  // would replace the form it reports to) wait for it.
+  const uploading = uploadingIndex !== null || singleUploading;
+
   const openPicker = (index: number) => {
+    if (uploading) return;
     pickIndexRef.current = index;
     fileInputRef.current?.click();
   };
@@ -105,21 +120,24 @@ export default function WhatsNewModal({
   };
 
   const handleRemoveStep = (index: number) => {
+    if (uploading) return;
     setSteps(steps.filter((_, i) => i !== index));
     setStepFacts(stepFacts.filter((_, i) => i !== index));
-    setPreviewIndex((current) => Math.max(0, Math.min(current, steps.length - 2)));
+    setPreviewIndex((current) =>
+      Math.max(0, Math.min(current, steps.length - 2)),
+    );
   };
 
   const updateStep = (index: number, patch: Partial<WhatsNewStep>) => {
     setSteps((current) =>
-      current.map((step, i) => (i === index ? { ...step, ...patch } : step))
+      current.map((step, i) => (i === index ? { ...step, ...patch } : step)),
     );
   };
 
   const handleStepChange = (
     index: number,
     field: "title" | "text" | "eyebrow" | "buttonLabel" | "buttonLink",
-    value: string
+    value: string,
   ) => updateStep(index, { [field]: value });
 
   const setFacts = (index: number, facts: MediaFacts) =>
@@ -150,7 +168,7 @@ export default function WhatsNewModal({
         const video = await readVideo(file);
         if (isVideoTooLong(video.durationSec)) {
           toast.error(
-            `This video is ${Math.round(video.durationSec)} s. Keep it to a few seconds, ${VIDEO_MAX_SECONDS} s at most.`
+            `This video is ${Math.round(video.durationSec)} s. Keep it to a few seconds, ${VIDEO_MAX_SECONDS} s at most.`,
           );
           return;
         }
@@ -159,7 +177,7 @@ export default function WhatsNewModal({
         updateStep(index, {
           imageUrl: posterUrl,
           videoUrl: url,
-          videoDurationSec: Math.round(video.durationSec * 10) / 10,
+          videoDurationSec: roundVideoSeconds(video.durationSec),
         });
         setFacts(index, {
           type: "video",
@@ -177,7 +195,12 @@ export default function WhatsNewModal({
           videoUrl: undefined,
           videoDurationSec: undefined,
         });
-        setFacts(index, { type: "image", ...size, sizeBytes: file.size, mimeType: file.type });
+        setFacts(index, {
+          type: "image",
+          ...size,
+          sizeBytes: file.size,
+          mimeType: file.type,
+        });
       }
       setPreviewIndex(index);
       toast.success(`${isVideo ? "Video" : "Image"} uploaded`);
@@ -231,7 +254,7 @@ export default function WhatsNewModal({
 
     const isMissingImage = steps.some((step) => !step.imageUrl);
     const isMissingContent = steps.some(
-      (step) => !step.title.trim() || !step.text.trim()
+      (step) => !step.title.trim() || !step.text.trim(),
     );
 
     if (isMissingImage || isMissingContent) {
@@ -304,11 +327,12 @@ export default function WhatsNewModal({
                   type="button"
                   role="radio"
                   aria-checked={format === option.value}
+                  disabled={uploading}
                   onClick={() => {
                     setShowErrors(false);
                     setFormat(option.value);
                   }}
-                  className={`cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     format === option.value
                       ? "bg-indigo-600 text-white"
                       : "text-gray-700 hover:bg-gray-100"
@@ -349,252 +373,269 @@ export default function WhatsNewModal({
             <WhatsNewSingleForm
               form={single}
               onChange={(next) =>
-                setSingle((current) => ({ ...current, ...next }))
+                setSingle((current) => ({
+                  ...current,
+                  ...(typeof next === "function" ? next(current) : next),
+                }))
               }
               showErrors={showErrors}
               onUploadingChange={setSingleUploading}
             />
           ) : (
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Steps</h3>
-                <button
-                  type="button"
-                  onClick={handleAddStep}
-                  className="inline-flex items-center px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors cursor-pointer"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Step
-                </button>
-              </div>
-
-              {steps.map((step, index) => (
-                <div
-                  key={index}
-                  onFocusCapture={() => setPreviewIndex(index)}
-                  onClick={() => setPreviewIndex(index)}
-                  className={`p-6 border rounded-xl space-y-4 relative bg-white shadow-sm ${
-                    previewIndex === index ? "border-indigo-300" : "border-gray-200"
-                  }`}
-                >
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold text-gray-900">Steps</h3>
                   <button
                     type="button"
-                    onClick={() => handleRemoveStep(index)}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                    onClick={handleAddStep}
+                    className="inline-flex items-center px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors cursor-pointer"
                   >
-                    <Trash2 className="h-5 w-5" />
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Step
                   </button>
+                </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        Image or video
-                      </label>
-                      <div
-                        className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 h-40 bg-gray-50 overflow-hidden relative group transition-colors ${
-                          showErrors && !step.imageUrl
-                            ? "border-red-300 bg-red-50"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {step.imageUrl ? (
-                          <>
-                            <Image
-                              src={step.imageUrl}
-                              alt="Preview"
-                              fill
-                              className="object-cover rounded"
-                            />
-                            {step.videoUrl ? (
-                              <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
-                                <Film className="h-3 w-3" />
-                                Video
-                                {step.videoDurationSec !== undefined
-                                  ? ` · ${step.videoDurationSec.toFixed(1)} s`
-                                  : ""}
-                              </span>
-                            ) : null}
-                            <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                              <button
-                                type="button"
-                                onClick={() => openPicker(index)}
-                                className="p-2 bg-white rounded-full text-gray-900 cursor-pointer"
-                              >
-                                <Upload className="h-5 w-5" />
-                              </button>
-                            </div>
-                          </>
-                        ) : (
+                {steps.map((step, index) => (
+                  <div
+                    key={index}
+                    onFocusCapture={() => setPreviewIndex(index)}
+                    onClick={() => setPreviewIndex(index)}
+                    className={`p-6 border rounded-xl space-y-4 relative bg-white shadow-sm ${
+                      previewIndex === index
+                        ? "border-indigo-300"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveStep(index)}
+                      disabled={uploading}
+                      title={
+                        uploading ? "Wait for the upload to finish" : undefined
+                      }
+                      className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-400"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          Image or video
+                        </label>
+                        <div
+                          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 h-40 bg-gray-50 overflow-hidden relative group transition-colors ${
+                            showErrors && !step.imageUrl
+                              ? "border-red-300 bg-red-50"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          {step.imageUrl ? (
+                            <>
+                              <Image
+                                src={step.imageUrl}
+                                alt="Preview"
+                                fill
+                                className="object-cover rounded"
+                              />
+                              {step.videoUrl ? (
+                                <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
+                                  <Film className="h-3 w-3" />
+                                  Video
+                                  {step.videoDurationSec !== undefined
+                                    ? ` · ${step.videoDurationSec.toFixed(1)} s`
+                                    : ""}
+                                </span>
+                              ) : null}
+                              <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => openPicker(index)}
+                                  disabled={uploading}
+                                  className="p-2 bg-white rounded-full text-gray-900 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <Upload className="h-5 w-5" />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openPicker(index)}
+                              disabled={uploading}
+                              className="flex flex-col items-center space-y-2 text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                            >
+                              {uploadingIndex === index ? (
+                                <Loader2 className="h-8 w-8 animate-spin" />
+                              ) : (
+                                <>
+                                  <Upload className="h-8 w-8" />
+                                  <span className="text-xs">
+                                    Upload image or video
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          16:9, {SLIDE_RECOMMENDED_WIDTH} ×{" "}
+                          {SLIDE_RECOMMENDED_HEIGHT}. Phones crop the sides to
+                          5:4, so keep the important part in the middle. Video:
+                          MP4, a few seconds ({VIDEO_MAX_SECONDS} s at most),
+                          plays muted on loop.
+                        </p>
+                        {step.videoUrl ? (
                           <button
                             type="button"
-                            onClick={() => openPicker(index)}
-                            className="flex flex-col items-center space-y-2 text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                            onClick={() =>
+                              updateStep(index, {
+                                videoUrl: undefined,
+                                videoDurationSec: undefined,
+                              })
+                            }
+                            className="text-xs text-gray-500 underline hover:text-red-600 cursor-pointer"
                           >
-                            {uploadingIndex === index ? (
-                              <Loader2 className="h-8 w-8 animate-spin" />
-                            ) : (
-                              <>
-                                <Upload className="h-8 w-8" />
-                                <span className="text-xs">Upload image or video</span>
-                              </>
-                            )}
+                            Remove video, keep its poster as the image
                           </button>
-                        )}
+                        ) : null}
+                        {stepFacts[index] &&
+                        slideMediaWarnings(stepFacts[index]!).length > 0 ? (
+                          <ul className="space-y-1 rounded-md bg-amber-50 p-2">
+                            {slideMediaWarnings(stepFacts[index]!).map(
+                              (warning) => (
+                                <li
+                                  key={warning}
+                                  className="flex items-start gap-1.5 text-xs text-amber-800"
+                                >
+                                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                  {warning}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        ) : null}
                       </div>
-                      <p className="text-xs text-gray-500">
-                        16:9, {SLIDE_RECOMMENDED_WIDTH} × {SLIDE_RECOMMENDED_HEIGHT}.
-                        Phones crop the sides to 5:4, so keep the important part
-                        in the middle. Video: MP4, a few seconds (
-                        {VIDEO_MAX_SECONDS} s at most), plays muted on loop.
-                      </p>
-                      {step.videoUrl ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateStep(index, {
-                              videoUrl: undefined,
-                              videoDurationSec: undefined,
-                            })
-                          }
-                          className="text-xs text-gray-500 underline hover:text-red-600 cursor-pointer"
-                        >
-                          Remove video, keep its poster as the image
-                        </button>
-                      ) : null}
-                      {stepFacts[index] && slideMediaWarnings(stepFacts[index]!).length > 0 ? (
-                        <ul className="space-y-1 rounded-md bg-amber-50 p-2">
-                          {slideMediaWarnings(stepFacts[index]!).map((warning) => (
-                            <li
-                              key={warning}
-                              className="flex items-start gap-1.5 text-xs text-amber-800"
-                            >
-                              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                              {warning}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
 
-                    <div className="md:col-span-2 space-y-4">
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">
-                          Label above the title{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={step.eyebrow ?? ""}
-                          maxLength={40}
-                          onChange={(e) =>
-                            handleStepChange(index, "eyebrow", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="e.g. Spend your crypto"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">
-                          Title
-                        </label>
-                        <input
-                          type="text"
-                          value={step.title}
-                          onChange={(e) =>
-                            handleStepChange(index, "title", e.target.value)
-                          }
-                          className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${
-                            showErrors && !step.title.trim()
-                              ? "border-red-300 bg-red-50"
-                              : "border-gray-300"
-                          }`}
-                          placeholder="Step title"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">
-                          Description
-                        </label>
-                        <textarea
-                          value={step.text}
-                          onChange={(e) =>
-                            handleStepChange(index, "text", e.target.value)
-                          }
-                          className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 h-24 ${
-                            showErrors && !step.text.trim()
-                              ? "border-red-300 bg-red-50"
-                              : "border-gray-300"
-                          }`}
-                          placeholder="What's new in this update?"
-                          required
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="md:col-span-2 space-y-4">
                         <div className="space-y-1">
                           <label className="text-sm font-medium text-gray-700">
-                            Button Label{" "}
+                            Label above the title{" "}
                             <span className="font-normal text-gray-400">
                               (optional)
                             </span>
                           </label>
                           <input
                             type="text"
-                            value={step.buttonLabel ?? ""}
+                            value={step.eyebrow ?? ""}
+                            maxLength={40}
                             onChange={(e) =>
-                              handleStepChange(
-                                index,
-                                "buttonLabel",
-                                e.target.value
-                              )
+                              handleStepChange(index, "eyebrow", e.target.value)
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="e.g. Check your tier"
+                            placeholder="e.g. Spend your crypto"
                           />
                         </div>
                         <div className="space-y-1">
                           <label className="text-sm font-medium text-gray-700">
-                            Button Link{" "}
-                            <span className="font-normal text-gray-400">
-                              (optional)
-                            </span>
+                            Title
                           </label>
                           <input
                             type="text"
-                            value={step.buttonLink ?? ""}
+                            value={step.title}
                             onChange={(e) =>
-                              handleStepChange(
-                                index,
-                                "buttonLink",
-                                e.target.value
-                              )
+                              handleStepChange(index, "title", e.target.value)
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="https://... or /rewards"
+                            className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${
+                              showErrors && !step.title.trim()
+                                ? "border-red-300 bg-red-50"
+                                : "border-gray-300"
+                            }`}
+                            placeholder="Step title"
+                            required
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-gray-700">
+                            Description
+                          </label>
+                          <textarea
+                            value={step.text}
+                            onChange={(e) =>
+                              handleStepChange(index, "text", e.target.value)
+                            }
+                            className={`w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 h-24 ${
+                              showErrors && !step.text.trim()
+                                ? "border-red-300 bg-red-50"
+                                : "border-gray-300"
+                            }`}
+                            placeholder="What's new in this update?"
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">
+                              Button Label{" "}
+                              <span className="font-normal text-gray-400">
+                                (optional)
+                              </span>
+                            </label>
+                            <input
+                              type="text"
+                              value={step.buttonLabel ?? ""}
+                              onChange={(e) =>
+                                handleStepChange(
+                                  index,
+                                  "buttonLabel",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="e.g. Check your tier"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">
+                              Button Link{" "}
+                              <span className="font-normal text-gray-400">
+                                (optional)
+                              </span>
+                            </label>
+                            <input
+                              type="text"
+                              value={step.buttonLink ?? ""}
+                              onChange={(e) =>
+                                handleStepChange(
+                                  index,
+                                  "buttonLink",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="https://... or /rewards"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Add both to give this slide its green button. Without
+                          them the button says Next, or Done on the last slide.
+                          Links can be an external URL (https://...) or an
+                          in-app route (e.g. /rewards).
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500">
-                        Add both to give this slide its green button. Without
-                        them the button says Next, or Done on the last slide.
-                        Links can be an external URL (https://...) or an in-app
-                        route (e.g. /rewards).
-                      </p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="lg:sticky lg:top-0 self-start">
-              <WhatsNewCarouselPreview
-                steps={steps}
-                selected={previewIndex}
-                onSelect={setPreviewIndex}
-              />
-            </div>
+                ))}
+              </div>
+              <div className="lg:sticky lg:top-0 self-start">
+                <WhatsNewCarouselPreview
+                  steps={steps}
+                  selected={previewIndex}
+                  onSelect={setPreviewIndex}
+                />
+              </div>
             </div>
           )}
         </form>
@@ -610,7 +651,7 @@ export default function WhatsNewModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={saving || uploadingIndex !== null || singleUploading}
+            disabled={saving || uploading}
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {saving ? (
