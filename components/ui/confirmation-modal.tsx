@@ -27,8 +27,11 @@ export default function ConfirmationModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-      {/* Bounded to the viewport: a long message scrolls, Save and Cancel stay in view. */}
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[calc(100vh-2rem)]">
+      {/*
+        Bounded to the viewport: a long message scrolls, Save and Cancel stay in view.
+        On a viewport too short for even the header and footer, the whole dialog scrolls.
+      */}
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-y-auto flex flex-col max-h-[calc(100vh-2rem)]">
         <div className="shrink-0 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
           <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <button

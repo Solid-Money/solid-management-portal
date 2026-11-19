@@ -818,7 +818,9 @@ export default function AiApiSettingsEditor() {
                       {keySplitKnown &&
                       isFreeModelPrices(model) &&
                       offer &&
-                      (offer.inputUsdPerMTok > 0 || offer.outputUsdPerMTok > 0) ? (
+                      (offer.inputUsdPerMTok > 0 ||
+                        offer.outputUsdPerMTok > 0 ||
+                        (offer.cachedInputUsdPerMTok ?? 0) > 0) ? (
                         <span className="mt-1 block text-[11px] text-amber-700">
                           {/* A pinned model is served by that seller alone, cheaper ones or not. */}
                           {model.upstreamModel.includes("@")
