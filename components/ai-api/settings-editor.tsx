@@ -657,14 +657,15 @@ export default function AiApiSettingsEditor() {
                 is refused: AI_API_UPSTREAM_FREE_API_KEY isn&apos;t set on
                 accounts-service. Free models never fall back to the paid key,
                 so add the free-only AntSeed key to Vault, or give the model a
-                price.
+                price. A price saved in the last 5 minutes may not have reached
+                the gateway yet, so it can still route as before.
               </p>
             ) : null}
             {refusalChanges ? (
               <p>
                 {refusedAfterSave.length > 0
-                  ? `After saving, requests for ${refusedAfterSave.join(", ")} are refused until the free-only key is set.`
-                  : "After saving, no model is refused for the missing free-only key."}
+                  ? `Within 5 minutes of saving, requests for ${refusedAfterSave.join(", ")} are refused until the free-only key is set.`
+                  : "Within 5 minutes of saving, no model is refused for the missing free-only key."}
               </p>
             ) : null}
           </div>
