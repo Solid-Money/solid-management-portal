@@ -686,10 +686,7 @@ function TaskBody({
         <ClaudeJobs
           className="mt-2"
           jobs={claude.data?.jobs}
-          onChanged={() => {
-            void claude.refetch();
-            refresh(task.id);
-          }}
+          onChanged={() => refresh(task.id)}
         />
       </div>
       <div className="border-b border-gray-200 px-6 pb-4">

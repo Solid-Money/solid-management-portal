@@ -155,9 +155,10 @@ export function useTask(id: string | null) {
 }
 
 /**
- * Claude's jobs on a task. A live task event refreshes it with the rest;
- * while a job is open it is also checked every minute, in case the event
- * doesn't arrive. Never retried: a backend without the queue answers 404.
+ * Claude's jobs on a task. A live task event and every write on the task
+ * refresh it (useRefreshTask, the `tasks_updated` handler); while a job is
+ * open it is also checked every minute, in case the event doesn't arrive.
+ * Never retried: a backend without the queue answers 404.
  */
 export function useClaudeJobs(taskId: string | null) {
   return useQuery({
@@ -206,6 +207,8 @@ export function useRefreshTask() {
   return (id: string, task?: TaskDetail) => {
     if (task) queryClient.setQueryData(TASK_KEYS.task(id), task);
     else void queryClient.invalidateQueries({ queryKey: TASK_KEYS.task(id) });
+    // An update that tags @Claude opens a job; a write can also close one.
+    void queryClient.invalidateQueries({ queryKey: TASK_KEYS.claudeJobs(id) });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "sprint"] });
     void queryClient.invalidateQueries({ queryKey: ["tasks", "marketing"] });

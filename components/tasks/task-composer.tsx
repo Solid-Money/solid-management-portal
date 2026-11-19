@@ -423,6 +423,7 @@ export default function TaskComposer({
   // refs; they're set after each commit (below), not during render.
   const peopleRef = useRef(people);
   const claudeRef = useRef(askClaude);
+  const placeholderRef = useRef(placeholder);
   const mentionKeys = useRef<(props: SuggestionKeyDownProps) => boolean>(() => false);
   const sendRef = useRef<() => void>(() => undefined);
   const cancelRef = useRef(onCancel);
@@ -446,7 +447,8 @@ export default function TaskComposer({
       TableHeader,
       TableCell,
       TaskImage.configure({ inline: false, allowBase64: false }),
-      Placeholder.configure({ placeholder }),
+      // Read through a ref: the words can change after the editor is built.
+      Placeholder.configure({ placeholder: () => placeholderRef.current }),
       Mention.configure({
         renderText: ({ node }) => `@${node.attrs.label ?? node.attrs.id}`,
         renderHTML: ({ options, node }) => [
@@ -566,6 +568,17 @@ export default function TaskComposer({
     // The arrays are derived each render; html and the counts say what changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [html, mentions.join(), attachmentIds.join(), uploading]);
+
+  // The placeholder can change after the editor is built (the drawer learns
+  // that @Claude is queued once the task's jobs load). The installed plugin
+  // reads the words through the ref; it redraws on a selection, so the same
+  // selection is set again. The draft and its history are untouched.
+  useEffect(() => {
+    const changed = placeholderRef.current !== placeholder;
+    placeholderRef.current = placeholder;
+    if (!changed || !editor || editor.isDestroyed) return;
+    editor.view.dispatch(editor.state.tr.setSelection(editor.state.selection).setMeta("addToHistory", false));
+  }, [editor, placeholder]);
 
   const addFiles = useCallback(
     (incoming: File[], inline: boolean) => {
