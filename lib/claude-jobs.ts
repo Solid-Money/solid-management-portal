@@ -63,6 +63,11 @@ export function claudePrLabel(pr: ClaudeJobPr): string {
   return `${pr.repo.split("/").pop() ?? pr.repo} #${pr.number} → ${pr.base}`;
 }
 
+/** The commit an approval is for, short: "a1b2c3d"; null when none is named. */
+export function claudePrCommit(pr: Pick<ClaudeJobPr, "head">): string | null {
+  return pr.head ? pr.head.slice(0, 7) : null;
+}
+
 /** Only https links are shown as links; anything else stays out. */
 export function safeHttps(url: string): string | null {
   try {

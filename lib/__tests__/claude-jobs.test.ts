@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   claudeJobChip,
   claudeJobsOpen,
+  claudePrCommit,
   claudePrLabel,
   safeHttps,
   shownClaudeJobs,
@@ -68,11 +69,27 @@ describe("Claude's jobs on a task", () => {
   });
 
   it("separates the production pull request from the QA one", () => {
-    const master = { repo: "Solid-Money/solid-backend", number: 2400, base: "master", url: "https://github.com/x/1" };
-    const qa = { repo: "Solid-Money/solid-backend", number: 2401, base: "qa", url: "https://github.com/x/2" };
-    const main = { repo: "Solid-Money/solid-management-portal", number: 210, base: "main", url: "https://github.com/x/3" };
+    const head = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
+    const master = {
+      repo: "Solid-Money/solid-backend",
+      number: 2400,
+      base: "master",
+      head,
+      url: "https://github.com/x/1",
+    };
+    const qa = { repo: "Solid-Money/solid-backend", number: 2401, base: "qa", head: null, url: "https://github.com/x/2" };
+    const main = {
+      repo: "Solid-Money/solid-management-portal",
+      number: 210,
+      base: "main",
+      head,
+      url: "https://github.com/x/3",
+    };
     expect(splitClaudePrs([qa, master, main])).toEqual({ production: [master, main], other: [qa] });
     expect(claudePrLabel(master)).toBe("solid-backend #2400 → master");
+    // The commit the approval is for, as the dialog shows it.
+    expect(claudePrCommit(master)).toBe("a1b2c3d");
+    expect(claudePrCommit(qa)).toBeNull();
   });
 
   it("links only to https", () => {

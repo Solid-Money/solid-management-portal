@@ -556,6 +556,8 @@ export interface ClaudeJobPr {
   url: string;
   /** The branch it merges into (`master`, `main`, `qa`). */
   base: string;
+  /** The commit reviewed and tried on QA; set on production PRs once ready to ship. */
+  head: string | null;
 }
 
 export interface ClaudeJob {
@@ -573,12 +575,14 @@ export interface ClaudeJob {
   note: string | null;
   links: Array<{ label: string; url: string }>;
   prs: ClaudeJobPr[];
-  go: { by: string; at: string } | null;
+  /** Who approved shipping, when, and the exact commits they approved. */
+  go: { by: string; at: string; prs: Array<{ repo: string; number: number; head: string }> } | null;
   /** The signed-in admin may press Ship to production on it now. */
   canShip: boolean;
   /** The signed-in admin may cancel it now. */
   canCancel: boolean;
   createdAt: string;
+  /** Moves on every change to the job; Ship to production sends back the one shown. */
   updatedAt: string;
 }
 

@@ -15,6 +15,7 @@ import {
 import { BotAvatar } from "@/components/tasks/task-format";
 import {
   claudeJobChip,
+  claudePrCommit,
   claudePrLabel,
   safeHttps,
   shownClaudeJobs,
@@ -84,16 +85,21 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
     setBusy(what);
     try {
       if (what === "ship") {
-        await shipClaudeJob(job.id);
+        // Approval is for the job exactly as this dialog shows it: the
+        // backend refuses if it moved since (another commit, other PRs).
+        await shipClaudeJob(job.id, job.updatedAt);
         toast.success("Approved. Claude ships it on the next hourly run.");
-        setConfirming(false);
       } else {
         await cancelClaudeJob(job.id);
         toast.success("Claude's job cancelled");
       }
+      setConfirming(false);
       onChanged();
     } catch {
-      // The API layer shows the error.
+      // The API layer shows the error. The job may have moved: close the
+      // dialog and read it again, so what gets approved is what is shown.
+      setConfirming(false);
+      onChanged();
     } finally {
       setBusy(null);
     }
@@ -139,7 +145,8 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
           <DialogHeader>
             <DialogTitle>Ship this to production?</DialogTitle>
             <DialogDescription>
-              Claude merges it on the next hourly run and it goes live for everyone. Check it on QA first.
+              Claude merges exactly the commits below on the next hourly run and they go live for everyone. Check it
+              on QA first.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-gray-800">
@@ -154,6 +161,9 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
                 {production.map((pr) => (
                   <li key={`${pr.repo}#${pr.number}`}>
                     <OutLink href={pr.url}>{claudePrLabel(pr)}</OutLink>
+                    {claudePrCommit(pr) && (
+                      <span className="ml-1.5 font-mono text-xs text-gray-500">at {claudePrCommit(pr)}</span>
+                    )}
                   </li>
                 ))}
               </ul>
