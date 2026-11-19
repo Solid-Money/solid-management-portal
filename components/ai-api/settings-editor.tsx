@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,13 +21,19 @@ import {
 } from "@/hooks/use-ai-api";
 import {
   antseedOfferFor,
+  autoPriceStatus,
   formatRate,
-  isFreeModelPrices,
+  isFreeModelRow,
+  lowestNetAtReference,
   modelSaveEffects,
+  netMultiple,
   priceMultiple,
+  sameUpstream,
 } from "@/lib/ai-api";
 import { fromPercentInput, toPercentInput } from "@/lib/cashback-percentage";
+import { formatDateTime } from "@/lib/utils";
 import type {
+  AiApiAutoPricing,
   AiApiModelConfig,
   AiApiSettings,
   AiApiSettingsPatch,
@@ -47,10 +53,26 @@ interface ModelDraft {
   officialInput: string;
   officialOutput: string;
   enabled: boolean;
+  /** Priced from AntSeed's rates, at `markup` times, within the min and max. */
+  autoEnabled: boolean;
+  markup: string;
+  minInput: string;
+  minOutput: string;
+  maxInput: string;
+  maxOutput: string;
 }
 
 /** The text fields of a model row. */
-type ModelTextField = Exclude<keyof ModelDraft, "enabled" | "logoUrl" | "upstreamModel">;
+type ModelTextField = Exclude<
+  keyof ModelDraft,
+  "enabled" | "logoUrl" | "upstreamModel" | "autoEnabled"
+>;
+
+/** Our price over AntSeed's, as the backend holds it. */
+const MARKUP_RANGE = { min: 1, max: 50 };
+
+/** The markup a row gets when it is first priced from AntSeed: the picker's default. */
+const DEFAULT_MARKUP = "4";
 
 interface TierDraft {
   tier: number;
@@ -99,6 +121,12 @@ const toDraft = (settings: AiApiSettings): Draft => ({
     officialInput: priceText(model.officialInputUsdPerMTok),
     officialOutput: priceText(model.officialOutputUsdPerMTok),
     enabled: model.enabled,
+    autoEnabled: model.autoPricing?.enabled ?? false,
+    markup: model.autoPricing ? String(model.autoPricing.markup) : "",
+    minInput: priceText(model.autoPricing?.minInputUsdPerMTok),
+    minOutput: priceText(model.autoPricing?.minOutputUsdPerMTok),
+    maxInput: priceText(model.autoPricing?.maxInputUsdPerMTok),
+    maxOutput: priceText(model.autoPricing?.maxOutputUsdPerMTok),
   })),
 });
 
@@ -116,6 +144,12 @@ const EMPTY_MODEL: ModelDraft = {
   officialInput: "",
   officialOutput: "",
   enabled: true,
+  autoEnabled: false,
+  markup: "",
+  minInput: "",
+  minOutput: "",
+  maxInput: "",
+  maxOutput: "",
 };
 
 /** A dollar amount typed in, or NaN when it isn't one. */
@@ -126,6 +160,78 @@ const price = (text: string): number | null => {
   const value = Number(text);
   return Number.isFinite(value) && value >= 0 ? value : Number.NaN;
 };
+
+/** A minimum or maximum typed in: blank is none, and a set one is more than 0. */
+const priceLimit = (text: string): number | null => {
+  if (text.trim() === "") return null;
+  const value = Number(text);
+  return Number.isFinite(value) && value > 0 ? value : Number.NaN;
+};
+
+/**
+ * A row's AntSeed pricing as the API takes it, or what is wrong with it.
+ * Off with no markup is no settings; off with one keeps it for next time.
+ */
+function parseAutoPricing(
+  row: ModelDraft,
+  label: string,
+  before?: ModelDraft,
+): { autoPricing?: AiApiAutoPricing } | { error: string } {
+  const parsed = readAutoPricing(row, label);
+  if (!("error" in parsed) || row.autoEnabled) return parsed;
+  // Off, the markup and limits are hidden, so a bad edit to them must not
+  // block saving the fixed prices: keep what they were before this edit, off,
+  // or nothing when that wasn't valid either. Good ones are kept as typed.
+  const kept = before ? readAutoPricing({ ...before, autoEnabled: false }, label) : {};
+  return "error" in kept ? {} : kept;
+}
+
+function readAutoPricing(
+  row: ModelDraft,
+  label: string,
+): { autoPricing?: AiApiAutoPricing } | { error: string } {
+  const markupText = row.markup.trim();
+  if (markupText === "") {
+    return row.autoEnabled
+      ? { error: `${label}: set a markup to price it from AntSeed.` }
+      : {};
+  }
+  const markup = Number(markupText);
+  if (
+    !Number.isFinite(markup) ||
+    markup < MARKUP_RANGE.min ||
+    markup > MARKUP_RANGE.max
+  ) {
+    return {
+      error: `${label}: the markup must be ${MARKUP_RANGE.min}× to ${MARKUP_RANGE.max}× AntSeed's rate.`,
+    };
+  }
+  const minInput = priceLimit(row.minInput);
+  const minOutput = priceLimit(row.minOutput);
+  const maxInput = priceLimit(row.maxInput);
+  const maxOutput = priceLimit(row.maxOutput);
+  if ([minInput, minOutput, maxInput, maxOutput].some((v) => Number.isNaN(v))) {
+    return {
+      error: `${label}: minimum and maximum prices must be more than 0, or left blank.`,
+    };
+  }
+  if (minInput !== null && maxInput !== null && minInput > maxInput) {
+    return { error: `${label}: the minimum input price is above the maximum.` };
+  }
+  if (minOutput !== null && maxOutput !== null && minOutput > maxOutput) {
+    return { error: `${label}: the minimum output price is above the maximum.` };
+  }
+  return {
+    autoPricing: {
+      enabled: row.autoEnabled,
+      markup,
+      ...(minInput !== null ? { minInputUsdPerMTok: minInput } : {}),
+      ...(minOutput !== null ? { minOutputUsdPerMTok: minOutput } : {}),
+      ...(maxInput !== null ? { maxInputUsdPerMTok: maxInput } : {}),
+      ...(maxOutput !== null ? { maxOutputUsdPerMTok: maxOutput } : {}),
+    },
+  };
+}
 
 /**
  * The draft as the API takes it, or the first thing wrong with it.
@@ -219,6 +325,12 @@ function parseDraft(
     if (provider.length > 40) {
       return { error: `${label}: the provider can be 40 characters at most.` };
     }
+    const auto = parseAutoPricing(
+      row,
+      label,
+      base.models.find((entry) => entry.id.trim() === id),
+    );
+    if ("error" in auto) return auto;
     models.push({
       id,
       name: row.name.trim(),
@@ -233,6 +345,7 @@ function parseDraft(
       ...(officialInput !== null ? { officialInputUsdPerMTok: officialInput } : {}),
       ...(officialOutput !== null ? { officialOutputUsdPerMTok: officialOutput } : {}),
       enabled: row.enabled,
+      ...(auto.autoPricing ? { autoPricing: auto.autoPricing } : {}),
     });
   }
 
@@ -338,6 +451,8 @@ export default function AiApiSettingsEditor() {
   const error = parsed && "error" in parsed ? parsed.error : null;
   const turningOff = saved.enabled && !draft.enabled;
   const modelsOff = modelsTurnedOff(draft, base);
+  const autoPrices = saved.autoPrices ?? {};
+  const anyAuto = draft.models.some((model) => model.autoEnabled);
   // Whether the backend reports the free-only key at all. An older one
   // doesn't, and then nothing is claimed about which key a model goes under.
   const keySplitKnown = saved.freeUpstreamConfigured !== undefined;
@@ -345,14 +460,23 @@ export default function AiApiSettingsEditor() {
   // Refused now is what is saved, not what is typed; a save that writes the
   // models table says separately what it changes. One that doesn't (an edit
   // elsewhere on the page) changes nothing here, whatever was refetched.
+  // Free is by the prices served: a model priced from AntSeed by its auto
+  // prices once they are read, not the fixed ones typed.
   const effects = modelSaveEffects({
     draft: draft.models,
     base: base.models,
     saved: toDraft(saved).models,
+    autoPrices,
   });
   const { refusedNow, refusedAfterSave } = effects;
   const { toFree, toPaid } = keySplitKnown ? effects : { toFree: [], toPaid: [] };
   const refusalChanges = JSON.stringify(refusedAfterSave) !== JSON.stringify(refusedNow);
+  // Every tier's cashback as typed, so a markup is weighed against the most
+  // generous one before it is saved.
+  const cashbackRates = draft.tiers
+    .map((tier) => fromPercentInput(tier.percent))
+    .filter((rate): rate is number => rate !== undefined);
+  const pricingRun = saved.pricingRun ?? null;
 
   const updateTier = (index: number, patch: Partial<TierDraft>) =>
     setDraft({
@@ -383,7 +507,11 @@ export default function AiApiSettingsEditor() {
       }),
     });
 
-  /** Fill a row from the AntSeed picker: its gateway model, its id and name if blank, its prices if asked. */
+  /**
+   * Fill a row from the AntSeed picker: its gateway model, its id and name if
+   * blank, its prices if asked, and pricing from AntSeed at that multiple if
+   * asked to keep following it.
+   */
   const applyPick = (index: number, pick: AntseedPick) => {
     const row = draft.models[index];
     if (!row) return;
@@ -392,6 +520,13 @@ export default function AiApiSettingsEditor() {
       ...(row.id.trim() ? {} : { id: pick.id }),
       ...(row.name.trim() ? {} : { name: pick.name }),
       ...(pick.prices ?? {}),
+      // Prices picked without following AntSeed are fixed prices: the row
+      // stops following. A pick that leaves the prices alone leaves the mode.
+      ...(pick.prices
+        ? pick.followMarkup
+          ? { autoEnabled: true, markup: pick.followMarkup }
+          : { autoEnabled: false }
+        : {}),
     });
   };
 
@@ -589,14 +724,42 @@ export default function AiApiSettingsEditor() {
               million tokens. Cached and cache-write prices fall back to the
               input price when empty. Provider, logo and official prices are
               what the app&apos;s price list shows; official prices give the
-              &ldquo;vs official price&rdquo; discount.
+              &ldquo;vs official price&rdquo; discount. Turn on From AntSeed
+              to price a model at a multiple of what AntSeed&apos;s sellers
+              typically charge, read four times an hour: its prices go up as
+              soon as AntSeed&apos;s do, come down gradually, and stay put when
+              AntSeed can&apos;t be read. They stay under the maximum you set,
+              or the official price when you set none, unless a minimum you
+              set is higher: the minimum wins. The fixed prices apply until its
+              rates are first read.
             </p>
             {keySplitKnown ? (
               <p className="mt-1 text-xs text-gray-500">
                 A model priced 0 everywhere is free: it goes to AntSeed only
                 under the free-only key, which can&apos;t be charged, so if its
                 sellers start charging it stops instead of costing us. Any
-                price above 0 sends it under the paid key.
+                price above 0 sends it under the paid key. AntSeed pricing
+                never sets 0, so a model priced from AntSeed is free only
+                until its rates are read with a seller charging.
+              </p>
+            ) : null}
+            {anyAuto || pricingRun ? (
+              <p
+                className={`mt-1 text-xs ${
+                  pricingRun && !pricingRun.ok ? "text-amber-700" : "text-gray-500"
+                }`}
+              >
+                {!pricingRun
+                  ? "AntSeed's rates haven't been read since the API last started; they're read four times an hour."
+                  : pricingRun.ok
+                    ? `AntSeed's rates last read ${formatDateTime(pricingRun.at)}${
+                        pricingRun.repriced?.length
+                          ? `; repriced ${pricingRun.repriced.join(", ")}`
+                          : ""
+                      }.`
+                    : `Couldn't read AntSeed's rates at ${formatDateTime(pricingRun.at)}${
+                        pricingRun.error ? ` (${pricingRun.error})` : ""
+                      }; every price stays as it was.`}
               </p>
             ) : null}
           </div>
@@ -687,6 +850,7 @@ export default function AiApiSettingsEditor() {
                 <th className="px-3 py-2">Name</th>
                 <th className="px-3 py-2">Provider</th>
                 <th className="px-3 py-2">Gateway model</th>
+                <th className="px-3 py-2">From AntSeed</th>
                 <th className="px-3 py-2">Input</th>
                 <th className="px-3 py-2">Output</th>
                 <th className="px-3 py-2">Cached in</th>
@@ -701,7 +865,7 @@ export default function AiApiSettingsEditor() {
               {draft.models.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={14}
+                    colSpan={15}
                     className="px-3 py-6 text-center text-gray-500"
                   >
                     No models yet. Users can create keys, but every request is
@@ -726,6 +890,91 @@ export default function AiApiSettingsEditor() {
                         : ""}
                     </span>
                   ) : null;
+                // Priced from AntSeed as saved, at the gateway model in the
+                // row: only then is the stored price what users pay.
+                const savedModel = saved.models.find(
+                  (entry) => entry.id === model.id.trim(),
+                );
+                const live =
+                  !!savedModel?.autoPricing?.enabled &&
+                  savedModel.upstreamModel.trim().toLowerCase() ===
+                    model.upstreamModel.trim().toLowerCase();
+                const state = autoPrices[model.id.trim()];
+                const status = autoPriceStatus(state, model.upstreamModel, live);
+                // Free as this row will be served once saved.
+                const free = isFreeModelRow(model, autoPrices);
+                // What users pay now: the saved model's auto prices, whatever
+                // the draft says, until a save changes them.
+                const livePrices =
+                  savedModel?.autoPricing?.enabled &&
+                  state?.prices &&
+                  sameUpstream(state.upstreamModel, savedModel.upstreamModel)
+                    ? state.prices
+                    : null;
+                const liveHint = (rate: number | undefined) =>
+                  livePrices && rate !== undefined ? (
+                    <span className="mt-1 block whitespace-nowrap text-[11px] text-gray-500">
+                      Users pay {formatRate(rate)}
+                    </span>
+                  ) : null;
+                const markup = Number(model.markup);
+                const markupSet =
+                  model.markup.trim() !== "" && Number.isFinite(markup);
+                const typed = (text: string) => {
+                  const value = Number(text);
+                  return text.trim() !== "" && Number.isFinite(value)
+                    ? value
+                    : undefined;
+                };
+                // At AntSeed's typical rate with the row's limits applied,
+                // when it is known for this gateway model; otherwise the
+                // markup alone, before any minimum or maximum.
+                const reference =
+                  state?.reference &&
+                  state.reference.sellers > 0 &&
+                  sameUpstream(state.upstreamModel, model.upstreamModel)
+                    ? state.reference
+                    : null;
+                const lowest =
+                  markupSet && reference
+                    ? lowestNetAtReference(
+                        reference,
+                        markup,
+                        {
+                          minInput: typed(model.minInput),
+                          minOutput: typed(model.minOutput),
+                          maxInput: typed(model.maxInput),
+                          maxOutput: typed(model.maxOutput),
+                          officialInput: typed(model.officialInput),
+                          officialOutput: typed(model.officialOutput),
+                        },
+                        cashbackRates,
+                      )
+                    : null;
+                const net =
+                  markupSet && !reference
+                    ? netMultiple(markup, cashbackRates)
+                    : null;
+                const topCashback = Math.max(0, ...cashbackRates);
+                const limitInput = (
+                  key: "markup" | "minInput" | "minOutput" | "maxInput" | "maxOutput",
+                  label: string,
+                  placeholder: string,
+                ) => (
+                  <Field label={label}>
+                    <Input
+                      className="w-24"
+                      inputMode="decimal"
+                      aria-label={`${model.id || "Model"} ${label.toLowerCase()}`}
+                      value={model[key]}
+                      placeholder={placeholder}
+                      disabled={disabled}
+                      onChange={(e) =>
+                        updateModel(index, { [key]: e.target.value })
+                      }
+                    />
+                  </Field>
+                );
                 const field = (
                   key: ModelTextField,
                   placeholder: string,
@@ -751,124 +1000,206 @@ export default function AiApiSettingsEditor() {
                   </td>
                 );
                 return (
-                  <tr key={index}>
-                    <td className="px-3 py-2 align-top pt-4">
-                      <Switch
-                        aria-label={`${model.id || "Model"} on`}
-                        checked={model.enabled}
-                        disabled={disabled}
-                        onCheckedChange={(enabled) =>
-                          updateModel(index, { enabled })
-                        }
-                      />
-                    </td>
-                    <td className="px-3 py-2 align-top">
-                      <ModelLogoInput
-                        value={model.logoUrl}
-                        name={model.provider || model.name || model.id}
-                        disabled={disabled}
-                        onChange={(logoUrl) => updateModel(index, { logoUrl })}
-                      />
-                    </td>
-                    {field("id", "claude-opus-5-5", "w-40")}
-                    {field("name", "Claude Opus 5.5", "w-36")}
-                    {field("provider", "Anthropic", "w-28")}
-                    <td className="px-3 py-2 align-top">
-                      <div className="flex gap-1.5">
-                        <Input
-                          className="w-44"
-                          value={model.upstreamModel}
-                          placeholder="claude-opus-5-5"
+                  <Fragment key={index}>
+                    <tr>
+                      <td className="px-3 py-2 align-top pt-4">
+                        <Switch
+                          aria-label={`${model.id || "Model"} on`}
+                          checked={model.enabled}
                           disabled={disabled}
-                          onChange={(e) =>
+                          onCheckedChange={(enabled) =>
+                            updateModel(index, { enabled })
+                          }
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <ModelLogoInput
+                          value={model.logoUrl}
+                          name={model.provider || model.name || model.id}
+                          disabled={disabled}
+                          onChange={(logoUrl) => updateModel(index, { logoUrl })}
+                        />
+                      </td>
+                      {field("id", "claude-opus-5-5", "w-40")}
+                      {field("name", "Claude Opus 5.5", "w-36")}
+                      {field("provider", "Anthropic", "w-28")}
+                      <td className="px-3 py-2 align-top">
+                        <div className="flex gap-1.5">
+                          <Input
+                            className="w-44"
+                            value={model.upstreamModel}
+                            placeholder="claude-opus-5-5"
+                            disabled={disabled}
+                            onChange={(e) =>
+                              updateModel(index, {
+                                upstreamModel: e.target.value,
+                              })
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={disabled}
+                            onClick={() => setPickingRow(index)}
+                            className="h-9 cursor-pointer px-2 text-xs"
+                            title="Pick the gateway model and prices from AntSeed"
+                          >
+                            AntSeed
+                          </Button>
+                        </div>
+                        {showRates &&
+                        catalog.data &&
+                        model.upstreamModel.trim() &&
+                        !offer ? (
+                          <span className="mt-1 block text-[11px] text-amber-700">
+                            Not listed on AntSeed right now
+                          </span>
+                        ) : null}
+                        {keySplitKnown && free ? (
+                          <span
+                            className={`mt-1 block text-[11px] ${
+                              freeKeyMissing ? "text-red-700" : "text-emerald-700"
+                            }`}
+                          >
+                            {freeKeyMissing
+                              ? "Free: refused until the free-only key is set"
+                              : model.autoEnabled
+                                ? "Free for now: under the free-only key until a seller charges and AntSeed pricing sets a price"
+                                : "Free: sent under the free-only key"}
+                          </span>
+                        ) : null}
+                        {keySplitKnown &&
+                        free &&
+                        !model.autoEnabled &&
+                        offer &&
+                        (offer.inputUsdPerMTok > 0 ||
+                          offer.outputUsdPerMTok > 0 ||
+                          (offer.cachedInputUsdPerMTok ?? 0) > 0) ? (
+                          <span className="mt-1 block text-[11px] text-amber-700">
+                            {/* A pinned model is served by that seller alone, cheaper ones or not. */}
+                            {model.upstreamModel.includes("@")
+                              ? "The pinned seller charges: the free-only key may be refused"
+                              : "Cheapest seller listed charges: the free-only key may be refused"}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 align-top pt-4">
+                        <Switch
+                          aria-label={`Price ${model.id || "model"} from AntSeed`}
+                          checked={model.autoEnabled}
+                          disabled={disabled}
+                          onCheckedChange={(autoEnabled) =>
                             updateModel(index, {
-                              upstreamModel: e.target.value,
+                              autoEnabled,
+                              ...(autoEnabled && !model.markup.trim()
+                                ? { markup: DEFAULT_MARKUP }
+                                : {}),
                             })
                           }
                         />
-                        <Button
-                          size="sm"
-                          variant="outline"
+                      </td>
+                      {field(
+                        "input",
+                        "0.40",
+                        "w-20",
+                        <>
+                          {liveHint(livePrices?.inputUsdPerMTok)}
+                          {rateHint(model.input, offer?.inputUsdPerMTok)}
+                        </>,
+                      )}
+                      {field(
+                        "output",
+                        "2.40",
+                        "w-20",
+                        <>
+                          {liveHint(livePrices?.outputUsdPerMTok)}
+                          {rateHint(model.output, offer?.outputUsdPerMTok)}
+                        </>,
+                      )}
+                      {field(
+                        "cachedInput",
+                        "",
+                        "w-20",
+                        <>
+                          {liveHint(livePrices?.cachedInputUsdPerMTok)}
+                          {rateHint(model.cachedInput, offer?.cachedInputUsdPerMTok)}
+                        </>,
+                      )}
+                      {field("cacheWrite", "", "w-20")}
+                      {field("officialInput", "15", "w-20")}
+                      {field("officialOutput", "75", "w-20")}
+                      {field("aliases", "claude-opus-5", "w-36")}
+                      <td className="px-3 py-2 align-top pt-4">
+                        <button
+                          type="button"
+                          aria-label={`Remove ${model.id || "model"}`}
                           disabled={disabled}
-                          onClick={() => setPickingRow(index)}
-                          className="h-9 cursor-pointer px-2 text-xs"
-                          title="Pick the gateway model and prices from AntSeed"
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              models: draft.models.filter((_, i) => i !== index),
+                            })
+                          }
+                          className="cursor-pointer text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          AntSeed
-                        </Button>
-                      </div>
-                      {showRates &&
-                      catalog.data &&
-                      model.upstreamModel.trim() &&
-                      !offer ? (
-                        <span className="mt-1 block text-[11px] text-amber-700">
-                          Not listed on AntSeed right now
-                        </span>
-                      ) : null}
-                      {keySplitKnown && isFreeModelPrices(model) ? (
-                        <span
-                          className={`mt-1 block text-[11px] ${
-                            freeKeyMissing ? "text-red-700" : "text-emerald-700"
-                          }`}
-                        >
-                          {freeKeyMissing
-                            ? "Free: refused until the free-only key is set"
-                            : "Free: sent under the free-only key"}
-                        </span>
-                      ) : null}
-                      {keySplitKnown &&
-                      isFreeModelPrices(model) &&
-                      offer &&
-                      (offer.inputUsdPerMTok > 0 ||
-                        offer.outputUsdPerMTok > 0 ||
-                        (offer.cachedInputUsdPerMTok ?? 0) > 0) ? (
-                        <span className="mt-1 block text-[11px] text-amber-700">
-                          {/* A pinned model is served by that seller alone, cheaper ones or not. */}
-                          {model.upstreamModel.includes("@")
-                            ? "The pinned seller charges: the free-only key may be refused"
-                            : "Cheapest seller listed charges: the free-only key may be refused"}
-                        </span>
-                      ) : null}
-                    </td>
-                    {field(
-                      "input",
-                      "0.40",
-                      "w-20",
-                      rateHint(model.input, offer?.inputUsdPerMTok),
-                    )}
-                    {field(
-                      "output",
-                      "2.40",
-                      "w-20",
-                      rateHint(model.output, offer?.outputUsdPerMTok),
-                    )}
-                    {field(
-                      "cachedInput",
-                      "",
-                      "w-20",
-                      rateHint(model.cachedInput, offer?.cachedInputUsdPerMTok),
-                    )}
-                    {field("cacheWrite", "", "w-20")}
-                    {field("officialInput", "15", "w-20")}
-                    {field("officialOutput", "75", "w-20")}
-                    {field("aliases", "claude-opus-5", "w-36")}
-                    <td className="px-3 py-2 align-top pt-4">
-                      <button
-                        type="button"
-                        aria-label={`Remove ${model.id || "model"}`}
-                        disabled={disabled}
-                        onClick={() =>
-                          setDraft({
-                            ...draft,
-                            models: draft.models.filter((_, i) => i !== index),
-                          })
-                        }
-                        className="cursor-pointer text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                    {model.autoEnabled ? (
+                      <tr>
+                        <td colSpan={15} className="bg-gray-50 px-3 py-3">
+                          <div className="flex flex-wrap items-start gap-4">
+                            {limitInput("markup", "Markup (× AntSeed)", DEFAULT_MARKUP)}
+                            {limitInput("minInput", "Min input", "None")}
+                            {limitInput("minOutput", "Min output", "None")}
+                            {limitInput(
+                              "maxInput",
+                              "Max input",
+                              model.officialInput.trim() ? "Official" : "None",
+                            )}
+                            {limitInput(
+                              "maxOutput",
+                              "Max output",
+                              model.officialOutput.trim() ? "Official" : "None",
+                            )}
+                          </div>
+                          <p className="mt-2 text-xs text-gray-500">
+                            Blank maximum: the official price, or no ceiling
+                            when there&apos;s none. A minimum above that ceiling
+                            wins; a minimum above a maximum you set can&apos;t
+                            be saved.
+                          </p>
+                          <p
+                            className={`mt-1 text-xs ${
+                              status.warn ? "text-amber-700" : "text-gray-500"
+                            }`}
+                          >
+                            {status.text}
+                          </p>
+                          {lowest && lowest.net < 1 ? (
+                            <p className="mt-1 text-xs text-amber-700">
+                              At AntSeed&apos;s typical rate, with{" "}
+                              {Math.round(topCashback * 100)}% cashback and
+                              these limits, {lowest.token} nets{" "}
+                              {lowest.net.toFixed(2)}× what it costs us: users
+                              under their cashback cap cost us more than they
+                              pay.
+                            </p>
+                          ) : null}
+                          {net !== null && net < 1 ? (
+                            <p className="mt-1 text-xs text-amber-700">
+                              With {Math.round(topCashback * 100)}% cashback,{" "}
+                              {model.markup.trim()}× nets {net.toFixed(2)}×
+                              AntSeed&apos;s rate before any minimum or maximum:
+                              users under their cashback cap cost us more than
+                              they pay.
+                            </p>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -930,7 +1261,11 @@ export default function AiApiSettingsEditor() {
                 toPaid.length
                   ? `${toPaid.join(", ")} get${toPaid.length === 1 ? "s" : ""} a price and move${toPaid.length === 1 ? "s" : ""} to the paid AntSeed key: we pay whatever ${toPaid.length === 1 ? "its" : "their"} sellers charge. `
                   : ""
-              }New prices apply to requests made after the change. What has already been used keeps the price it was metered at.`
+              }New prices apply to requests made after the change. What has already been used keeps the price it was metered at.${
+                anyAuto
+                  ? " Models priced from AntSeed are repriced as soon as this is saved."
+                  : ""
+              }`
         }
         confirmText={turningOff ? "Turn off" : "Save"}
         isDestructive={turningOff || modelsOff.length > 0}

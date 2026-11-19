@@ -242,6 +242,53 @@ export interface AiApiModelConfig {
   officialInputUsdPerMTok?: number;
   officialOutputUsdPerMTok?: number;
   enabled: boolean;
+  /**
+   * Price it from AntSeed's rates instead: the fixed prices above then apply
+   * only until AntSeed's rates are first read for it.
+   */
+  autoPricing?: AiApiAutoPricing;
+}
+
+/** A model priced as a multiple of what AntSeed's sellers typically charge. */
+export interface AiApiAutoPricing {
+  enabled: boolean;
+  /** Our price over AntSeed's typical seller rate: 4 is 4×. */
+  markup: number;
+  /** Never below these, USD per million tokens. */
+  minInputUsdPerMTok?: number;
+  minOutputUsdPerMTok?: number;
+  /** Never above these. Unset, the official price is the ceiling. */
+  maxInputUsdPerMTok?: number;
+  maxOutputUsdPerMTok?: number;
+}
+
+/** USD per million tokens, one rate per kind of token AntSeed prices. */
+export interface AiApiTokenRates {
+  inputUsdPerMTok: number;
+  outputUsdPerMTok: number;
+  cachedInputUsdPerMTok: number;
+}
+
+/** What the pricing pass last read of a model on AntSeed, and the prices it set. */
+export interface AiApiModelPriceState {
+  upstreamModel: string;
+  /** Whether AntSeed listed it at the last read. */
+  listed: boolean;
+  unlistedSince?: string;
+  /** The median seller's rates; zero when every seller gives it away. */
+  reference: (AiApiTokenRates & { sellers: number }) | null;
+  moved?: { at: string; from: AiApiTokenRates; to: AiApiTokenRates };
+  /** The prices set from it, for a model priced from AntSeed. */
+  prices?: AiApiTokenRates;
+  pricedAt?: string;
+}
+
+/** How the last pricing pass went; null until one has run since the service started. */
+export interface AiApiPricingRun {
+  at: string;
+  ok: boolean;
+  error: string | null;
+  repriced: string[];
 }
 
 /** One seller's offer of a model on AntSeed, USD per million tokens. */
@@ -293,7 +340,11 @@ export interface AiApiSettings {
   chargeThresholdUsd: number;
   maxUnpaidUsd: number;
   balanceHeadroomUsd: number;
+  /** As saved, with their fixed prices; what users pay now is in `autoPrices`. */
   models: AiApiModelConfig[];
+  /** What the pricing pass last read from AntSeed, by model id. Absent from an older API. */
+  autoPrices?: Record<string, AiApiModelPriceState>;
+  pricingRun?: AiApiPricingRun | null;
   /** From the environment; read-only here. */
   cohortOnly: boolean;
   /** The paid AntSeed key, which every model priced above 0 goes under. */

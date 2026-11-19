@@ -3,11 +3,13 @@ import type {
   AiApiChargeFailure,
   AiApiChargeStatus,
   AiApiKeyStatus,
+  AiApiModelPriceState,
   AiApiPauseReason,
+  AiApiTokenRates,
   AiApiUpstreamModel,
   AiApiUpstreamOffer,
 } from "@/types/ai-api";
-import { formatNumber } from "@/lib/utils";
+import { formatDateTime, formatNumber } from "@/lib/utils";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "muted";
 
@@ -152,12 +154,48 @@ export interface ModelPriceRow {
   output: string;
   cachedInput: string;
   cacheWrite: string;
+  /** The gateway model; auto prices count only when read for this one. */
+  upstreamModel?: string;
+  /** Priced from AntSeed's rates. */
+  autoEnabled?: boolean;
 }
 
+/** What the pricing pass last set, by model id, as the settings return it. */
+export type AutoPriceStates =
+  | Record<string, Pick<AiApiModelPriceState, "upstreamModel" | "prices">>
+  | undefined;
+
+/**
+ * The prices a model row is served at, as the backend lays them over the
+ * saved list: a model priced from AntSeed whose rates were read for its
+ * gateway model is served at the prices the pass set (cache write stays as
+ * typed); any other model at its typed prices. The pass never sets a price
+ * of 0 and every limit is above 0, so a model it priced is never free.
+ */
+export function servedPrices(
+  row: ModelPriceRow,
+  autoPrices: AutoPriceStates,
+): Pick<ModelPriceRow, "input" | "output" | "cachedInput" | "cacheWrite"> {
+  const state = row.autoEnabled ? autoPrices?.[row.id.trim()] : undefined;
+  if (state?.prices && sameUpstream(state.upstreamModel, row.upstreamModel ?? "")) {
+    return {
+      input: String(state.prices.inputUsdPerMTok),
+      output: String(state.prices.outputUsdPerMTok),
+      cachedInput: String(state.prices.cachedInputUsdPerMTok),
+      cacheWrite: row.cacheWrite,
+    };
+  }
+  return row;
+}
+
+/** Whether a model row is free at the prices it is served at. */
+export const isFreeModelRow = (row: ModelPriceRow, autoPrices: AutoPriceStates): boolean =>
+  isFreeModelPrices(servedPrices(row, autoPrices));
+
 /** The free models that are on, by id (or name, for a row not named yet). */
-const freeModelsOn = (rows: ModelPriceRow[]): string[] =>
+const freeModelsOn = (rows: ModelPriceRow[], autoPrices: AutoPriceStates): string[] =>
   rows
-    .filter((row) => row.enabled && isFreeModelPrices(row))
+    .filter((row) => row.enabled && isFreeModelRow(row, autoPrices))
     .map((row) => row.id.trim() || row.name.trim() || "A new model");
 
 /**
@@ -170,15 +208,19 @@ const freeModelsOn = (rows: ModelPriceRow[]): string[] =>
  * save moves nothing and refuses nothing new. When the table is saved, the
  * moves are against `saved`, which is what the save replaces, and only for
  * models left on: a model switched off takes no requests on either key.
+ * Free means free at the prices served (`servedPrices`), so a model priced
+ * from AntSeed counts by the prices the pass set, not the fixed ones typed.
  */
 export function modelSaveEffects<Row extends ModelPriceRow>({
   draft,
   base,
   saved,
+  autoPrices,
 }: {
   draft: Row[];
   base: Row[];
   saved: Row[];
+  autoPrices?: AutoPriceStates;
 }): {
   savesModels: boolean;
   /** Priced before, free after: moving to the free-only key. */
@@ -191,12 +233,12 @@ export function modelSaveEffects<Row extends ModelPriceRow>({
   refusedAfterSave: string[];
 } {
   const savesModels = JSON.stringify(draft) !== JSON.stringify(base);
-  const refusedNow = freeModelsOn(saved);
+  const refusedNow = freeModelsOn(saved, autoPrices);
   if (!savesModels) {
     return { savesModels, toFree: [], toPaid: [], refusedNow, refusedAfterSave: refusedNow };
   }
 
-  const wasFree = new Map(saved.map((row) => [row.id.trim(), isFreeModelPrices(row)]));
+  const wasFree = new Map(saved.map((row) => [row.id.trim(), isFreeModelRow(row, autoPrices)]));
   const toFree: string[] = [];
   const toPaid: string[] = [];
   for (const row of draft) {
@@ -204,11 +246,17 @@ export function modelSaveEffects<Row extends ModelPriceRow>({
     const id = row.id.trim();
     const before = wasFree.get(id);
     if (before === undefined) continue;
-    const free = isFreeModelPrices(row);
+    const free = isFreeModelRow(row, autoPrices);
     if (free && !before) toFree.push(id);
     if (!free && before) toPaid.push(id);
   }
-  return { savesModels, toFree, toPaid, refusedNow, refusedAfterSave: freeModelsOn(draft) };
+  return {
+    savesModels,
+    toFree,
+    toPaid,
+    refusedNow,
+    refusedAfterSave: freeModelsOn(draft, autoPrices),
+  };
 }
 
 /** A rate times a multiple, as a price to type: no float noise, at most 6 decimals. */
@@ -225,3 +273,152 @@ export function priceMultiple(price: string, rate: number): string | null {
 /** A per-million-token rate: `$2.40`, `$0.0003`. */
 export const formatRate = (usd: number): string =>
   usd >= 1 ? `$${usd.toFixed(2)}` : `$${Number(usd.toPrecision(3))}`;
+
+const isRate = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+/**
+ * Up to three rates as one line: `in $0.08 · out $0.60 · cached $0.04`. A rate
+ * missing from the response is left out rather than breaking the page; a
+ * real $0 still shows.
+ */
+export const formatRates = (rates: Partial<AiApiTokenRates>): string => {
+  const parts: [string, number | undefined][] = [
+    ["in", rates.inputUsdPerMTok],
+    ["out", rates.outputUsdPerMTok],
+    ["cached", rates.cachedInputUsdPerMTok],
+  ];
+  return parts
+    .filter((part): part is [string, number] => isRate(part[1]))
+    .map(([label, rate]) => `${label} ${formatRate(rate)}`)
+    .join(" · ");
+};
+
+/**
+ * What a markup is worth to us after the most generous tier's cashback, as a
+ * multiple of AntSeed's rate: 4× with 50% back nets 2×. Under 1 loses money
+ * on every request a capped user makes.
+ */
+export const netMultiple = (markup: number, cashbackRates: number[]): number =>
+  markup * (1 - Math.min(1, Math.max(0, ...cashbackRates)));
+
+/** A row's minimum, maximum and official prices as typed; unset or unreadable is undefined. */
+export interface AutoPricingLimits {
+  minInput?: number;
+  minOutput?: number;
+  maxInput?: number;
+  maxOutput?: number;
+  officialInput?: number;
+  officialOutput?: number;
+}
+
+const within = (value: number, floor?: number, top?: number) =>
+  Math.max(floor ?? 0, Math.min(top ?? Infinity, value));
+
+/**
+ * The kind of token that nets least at AntSeed's typical rate, after the most
+ * generous tier's cashback, with the markup and the row's limits applied the
+ * way the pricing pass applies them: a blank maximum is the official price, a
+ * minimum wins over a ceiling, cached input never costs more than input.
+ * Null when AntSeed has no paid rate for it.
+ */
+export function lowestNetAtReference(
+  reference: AiApiTokenRates,
+  markup: number,
+  limits: AutoPricingLimits,
+  cashbackRates: number[],
+): { token: string; net: number } | null {
+  const keep = 1 - Math.min(1, Math.max(0, ...cashbackRates));
+  const ceiling = (set?: number, official?: number) =>
+    set ?? (official !== undefined && official > 0 ? official : undefined);
+  const input = within(
+    reference.inputUsdPerMTok * markup,
+    limits.minInput,
+    ceiling(limits.maxInput, limits.officialInput),
+  );
+  const output = within(
+    reference.outputUsdPerMTok * markup,
+    limits.minOutput,
+    ceiling(limits.maxOutput, limits.officialOutput),
+  );
+  const cached = Math.min(reference.cachedInputUsdPerMTok * markup, input);
+  const nets = (
+    [
+      ["input", input, reference.inputUsdPerMTok],
+      ["output", output, reference.outputUsdPerMTok],
+      ["cached input", cached, reference.cachedInputUsdPerMTok],
+    ] as const
+  )
+    .filter(([, price, rate]) => isRate(rate) && rate > 0 && isRate(price))
+    .map(([token, price, rate]) => ({ token, net: (price / rate) * keep }));
+  if (nets.length === 0) return null;
+  return nets.reduce((low, next) => (next.net < low.net ? next : low));
+}
+
+/**
+ * Whether stored pricing state was read for this gateway model, ignoring case
+ * and spaces. A state with no gateway model, from an older or partial
+ * response, matches nothing.
+ */
+export const sameUpstream = (stored: unknown, upstreamModel: string): boolean =>
+  typeof stored === "string" &&
+  stored.trim().toLowerCase() === upstreamModel.trim().toLowerCase();
+
+/**
+ * What the row under a model priced from AntSeed says about its price: what
+ * users pay now and AntSeed's typical rate, or why the fixed prices still
+ * apply. `live` is whether the saved model is priced from AntSeed, at this
+ * gateway model: the draft may have just turned it on.
+ */
+export function autoPriceStatus(
+  state: AiApiModelPriceState | undefined,
+  upstreamModel: string,
+  live: boolean,
+): { text: string; warn: boolean } {
+  if (!live) {
+    return {
+      text: "Priced from AntSeed as soon as this is saved. The fixed prices above apply until its rates are read.",
+      warn: false,
+    };
+  }
+  if (!state || !sameUpstream(state.upstreamModel, upstreamModel)) {
+    return {
+      text: "Waiting for AntSeed's rates, read four times an hour. The fixed prices above apply until then.",
+      warn: false,
+    };
+  }
+  if (!state.listed) {
+    return {
+      text: `Not on AntSeed's model list${
+        state.unlistedSince ? ` since ${formatDateTime(state.unlistedSince)}` : ""
+      }: ${state.prices ? "it keeps its last price" : "the fixed prices above apply"}.`,
+      warn: true,
+    };
+  }
+  const reference = state.reference;
+  const allFree = reference?.sellers === 0;
+  const typical =
+    !reference || allFree
+      ? ""
+      : ` AntSeed's typical rate: ${formatRates(reference)}, across ${reference.sellers} seller${
+          reference.sellers === 1 ? "" : "s"
+        }.`;
+  if (!state.prices) {
+    return {
+      text: allFree
+        ? "Every AntSeed seller gives it away right now, so the fixed prices above apply until one charges for it."
+        : `Waiting for a paid AntSeed rate; the fixed prices above apply.${typical}`,
+      warn: false,
+    };
+  }
+  return {
+    text: `Users pay ${formatRates(state.prices)}${
+      state.pricedAt ? `, set ${formatDateTime(state.pricedAt)}` : ""
+    }.${
+      allFree
+        ? " Every AntSeed seller gives it away right now, so it keeps its last price."
+        : typical
+    }`,
+    warn: false,
+  };
+}
