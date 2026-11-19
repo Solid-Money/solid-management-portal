@@ -76,29 +76,41 @@ export default function ClaudeJobs({
 }
 
 function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
-  const [confirming, setConfirming] = useState(false);
+  // The job as it was when the Ship dialog opened. The dialog shows this
+  // and approves this revision, never the live job: a poll can bring a newer
+  // one (another commit, other pull requests) while it is open.
+  const [reviewing, setReviewing] = useState<ClaudeJob | null>(null);
+  const [moved, setMoved] = useState(false);
   const [busy, setBusy] = useState<"ship" | "cancel" | null>(null);
+  // It changed under the open dialog: close it, so nothing is approved that
+  // was not read there. Shipping needs a fresh look and a fresh confirm.
+  if (reviewing && reviewing.rev !== job.rev) {
+    setReviewing(null);
+    setMoved(true);
+  }
   const chip = claudeJobChip(job);
   const { production, other } = splitClaudePrs(job.prs);
+  const shown = reviewing ? splitClaudePrs(reviewing.prs) : null;
 
   const act = async (what: "ship" | "cancel") => {
     setBusy(what);
     try {
       if (what === "ship") {
-        // Approval is for the job exactly as this dialog shows it: the
-        // backend refuses if it moved since (another commit, other PRs).
-        await shipClaudeJob(job.id, job.rev);
+        if (!reviewing) return;
+        // Approval is for the revision this dialog opened with and shows:
+        // the backend refuses if the job moved since.
+        await shipClaudeJob(reviewing.id, reviewing.rev);
         toast.success("Approved. Claude ships it on the next hourly run.");
       } else {
         await cancelClaudeJob(job.id);
         toast.success("Claude's job cancelled");
       }
-      setConfirming(false);
+      setReviewing(null);
       onChanged();
     } catch {
       // The API layer shows the error. The job may have moved: close the
       // dialog and read it again, so what gets approved is what is shown.
-      setConfirming(false);
+      setReviewing(null);
       onChanged();
     } finally {
       setBusy(null);
@@ -134,13 +146,21 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
             size="xs"
             className="bg-emerald-600 text-white hover:bg-emerald-700"
             disabled={!!busy}
-            onClick={() => setConfirming(true)}
+            onClick={() => {
+              setMoved(false);
+              setReviewing(job);
+            }}
           >
             <Rocket /> Ship to production
           </Button>
         )}
       </span>
-      <Dialog open={confirming} onOpenChange={(next) => !busy && setConfirming(next)}>
+      {moved && job.canShip && (
+        <span className="basis-full text-amber-800">
+          This changed while you were looking at it. Check it again before shipping.
+        </span>
+      )}
+      <Dialog open={!!reviewing} onOpenChange={(next) => !busy && !next && setReviewing(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Ship this to production?</DialogTitle>
@@ -150,15 +170,15 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-gray-800">
-            {job.note && (
+            {reviewing?.note && (
               <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md bg-gray-50 p-3 text-xs text-gray-700">
-                {job.note}
+                {reviewing?.note}
               </p>
             )}
             <div>
               <p className="mb-1 text-xs font-medium text-gray-500">Goes to production</p>
               <ul className="space-y-1">
-                {production.map((pr) => (
+                {(shown?.production ?? []).map((pr) => (
                   <li key={`${pr.repo}#${pr.number}`}>
                     <OutLink href={pr.url}>{claudePrLabel(pr)}</OutLink>
                     {claudePrCommit(pr) && (
@@ -168,16 +188,16 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
                 ))}
               </ul>
             </div>
-            {(other.length > 0 || job.links.length > 0) && (
+            {((shown?.other.length ?? 0) > 0 || (reviewing?.links.length ?? 0) > 0) && (
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-500">To check first</p>
                 <ul className="space-y-1">
-                  {other.map((pr) => (
+                  {(shown?.other ?? []).map((pr) => (
                     <li key={`${pr.repo}#${pr.number}`}>
                       <OutLink href={pr.url}>{claudePrLabel(pr)}</OutLink>
                     </li>
                   ))}
-                  {job.links.map((link) => (
+                  {(reviewing?.links ?? []).map((link) => (
                     <li key={link.url}>
                       <OutLink href={link.url}>{link.label}</OutLink>
                     </li>
@@ -187,7 +207,7 @@ function JobRow({ job, onChanged }: { job: ClaudeJob; onChanged: () => void }) {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={!!busy} onClick={() => setConfirming(false)}>
+            <Button variant="outline" disabled={!!busy} onClick={() => setReviewing(null)}>
               Not yet
             </Button>
             <Button
