@@ -122,7 +122,7 @@ export const FEE_PRODUCTS: FeeProductDefinition[] = [
     // The app's tier pages quote Wirex cardholders the flat tier FX price, which
     // this fee is charged on top of — see `cardFx` on the tier-benefits payload.
     caution:
-      "This is not the \"Card FX fee\" on the app's tier pages. Wirex purchases are priced by flat tier FX pricing (card_fees.fx_pricing): each tier's rate replaces Wirex's own fee, and the tier pages quote that rate to Wirex cardholders. This fee is charged on top of it, so switching it on makes Wirex cardholders pay more than their tier page says.",
+      "This is not the \"Card FX fee\" on the app's tier pages. Wirex purchases are priced by flat tier FX pricing (card_fees.fx_pricing): each tier's rate replaces Wirex's own fee, and the tier pages quote that rate to Wirex cardholders. This fee is charged on top of it, so any tier given a rate above 0 here pays more on Wirex than its tier page says.",
   },
   {
     key: "offRamp",
