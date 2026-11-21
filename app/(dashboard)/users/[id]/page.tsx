@@ -372,7 +372,7 @@ export default function UserDetailPage({
             <UserRewardsCard userId={id} />
           </SectionAnchor>
           {/* Directly under the tier it can override: a running trial is why
-              the tier above may not match the points next to it. */}
+              the tier above may not match the user's lock or membership. */}
           <SectionAnchor id="user-tier">
             <UserTierMembershipCard userId={id} />
           </SectionAnchor>
