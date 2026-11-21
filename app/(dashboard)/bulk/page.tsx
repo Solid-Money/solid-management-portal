@@ -1,8 +1,15 @@
 "use client";
 
-import { CircleDollarSign, Layers, RotateCcw, Sparkles } from "lucide-react";
+import {
+  CircleDollarSign,
+  Layers,
+  Percent,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 
 import BulkSection from "@/components/bulk/bulk-section";
+import CashbackRateTopUpBulk from "@/components/bulk/cashback-rate-topup-bulk";
 import PartialRefundCashbackBulk from "@/components/bulk/partial-refund-cashback-bulk";
 import StuckCashbackBulk from "@/components/bulk/stuck-cashback-bulk";
 import TierTrialsBulk from "@/components/bulk/tier-trials-bulk";
@@ -48,6 +55,15 @@ export default function BulkPage() {
           icon={RotateCcw}
         >
           {(open) => <PartialRefundCashbackBulk open={open} />}
+        </BulkSection>
+
+        <BulkSection
+          id="cashback-rate-topup"
+          title="Cashback paid at the wrong rate"
+          description="Purchases paid below the rate they should have earned — a tier read wrongly, a campaign rate missed — previewed, then topped up with the difference"
+          icon={Percent}
+        >
+          {() => <CashbackRateTopUpBulk />}
         </BulkSection>
 
         <BulkSection
