@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Loader2, Percent } from "lucide-react";
 
@@ -18,7 +19,11 @@ import {
 } from "@/lib/cashback-percentage";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import CorrectCashbackTierDialog, {
+  isTierCorrectable,
+} from "@/components/user/correct-cashback-tier-dialog";
 import ReevaluateFailedCashbackDialog from "@/components/user/reevaluate-failed-cashback-dialog";
 import TrialCashbackTermsDialog from "@/components/user/trial-cashback-terms-dialog";
 import WithholdCashbackDialog from "@/components/user/withhold-cashback-dialog";
@@ -63,6 +68,9 @@ function PayoutTxLink({ entry }: { entry: CashbackEntry }) {
  * knowing which of nine statuses count as settled.
  */
 export default function UserCashbackCard({ userId }: { userId: string }) {
+  // The row whose tier is being corrected; its dialog is mounted only while set.
+  const [correcting, setCorrecting] = useState<CashbackEntry | null>(null);
+
   const { data, isLoading, error } = useQuery<{ data: CashbackHistory }>({
     queryKey: ["user-cashback", userId],
     queryFn: async () => (await getUserCashback(userId)).data,
@@ -185,6 +193,9 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                       <th className="px-3 py-2 text-left font-medium">
                         Status
                       </th>
+                      <th className="px-3 py-2">
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -252,6 +263,19 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
                             </p>
                           )}
                         </td>
+                        <td className="px-3 py-2 text-right">
+                          {isTierCorrectable(entry) && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => setCorrecting(entry)}
+                              className="cursor-pointer whitespace-nowrap text-indigo-600"
+                              title="Put this purchase on the tier it should have accrued at"
+                            >
+                              Correct tier
+                            </Button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -261,6 +285,13 @@ export default function UserCashbackCard({ userId }: { userId: string }) {
           </>
         )}
       </CardContent>
+      {correcting && (
+        <CorrectCashbackTierDialog
+          userId={userId}
+          entry={correcting}
+          onClose={() => setCorrecting(null)}
+        />
+      )}
     </Card>
   );
 }

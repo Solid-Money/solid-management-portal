@@ -56,6 +56,8 @@ import {
   WithholdCashbackResult,
   TrialCashbackCorrectionPlan,
   ApplyTrialCashbackTermsResult,
+  CashbackTierCorrectionPlan,
+  CashbackTierCorrectionResult,
   TierTrial,
   TierLockReevaluationPreview,
   TierLockReevaluationResult,
@@ -582,6 +584,43 @@ export const applyTrialCashbackTerms = (
   api.post<{ data: ApplyTrialCashbackTermsResult }>(
     `/admin/v1/users/${encodeURIComponent(userId)}/cashback/trial-terms`,
     { cashbackIds, reason: reason || undefined },
+  );
+
+/** The admin path for one purchase's tier correction. */
+const tierCorrectionPath = (userId: string, transactionId: string) =>
+  `/admin/v1/users/${encodeURIComponent(userId)}/cashback/${encodeURIComponent(transactionId)}/tier-correction`;
+
+/**
+ * What correcting one purchase's cashback to a tier would do: re-price it if
+ * still owed, escrow a top-up for the difference if already paid, or nothing
+ * and why. `tier` defaults to the cardholder's tier now. Read-only, and safe to
+ * repeat.
+ */
+export const previewCashbackTierCorrection = (
+  userId: string,
+  transactionId: string,
+  tier?: string,
+) =>
+  api.get<{ data: CashbackTierCorrectionPlan }>(
+    tierCorrectionPath(userId, transactionId),
+    { params: tier ? { tier } : undefined },
+  );
+
+/**
+ * Correct one purchase's cashback to the tier the cardholder should have been
+ * on when it accrued. Only ever raises it; a paid purchase gets one escrowed
+ * top-up for the difference, which the escrow job pays. The reason is required
+ * and goes on the audit trail with the admin's name from the Firebase token.
+ */
+export const correctCashbackTier = (
+  userId: string,
+  transactionId: string,
+  tier: string,
+  reason: string,
+) =>
+  api.post<{ data: CashbackTierCorrectionResult }>(
+    tierCorrectionPath(userId, transactionId),
+    { tier, reason },
   );
 
 /**
