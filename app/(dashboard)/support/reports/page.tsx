@@ -256,6 +256,33 @@ function ReportsScreen() {
             </section>
           </div>
 
+          {data.aiSecurity && (
+            <section id="ai-security" className="rounded-lg bg-white p-4 shadow-sm">
+              <h2 className="text-sm font-semibold text-gray-900">AI security stops</h2>
+              <p className="text-xs text-gray-500">
+                Solid AI turns a security check stopped. Nothing from them reached the customer, and each
+                case has a note saying what was blocked. Anything here needs a look.
+              </p>
+              <table className="mt-2 w-full text-sm">
+                <tbody>
+                  {[
+                    { label: "The AI model asked to run a tool Solid AI does not have", count: data.aiSecurity.unknownTool },
+                    { label: "The answer came from a different AI model", count: data.aiSecurity.modelMismatch },
+                  ].map((row) => (
+                    <tr key={row.label} className="border-t border-gray-100">
+                      <td className="py-1.5 text-gray-700">{row.label}</td>
+                      <td
+                        className={`py-1.5 text-right tabular-nums ${row.count > 0 ? "font-semibold text-red-600" : ""}`}
+                      >
+                        {formatCount(row.count)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+
           <div className="grid gap-3 md:grid-cols-2">
             <CountTable title="By intent" rows={data.byIntent.map((row) => ({ label: intentLabel(row.intent === "unlabelled" ? null : row.intent), count: row.count }))} />
             <CountTable title="By language" rows={data.byLanguage.map((row) => ({ label: row.language === "unknown" ? "Not detected" : (languageName(row.language) ?? row.language), count: row.count }))} />
