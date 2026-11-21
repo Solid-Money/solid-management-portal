@@ -323,6 +323,12 @@ export enum TransactionType {
    */
   WIREX_BANK_DEPOSIT = "wirex_bank_deposit",
   WIREX_BANK_PAYOUT = "wirex_bank_payout",
+  /**
+   * An Apple Pay / Google Pay top-up through Wirex's checkout: Wirex charges
+   * the card and we pay the same amount of USDC or EURC into the Safe on Base.
+   * `metadata.payoutTxHash` is that payout. Inbound, like a Wirex bank deposit.
+   */
+  WIREX_WALLET_TOPUP = "wirex_wallet_topup",
   CARD_TRANSACTION = "card_transaction",
   CARD_DEPOSIT = "card_deposit",
   CARD_WITHDRAWAL = "card_withdrawal",
@@ -466,6 +472,11 @@ export const TRANSACTION_DETAILS: Record<TransactionType, TransactionDetails> =
     [TransactionType.WIREX_BANK_PAYOUT]: {
       sign: TransactionDirection.OUT,
       category: TransactionCategory.BANK_WITHDRAWAL,
+    },
+    // Shown like a Wirex bank deposit, as the app does: money in, from outside Solid.
+    [TransactionType.WIREX_WALLET_TOPUP]: {
+      sign: TransactionDirection.IN,
+      category: TransactionCategory.BANK_DEPOSIT,
     },
     [TransactionType.CARD_TRANSACTION]: {
       sign: TransactionDirection.OUT,
@@ -625,6 +636,10 @@ export const ACTIVITY_TYPES = [
   { value: TransactionType.BANK_TRANSFER, label: "Bank Transfer" },
   { value: TransactionType.WIREX_BANK_DEPOSIT, label: "Wirex Bank Deposit" },
   { value: TransactionType.WIREX_BANK_PAYOUT, label: "Wirex Bank Payout" },
+  {
+    value: TransactionType.WIREX_WALLET_TOPUP,
+    label: "Apple Pay / Google Pay Top-up",
+  },
   { value: TransactionType.MERCURYO_TRANSACTION, label: "Mercuryo Purchase" },
   { value: TransactionType.CARD_DEPOSIT, label: "Card Deposit" },
   { value: TransactionType.CARD_TRANSACTION, label: "Card Transaction" },
@@ -4160,7 +4175,8 @@ export type InternalTeamFeatureKey =
   | "spend_modes"
   | "deposit_tokens"
   | "ai_api"
-  | "referral_v4";
+  | "referral_v4"
+  | "wallet_topup";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;
