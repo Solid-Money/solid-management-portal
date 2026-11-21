@@ -43,6 +43,28 @@ export function daysLate(date: string, now = new Date()): number {
 }
 
 /** `Nov 7, 13:05` in the admin's time; `Today, 13:05` / `Yesterday, …` when close. */
+/**
+ * The time to show on an update. Claude's reply is created as a "Queued…"
+ * line and gets its words when a run answers, so its own time is the time
+ * of the question: show when it was answered (`editedAt`) instead.
+ */
+export function updateShownAt(update: {
+  author: { bot?: string | null };
+  createdAt: string;
+  editedAt: string | null;
+}): string {
+  return update.author.bot && update.editedAt ? update.editedAt : update.createdAt;
+}
+
+/** "edited" is for a person's change, not for a bot writing its answer. */
+export function showsEdited(update: {
+  author: { bot?: string | null };
+  editedAt: string | null;
+  deleted: boolean;
+}): boolean {
+  return !!update.editedAt && !update.deleted && !update.author.bot;
+}
+
 export function formatWhen(iso: string, now = new Date()): string {
   const at = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");

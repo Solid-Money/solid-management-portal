@@ -26,7 +26,16 @@ import type {
   TaskStatus,
 } from "@/types/tasks";
 
-export { daysLate, firstName, formatAgo, formatDue, formatWhen, personName } from "@/lib/task-format";
+export {
+  daysLate,
+  firstName,
+  formatAgo,
+  formatDue,
+  formatWhen,
+  personName,
+  showsEdited,
+  updateShownAt,
+} from "@/lib/task-format";
 
 export const STATUS_META: Record<
   TaskStatus,

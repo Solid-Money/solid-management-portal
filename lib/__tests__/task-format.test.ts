@@ -12,10 +12,12 @@ import {
   personName,
   plainText,
   shiftSprint,
+  showsEdited,
   splitMentions,
   splitRich,
   sprintLabel,
   sprintStart,
+  updateShownAt,
 } from "@/lib/task-format";
 import { isTaskChange } from "@/lib/realtime";
 
@@ -155,5 +157,29 @@ describe("search", () => {
     expect(formatAgo(new Date(2026, 10, 1, 12, 0).toISOString(), now)).toBe("2w");
     expect(formatAgo(new Date(2026, 8, 7, 12, 0).toISOString(), now)).toBe("Sep 7");
     expect(formatAgo(new Date(2025, 8, 7, 12, 0).toISOString(), now)).toBe("Sep 7 2025");
+  });
+});
+
+describe("the time shown on an update", () => {
+  const asked = "2026-11-21T16:45:15.000Z";
+  const answered = "2026-11-21T17:52:40.000Z";
+  const by = (bot: string | null, editedAt: string | null) => ({
+    author: { bot },
+    createdAt: asked,
+    editedAt,
+    deleted: false,
+  });
+
+  it("is the answer time for Claude's reply, without an edited mark", () => {
+    expect(updateShownAt(by("claude", answered))).toBe(answered);
+    expect(showsEdited(by("claude", answered))).toBe(false);
+    // Still queued: nothing was written yet.
+    expect(updateShownAt(by("claude", null))).toBe(asked);
+  });
+
+  it("stays the posting time for a person, with the edited mark", () => {
+    expect(updateShownAt(by(null, answered))).toBe(asked);
+    expect(showsEdited(by(null, answered))).toBe(true);
+    expect(showsEdited({ ...by(null, answered), deleted: true })).toBe(false);
   });
 });
