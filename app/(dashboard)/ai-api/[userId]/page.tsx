@@ -8,6 +8,7 @@ import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import AiApiUsageChart from "@/components/ai-api/usage-chart";
 import ReasonDialog, { ReasonDialogRequest } from "@/components/ai-api/reason-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import UserLink from "@/components/user-link";
@@ -25,6 +26,7 @@ import {
   formatTokens,
   KEY_STATUS,
   PAUSE_REASON_LABELS,
+  walletShortLabel,
 } from "@/lib/ai-api";
 import { formatCashbackRate } from "@/lib/cashback-percentage";
 import { formatDateTime, formatUsd } from "@/lib/utils";
@@ -327,9 +329,20 @@ export default function AiApiUserPage({
           >
             {billing.walletBalanceUsd === null ? "—" : formatUsd(billing.walletBalanceUsd)}{" "}
             {billing.walletShort ? (
-              <Badge variant="warning" title="Requests are refused until the Wallet covers unpaid usage">
-                Short
-              </Badge>
+              // A button, so the guidance is reachable from the keyboard too:
+              // the tooltip opens on hover and on focus, and Radix ties its
+              // text to the button (aria-describedby).
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="inline-flex cursor-help align-middle">
+                    <Badge variant="warning">{walletShortLabel(billing.walletShortfallUsd)}</Badge>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Requests are refused until the Wallet covers unpaid usage and the next request.
+                  The user can add any token from the AI API screen: it arrives as USDC on Base.
+                </TooltipContent>
+              </Tooltip>
             ) : null}
           </Fact>
           <Fact label="Mandate">
