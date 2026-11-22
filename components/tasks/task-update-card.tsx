@@ -24,6 +24,8 @@ import {
   firstName,
   formatDue,
   formatWhen,
+  showsEdited,
+  updateShownAt,
   MentionText,
   personName,
   PRIORITY_META,
@@ -485,8 +487,8 @@ export default function TaskUpdateCard({
           <div className="flex items-baseline gap-2">
             <span className="text-sm font-semibold text-gray-900">{authorName(update.author, people)}</span>
             <span className="text-xs text-gray-400">
-              {formatWhen(update.createdAt)}
-              {update.editedAt && !update.deleted && " · edited"}
+              {formatWhen(updateShownAt(update))}
+              {showsEdited(update) && " · edited"}
             </span>
             {!update.deleted && (
               <div className="ml-auto flex items-center gap-0.5">
