@@ -9,7 +9,7 @@ import type {
   AiApiUpstreamModel,
   AiApiUpstreamOffer,
 } from "@/types/ai-api";
-import { formatDateTime, formatNumber } from "@/lib/utils";
+import { formatDateTime, formatNumber, formatUsd } from "@/lib/utils";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "muted";
 
@@ -421,4 +421,13 @@ export function autoPriceStatus(
     }`,
     warn: false,
   };
+}
+
+/**
+ * The badge beside the Wallet's balance while requests are refused for want of
+ * money in it: by how much, when the backend says, so support can tell the user
+ * exactly what to add. Plain "Short" when it can't tell (or predates the field).
+ */
+export function walletShortLabel(shortfallUsd: number | null | undefined): string {
+  return shortfallUsd && shortfallUsd > 0 ? `Short ${formatUsd(shortfallUsd)}` : "Short";
 }

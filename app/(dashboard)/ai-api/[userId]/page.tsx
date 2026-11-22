@@ -25,6 +25,7 @@ import {
   formatTokens,
   KEY_STATUS,
   PAUSE_REASON_LABELS,
+  walletShortLabel,
 } from "@/lib/ai-api";
 import { formatCashbackRate } from "@/lib/cashback-percentage";
 import { formatDateTime, formatUsd } from "@/lib/utils";
@@ -327,8 +328,11 @@ export default function AiApiUserPage({
           >
             {billing.walletBalanceUsd === null ? "—" : formatUsd(billing.walletBalanceUsd)}{" "}
             {billing.walletShort ? (
-              <Badge variant="warning" title="Requests are refused until the Wallet covers unpaid usage">
-                Short
+              <Badge
+                variant="warning"
+                title="Requests are refused until the Wallet covers unpaid usage and the next request. The user can add any token from the AI API screen: it arrives as USDC on Base."
+              >
+                {walletShortLabel(billing.walletShortfallUsd)}
               </Badge>
             ) : null}
           </Fact>

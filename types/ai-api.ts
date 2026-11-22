@@ -204,6 +204,12 @@ export interface AiApiAdminUser {
      * request: the proxy refuses requests until funds arrive (no pause).
      */
     walletShort: boolean;
+    /**
+     * How much the Wallet must receive for requests to be served again, USD,
+     * rounded up to the cent: 0 when not short, null when the balance can't be
+     * read. Absent from a backend that predates it.
+     */
+    walletShortfallUsd?: number | null;
   };
   account: {
     paused: boolean;

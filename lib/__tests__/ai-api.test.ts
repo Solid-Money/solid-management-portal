@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  walletShortLabel,
   autoPriceStatus,
   formatFirstToken,
   formatRates,
@@ -399,5 +400,17 @@ describe("AI API pricing from AntSeed", () => {
     );
     expect(text).toMatch(/fixed prices above apply until one charges for it/);
     expect(text).not.toMatch(/typical rate/);
+  });
+});
+
+describe("walletShortLabel", () => {
+  it("says by how much the Wallet is short, to the cent", () => {
+    expect(walletShortLabel(2.2)).toBe("Short $2.20");
+  });
+
+  it("says only that it is short when the amount is unknown, or from an older backend", () => {
+    expect(walletShortLabel(null)).toBe("Short");
+    expect(walletShortLabel(undefined)).toBe("Short");
+    expect(walletShortLabel(0)).toBe("Short");
   });
 });
