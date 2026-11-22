@@ -166,6 +166,7 @@ const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
   eur_vault: "EUR vault",
   ai_api: "AI API",
   referral_v4: "Referral v4",
+  wallet_topup: "Apple Pay & Google Pay top-up",
 };
 
 /** How the audit trail names an admin's change to a user's AI API. */
