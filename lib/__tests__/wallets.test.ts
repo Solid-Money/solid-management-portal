@@ -4,6 +4,8 @@ import {
   assetCostPerDay,
   assetHistoryNote,
   assetOwedNow,
+  groupPlanGaps,
+  listJoin,
   assetReading,
   assetRefillPlan,
   assetRunwayDays,
@@ -15,6 +17,7 @@ import type {
   WalletAssetFlow,
   WalletAssetPlan,
   WalletOwedNow,
+  WalletPlansResponse,
   WalletRefillPlan,
 } from "@/types";
 
@@ -189,5 +192,57 @@ describe("an asset whose transfer history is incomplete", () => {
       assetHistoryNote({ snapshotCount: 140 } as WalletAssetPlan, flow),
     ).toBeUndefined();
     expect(assetHistoryNote(undefined, flow)).toBe("older read");
+  });
+});
+
+describe("the plans' gaps, as the board names them", () => {
+  const asset = (walletName: string, chainId: number, chainName: string) =>
+    ({ walletName, chainId, chainName }) as WalletAssetPlan;
+  const plans = {
+    windowDays: 7,
+    generatedAt: "2026-11-22T14:00:00.000Z",
+    assets: [
+      asset("Treasury", 122, "Fuse"),
+      asset("Treasury", 8453, "Base"),
+      asset("Cashback Payout Wallet", 8453, "Base"),
+    ],
+    gaps: [
+      { walletName: "Treasury", chainId: 122, reason: "fuse reason" },
+      { walletName: "Treasury", chainId: 8453, reason: "base reason" },
+      { walletName: "Paymaster", reason: "indexer down" },
+      { walletName: "Paymaster", chainId: 122, reason: "also fuse" },
+      { walletName: "Cashback Payout Wallet", chainId: 8453, reason: "b" },
+    ],
+  } as WalletPlansResponse;
+
+  it("names a wallet with gaps on several chains once, with its chains", () => {
+    const { whole, partial } = groupPlanGaps(plans);
+
+    expect(whole).toEqual(["Paymaster"]);
+    // Paymaster's chain gap is covered by its whole-wallet one.
+    expect(partial).toEqual([
+      { walletName: "Treasury", chains: ["Fuse", "Base"] },
+      { walletName: "Cashback Payout Wallet", chains: ["Base"] },
+    ]);
+  });
+
+  it("keeps every reason for the hover text", () => {
+    const { title } = groupPlanGaps(plans);
+
+    expect(title.split("\n")).toEqual([
+      "Treasury (Fuse): fuse reason",
+      "Treasury (Base): base reason",
+      "Paymaster: indexer down",
+      "Paymaster (chain 122): also fuse",
+      "Cashback Payout Wallet (Base): b",
+    ]);
+  });
+
+  it("joins chain names as a sentence", () => {
+    expect(listJoin(["Fuse"])).toBe("Fuse");
+    expect(listJoin(["Fuse", "Base"])).toBe("Fuse and Base");
+    expect(listJoin(["Fuse", "Base", "Ethereum"])).toBe(
+      "Fuse, Base and Ethereum",
+    );
   });
 });

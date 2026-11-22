@@ -36,7 +36,9 @@ import {
   getWalletFlow,
   getWalletPlans,
   groupByRole,
+  groupPlanGaps,
   indexPlans,
+  listJoin,
   monitoredAssets,
   planKey,
   severityOf,
@@ -1173,27 +1175,7 @@ function FloorNote({
  * carry indexer errors nobody needs to read unless they are looking into it.
  */
 function GapsNotice({ plans }: { plans: WalletPlansResponse }) {
-  const chainName = (walletName: string, chainId: number) =>
-    plans.assets.find(
-      (asset) => asset.walletName === walletName && asset.chainId === chainId
-    )?.chainName ?? `chain ${chainId}`;
-
-  const whole = [
-    ...new Set(
-      plans.gaps.filter((gap) => gap.chainId == null).map((g) => g.walletName)
-    ),
-  ];
-  const partial = plans.gaps.filter(
-    (gap) => gap.chainId != null && !whole.includes(gap.walletName)
-  );
-  const title = plans.gaps
-    .map(
-      (gap) =>
-        `${gap.walletName}${
-          gap.chainId != null ? ` (${chainName(gap.walletName, gap.chainId)})` : ""
-        }: ${gap.reason}`
-    )
-    .join("\n");
+  const { whole, partial, title } = groupPlanGaps(plans);
 
   return (
     <div
@@ -1211,14 +1193,8 @@ function GapsNotice({ plans }: { plans: WalletPlansResponse }) {
         <p>
           Top-ups not yet fully on record for{" "}
           {partial
-            .map(
-              (gap) =>
-                `${gap.walletName} on ${chainName(
-                  gap.walletName,
-                  gap.chainId as number
-                )}`
-            )
-            .join(", ")}
+            .map(({ walletName, chains }) => `${walletName} on ${listJoin(chains)}`)
+            .join("; ")}
           , so no cost is measured there — a missed top-up would read as
           spend. Those assets are judged against configured thresholds until
           the history is read in.
