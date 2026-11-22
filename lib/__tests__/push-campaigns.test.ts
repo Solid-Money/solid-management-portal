@@ -37,7 +37,13 @@ const destinations: PushDestination[] = [
     group: "Announcements",
     needsWhatsNewStep: true,
   },
-  { id: "activity", label: "Activity", description: "", path: "/activity", group: "Home" },
+  {
+    id: "activity",
+    label: "Activity",
+    description: "",
+    path: "/activity",
+    group: "Home",
+  },
 ];
 const whatsNew = {
   id: "ffffffffffffffffffffffff",
@@ -106,13 +112,21 @@ describe("parseAudience", () => {
   });
 
   it("is empty for an empty paste", () => {
-    expect(parseAudience("  \n ")).toMatchObject({ ids: [], invalid: [], duplicates: 0 });
+    expect(parseAudience("  \n ")).toMatchObject({
+      ids: [],
+      invalid: [],
+      duplicates: 0,
+    });
   });
 });
 
 describe("splitCsvLine", () => {
   it("keeps commas and escaped quotes inside a quoted field", () => {
-    expect(splitCsvLine('a,"b, c","say ""hi"""')).toEqual(["a", "b, c", 'say "hi"']);
+    expect(splitCsvLine('a,"b, c","say ""hi"""')).toEqual([
+      "a",
+      "b, c",
+      'say "hi"',
+    ]);
   });
 });
 
@@ -150,7 +164,10 @@ describe("campaign labels", () => {
 
 describe("expectedSplit", () => {
   it("takes the rounded control share and deals the rest evenly", () => {
-    expect(expectedSplit(1001, 2, 10)).toEqual({ control: 100, arms: [451, 450] });
+    expect(expectedSplit(1001, 2, 10)).toEqual({
+      control: 100,
+      arms: [451, 450],
+    });
     expect(expectedSplit(10, 3, 0)).toEqual({ control: 0, arms: [4, 3, 3] });
   });
 
@@ -163,7 +180,10 @@ describe("expectedSplit", () => {
 describe("groupDestinations", () => {
   it("groups in the order groups first appear", () => {
     expect(
-      groupDestinations(destinations).map((g) => [g.group, g.items.map((d) => d.id)]),
+      groupDestinations(destinations).map((g) => [
+        g.group,
+        g.items.map((d) => d.id),
+      ]),
     ).toEqual([
       ["Home", ["home", "activity"]],
       ["Savings", ["savings_euro"]],
@@ -173,7 +193,11 @@ describe("groupDestinations", () => {
 });
 
 describe("variantProblem", () => {
-  const ok = { ...emptyVariant(), title: "Earn on euros", destinationId: "savings_euro" };
+  const ok = {
+    ...emptyVariant(),
+    title: "Earn on euros",
+    destinationId: "savings_euro",
+  };
 
   it("passes a complete variant", () => {
     expect(variantProblem(ok, destinations, whatsNew, limits)).toBeNull();
@@ -181,10 +205,22 @@ describe("variantProblem", () => {
 
   it.each([
     ["no title", { title: "  " }, "Write a title."],
-    ["a long title", { title: "x".repeat(81) }, "The title is over 80 characters."],
-    ["long text", { body: "x".repeat(241) }, "The text is over 240 characters."],
+    [
+      "a long title",
+      { title: "x".repeat(81) },
+      "The title is over 80 characters.",
+    ],
+    [
+      "long text",
+      { body: "x".repeat(241) },
+      "The text is over 240 characters.",
+    ],
     ["no destination", { destinationId: "" }, "Choose where the push opens."],
-    ["an unknown destination", { destinationId: "nowhere" }, "Choose where the push opens."],
+    [
+      "an unknown destination",
+      { destinationId: "nowhere" },
+      "Choose where the push opens.",
+    ],
     [
       "a What's New push without a page",
       { destinationId: "whats_new" },
@@ -192,22 +228,37 @@ describe("variantProblem", () => {
     ],
     [
       "a page the announcement does not have",
-      { destinationId: "whats_new", whatsNewStep: "2", whatsNewId: whatsNew.id },
+      {
+        destinationId: "whats_new",
+        whatsNewStep: "2",
+        whatsNewId: whatsNew.id,
+      },
       "Choose the What's New page to open.",
     ],
     [
       "a page picked on an announcement since replaced",
-      { destinationId: "whats_new", whatsNewStep: "1", whatsNewId: "eeeeeeeeeeeeeeeeeeeeeeee" },
+      {
+        destinationId: "whats_new",
+        whatsNewStep: "1",
+        whatsNewId: "eeeeeeeeeeeeeeeeeeeeeeee",
+      },
       "The What's New announcement changed. Choose the page again.",
     ],
   ])("refuses %s", (_label, override, problem) => {
-    expect(variantProblem({ ...ok, ...override }, destinations, whatsNew, limits)).toBe(problem);
+    expect(
+      variantProblem({ ...ok, ...override }, destinations, whatsNew, limits),
+    ).toBe(problem);
   });
 
   it("passes a What's New page picked on the active announcement", () => {
     expect(
       variantProblem(
-        { ...ok, destinationId: "whats_new", whatsNewStep: "1", whatsNewId: whatsNew.id },
+        {
+          ...ok,
+          destinationId: "whats_new",
+          whatsNewStep: "1",
+          whatsNewId: whatsNew.id,
+        },
         destinations,
         whatsNew,
         limits,
@@ -224,6 +275,52 @@ describe("variantProblem", () => {
         limits,
       ),
     ).toBe("There is no active What's New announcement to open.");
+  });
+});
+
+describe("a single image or video What's New", () => {
+  const single = { id: whatsNew.id, format: "single", steps: [] };
+  const draft = {
+    ...emptyVariant(),
+    title: "New",
+    destinationId: "whats_new",
+    whatsNewId: whatsNew.id,
+  };
+
+  it("needs no page", () => {
+    expect(variantProblem(draft, destinations, single, limits)).toBeNull();
+  });
+
+  it("refuses it once the announcement has been replaced", () => {
+    expect(
+      variantProblem(
+        { ...draft, whatsNewId: "eeeeeeeeeeeeeeeeeeeeeeee" },
+        destinations,
+        single,
+        limits,
+      ),
+    ).toBe("The What's New announcement changed. Choose it again.");
+  });
+
+  it("refuses a page picked while it was still a carousel", () => {
+    for (const whatsNewStep of ["0", "2"]) {
+      expect(
+        variantProblem(
+          { ...draft, whatsNewStep },
+          destinations,
+          single,
+          limits,
+        ),
+      ).toBe("The What's New announcement changed. Choose it again.");
+    }
+  });
+
+  it("sends the announcement without a page", () => {
+    expect(toVariantInput(draft, destinations)).toEqual({
+      title: "New",
+      destinationId: "whats_new",
+      whatsNewId: whatsNew.id,
+    });
   });
 });
 
@@ -267,6 +364,10 @@ describe("toVariantInput", () => {
 
 describe("parseTestRecipients", () => {
   it("accepts ids and usernames, with or without @", () => {
-    expect(parseTestRecipients(`@tester, ${A}\ntester tester2`)).toEqual(["tester", A, "tester2"]);
+    expect(parseTestRecipients(`@tester, ${A}\ntester tester2`)).toEqual([
+      "tester",
+      A,
+      "tester2",
+    ]);
   });
 });

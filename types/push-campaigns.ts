@@ -41,7 +41,15 @@ export interface PushCampaignLimits {
 export interface PushCampaignDestinations {
   destinations: PushDestination[];
   /** The active What's New announcement, whose pages a push can open on. */
-  whatsNew: { id: string; steps: { index: number; title: string }[] } | null;
+  whatsNew: {
+    id: string;
+    /**
+     * A single image or video has no pages: a push opens it as it is. Absent
+     * from backends before that format, which only had carousels.
+     */
+    format?: "carousel" | "single";
+    steps: { index: number; title: string }[];
+  } | null;
   /** Whether the signed-in admin may send (otherwise: preview only). */
   canSend: boolean;
   limits: PushCampaignLimits;
