@@ -147,11 +147,25 @@ function AppVersionField({
 }) {
   const id = useId();
   const [draft, setDraft] = useState(value);
+  // The URL value this field last saw, and the value it last sent there.
+  // When the URL changes to anything but that (back/forward, a pasted link),
+  // the draft shows the new value; replacing it also restarts the debounce,
+  // so a draft typed before the navigation is never committed over it. The
+  // field's own commit arriving leaves alone whatever was typed since.
+  const [seen, setSeen] = useState(value);
+  const [sent, setSent] = useState<string | null>(null);
+  if (value !== seen) {
+    setSeen(value);
+    setSent(null);
+    if (value !== sent && draft.trim() !== value) setDraft(value);
+  }
   const settled = useDebounce(draft, 400);
 
   const commit = useEffectEvent((next: string) => {
     const trimmed = next.trim();
-    if (trimmed !== value) onCommit(trimmed || undefined);
+    if (trimmed === value) return;
+    setSent(trimmed);
+    onCommit(trimmed || undefined);
   });
 
   useEffect(() => {
@@ -610,7 +624,7 @@ function VersionsTable({
   return (
     <Section
       title="By app version"
-      description="Whether a release made it better or worse. Filter by a version above to see only its numbers."
+      description="Reports per release, launches and resumes together. The share is of reports received, not weighted: fast resumes are only sometimes reported, so a release's mix can move it. For a release's weighted rates, filter by its version above."
     >
       <Table className="text-xs">
         <TableHeader>
@@ -621,7 +635,7 @@ function VersionsTable({
               Over 10s
             </TableHead>
             <TableHead className={NUM_HEAD} title={RAW_SHARE_HINT}>
-              Share over 10s
+              Share of reports
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -663,12 +677,13 @@ export default function AppPerformancePage() {
   const { filters, update } = useAppPerformanceFilters();
   const { data, isLoading, isError, isPlaceholderData } =
     useAppPerformanceSummary(filters);
-  const rangeLabel = appPerfRangeLabel(filters.days);
 
   let body: ReactNode;
-  if (isLoading && !data) {
+  // While new filters load, `data` is still the previous filters' summary:
+  // never show the empty state for the new ones off it, never label it with them.
+  if ((isLoading && !data) || (isPlaceholderData && data?.groups.length === 0)) {
     body = (
-      <div className="flex justify-center py-12">
+      <div className="flex justify-center py-12" aria-busy>
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
       </div>
     );
@@ -689,22 +704,30 @@ export default function AppPerformancePage() {
     const highlights = platformHighlights(data);
     body = (
       <div
+        aria-busy={isPlaceholderData}
         className={cn(
           "space-y-6 transition-opacity",
           isPlaceholderData && "opacity-60"
         )}
       >
-        <p className="text-xs text-gray-500">
-          {dayLabel(data.from)} – {dayLabel(data.to)}
-          {filters.platform && ` · ${platformLabel(filters.platform)}`}
-          {filters.appVersion && ` · app version ${filters.appVersion}`}
-        </p>
+        {isPlaceholderData ? (
+          <p className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+            Updating for the new filters; the figures below are the previous ones.
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500">
+            {dayLabel(data.from)} – {dayLabel(data.to)}
+            {filters.platform && ` · ${platformLabel(filters.platform)}`}
+            {filters.appVersion && ` · app version ${filters.appVersion}`}
+          </p>
+        )}
 
         {highlights.map((highlight) => (
           <PlatformTiles
             key={highlight.platform}
             highlight={highlight}
-            rangeLabel={rangeLabel}
+            rangeLabel={appPerfRangeLabel(data.days)}
           />
         ))}
 

@@ -19,6 +19,7 @@ import {
   kindLabel,
   parseAppPerfFilters,
   platformHighlights,
+  platformLabel,
   sampleCounts,
   sampleHeadline,
   sampleNotes,
@@ -235,6 +236,31 @@ describe("waitMs", () => {
   it("does not fall back for a launch", () => {
     expect(waitMs(startup({ freshMs: 4_200 }))).toBeUndefined();
   });
+
+  it("is no wait for a resume with a refresh but no home-ready time", () => {
+    // The home screen was not open: the card shows the refresh as context.
+    const sample = resume({ freshMs: 25_000 });
+    expect(waitMs(sample)).toBeUndefined();
+    expect(isOver10s(sample)).toBe(false);
+    expect(balancesPhrase(sample)).toBe(
+      "home screen not open, balances refreshed after 25.0s"
+    );
+  });
+});
+
+describe("platformLabel", () => {
+  it("names the known platforms and passes others through", () => {
+    expect(platformLabel("ios")).toBe("iOS");
+    expect(platformLabel("android")).toBe("Android");
+    expect(platformLabel("tvos")).toBe("tvos");
+  });
+
+  it("never returns an inherited property", () => {
+    expect(platformLabel("toString")).toBe("toString");
+    expect(platformLabel("__proto__")).toBe("__proto__");
+    expect(describeGate("constructor")).toBe("constructor");
+    expect(describeCacheOutcome("hasOwnProperty")).toBe("hasOwnProperty");
+  });
 });
 
 describe("sampleTypeLabel", () => {
@@ -384,6 +410,15 @@ describe("tokenFetchDetails", () => {
 
   it("is empty without a fetch", () => {
     expect(tokenFetchDetails(undefined)).toEqual([]);
+  });
+
+  it("keeps an unpriced count reported without a total", () => {
+    expect(tokenFetchDetails({ unpricedCount: 2 })).toEqual([
+      "2 tokens without a price",
+    ]);
+    expect(tokenFetchDetails({ unpricedCount: 1 })).toEqual([
+      "1 token without a price",
+    ]);
   });
 });
 

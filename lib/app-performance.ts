@@ -106,6 +106,14 @@ const plural = (count: number, one: string, many = `${one}s`) =>
 const lowerFirst = (text: string) =>
   text ? text.charAt(0).toLowerCase() + text.slice(1) : text;
 
+/**
+ * A lookup table's own entry for a name from the wire, or undefined. A plain
+ * `table[name]` also reads inherited keys: `toString` would give a function
+ * and `__proto__` Object.prototype, neither of which React can render.
+ */
+const own = <T,>(table: Record<string, T>, name: string): T | undefined =>
+  Object.prototype.hasOwnProperty.call(table, name) ? table[name] : undefined;
+
 // --- Vocabulary -------------------------------------------------------------
 
 export const APP_PERF_PLATFORMS: AppPerfPlatform[] = ["ios", "android", "web"];
@@ -118,7 +126,7 @@ export const PLATFORM_LABELS: Record<AppPerfPlatform, string> = {
 
 /** A platform's name, or the raw value for one this file does not know yet. */
 export const platformLabel = (platform: string): string =>
-  PLATFORM_LABELS[platform as AppPerfPlatform] ?? platform;
+  own<string>(PLATFORM_LABELS, platform) ?? platform;
 
 export const isAppPerfPlatform = (value: unknown): value is AppPerfPlatform =>
   APP_PERF_PLATFORMS.includes(value as AppPerfPlatform);
@@ -140,10 +148,10 @@ const LAUNCH_KINDS: Record<string, { label: string; hint: string }> = {
 const LAUNCH_KIND_ORDER = ["cold", "page_load", "ota_reload", "after_login"];
 
 export const launchKindLabel = (launchKind: string): string =>
-  LAUNCH_KINDS[launchKind]?.label ?? launchKind;
+  own(LAUNCH_KINDS, launchKind)?.label ?? launchKind;
 
 export const launchKindHint = (launchKind?: string | null): string | undefined =>
-  launchKind ? LAUNCH_KINDS[launchKind]?.hint : undefined;
+  launchKind ? own(LAUNCH_KINDS, launchKind)?.hint : undefined;
 
 /** "Launch (cold)" or "Resume": a summary group's kind, in words. */
 export function kindLabel(kind: AppPerfKind, launchKind?: string | null): string {
@@ -185,12 +193,12 @@ const GATES: Record<string, { label: string; hint: string }> = {
 /** A gate's label ("Wallet tokens"), the raw name for an unknown one, "—" for none. */
 export function describeGate(gate: string | null | undefined): string {
   if (!gate) return "—";
-  return GATES[gate]?.label ?? gate;
+  return own(GATES, gate)?.label ?? gate;
 }
 
 /** What a gate waits for, for a tooltip. */
 export const gateHint = (gate: string | null | undefined): string | undefined =>
-  gate ? GATES[gate]?.hint : undefined;
+  gate ? own(GATES, gate)?.hint : undefined;
 
 /**
  * Why the saved cache was or wasn't restored at launch: a short form for a
@@ -224,12 +232,12 @@ const CACHE_OUTCOMES: Record<string, { short: string; long: string }> = {
 
 export function describeCacheOutcome(outcome: string | null | undefined): string {
   if (!outcome) return "—";
-  return CACHE_OUTCOMES[outcome]?.long ?? outcome;
+  return own(CACHE_OUTCOMES, outcome)?.long ?? outcome;
 }
 
 export function cacheOutcomeShort(outcome: string | null | undefined): string {
   if (!outcome) return "—";
-  return CACHE_OUTCOMES[outcome]?.short ?? outcome;
+  return own(CACHE_OUTCOMES, outcome)?.short ?? outcome;
 }
 
 /**
@@ -265,13 +273,15 @@ export function cacheSummary(sample: Sample): { label: string; title: string } |
 /**
  * How long this sample kept the user waiting: the time until balances showed,
  * or — for a resume that kept them on screen (`homeReadyMs` 0) — the time
- * until every balance was refreshed. Undefined when the app reported neither.
+ * until every balance was refreshed. Undefined without a `homeReadyMs`: a
+ * resume reports none when the home screen was not open, so its refresh time
+ * was not a wait anyone saw (the card shows it as context, not as a wait).
  */
 export function waitMs(sample: Sample): number | undefined {
   if (sample.homeReadyMs !== undefined && sample.homeReadyMs > 0) {
     return sample.homeReadyMs;
   }
-  if (sample.kind === "resume") return sample.freshMs ?? sample.homeReadyMs;
+  if (alreadyShown(sample)) return sample.freshMs ?? 0;
   return sample.homeReadyMs;
 }
 
@@ -302,6 +312,10 @@ export function balancesPhrase(sample: Sample): string {
   if (sample.timedOut) return "timed out before balances showed";
   if (sample.backgrounded) return "left the app before balances showed";
   if (sample.interrupted) return "measurement interrupted";
+  // No home-ready time: the home screen was not open (see waitMs).
+  if (sample.freshMs !== undefined) {
+    return `home screen not open, balances refreshed after ${formatMs(sample.freshMs)}`;
+  }
   return "no timing reported";
 }
 
@@ -431,6 +445,8 @@ export function tokenFetchDetails(
         tokenFetch.unpricedCount ? `, ${tokenFetch.unpricedCount} without a price` : ""
       }`
     );
+  } else if (tokenFetch.unpricedCount) {
+    lines.push(`${plural(tokenFetch.unpricedCount, "token")} without a price`);
   }
   if (tokenFetch.timedOutReads) {
     lines.push(`${plural(tokenFetch.timedOutReads, "chain read")} timed out`);

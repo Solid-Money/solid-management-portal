@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, Gauge, Loader2 } from "lucide-react";
 
 import { RelativeTime } from "@/components/errors/error-badges";
-import { onRowKeyDown } from "@/components/errors/error-events-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserAppPerformance } from "@/hooks/use-app-performance";
 import {
@@ -243,21 +242,33 @@ function SamplesTable({ samples }: { samples: AppPerformanceSampleView[] }) {
               .filter(Boolean)
               .join("\n");
             const Chevron = expanded ? ChevronDown : ChevronRight;
+            const detailsId = `app-perf-details-${sample.id}`;
 
             return (
               <Fragment key={sample.id}>
+                {/* The row also toggles on click; the button is the control. */}
                 <tr
-                  tabIndex={0}
-                  aria-expanded={expanded}
                   onClick={toggle}
-                  onKeyDown={onRowKeyDown(toggle)}
                   className={cn(
-                    "cursor-pointer hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-500",
+                    "cursor-pointer hover:bg-gray-50",
                     expanded && "bg-gray-50"
                   )}
                 >
                   <td className={cn(TD_CLASS, "pr-0 text-gray-400")}>
-                    <Chevron className="h-3.5 w-3.5" aria-hidden />
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      aria-controls={expanded ? detailsId : undefined}
+                      aria-label={`${expanded ? "Hide" : "Show"} details: ${sampleHeadline(sample)}`}
+                      onClick={(event) => {
+                        // The row's own click would toggle it back.
+                        event.stopPropagation();
+                        toggle();
+                      }}
+                      className="rounded p-0.5 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-indigo-500"
+                    >
+                      <Chevron className="h-3.5 w-3.5" aria-hidden />
+                    </button>
                   </td>
                   <td className={cn(TD_CLASS, "text-gray-900")}>
                     <RelativeTime iso={sample.occurredAt} />
@@ -304,7 +315,7 @@ function SamplesTable({ samples }: { samples: AppPerformanceSampleView[] }) {
                   </td>
                 </tr>
                 {expanded && (
-                  <tr className="bg-gray-50">
+                  <tr id={detailsId} className="bg-gray-50">
                     <td />
                     <td colSpan={9} className="px-2 pt-1 pb-3">
                       <SampleDetails sample={sample} />

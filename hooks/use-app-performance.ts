@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -57,9 +57,20 @@ export function useAppPerformanceFilters() {
     [searchParams]
   );
 
+  // The filters last asked for, until the URL catches up. A second change made
+  // before the first navigation commits (a range picked while a typed version
+  // settles) builds on this, not on the URL, so neither change is lost; the
+  // router keeps only the newest pending navigation anyway.
+  const requested = useRef<AppPerfFilters | null>(null);
+  useEffect(() => {
+    requested.current = null;
+  }, [searchParams]);
+
   const update = useCallback(
     (next: Partial<AppPerfFilters>) => {
-      const query = appPerfFiltersQuery({ ...filters, ...next });
+      const merged = { ...(requested.current ?? filters), ...next };
+      requested.current = merged;
+      const query = appPerfFiltersQuery(merged);
       // `scroll: false` — a filter change should not throw the reader back
       // to the top of the page.
       router.replace(query ? `${pathname}?${query}` : pathname, {
