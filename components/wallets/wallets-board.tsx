@@ -43,6 +43,7 @@ import {
   truncateAddress,
   assetVerdict,
   assetCostPerDay,
+  assetHistoryNote,
   assetOwedNow,
   assetReading,
   assetRefillPlan,
@@ -268,14 +269,7 @@ export default function WalletsBoard({
         </div>
       )}
 
-      {plans && plans.gaps.length > 0 && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-          No transfer history for{" "}
-          {plans.gaps.map((gap) => gap.walletName).join(", ")}, so{" "}
-          {plans.gaps.length === 1 ? "it is" : "they are"} judged against
-          configured thresholds rather than days of cover.
-        </div>
-      )}
+      {plans && plans.gaps.length > 0 && <GapsNotice plans={plans} />}
 
       {shown.length === 0 && <Notice>No {filter} wallets to display.</Notice>}
 
@@ -1169,6 +1163,71 @@ function FloorNote({
   );
 }
 
+/**
+ * Which wallets are judged on configured thresholds because their transfer
+ * history is missing, and which only on one chain whose history is still
+ * being read in or could not be updated.
+ *
+ * Named once each: a chain gap is reported per chain, and a wallet listed
+ * twice read as two problems. The backend's reasons are on hover, since they
+ * carry indexer errors nobody needs to read unless they are looking into it.
+ */
+function GapsNotice({ plans }: { plans: WalletPlansResponse }) {
+  const chainName = (walletName: string, chainId: number) =>
+    plans.assets.find(
+      (asset) => asset.walletName === walletName && asset.chainId === chainId
+    )?.chainName ?? `chain ${chainId}`;
+
+  const whole = [
+    ...new Set(
+      plans.gaps.filter((gap) => gap.chainId == null).map((g) => g.walletName)
+    ),
+  ];
+  const partial = plans.gaps.filter(
+    (gap) => gap.chainId != null && !whole.includes(gap.walletName)
+  );
+  const title = plans.gaps
+    .map(
+      (gap) =>
+        `${gap.walletName}${
+          gap.chainId != null ? ` (${chainName(gap.walletName, gap.chainId)})` : ""
+        }: ${gap.reason}`
+    )
+    .join("\n");
+
+  return (
+    <div
+      className="space-y-1 rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+      title={title}
+    >
+      {whole.length > 0 && (
+        <p>
+          No transfer history for {whole.join(", ")}, so{" "}
+          {whole.length === 1 ? "it is" : "they are"} judged against configured
+          thresholds rather than days of cover.
+        </p>
+      )}
+      {partial.length > 0 && (
+        <p>
+          Top-ups not yet fully on record for{" "}
+          {partial
+            .map(
+              (gap) =>
+                `${gap.walletName} on ${chainName(
+                  gap.walletName,
+                  gap.chainId as number
+                )}`
+            )
+            .join(", ")}
+          , so no cost is measured there — a missed top-up would read as
+          spend. Those assets are judged against configured thresholds until
+          the history is read in.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RunwayCell({
   plan,
   flow,
@@ -1189,6 +1248,17 @@ function RunwayCell({
 
   if (runwayDays == null) {
     if (snapshotCount == null) return <span className="text-gray-400">—</span>;
+    // A blank runway because the top-ups could not all be read is not "not
+    // draining": the cost was withheld, not found to be zero. Saying the
+    // latter beside an empty wallet is the reading this guards against.
+    const historyNote = assetHistoryNote(plan, flow);
+    if (historyNote && snapshotCount >= 2) {
+      return (
+        <span className="text-xs text-amber-700" title={historyNote}>
+          history incomplete
+        </span>
+      );
+    }
     return (
       <span
         className="text-xs text-gray-400"

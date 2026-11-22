@@ -1049,12 +1049,35 @@ export interface WalletAssetPlan {
   /** The last time an operator said they had funded this, if still pending. */
   acknowledgedAt?: string;
   acknowledgedBy?: string;
+  /** How much of the transfer history the figures rest on. */
+  transferHistory?: WalletTransferHistory;
   /**
    * How often this asset is touched relative to the wallet's others — the
    * tiebreak the asset order uses, carried here so a collapsed card can sort
    * its chips without opening.
    */
   activityScore: number;
+}
+
+/**
+ * How much of an asset's transfer history its figures rest on.
+ *
+ * The cost per day adds back every top-up between two balance snapshots, so a
+ * top-up missing from the history reads as money spent. Where the stored
+ * history does not reach back over the whole stretch, the backend does not
+ * measure a cost from it at all, and `note` says why.
+ */
+export interface WalletTransferHistory {
+  /** Every top-up since this time is on record. */
+  incomingSince?: string;
+  /** Every transfer out since this time is on record. */
+  outgoingSince?: string;
+  /** When the history was last brought up to date. */
+  updatedAt?: string;
+  /** Whether it covers the whole stretch the figures are taken over. */
+  complete: boolean;
+  /** Why not, in a sentence, when it does not. */
+  note?: string;
 }
 
 /**
@@ -1117,8 +1140,11 @@ export interface WalletTreasurySettings {
 export interface WalletPlansResponse {
   windowDays: number;
   assets: WalletAssetPlan[];
-  /** Wallets judged on their configured thresholds alone, and why. */
-  gaps: Array<{ walletName: string; reason: string }>;
+  /**
+   * Wallets judged on their configured thresholds alone, and why. `chainId`
+   * is set when only one chain's history is missing or incomplete.
+   */
+  gaps: Array<{ walletName: string; chainId?: number; reason: string }>;
   generatedAt: string;
 }
 
@@ -1172,6 +1198,8 @@ export interface WalletAssetFlow {
   verdict?: WalletVerdict;
   verdictBasis?: WalletVerdictBasis;
   verdictReason?: string;
+  /** How much of the transfer history the figures above rest on. */
+  transferHistory?: WalletTransferHistory;
   activityScore: number;
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   WALLET_ASSETS,
   assetCostPerDay,
+  assetHistoryNote,
   assetOwedNow,
   assetReading,
   assetRefillPlan,
@@ -148,5 +149,45 @@ describe("an asset's daily cost", () => {
     expect(
       assetCostPerDay(undefined, { ...unmeasured, isFloat: true }).estimate,
     ).toBeUndefined();
+  });
+});
+
+describe("an asset whose transfer history is incomplete", () => {
+  // The Cashback Payout Wallet's Base soUSD while its top-ups were still
+  // being read in: no cost measured, judged against the configured 1,000.
+  const note =
+    "Top-ups on Base are only on record since 2026-11-22 09:00 UTC while " +
+    "the rest of the history is read in, so no cost per day is measured " +
+    "from them: a top-up missing from the history would read as money spent.";
+  const plan = {
+    snapshotCount: 140,
+    transferHistory: { complete: false, note },
+  } as WalletAssetPlan;
+
+  it("says why, from the same read as the verdict", () => {
+    expect(assetHistoryNote(plan)).toBe(note);
+  });
+
+  it("says nothing when the history is complete or not reported", () => {
+    expect(
+      assetHistoryNote({
+        ...plan,
+        transferHistory: { complete: true },
+      } as WalletAssetPlan),
+    ).toBeUndefined();
+    // A backend from before the field existed.
+    expect(
+      assetHistoryNote({ snapshotCount: 140 } as WalletAssetPlan),
+    ).toBeUndefined();
+  });
+
+  it("does not borrow an older flow's gap beside a plan that has none", () => {
+    const flow = {
+      transferHistory: { complete: false, note: "older read" },
+    } as WalletAssetFlow;
+    expect(
+      assetHistoryNote({ snapshotCount: 140 } as WalletAssetPlan, flow),
+    ).toBeUndefined();
+    expect(assetHistoryNote(undefined, flow)).toBe("older read");
   });
 });

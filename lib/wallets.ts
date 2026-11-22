@@ -372,6 +372,24 @@ export const assetReading = (
 ): WalletAssetPlan | WalletAssetFlow | undefined => plan ?? flow;
 
 /**
+ * Why an asset's figures rest on only part of its transfer history, when they
+ * do — from the same read as its verdict.
+ *
+ * Where the history does not reach back over the balance span, the backend
+ * measures no cost at all rather than count a missing top-up as spend, so the
+ * runway is blank for that reason and not because nothing left. Undefined when
+ * the history is complete, or from a backend that does not report it.
+ */
+export const assetHistoryNote = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): string | undefined => {
+  const history = assetReading(plan, flow)?.transferHistory;
+  if (!history || history.complete) return undefined;
+  return history.note ?? "Transfer history is incomplete.";
+};
+
+/**
  * What to quote as an asset's daily cost, from the same read as its runway
  * and floor.
  *

@@ -221,6 +221,8 @@ function Header({
             note={
               (flow.realCostPerDay != null
                 ? "measured net of top-ups — what we actually spend"
+                : flow.transferHistory && !flow.transferHistory.complete
+                ? "not measured — the transfer history is incomplete"
                 : flow.isFloat
                 ? "not measured yet; outflow here is users' money, not cost"
                 : flow.outflowPerDay > 0
@@ -246,6 +248,8 @@ function Header({
                 ? "at the observed outflow — likely optimistic"
                 : flow.snapshotCount < 2
                 ? "needs a few hours of balance history"
+                : flow.transferHistory && !flow.transferHistory.complete
+                ? "no cost measured yet — see below"
                 : "not draining"
             }
           />
@@ -275,6 +279,23 @@ function Header({
 
       {flow?.owedNow && flow.owedNow.count + flow.owedNow.failedCount > 0 && (
         <OwedNowNote owed={flow.owedNow} label={label} />
+      )}
+
+      {/* The figures above count every top-up between two balance readings;
+          one missing from the history would read as money spent. So where
+          the history does not reach back far enough, say so beside them. */}
+      {flow?.transferHistory && !flow.transferHistory.complete && (
+        <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <strong>Transfer history incomplete.</strong>{" "}
+          {flow.transferHistory.note}
+          {flow.transferHistory.updatedAt && (
+            <>
+              {" "}
+              Last brought up to date{" "}
+              {formatDateTime(flow.transferHistory.updatedAt)}.
+            </>
+          )}
+        </p>
       )}
 
       {flow?.excludedOneOff && (
