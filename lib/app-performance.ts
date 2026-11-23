@@ -658,6 +658,43 @@ export function parseAppPerfFilters(params: {
   };
 }
 
+/**
+ * The app version field's sync with the URL, kept here so it is tested.
+ * `pending` is what the field has sent to the URL and not yet seen arrive,
+ * oldest first.
+ */
+
+/**
+ * The URL's version changed. One of the field's own requests arriving clears
+ * it and everything older (keystrokes since then stay); anything else came
+ * from outside (back/forward, a pasted link) and the field should show it.
+ */
+export function versionUrlChanged(
+  pending: readonly string[],
+  value: string
+): { own: boolean; pending: string[] } {
+  const index = pending.indexOf(value);
+  return index >= 0
+    ? { own: true, pending: pending.slice(index + 1) }
+    : { own: false, pending: [] };
+}
+
+/**
+ * A draft settled: what to send, or null. Compared with the newest value
+ * asked for rather than the URL, so typing B and then back to A while B is
+ * still on its way sends A, and the URL ends on what the field shows.
+ */
+export function versionToCommit(
+  pending: readonly string[],
+  url: string,
+  draft: string
+): { send: string; pending: string[] } | null {
+  const next = draft.trim();
+  const newest = pending.length ? pending[pending.length - 1] : url;
+  if (next === newest) return null;
+  return { send: next, pending: [...pending, next] };
+}
+
 /** The query string for some filters, defaults left out so the plain page has a plain link. */
 export function appPerfFiltersQuery(filters: AppPerfFilters): string {
   const params = new URLSearchParams();

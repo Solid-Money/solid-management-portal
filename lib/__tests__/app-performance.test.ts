@@ -33,6 +33,8 @@ import {
   sortGroups,
   summaryParams,
   tokenFetchDetails,
+  versionToCommit,
+  versionUrlChanged,
   waitMs,
 } from "@/lib/app-performance";
 import type {
@@ -588,5 +590,87 @@ describe("filters", () => {
     expect(APP_PERF_KEYS.summary({ days: 7, appVersion: " " })).toEqual(
       APP_PERF_KEYS.summary({ days: 7 })
     );
+  });
+});
+
+describe("the app version field's URL sync", () => {
+  /** The field: its draft, the URL it sees, and what it has in flight. */
+  const field = (url: string) => {
+    let draft = url;
+    let seen = url;
+    let pending: string[] = [];
+    const sent: string[] = [];
+    return {
+      type(text: string) {
+        draft = text;
+      },
+      /** The draft settled (the debounce fired). */
+      settle() {
+        const step = versionToCommit(pending, seen, draft);
+        if (!step) return;
+        pending = step.pending;
+        sent.push(step.send);
+      },
+      /** The URL changed to `value`. */
+      arrive(value: string) {
+        if (value === seen) return;
+        seen = value;
+        const change = versionUrlChanged(pending, value);
+        pending = change.pending;
+        if (!change.own && draft.trim() !== value) draft = value;
+      },
+      get draft() {
+        return draft;
+      },
+      sent,
+    };
+  };
+
+  it("sends a settled edit once", () => {
+    const f = field("2.1.0");
+    f.type("2.2.0");
+    f.settle();
+    f.settle();
+    expect(f.sent).toEqual(["2.2.0"]);
+  });
+
+  it("sends the way back to the URL's value while the first edit is in flight", () => {
+    const f = field("A");
+    f.type("B");
+    f.settle(); // sends B
+    f.type("A");
+    f.settle(); // the URL still says A, but B is on its way: A must be sent
+    expect(f.sent).toEqual(["B", "A"]);
+    f.arrive("B"); // the older request lands first
+    expect(f.draft).toBe("A");
+    f.arrive("A");
+    expect(f.draft).toBe("A");
+  });
+
+  it("keeps keystrokes typed while its own request was in flight", () => {
+    const f = field("2.1");
+    f.type("2.1.0");
+    f.settle();
+    f.type("2.1.0-beta");
+    f.arrive("2.1.0");
+    expect(f.draft).toBe("2.1.0-beta");
+  });
+
+  it("follows a change from outside and never sends the older draft over it", () => {
+    const f = field("2.1.0");
+    f.type("2.1.");
+    f.arrive("2.2.0"); // back/forward before the draft settled
+    expect(f.draft).toBe("2.2.0");
+    f.settle();
+    expect(f.sent).toEqual([]);
+  });
+
+  it("treats the cleared field like any other value", () => {
+    const f = field("2.1.0");
+    f.type("  ");
+    f.settle();
+    expect(f.sent).toEqual([""]);
+    f.arrive("");
+    expect(f.draft).toBe("  ");
   });
 });
