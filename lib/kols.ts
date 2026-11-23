@@ -191,11 +191,12 @@ export function kolPerkDraftError(
   }
   if (months > 0) {
     const cap = Number(draft.sepaFreeCapUsd);
+    // Read off the typed decimal, never `cap * 100`: 0.29 * 100 is
+    // 28.999999999999996, which would refuse a valid cap.
     if (
-      draft.sepaFreeCapUsd.trim() === "" ||
+      !/^\d+(\.\d{1,2})?$/.test(draft.sepaFreeCapUsd.trim()) ||
       !Number.isFinite(cap) ||
-      cap <= 0 ||
-      Math.round(cap * 100) !== cap * 100
+      cap <= 0
     ) {
       return "Free SEPA needs a cap above $0, to the cent.";
     }

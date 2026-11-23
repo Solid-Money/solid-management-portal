@@ -85,6 +85,14 @@ describe("kolPerkDraftError", () => {
     expect(kolPerkDraftError(draft(overrides), undefined, NOW)).toMatch(message);
   });
 
+  it("accepts any cap to the cent, without float rounding", () => {
+    expect(kolPerkDraftError(draft({ sepaFreeCapUsd: "0.29" }), undefined, NOW)).toBeNull();
+    expect(kolPerkDraftError(draft({ sepaFreeCapUsd: "1.25" }), undefined, NOW)).toBeNull();
+    expect(kolPerkDraftError(draft({ sepaFreeCapUsd: "1e-7" }), undefined, NOW)).toMatch(
+      /cap above \$0/,
+    );
+  });
+
   it("ignores the cap when there are no free SEPA months", () => {
     expect(
       kolPerkDraftError(
