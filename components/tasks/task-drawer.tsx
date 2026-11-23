@@ -984,6 +984,13 @@ export default function TaskDrawer({
   const { data: people = [] } = useTaskPeople();
   const me = user?.email?.toLowerCase() ?? "";
 
+  // The toast's Reopen can be clicked after the board or filters changed, so
+  // it calls the latest onReopen (which keeps them), not the one from closing.
+  const reopenRef = useRef(onReopen);
+  useEffect(() => {
+    reopenRef.current = onReopen;
+  }, [onReopen]);
+
   const close = () => {
     onClose();
     if (!task || !onReopen) return;
@@ -991,7 +998,7 @@ export default function TaskDrawer({
     toast(`Closed T-${task.number}`, {
       description: task.title,
       duration: 8000,
-      action: { label: "Reopen", onClick: () => onReopen(id) },
+      action: { label: "Reopen", onClick: () => reopenRef.current?.(id) },
     });
   };
 
