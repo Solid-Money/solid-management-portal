@@ -950,28 +950,68 @@ function TaskBody({
 }
 
 /**
+ * The field being typed in (an input, a text box or the update editor), if
+ * any. Escape there never closes the task, so a half-written update or title
+ * is never thrown away with it.
+ */
+function typingIn(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return null;
+  if (target.isContentEditable || target.matches("input, textarea, select")) return target;
+  return null;
+}
+
+/**
  * A task, over the list: its fields at the top, then the description,
  * checklist and the updates feed. Opened by `?task=<id>`, so the URL is the
- * link to share; `&update=<id>` goes to one update in it.
+ * link to share; `&update=<id>` goes to one update in it. Closing it (Escape,
+ * the X or a click outside) shows a toast to open it again.
  */
 export default function TaskDrawer({
   taskId,
   focusUpdate = null,
   onClose,
+  onReopen,
 }: {
   taskId: string | null;
   /** An update to scroll to and light up (`&update=` in the URL). */
   focusUpdate?: string | null;
   onClose: () => void;
+  /** Opens a task again, from the toast shown after closing it. */
+  onReopen?: (id: string) => void;
 }) {
   const { user } = useAuth();
   const { data: task, isLoading, isError } = useTask(taskId);
   const { data: people = [] } = useTaskPeople();
   const me = user?.email?.toLowerCase() ?? "";
 
+  const close = () => {
+    onClose();
+    if (!task || !onReopen) return;
+    const id = task.id;
+    toast(`Closed T-${task.number}`, {
+      description: task.title,
+      duration: 8000,
+      action: { label: "Reopen", onClick: () => onReopen(id) },
+    });
+  };
+
   return (
-    <Sheet open={!!taskId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="gap-0 p-0 sm:max-w-2xl">
+    <Sheet open={!!taskId} onOpenChange={(open) => !open && close()}>
+      <SheetContent
+        className="gap-0 p-0 sm:max-w-2xl"
+        onEscapeKeyDown={(event) => {
+          const field = typingIn(document.activeElement);
+          if (!field) return;
+          // Keep the task open. A plain field is left (after its own Escape
+          // handling, like the title's cancel, has run), so the next Escape
+          // closes the task; the update editor keeps its text and focus.
+          event.preventDefault();
+          if (field.isContentEditable) return;
+          setTimeout(() => {
+            if (document.activeElement === field) field.blur();
+          });
+        }}
+      >
         {task ? (
           <TaskBody key={task.id} task={task} people={people} me={me} focusUpdate={focusUpdate} onDeleted={onClose} />
         ) : (
