@@ -6,6 +6,7 @@ import {
   balancesAfter,
   balancesPhrase,
   bySamples,
+  effectiveAppPerfFilters,
   cacheOutcomeShort,
   cacheSummary,
   countsLine,
@@ -33,8 +34,8 @@ import {
   sortGroups,
   summaryParams,
   tokenFetchDetails,
-  versionToCommit,
-  versionUrlChanged,
+  versionDraftAfterChange,
+  versionToSend,
   waitMs,
 } from "@/lib/app-performance";
 import type {
@@ -593,98 +594,173 @@ describe("filters", () => {
   });
 });
 
-describe("the app version field's URL sync", () => {
-  /** The field: its draft, the URL it sees, and what it has in flight. */
-  const field = (url: string) => {
-    let draft = url;
-    let seen = url;
-    let pending: string[] = [];
-    const sent: string[] = [];
+describe("effectiveAppPerfFilters", () => {
+  const url = { days: 7 as const };
+  const requested = { days: 30 as const, appVersion: "2.1.0" };
+
+  it("is what was asked for while navigating, the URL once settled", () => {
+    expect(effectiveAppPerfFilters(url, requested, true)).toBe(requested);
+    expect(effectiveAppPerfFilters(url, requested, false)).toBe(url);
+    expect(effectiveAppPerfFilters(url, null, true)).toBe(url);
+  });
+});
+
+describe("the app version field and the page's navigations", () => {
+  /**
+   * The router (URL and the navigations in flight), the filters hook
+   * (effectiveAppPerfFilters over them) and the field (versionToSend,
+   * versionDraftAfterChange), stepped the way React renders them.
+   */
+  const page = (initial: string) => {
+    let url = initial;
+    let inFlight: string[] = [];
+    let requested: string | null = null;
+    let draft = initial;
+    let seen = initial;
+    let sent: string | null = null;
+    const sentLog: string[] = [];
+
+    const value = () => {
+      const navigating = inFlight.length > 0;
+      if (!navigating) requested = null;
+      return effectiveAppPerfFilters(
+        { days: 7, appVersion: url },
+        requested === null ? null : { days: 7, appVersion: requested },
+        navigating
+      ).appVersion as string;
+    };
+    /** A render: the field reacts to the page's version. */
+    const render = () => {
+      const current = value();
+      if (current === seen) return;
+      seen = current;
+      const replace = versionDraftAfterChange(current, sent, draft);
+      sent = null;
+      if (replace !== null) draft = replace;
+    };
+
     return {
       type(text: string) {
         draft = text;
+        render();
       },
       /** The draft settled (the debounce fired). */
       settle() {
-        const step = versionToCommit(pending, seen, draft);
-        if (!step) return;
-        pending = step.pending;
-        sent.push(step.send);
+        const send = versionToSend(value(), draft);
+        if (send === null) return;
+        sent = send;
+        sentLog.push(send);
+        requested = send;
+        inFlight = [...inFlight, send];
+        render();
       },
-      /** The URL changed to `value`. */
-      arrive(value: string) {
-        if (value === seen) return;
-        seen = value;
-        const change = versionUrlChanged(pending, value);
-        pending = change.pending;
-        if (!change.own && draft.trim() !== value) draft = value;
+      /** The router publishes one of the navigations in flight. */
+      publish(version: string) {
+        url = version;
+        inFlight = inFlight.filter((v) => v !== version);
+        render();
+      },
+      /** The router drops a navigation without publishing it. */
+      drop(version: string) {
+        inFlight = inFlight.filter((v) => v !== version);
+        render();
+      },
+      /** Back/forward or a pasted link; whatever was in flight is dropped. */
+      outside(version: string) {
+        url = version;
+        inFlight = [];
+        render();
       },
       get draft() {
         return draft;
       },
-      sent,
+      get url() {
+        return url;
+      },
+      sent: sentLog,
     };
   };
 
   it("sends a settled edit once", () => {
-    const f = field("2.1.0");
-    f.type("2.2.0");
-    f.settle();
-    f.settle();
-    expect(f.sent).toEqual(["2.2.0"]);
+    const p = page("2.1.0");
+    p.type("2.2.0");
+    p.settle();
+    p.settle();
+    p.publish("2.2.0");
+    expect(p.sent).toEqual(["2.2.0"]);
+    expect(p.draft).toBe("2.2.0");
   });
 
   it("sends the way back to the URL's value while the first edit is in flight", () => {
-    const f = field("A");
-    f.type("B");
-    f.settle(); // sends B
-    f.type("A");
-    f.settle(); // the URL still says A, but B is on its way: A must be sent
-    expect(f.sent).toEqual(["B", "A"]);
-    // If the router still publishes B before A, the field ends on A too.
-    f.arrive("B");
-    f.arrive("A");
-    expect(f.draft).toBe("A");
-    expect(f.sent).toEqual(["B", "A"]);
+    const p = page("A");
+    p.type("B");
+    p.settle();
+    p.type("A");
+    p.settle();
+    expect(p.sent).toEqual(["B", "A"]);
+    p.publish("B");
+    expect(p.draft).toBe("A");
+    p.publish("A");
+    expect([p.url, p.draft]).toEqual(["A", "A"]);
   });
 
-  it("keeps nothing pending when the router drops the superseded request", () => {
-    const f = field("A");
-    f.type("B");
-    f.settle(); // sends B
-    f.type("A");
-    f.settle(); // sends A; the router drops B and the URL never changes
-    // Later, back/forward to a URL on B: from outside, so the field shows it.
-    f.arrive("B");
-    expect(f.draft).toBe("B");
-    f.settle();
-    expect(f.sent).toEqual(["B", "A"]);
+  it("ends on the URL when the router drops the superseded request", () => {
+    const p = page("A");
+    p.type("B");
+    p.settle();
+    p.type("A");
+    p.settle();
+    p.drop("B");
+    p.publish("A");
+    expect([p.url, p.draft]).toEqual(["A", "A"]);
+    // Later, back/forward to B: from outside, so the field shows it.
+    p.outside("B");
+    expect(p.draft).toBe("B");
+    p.settle();
+    expect(p.sent).toEqual(["B", "A"]);
   });
 
-  it("keeps keystrokes typed while its own request was in flight", () => {
-    const f = field("2.1");
-    f.type("2.1.0");
-    f.settle();
-    f.type("2.1.0-beta");
-    f.arrive("2.1.0");
-    expect(f.draft).toBe("2.1.0-beta");
+  it("keeps an edit typed while an older request lands late", () => {
+    const p = page("A");
+    p.type("B");
+    p.settle();
+    p.type("A");
+    p.settle();
+    p.type("C"); // not settled yet
+    p.publish("B"); // B lands after A was sent
+    expect(p.draft).toBe("C");
+    p.publish("A");
+    expect(p.draft).toBe("C");
+    p.settle();
+    expect(p.sent).toEqual(["B", "A", "C"]);
+    p.publish("C");
+    expect([p.url, p.draft]).toEqual(["C", "C"]);
+  });
+
+  it("keeps keystrokes typed while its own request is in flight", () => {
+    const p = page("2.1");
+    p.type("2.1.0");
+    p.settle();
+    p.type("2.1.0-beta");
+    p.publish("2.1.0");
+    expect(p.draft).toBe("2.1.0-beta");
   });
 
   it("follows a change from outside and never sends the older draft over it", () => {
-    const f = field("2.1.0");
-    f.type("2.1.");
-    f.arrive("2.2.0"); // back/forward before the draft settled
-    expect(f.draft).toBe("2.2.0");
-    f.settle();
-    expect(f.sent).toEqual([]);
+    const p = page("2.1.0");
+    p.type("2.1.");
+    p.outside("2.2.0");
+    expect(p.draft).toBe("2.2.0");
+    p.settle();
+    expect(p.sent).toEqual([]);
   });
 
   it("treats the cleared field like any other value", () => {
-    const f = field("2.1.0");
-    f.type("  ");
-    f.settle();
-    expect(f.sent).toEqual([""]);
-    f.arrive("");
-    expect(f.draft).toBe("  ");
+    const p = page("2.1.0");
+    p.type("  ");
+    p.settle();
+    expect(p.sent).toEqual([""]);
+    p.publish("");
+    expect(p.draft).toBe("  ");
   });
 });

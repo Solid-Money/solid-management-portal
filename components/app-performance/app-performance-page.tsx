@@ -52,8 +52,8 @@ import {
   severityClass,
   shareOf,
   sortGroups,
-  versionToCommit,
-  versionUrlChanged,
+  versionDraftAfterChange,
+  versionToSend,
   type AppPerfFilters,
   type PlatformHighlight,
 } from "@/lib/app-performance";
@@ -149,26 +149,25 @@ function AppVersionField({
 }) {
   const id = useId();
   const [draft, setDraft] = useState(value);
-  // The URL value this field last saw, and what it has sent there that has
-  // not arrived yet (see versionUrlChanged / versionToCommit). A change from
-  // outside replaces the draft, which also restarts the debounce, so a draft
-  // typed before the navigation is never committed over it. The field's own
-  // request arriving leaves alone whatever was typed since.
+  // The page's version this field last saw, and the one it last sent. `value`
+  // is what was last asked for while a navigation is under way (see
+  // useAppPerformanceFilters), so it only changes when the field sends, or
+  // when the page settles somewhere else (versionDraftAfterChange).
   const [seen, setSeen] = useState(value);
-  const [pending, setPending] = useState<string[]>([]);
+  const [sent, setSent] = useState<string | null>(null);
   if (value !== seen) {
     setSeen(value);
-    const change = versionUrlChanged(pending, value);
-    setPending(change.pending);
-    if (!change.own && draft.trim() !== value) setDraft(value);
+    setSent(null);
+    const replace = versionDraftAfterChange(value, sent, draft);
+    if (replace !== null) setDraft(replace);
   }
   const settled = useDebounce(draft, 400);
 
   const commit = useEffectEvent((next: string) => {
-    const step = versionToCommit(pending, value, next);
-    if (!step) return;
-    setPending(step.pending);
-    onCommit(step.send || undefined);
+    const send = versionToSend(value, next);
+    if (send === null) return;
+    setSent(send);
+    onCommit(send || undefined);
   });
 
   useEffect(() => {

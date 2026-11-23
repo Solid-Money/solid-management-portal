@@ -659,45 +659,41 @@ export function parseAppPerfFilters(params: {
 }
 
 /**
- * The app version field's sync with the URL, kept here so it is tested.
- * `pending` is what the field has sent to the URL and not yet seen arrive,
- * oldest first.
+ * The filters the page works with: the ones last asked for while the page's
+ * navigations are under way, the URL's once they have all settled. The URL
+ * passing through an older request in between is never shown as a change.
  */
-
-/**
- * The URL's version changed. One of the field's own requests arriving clears
- * it and everything older (keystrokes since then stay); anything else came
- * from outside (back/forward, a pasted link) and the field should show it.
- */
-export function versionUrlChanged(
-  pending: readonly string[],
-  value: string
-): { own: boolean; pending: string[] } {
-  const index = pending.indexOf(value);
-  return index >= 0
-    ? { own: true, pending: pending.slice(index + 1) }
-    : { own: false, pending: [] };
+export function effectiveAppPerfFilters(
+  url: AppPerfFilters,
+  requested: AppPerfFilters | null,
+  navigating: boolean
+): AppPerfFilters {
+  return navigating && requested ? requested : url;
 }
 
 /**
- * A draft settled: what to send, or null. Compared with the newest value
- * asked for rather than the URL, so typing B and then back to A while B is
- * still on its way sends A, and the URL ends on what the field shows.
- *
- * Sending the value the URL already holds supersedes whatever is in flight:
- * the router may drop B without the URL ever changing, so nothing is left
- * pending to mistake a later back/forward to B for the field's own. If B does
- * land after all, it reads as a change from outside and A follows it.
+ * The app version field after the page's version changed: the draft to show,
+ * or null to keep it. The field's own request (`sent`) keeps whatever was
+ * typed since; any other change (back/forward, a pasted link, a request the
+ * router dropped) replaces it, which also restarts the debounce so a draft
+ * typed before it is never sent over it.
  */
-export function versionToCommit(
-  pending: readonly string[],
-  url: string,
+export function versionDraftAfterChange(
+  value: string,
+  sent: string | null,
   draft: string
-): { send: string; pending: string[] } | null {
+): string | null {
+  return value !== sent && draft.trim() !== value ? value : null;
+}
+
+/**
+ * A settled draft: the version to send, or null when the page already has it.
+ * `value` is the page's version (what was last asked for while a navigation
+ * is under way), so typing B and then back to A before B lands still sends A.
+ */
+export function versionToSend(value: string, draft: string): string | null {
   const next = draft.trim();
-  const newest = pending.length ? pending[pending.length - 1] : url;
-  if (next === newest) return null;
-  return { send: next, pending: next === url ? [] : [...pending, next] };
+  return next === value ? null : next;
 }
 
 /** The query string for some filters, defaults left out so the plain page has a plain link. */

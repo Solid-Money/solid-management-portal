@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   APP_PERF_KEYS,
   appPerfFiltersQuery,
+  effectiveAppPerfFilters,
   getAppPerformanceSummary,
   getUserAppPerformance,
   parseAppPerfFilters,
@@ -52,29 +53,34 @@ export function useAppPerformanceFilters() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const filters = useMemo(
+  const urlFilters = useMemo(
     () => parseAppPerfFilters(searchParams),
     [searchParams]
   );
 
-  // The filters last asked for, until the URL catches up. A second change made
-  // before the first navigation commits (a range picked while a typed version
-  // settles) builds on this, not on the URL, so neither change is lost; the
-  // router keeps only the newest pending navigation anyway.
-  const requested = useRef<AppPerfFilters | null>(null);
-  useEffect(() => {
-    requested.current = null;
-  }, [searchParams]);
+  // The filters last asked for, while the page's navigations are under way.
+  // The router's navigations are transitions, so `navigating` stays true until
+  // every one of them has settled. Until then the page (and the version field)
+  // shows what was asked for, so a URL passing through an older request never
+  // reads as a change; a second change builds on it, so neither is lost. Once
+  // everything has settled the URL is the truth again: caught up, a request
+  // the router dropped, or a change from outside (back/forward).
+  const [requested, setRequested] = useState<AppPerfFilters | null>(null);
+  const [navigating, startNavigation] = useTransition();
+  if (!navigating && requested !== null) setRequested(null);
+  const filters = effectiveAppPerfFilters(urlFilters, requested, navigating);
 
   const update = useCallback(
     (next: Partial<AppPerfFilters>) => {
-      const merged = { ...(requested.current ?? filters), ...next };
-      requested.current = merged;
+      const merged = { ...filters, ...next };
+      setRequested(merged);
       const query = appPerfFiltersQuery(merged);
-      // `scroll: false` — a filter change should not throw the reader back
-      // to the top of the page.
-      router.replace(query ? `${pathname}?${query}` : pathname, {
-        scroll: false,
+      startNavigation(() => {
+        // `scroll: false` — a filter change should not throw the reader back
+        // to the top of the page.
+        router.replace(query ? `${pathname}?${query}` : pathname, {
+          scroll: false,
+        });
       });
     },
     [filters, pathname, router]
