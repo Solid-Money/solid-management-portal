@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatSepaUsd,
   isValidPerkCode,
   kolPerkChanges,
   kolPerkCreateBody,
@@ -175,6 +176,15 @@ describe("helpers", () => {
     expect(perkBenefitsLabel(perk({ sepaFreeMonths: 0 }))).toBe("50% off first year");
     expect(perkBenefitsLabel(perk({ tierDiscountPct: 0, sepaFreeMonths: 3 }))).toBe(
       "3 months free SEPA (up to $10,000)",
+    );
+  });
+
+  it("keeps the cents of a free SEPA amount only when it has them", () => {
+    expect(formatSepaUsd(10000)).toBe("$10,000");
+    expect(formatSepaUsd(0.29)).toBe("$0.29");
+    expect(formatSepaUsd(1234.5)).toBe("$1,234.50");
+    expect(perkBenefitsLabel(perk({ sepaFreeCapUsd: 0.29 }))).toBe(
+      "50% off first year · 1 month free SEPA (up to $0.29)",
     );
   });
 

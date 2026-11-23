@@ -35,11 +35,12 @@ import {
   kolPerkCreateBody,
   kolPerkDraftError,
   kolReferralLinks,
+  formatSepaUsd,
   normalizePerkCode,
   perkBenefitsLabel,
 } from "@/lib/kols";
 import { formatUtc, isoToUtcInput } from "@/lib/referral-v4";
-import { cn, formatNumber, formatUsd } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import type { Kol, KolLimits, KolPerk } from "@/types/kols";
 
 /** What the first campaign asked for: 50% off, a month of free SEPA. */
@@ -485,7 +486,7 @@ export function KolPerkDialog({
             />
             <p className="text-muted-foreground text-xs">
               {months > 0 && Number(sepaFreeCapUsd) > 0
-                ? `Deposits free up to ${formatUsd(Number(sepaFreeCapUsd), 0)} in total; the fee is charged on anything past it.`
+                ? `Deposits free up to ${formatSepaUsd(Number(sepaFreeCapUsd))} in total; the fee is charged on anything past it.`
                 : "The most deposit volume the free months cover."}
             </p>
           </div>

@@ -86,6 +86,15 @@ export function kolReferralLinks(code: string): { website: string; app: string }
   };
 }
 
+/**
+ * A free SEPA amount: whole dollars when it is whole ("$10,000"), to the cent
+ * when it is not ("$0.29"), so a cap set to the cent never reads as "$0".
+ */
+export function formatSepaUsd(value: number): string {
+  const cents = Math.round((Number.isFinite(value) ? value : 0) * 100);
+  return formatUsd(value, cents % 100 === 0 ? 0 : 2);
+}
+
 /** "50% off first year · 1 month free SEPA (up to $10,000)". */
 export function perkBenefitsLabel(
   perk: Pick<KolPerk, "tierDiscountPct" | "sepaFreeMonths" | "sepaFreeCapUsd">,
@@ -96,7 +105,7 @@ export function perkBenefitsLabel(
   }
   if (perk.sepaFreeMonths > 0) {
     parts.push(
-      `${perk.sepaFreeMonths} month${perk.sepaFreeMonths === 1 ? "" : "s"} free SEPA (up to ${formatUsd(perk.sepaFreeCapUsd, 0)})`,
+      `${perk.sepaFreeMonths} month${perk.sepaFreeMonths === 1 ? "" : "s"} free SEPA (up to ${formatSepaUsd(perk.sepaFreeCapUsd)})`,
     );
   }
   return parts.length > 0 ? parts.join(" · ") : "No benefits";

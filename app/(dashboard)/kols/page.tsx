@@ -61,6 +61,7 @@ import {
 } from "@/hooks/use-kols";
 import { useUrlTab } from "@/hooks/use-url-tab";
 import {
+  formatSepaUsd,
   KOL_PERK_STATUS_LABEL,
   KOL_PERK_STATUS_VARIANT,
   kolReferralLinks,
@@ -574,7 +575,9 @@ function KolsScreen() {
                                   referred without the perk
                                 </p>
                               )}
-                              {perk.tierDiscountPct > 0 && (
+                              {(perk.tierDiscountPct > 0 ||
+                                perk.stats.tierDiscountsClaimed > 0 ||
+                                perk.stats.tierDiscountsPaid > 0) && (
                                 <p className="text-muted-foreground">
                                   {formatNumber(perk.stats.tierDiscountsPaid, 0, 0)}{" "}
                                   memberships paid ·{" "}
@@ -582,10 +585,11 @@ function KolsScreen() {
                                   started
                                 </p>
                               )}
-                              {perk.sepaFreeMonths > 0 && (
+                              {(perk.sepaFreeMonths > 0 ||
+                                perk.stats.sepaDeposits > 0) && (
                                 <p className="text-muted-foreground">
                                   {formatNumber(perk.stats.sepaDeposits, 0, 0)} free
-                                  deposits · {formatUsd(perk.stats.sepaCoveredUsd, 0)}{" "}
+                                  deposits · {formatSepaUsd(perk.stats.sepaCoveredUsd)}{" "}
                                   · {formatUsd(perk.stats.sepaWaivedFeeUsd)} fees
                                 </p>
                               )}

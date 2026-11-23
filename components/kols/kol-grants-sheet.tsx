@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useKolGrants } from "@/hooks/use-kols";
-import { KOL_PERK_INELIGIBLE_LABEL } from "@/lib/kols";
+import { formatSepaUsd, KOL_PERK_INELIGIBLE_LABEL } from "@/lib/kols";
 import { formatUtc, formatUtcDay } from "@/lib/referral-v4";
 import { formatNumber, formatUsd } from "@/lib/utils";
 
@@ -134,8 +134,8 @@ export function KolGrantsSheet({ target, onClose }: KolGrantsSheetProps) {
                       {grant.sepaFreeUntil ? (
                         <>
                           <span className="font-medium">
-                            {formatUsd(grant.sepaCoveredUsd, 0)} of{" "}
-                            {formatUsd(grant.sepaFreeCapUsd, 0)}
+                            {formatSepaUsd(grant.sepaCoveredUsd)} of{" "}
+                            {formatSepaUsd(grant.sepaFreeCapUsd)}
                           </span>
                           <p className="text-muted-foreground text-xs">
                             {formatNumber(grant.sepaDepositCount, 0, 0)} deposits ·{" "}
