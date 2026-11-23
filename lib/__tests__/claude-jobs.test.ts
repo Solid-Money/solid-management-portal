@@ -47,8 +47,30 @@ describe("Claude's jobs on a task", () => {
       job("cancelled", "2026-11-19T09:00:00Z"),
       job("waiting", "2026-11-19T11:00:00Z"),
     ];
-    expect(shownClaudeJobs(jobs, NOW).map((j) => j.state)).toEqual(["stuck", "ready_to_ship", "waiting"]);
+    // The stuck one from the 18th is replaced by the same person's newer tags.
+    expect(shownClaudeJobs(jobs, NOW).map((j) => j.state)).toEqual(["ready_to_ship", "waiting"]);
     expect(shownClaudeJobs(undefined, NOW)).toEqual([]);
+  });
+
+  it("shows a stuck job until the same person tags Claude again on the task", () => {
+    const stuck = job("stuck", "2026-11-19T08:00:00Z");
+    expect(shownClaudeJobs([stuck], NOW).map((j) => j.id)).toEqual([stuck.id]);
+
+    const retries = [
+      stuck,
+      job("stuck", "2026-11-19T09:00:00Z"),
+      job("stuck", "2026-11-19T10:00:00Z"),
+      job("in_review", "2026-11-19T11:00:00Z"),
+    ];
+    expect(shownClaudeJobs(retries, NOW).map((j) => j.state)).toEqual(["in_review"]);
+
+    // Only the newest is left when the latest try got stuck too.
+    const allStuck = retries.slice(0, 3);
+    expect(shownClaudeJobs(allStuck, NOW).map((j) => j.createdAt)).toEqual(["2026-11-19T10:00:00Z"]);
+
+    // Someone else's newer tag does not hide your stuck job.
+    const other = { ...job("waiting", "2026-11-19T11:30:00Z"), askedBy: { email: "mark@fuse.io", name: "Mark" } };
+    expect(shownClaudeJobs([stuck, other], NOW).map((j) => j.state)).toEqual(["stuck", "waiting"]);
   });
 
   it("knows when a job is still open", () => {

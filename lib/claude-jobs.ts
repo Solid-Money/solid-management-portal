@@ -16,14 +16,26 @@ export function claudeJobsOpen(jobs: ClaudeJob[] | undefined): boolean {
 /**
  * The jobs a task shows a chip for, oldest first: the open ones, and a stuck
  * one for a week (until the asker answers it). A finished or cancelled job
- * has said what it had to say in its thread.
+ * has said what it had to say in its thread. A stuck job is also dropped once
+ * the same person tagged Claude again on the task: their newest tag replaces
+ * it, so the header does not pile up one "needs you" per earlier try.
  */
 export function shownClaudeJobs(jobs: ClaudeJob[] | undefined, now = new Date()): ClaudeJob[] {
-  return (jobs ?? [])
+  const all = jobs ?? [];
+  const replaced = (stuck: ClaudeJob) =>
+    all.some(
+      (other) =>
+        other.id !== stuck.id &&
+        other.askedBy.email === stuck.askedBy.email &&
+        other.createdAt > stuck.createdAt,
+    );
+  return all
     .filter(
       (job) =>
         OPEN.includes(job.state) ||
-        (job.state === "stuck" && now.getTime() - new Date(job.updatedAt).getTime() < STUCK_SHOWN_MS),
+        (job.state === "stuck" &&
+          now.getTime() - new Date(job.updatedAt).getTime() < STUCK_SHOWN_MS &&
+          !replaced(job)),
     )
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
