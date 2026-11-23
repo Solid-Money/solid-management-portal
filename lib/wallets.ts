@@ -372,6 +372,87 @@ export const assetReading = (
 ): WalletAssetPlan | WalletAssetFlow | undefined => plan ?? flow;
 
 /**
+ * The plans' gaps as the board names them: each wallet once.
+ *
+ * `whole` are wallets whose history could not be read at all. `partial` are
+ * wallets with one or more chains whose top-ups are not fully on record,
+ * each with its chains listed after its name — a wallet with gaps on two
+ * chains read as two problems when it was listed twice. A wallet in `whole`
+ * is not repeated in `partial`. `title` keeps every reason, one per line.
+ */
+export function groupPlanGaps(plans: WalletPlansResponse): {
+  whole: string[];
+  partial: Array<{ walletName: string; chains: string[] }>;
+  title: string;
+} {
+  const chainName = (walletName: string, chainId: number) =>
+    plans.assets.find(
+      (asset) => asset.walletName === walletName && asset.chainId === chainId
+    )?.chainName ?? `chain ${chainId}`;
+
+  const whole = [
+    ...new Set(
+      plans.gaps
+        .filter((gap) => gap.chainId == null)
+        .map((gap) => gap.walletName)
+    ),
+  ];
+
+  const byWallet = new Map<string, string[]>();
+  for (const gap of plans.gaps) {
+    if (gap.chainId == null || whole.includes(gap.walletName)) continue;
+    const chains = byWallet.get(gap.walletName) ?? [];
+    const name = chainName(gap.walletName, gap.chainId);
+    if (!chains.includes(name)) chains.push(name);
+    byWallet.set(gap.walletName, chains);
+  }
+
+  const title = plans.gaps
+    .map(
+      (gap) =>
+        `${gap.walletName}${
+          gap.chainId != null
+            ? ` (${chainName(gap.walletName, gap.chainId)})`
+            : ""
+        }: ${gap.reason}`
+    )
+    .join("\n");
+
+  return {
+    whole,
+    partial: [...byWallet].map(([walletName, chains]) => ({
+      walletName,
+      chains,
+    })),
+    title,
+  };
+}
+
+/** "Fuse", "Fuse and Base", "Fuse, Base and Ethereum". */
+export const listJoin = (items: string[]): string =>
+  items.length <= 1
+    ? items.join("")
+    : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+
+/**
+ * Why an asset's figures rest on only part of its transfer history, when they
+ * do — from the same read as its verdict.
+ *
+ * Where the history does not reach back over the balance span, the backend
+ * measures no cost at all rather than count a missing top-up as spend, so the
+ * runway is blank for that reason and not because nothing left. Undefined when
+ * the history is complete, or from a backend that does not report it.
+ */
+export const assetHistoryNote = (
+  plan?: WalletAssetPlan,
+  flow?: WalletAssetFlow
+): string | undefined => {
+  const history = assetReading(plan, flow)?.transferHistory;
+  if (!history || history.complete) return undefined;
+  return history.note ?? "Transfer history is incomplete.";
+};
+
+/**
  * What to quote as an asset's daily cost, from the same read as its runway
  * and floor.
  *

@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   WALLET_ASSETS,
   assetCostPerDay,
+  assetHistoryNote,
   assetOwedNow,
+  groupPlanGaps,
+  listJoin,
   assetReading,
   assetRefillPlan,
   assetRunwayDays,
@@ -14,6 +17,7 @@ import type {
   WalletAssetFlow,
   WalletAssetPlan,
   WalletOwedNow,
+  WalletPlansResponse,
   WalletRefillPlan,
 } from "@/types";
 
@@ -148,5 +152,97 @@ describe("an asset's daily cost", () => {
     expect(
       assetCostPerDay(undefined, { ...unmeasured, isFloat: true }).estimate,
     ).toBeUndefined();
+  });
+});
+
+describe("an asset whose transfer history is incomplete", () => {
+  // The Cashback Payout Wallet's Base soUSD while its top-ups were still
+  // being read in: no cost measured, judged against the configured 1,000.
+  const note =
+    "Top-ups on Base are only on record since 2026-11-22 09:00 UTC while " +
+    "the rest of the history is read in, so no cost per day is measured " +
+    "from them: a top-up missing from the history would read as money spent.";
+  const plan = {
+    snapshotCount: 140,
+    transferHistory: { complete: false, note },
+  } as WalletAssetPlan;
+
+  it("says why, from the same read as the verdict", () => {
+    expect(assetHistoryNote(plan)).toBe(note);
+  });
+
+  it("says nothing when the history is complete or not reported", () => {
+    expect(
+      assetHistoryNote({
+        ...plan,
+        transferHistory: { complete: true },
+      } as WalletAssetPlan),
+    ).toBeUndefined();
+    // A backend from before the field existed.
+    expect(
+      assetHistoryNote({ snapshotCount: 140 } as WalletAssetPlan),
+    ).toBeUndefined();
+  });
+
+  it("does not borrow an older flow's gap beside a plan that has none", () => {
+    const flow = {
+      transferHistory: { complete: false, note: "older read" },
+    } as WalletAssetFlow;
+    expect(
+      assetHistoryNote({ snapshotCount: 140 } as WalletAssetPlan, flow),
+    ).toBeUndefined();
+    expect(assetHistoryNote(undefined, flow)).toBe("older read");
+  });
+});
+
+describe("the plans' gaps, as the board names them", () => {
+  const asset = (walletName: string, chainId: number, chainName: string) =>
+    ({ walletName, chainId, chainName }) as WalletAssetPlan;
+  const plans = {
+    windowDays: 7,
+    generatedAt: "2026-11-22T14:00:00.000Z",
+    assets: [
+      asset("Treasury", 122, "Fuse"),
+      asset("Treasury", 8453, "Base"),
+      asset("Cashback Payout Wallet", 8453, "Base"),
+    ],
+    gaps: [
+      { walletName: "Treasury", chainId: 122, reason: "fuse reason" },
+      { walletName: "Treasury", chainId: 8453, reason: "base reason" },
+      { walletName: "Paymaster", reason: "indexer down" },
+      { walletName: "Paymaster", chainId: 122, reason: "also fuse" },
+      { walletName: "Cashback Payout Wallet", chainId: 8453, reason: "b" },
+    ],
+  } as WalletPlansResponse;
+
+  it("names a wallet with gaps on several chains once, with its chains", () => {
+    const { whole, partial } = groupPlanGaps(plans);
+
+    expect(whole).toEqual(["Paymaster"]);
+    // Paymaster's chain gap is covered by its whole-wallet one.
+    expect(partial).toEqual([
+      { walletName: "Treasury", chains: ["Fuse", "Base"] },
+      { walletName: "Cashback Payout Wallet", chains: ["Base"] },
+    ]);
+  });
+
+  it("keeps every reason for the hover text", () => {
+    const { title } = groupPlanGaps(plans);
+
+    expect(title.split("\n")).toEqual([
+      "Treasury (Fuse): fuse reason",
+      "Treasury (Base): base reason",
+      "Paymaster: indexer down",
+      "Paymaster (chain 122): also fuse",
+      "Cashback Payout Wallet (Base): b",
+    ]);
+  });
+
+  it("joins chain names as a sentence", () => {
+    expect(listJoin(["Fuse"])).toBe("Fuse");
+    expect(listJoin(["Fuse", "Base"])).toBe("Fuse and Base");
+    expect(listJoin(["Fuse", "Base", "Ethereum"])).toBe(
+      "Fuse, Base and Ethereum",
+    );
   });
 });
