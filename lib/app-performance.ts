@@ -683,6 +683,11 @@ export function versionUrlChanged(
  * A draft settled: what to send, or null. Compared with the newest value
  * asked for rather than the URL, so typing B and then back to A while B is
  * still on its way sends A, and the URL ends on what the field shows.
+ *
+ * Sending the value the URL already holds supersedes whatever is in flight:
+ * the router may drop B without the URL ever changing, so nothing is left
+ * pending to mistake a later back/forward to B for the field's own. If B does
+ * land after all, it reads as a change from outside and A follows it.
  */
 export function versionToCommit(
   pending: readonly string[],
@@ -692,7 +697,7 @@ export function versionToCommit(
   const next = draft.trim();
   const newest = pending.length ? pending[pending.length - 1] : url;
   if (next === newest) return null;
-  return { send: next, pending: [...pending, next] };
+  return { send: next, pending: next === url ? [] : [...pending, next] };
 }
 
 /** The query string for some filters, defaults left out so the plain page has a plain link. */

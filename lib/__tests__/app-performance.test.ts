@@ -641,10 +641,24 @@ describe("the app version field's URL sync", () => {
     f.type("A");
     f.settle(); // the URL still says A, but B is on its way: A must be sent
     expect(f.sent).toEqual(["B", "A"]);
-    f.arrive("B"); // the older request lands first
-    expect(f.draft).toBe("A");
+    // If the router still publishes B before A, the field ends on A too.
+    f.arrive("B");
     f.arrive("A");
     expect(f.draft).toBe("A");
+    expect(f.sent).toEqual(["B", "A"]);
+  });
+
+  it("keeps nothing pending when the router drops the superseded request", () => {
+    const f = field("A");
+    f.type("B");
+    f.settle(); // sends B
+    f.type("A");
+    f.settle(); // sends A; the router drops B and the URL never changes
+    // Later, back/forward to a URL on B: from outside, so the field shows it.
+    f.arrive("B");
+    expect(f.draft).toBe("B");
+    f.settle();
+    expect(f.sent).toEqual(["B", "A"]);
   });
 
   it("keeps keystrokes typed while its own request was in flight", () => {
