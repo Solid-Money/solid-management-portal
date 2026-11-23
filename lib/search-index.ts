@@ -11,6 +11,7 @@ import {
   CreditCard,
   FileClock,
   FolderTree,
+  Gauge,
   Gift,
   History,
   Inbox,
@@ -405,6 +406,7 @@ const USER_TARGETS: UserTarget[] = [
   { key: "referrals", kind: "section", label: "Referrals", tab: "rewards", anchor: "user-referrals", icon: Users, keywords: ["referred by", "referral code", "invites"] },
   { key: "recovery", kind: "section", label: "Account recovery", tab: "support", anchor: "user-recovery", icon: LifeBuoy, keywords: ["lockout", "locked out", "passkey", "recovery"] },
   { key: "errors", kind: "section", label: "Errors", tab: "support", anchor: "user-errors", icon: CircleAlert, keywords: ["ref", "failures", "error lookup"] },
+  { key: "app-performance", kind: "section", label: "App performance", tab: "support", anchor: "user-app-performance", icon: Gauge, keywords: ["slow", "loading", "stuck loading", "skeleton", "balances not showing", "startup", "launch", "resume", "speed"] },
   { key: "support", kind: "section", label: "Support conversations", tab: "support", anchor: "user-support", icon: MessagesSquare, keywords: ["intercom", "chats", "tickets", "cases"] },
   { key: "audit", kind: "section", label: "Admin audit log", tab: "support", anchor: "user-audit-log", icon: FileClock, keywords: ["who changed", "admin actions", "history"] },
 

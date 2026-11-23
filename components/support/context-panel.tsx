@@ -10,6 +10,7 @@ import UserKycCard from "@/components/user/user-kyc-card";
 import UserTierMembershipCard from "@/components/user/user-tier-membership-card";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
+import UserAppPerformanceCard from "@/components/user/user-app-performance-card";
 import { useSupportConversation } from "@/hooks/use-support";
 import {
   StatusBadge,
@@ -103,6 +104,8 @@ export default function ContextPanel({ conversationId }: { conversationId: strin
             username={username}
             suspended={Boolean(user?.suspension)}
           />
+          {/* "Balances won't load": the latest launches and resumes, compact. */}
+          <UserAppPerformanceCard userId={userId} compact />
         </div>
       )}
     </aside>

@@ -16,6 +16,7 @@ import {
   Coins,
   CreditCard,
   DollarSign,
+  Gauge,
   Gift,
   Globe,
   Image,
@@ -155,6 +156,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Errors",
         description: "What went wrong for users, live, with plain-English reasons",
         icon: AlertTriangle,
+      },
+      {
+        href: "/app-performance",
+        label: "App performance",
+        description:
+          "How long the app takes to show balances at launch and on return, and what holds it up",
+        icon: Gauge,
       },
     ],
   },

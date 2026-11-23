@@ -27,6 +27,7 @@ import UserCardCreditCard from "@/components/user/user-card-credit-card";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
+import UserAppPerformanceCard from "@/components/user/user-app-performance-card";
 import UserErrorsCard from "@/components/user/user-errors-card";
 import UserCashbackRateCard from "@/components/user/user-cashback-rate-card";
 import UserSupportCard from "@/components/user/user-support-card";
@@ -433,6 +434,11 @@ export default function UserDetailPage({
           {/* Above the chats: a Ref quoted in one resolves here without a lookup. */}
           <SectionAnchor id="user-errors">
             <UserErrorsCard userId={id} />
+          </SectionAnchor>
+          {/* Beside the errors: "the app is stuck loading" is the other half
+              of "the app is broken", and this says how long and on what. */}
+          <SectionAnchor id="user-app-performance">
+            <UserAppPerformanceCard userId={id} />
           </SectionAnchor>
           <SectionAnchor id="user-support">
             <UserSupportCard userId={id} userLabel={user?.username || undefined} email={user?.email} />
