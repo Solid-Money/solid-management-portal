@@ -510,10 +510,16 @@ export default function AiApiSettingsEditor() {
   // Whether the API has a default markup for rows without their own. An older
   // one doesn't, and every row priced from AntSeed needs its own there.
   const followsDefault = saved.defaultMarkup !== undefined;
-  // What a row without its own markup is priced at: the default as typed when
-  // it is one the API takes, else as saved.
+  // What a row without its own markup is priced at once saved, so the
+  // previews, the confirmation and the save agree: the default as typed when
+  // this edit changed it (and it is one the API takes), since only then is it
+  // sent; otherwise the default as saved now, which another admin may have
+  // changed since this edit began.
+  const defaultEdited = draft.defaultMarkup !== base.defaultMarkup;
   const defaultMarkup = followsDefault
-    ? (markupValue(draft.defaultMarkup) ?? saved.defaultMarkup ?? null)
+    ? ((defaultEdited ? markupValue(draft.defaultMarkup) : null) ??
+      saved.defaultMarkup ??
+      null)
     : null;
   const defaultNet = defaultMarkup !== null ? netMultiple(defaultMarkup, cashbackRates) : null;
   const ownMarkups = draft.models.filter((model) => model.markup.trim() !== "").length;

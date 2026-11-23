@@ -65,6 +65,14 @@ export function AntseedModelPicker({
   const [multiple, setMultiple] = useState(startMultiple);
   const [setPrices, setSetPrices] = useState(true);
   const [follow, setFollow] = useState(false);
+  // The picker stays mounted while closed, so the default may have moved since
+  // the multiple was last set: start each opening at the default as it is
+  // now, and leave what the admin types alone while it stays open.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setMultiple(startMultiple);
+  }
 
   // Only models a seller prices: the backend leaves out the rest, and the rows
   // below read the cheapest offer, so none must slip through without one.
