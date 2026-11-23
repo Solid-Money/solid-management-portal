@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Star,
   Terminal,
   TrendingUp,
   UserCog,
@@ -353,6 +354,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Limited-time multipliers on referral v4 card credit bonuses",
         icon: Zap,
+      },
+      {
+        href: "/kols",
+        label: "KOLs",
+        description:
+          "KOLs and the perks their special referral codes give: membership discounts and free SEPA deposits",
+        icon: Star,
       },
     ],
   },
