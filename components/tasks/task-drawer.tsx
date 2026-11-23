@@ -993,10 +993,12 @@ export default function TaskDrawer({
 
   const close = () => {
     onClose();
-    if (!task || !onReopen) return;
-    const id = task.id;
-    toast(`Closed T-${task.number}`, {
-      description: task.title,
+    // Closed before it loaded: still offer it back, by the id in the URL
+    // (not for a link to a task that doesn't exist).
+    const id = task?.id ?? (taskId && isTaskId(taskId) && !isError ? taskId : null);
+    if (!id || !onReopen) return;
+    toast(task ? `Closed T-${task.number}` : "Closed the task", {
+      description: task?.title,
       duration: 8000,
       action: { label: "Reopen", onClick: () => reopenRef.current?.(id) },
     });
