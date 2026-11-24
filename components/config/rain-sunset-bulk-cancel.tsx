@@ -159,7 +159,11 @@ export function RainSunsetBulkCancelSection() {
         <div className="space-y-4 border-t border-gray-100 p-4">
           <RunSummary run={run} />
           {run.status === "ready" ? <ConfirmPanel run={run} /> : null}
-          {run.status !== "discarded" ? <AffectedUsers run={run} /> : null}
+          {/* Keyed on the run: a new preview starts the list afresh, rather
+              than keeping a result filter ("Failed") the new run hides. */}
+          {run.status !== "discarded" ? (
+            <AffectedUsers key={run.id} run={run} />
+          ) : null}
         </div>
       ) : null}
 
@@ -528,6 +532,7 @@ function AffectedUsers({ run }: { run: RainSunsetBulkCancelRun }) {
 
   const { data, isFetching, error } = useRainSunsetBulkCancelItems(
     run.id,
+    run.status,
     { filter, search: debouncedSearch, page, limit: PAGE_SIZE },
     working,
   );

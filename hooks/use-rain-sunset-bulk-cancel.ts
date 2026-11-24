@@ -14,6 +14,7 @@ import type {
   RainSunsetBulkCancelMode,
   RainSunsetBulkCancelOverview,
   RainSunsetBulkCancelRun,
+  RainSunsetBulkCancelRunStatus,
 } from "@/types";
 
 const BASE = "/admin/v1/general-config/rain-sunset/bulk-cancel";
@@ -49,14 +50,22 @@ export interface BulkCancelItemsQuery {
   limit: number;
 }
 
-/** One page of a run's cards. Re-read alongside the run while it works. */
+/**
+ * One page of a run's cards. Re-read alongside the run while it works.
+ *
+ * The run's status is part of the key, so the page is read once more when the
+ * run stops working: a run that finished between two polls would otherwise
+ * stop polling with its last rows still "Waiting" or "Reading…". The previous
+ * page stays on screen while that read is in flight.
+ */
 export function useRainSunsetBulkCancelItems(
   runId: string | undefined,
+  status: RainSunsetBulkCancelRunStatus | undefined,
   query: BulkCancelItemsQuery,
   working: boolean,
 ) {
   return useQuery<RainSunsetBulkCancelItemPage>({
-    queryKey: [...ITEMS_QUERY_KEY, runId, query],
+    queryKey: [...ITEMS_QUERY_KEY, runId, status, query],
     enabled: !!runId,
     placeholderData: keepPreviousData,
     queryFn: async () => {

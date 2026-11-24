@@ -81,8 +81,18 @@ export default function UserRainSunsetCard({ userId }: UserRainSunsetCardProps) 
     queryFn: async () => (await getUserRainSunset(userId)).data.data,
   });
 
-  // Nothing to say about a user the sunset never touched.
-  if (!isLoading && data && !data.affected && !data.migration && !data.retired) {
+  // Nothing to say about a user the sunset never touched. A Rain card the
+  // sunset's bulk cancel closed counts as touched, whatever else the state says:
+  // support needs to see why the card closed.
+  const closedBySunset = data?.rainCards?.some((card) => card.bulkCancelRunId);
+  if (
+    !isLoading &&
+    data &&
+    !data.affected &&
+    !data.migration &&
+    !data.retired &&
+    !closedBySunset
+  ) {
     return null;
   }
 
