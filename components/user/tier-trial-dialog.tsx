@@ -226,10 +226,10 @@ export default function TierTrialDialog(props: TierTrialDialogProps) {
               : `Gift a tier trial to ${username}`}
           </DialogTitle>
           <DialogDescription>
-            {isBatch ? "They all keep" : "They keep"} their points and FUSE
-            balance exactly as they are. The trial grants its tier on top for
-            its duration, and the countdown starts when they activate it — not
-            now.
+            {isBatch ? "They all keep" : "They keep"} their FUSE lock,
+            membership and balances exactly as they are. The trial grants its
+            tier on top for its duration, and the countdown starts when they
+            activate it — not now.
           </DialogDescription>
         </DialogHeader>
 

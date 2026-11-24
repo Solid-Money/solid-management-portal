@@ -119,9 +119,9 @@ export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
 /**
  * Shipped defaults for the v3 purchase routes (mirrors the backend).
  *
- * Both routes ship OFF while the points ladder stays ON, so deploying this does
- * not change what anybody can reach. Turning a route on is a launch decision
- * made here, once its contract is deployed and its address configured.
+ * Both routes ship OFF. They are the only ways to upgrade a tier — points no
+ * longer grant one — so turning a route on is a launch decision made here,
+ * once its contract is deployed and its address configured.
  */
 /**
  * An annual tier price meaning "this tier is not sold for cash".
@@ -133,7 +133,6 @@ export const PRODUCT_FEES_DEFAULTS: ProductFeesConfig = {
 export const TIER_PRICE_NOT_PURCHASABLE = -1;
 
 export const TIER_MEMBERSHIP_DEFAULTS: TierMembershipConfig = {
-  pointsUnlockEnabled: true,
   lockEnabled: false,
   lockDurationDays: 365,
   // Equal to the skip-the-line thresholds, which is how they ship. They are

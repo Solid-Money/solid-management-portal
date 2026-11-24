@@ -108,9 +108,9 @@ export default function TierTrialsBulk() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-2xl space-y-2 text-sm text-gray-600">
           <p>
-            Same gift as the one on a user&apos;s profile — points and FUSE
-            balances are untouched, and each trial starts counting down only
-            when its user activates it in the app.
+            Same gift as the one on a user&apos;s profile — FUSE locks,
+            memberships and balances are untouched, and each trial starts
+            counting down only when its user activates it in the app.
           </p>
           {!result && (
             <>
