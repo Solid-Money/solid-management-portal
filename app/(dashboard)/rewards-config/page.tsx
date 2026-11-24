@@ -30,6 +30,7 @@ import {
   ToggleField,
 } from "@/components/config/config-fields";
 import ReferralV4ConfigSection from "@/components/config/referral-v4-config";
+import TierBalanceConfigSection from "@/components/config/tier-balance-config";
 import TierEmailModal from "@/components/tier-email-modal";
 import TierUsersModal from "@/components/tier-users-modal";
 import {
@@ -2347,6 +2348,10 @@ export default function RewardsConfigPage() {
             Save Tier Membership Config
           </button>
         </ConfigSection>
+
+        {/* The third tier route, next to the paid membership and the lock.
+            Its own endpoints, with a server preview before every save. */}
+        <TierBalanceConfigSection />
       </div>
 
       <TierUsersModal

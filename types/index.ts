@@ -2275,12 +2275,307 @@ export interface TierMembershipStateView {
     shareTokenAddress: string | null;
     billingTokenAddress: string | null;
   };
+  /**
+   * The Hold in Earn route as the app sees it. Null when the user has no access
+   * or the route is off; absent from a backend that predates it.
+   */
+  balance?: TierBalanceRouteDto | null;
 }
 
 /** The membership as it stands, plus every one the user has had. */
 export interface TierMembershipView {
   state: TierMembershipStateView;
   history: TierSubscriptionView[];
+}
+
+// --- Tier balance route ("Hold in Earn", T-314) ----------------------------
+
+/**
+ * Users reach Prime or Ultra by holding a USD balance in Earn (vault shares,
+ * shares escrowed as Credit collateral, soFUSE in the tier lock) through a
+ * lookback window — the third route next to the paid membership and the FUSE
+ * lock. Staged to internal team members tagged `tier_balance_route` until the
+ * audience is switched to `everyone`. Every number is admin config.
+ */
+export type TierBalanceTier = "prime" | "ultra";
+
+/** The tier the route grants: Core when it grants nothing. */
+export type TierBalanceGrantTier = "core" | "prime" | "ultra";
+
+export type TierBalanceTrackStatus =
+  | "none"
+  | "building"
+  | "active"
+  | "grace"
+  | "cooldown";
+
+/** One tier's progress on the route. Ultra and Prime are tracked separately. */
+export interface TierBalanceTrackDto {
+  tier: TierBalanceTier;
+  status: TierBalanceTrackStatus;
+  /** Pinned threshold while active/grace; today's threshold otherwise. USD. */
+  thresholdUsd: number;
+  /** How much more is needed now (0 when currentUsd >= thresholdUsd). USD. */
+  shortfallUsd: number;
+  /** 0..100, currentUsd / thresholdUsd. */
+  progressPct: number;
+  /** Consecutive measured days at or above the threshold, up to lookbackDays. */
+  daysHeld: number;
+  /** building: the UTC day (YYYY-MM-DD) the tier unlocks if the balance stays. */
+  qualifiesOn: string | null;
+  /** active/grace: when the route granted it (ISO). */
+  unlockedAt: string | null;
+  /** grace: the instant the tier ends unless the balance is back above (ISO). */
+  graceEndsAt: string | null;
+  /** cooldown: when the route can unlock this tier again (ISO). */
+  reentryAt: string | null;
+}
+
+/** What a qualifying Earn balance is made of. USD throughout. */
+export interface TierBalanceBreakdownDto {
+  /** Vault shares sitting in the Safe, all chains. */
+  walletUsd: number;
+  /** Vault shares escrowed as Credit collateral (Fuse + Base Cash module v2). */
+  creditCollateralUsd: number;
+  /** soFUSE locked in the tier lock. */
+  lockedFuseUsd: number;
+  /** Credit debt (subtracted when the config says so). */
+  creditDebtUsd: number;
+  /** Per asset, wallet + collateral + locked. */
+  byVault: { usd: number; eur: number; eth: number; btc: number; fuse: number };
+}
+
+/** The route for one user, as the app (and support) reads it. */
+export interface TierBalanceRouteDto {
+  /** The user may use the route (feature on and access granted). */
+  enabled: boolean;
+  /** Tier this route grants right now. */
+  grantsTier: TierBalanceGrantTier;
+  /** True when the user's current tier would be lower without this route. */
+  holdsCurrentTier: boolean;
+  /** Latest measured qualifying Earn balance, USD. Null before the first measurement. */
+  currentUsd: number | null;
+  measuredAt: string | null;
+  /** Lowest daily balance over the lookback window (measured days only). */
+  lowestUsd: number | null;
+  lookbackDays: number;
+  graceDays: number;
+  reentryDays: number;
+  breakdown: TierBalanceBreakdownDto | null;
+  rules: {
+    countsCreditCollateral: boolean;
+    subtractsCreditDebt: boolean;
+    countsLockedFuse: boolean;
+  };
+  prime: TierBalanceTrackDto;
+  ultra: TierBalanceTrackDto;
+}
+
+/** `team` = only members tagged `tier_balance_route` on Config → Internal team. */
+export type TierBalanceAudience = "team" | "everyone";
+
+/** The route's admin config (`GET/PATCH /admin/v1/tier-balance`). */
+export interface TierBalanceConfig {
+  /** The route grants tiers. */
+  enabled: boolean;
+  /** Earn balances are measured (keep on to build history). */
+  collectionEnabled: boolean;
+  audience: TierBalanceAudience;
+  primeUsd: number;
+  ultraUsd: number;
+  lookbackDays: number;
+  graceDays: number;
+  reentryDays: number;
+  maxMissingDays: number;
+  /** Intraday re-measure of watched users. */
+  sampleIntervalMinutes: number;
+  /** Users at/above this (or with an open state) are re-measured intraday. */
+  watchFloorUsd: number;
+  countCreditCollateral: boolean;
+  subtractCreditDebt: boolean;
+  countLockedFuse: boolean;
+  notificationsEnabled: boolean;
+}
+
+export type TierBalanceConfigField = keyof TierBalanceConfig;
+
+/** A config save: only the fields that change, with the admin's reason. */
+export type TierBalanceConfigUpdate = Partial<TierBalanceConfig> & {
+  reason?: string;
+};
+
+export type TierBalanceRunKind = "full" | "watch" | "users";
+export type TierBalanceRunTrigger = "cron" | "admin" | "transfer";
+export type TierBalanceRunStatus = "running" | "completed" | "partial" | "failed";
+
+/** One measurement run. */
+export interface TierBalanceRunView {
+  id: string;
+  kind: TierBalanceRunKind;
+  trigger: TierBalanceRunTrigger;
+  status: TierBalanceRunStatus;
+  dayKey: string;
+  startedAt: string;
+  completedAt: string | null;
+  stats: {
+    scanned: number;
+    valued: number;
+    incomplete: number;
+    written: number;
+    aboveFloor: number;
+  };
+  prices: Record<string, number | string> | null;
+  error: string | null;
+  adminEmail: string | null;
+}
+
+export interface TierBalanceStateCounts {
+  prime: number;
+  ultra: number;
+  building: number;
+  grace: number;
+  cooldown: number;
+}
+
+export interface TierBalanceAdminOverview {
+  config: TierBalanceConfig;
+  updatedAt: string | null;
+  status: {
+    lastRun: TierBalanceRunView | null;
+    lastFullRun: TierBalanceRunView | null;
+    nextSampleAt: string | null;
+    lastEvaluatedDay: string | null;
+    firstCollectedDay: string | null;
+    historyDays: number;
+    /** Everyone measured, access ignored (what launch to everyone would look like). */
+    counts: TierBalanceStateCounts;
+    /** Members who actually hold the tier through the route now (access applied). */
+    granted: { prime: number; ultra: number };
+  };
+}
+
+/** One user whose route tier a config change would move. */
+export interface TierBalanceImpactUser {
+  userId: string;
+  username?: string;
+  before: TierBalanceGrantTier;
+  after: TierBalanceGrantTier;
+  lowestUsd: number | null;
+  currentUsd: number | null;
+}
+
+/** What a config change would do, computed by the server without saving it. */
+export interface TierBalanceConfigPreview {
+  current: TierBalanceConfig;
+  proposed: TierBalanceConfig;
+  changes: Array<{ field: TierBalanceConfigField; from: unknown; to: unknown }>;
+  impact: {
+    asOfDay: string | null;
+    before: TierBalanceStateCounts;
+    after: TierBalanceStateCounts;
+    /** Users whose route tier changes (access ignored). */
+    changed: number;
+    /** Up to 50. */
+    users: TierBalanceImpactUser[];
+    /** Same, access applied: who actually gains or loses a tier. */
+    grantedBefore: { prime: number; ultra: number };
+    grantedAfter: { prime: number; ultra: number };
+  };
+  warnings: string[];
+}
+
+export interface TierBalanceEvaluationResult {
+  day: string;
+  users: number;
+  unlocked: number;
+  graceStarted: number;
+  graceCleared: number;
+  ended: number;
+}
+
+export type TierBalanceRunAction = "sample" | "evaluate";
+
+export interface TierBalanceRunRequest {
+  action: TierBalanceRunAction;
+  scope?: "full" | "watch";
+}
+
+export interface TierBalanceRunResult {
+  action: TierBalanceRunAction;
+  run: TierBalanceRunView | null;
+  evaluated: TierBalanceEvaluationResult | null;
+}
+
+/** One UTC day of a user's readings. */
+export interface TierBalanceDayView {
+  dayKey: string;
+  minUsd: number | null;
+  lastUsd: number | null;
+  samples: number;
+  incompleteSamples: number;
+  complete: boolean;
+  minAt: string | null;
+  lastAt: string | null;
+  /** At the day's lowest sample. */
+  breakdown: (TierBalanceBreakdownDto & { qualifyingUsd: number }) | null;
+}
+
+export type TierBalanceEventType =
+  | "unlocked"
+  | "grace_started"
+  | "grace_cleared"
+  | "ended"
+  | "reevaluated";
+
+export type TierBalanceEventCause = "outflow" | "price" | "mixed" | "unknown";
+
+export interface TierBalanceEventView {
+  at: string;
+  dayKey: string;
+  tier: TierBalanceTier;
+  type: TierBalanceEventType;
+  balanceUsd: number | null;
+  thresholdUsd: number | null;
+  cause: TierBalanceEventCause | null;
+  adminEmail: string | null;
+  reason: string | null;
+}
+
+export type TierBalanceAccessReason =
+  | "team"
+  | "everyone"
+  | "not-tagged"
+  | "disabled";
+
+/** One user's route, readings and history (`GET /users/:id/tier-balance`). */
+export interface TierBalanceUserView {
+  userId: string;
+  hasAccess: boolean;
+  accessReason: TierBalanceAccessReason;
+  /** Computed even without access; `route.enabled` = hasAccess. */
+  route: TierBalanceRouteDto;
+  /** Newest first. */
+  days: TierBalanceDayView[];
+  /** Newest first. */
+  events: TierBalanceEventView[];
+  periods: Array<{ tier: TierBalanceTier; from: string; to: string | null }>;
+}
+
+/**
+ * What re-evaluating one user does: read fresh from the chain, then the route
+ * before and after. The GET is read-only; the POST applies it.
+ */
+export interface TierBalanceReevaluationPreview {
+  measured: {
+    complete: boolean;
+    measuredAt: string;
+    qualifyingUsd: number | null;
+    breakdown: TierBalanceBreakdownDto | null;
+  };
+  before: TierBalanceRouteDto;
+  after: TierBalanceRouteDto;
+  /** Human-readable. */
+  changes: string[];
 }
 
 // Campaign Types
@@ -4244,7 +4539,8 @@ export type InternalTeamFeatureKey =
   | "deposit_tokens"
   | "ai_api"
   | "referral_v4"
-  | "wallet_topup";
+  | "wallet_topup"
+  | "tier_balance_route";
 
 export interface InternalTeamFeature {
   key: InternalTeamFeatureKey;

@@ -80,6 +80,14 @@ const ACTION_LABELS: Record<string, { label: string; variant: BadgeVariant }> =
       variant: "success",
     },
     tier_lock_reevaluated: { label: "Tier lock re-evaluated", variant: "info" },
+    tier_balance_reevaluated: {
+      label: "Hold in Earn route re-evaluated",
+      variant: "info",
+    },
+    tier_balance_config_updated: {
+      label: "Hold in Earn route config changed",
+      variant: "warning",
+    },
     cashback_failed_reevaluated: {
       label: "Failed cashback re-sent",
       variant: "info",
@@ -167,6 +175,7 @@ const INTERNAL_TEAM_FEATURE_LABELS: Record<string, string> = {
   ai_api: "AI API",
   referral_v4: "Referral v4",
   wallet_topup: "Apple Pay & Google Pay top-up",
+  tier_balance_route: "Hold in Earn tier route",
 };
 
 /** How the audit trail names an admin's change to a user's AI API. */

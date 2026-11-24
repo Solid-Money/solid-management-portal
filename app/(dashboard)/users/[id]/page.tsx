@@ -41,6 +41,7 @@ import UserReferralV4Card from "@/components/user/user-referral-v4-card";
 import UserRewardsCard from "@/components/user/user-rewards-card";
 import UserSavingsCard from "@/components/user/user-savings-card";
 import UserTierMembershipCard from "@/components/user/user-tier-membership-card";
+import UserTierBalanceCard from "@/components/user/user-tier-balance-card";
 import UserTierTrialCard from "@/components/user/user-tier-trial-card";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -376,6 +377,11 @@ export default function UserDetailPage({
               the tier above may not match the points next to it. */}
           <SectionAnchor id="user-tier">
             <UserTierMembershipCard userId={id} />
+          </SectionAnchor>
+          {/* The third tier route, beside the lock and the paid membership:
+              "I hold enough in Earn, why am I not Prime?" is answered here. */}
+          <SectionAnchor id="user-tier-balance">
+            <UserTierBalanceCard userId={id} />
           </SectionAnchor>
 
           <SectionAnchor id="user-tier-trial">

@@ -117,8 +117,8 @@ export function GoodCustomersView({ data }: { data: GoodCustomersResponse }) {
         {d.windowDays} days. High-value = qualified plus ${d.highValueSpendUsd}+ spend, $
         {d.highValueMoneyInUsd}+ of their own money in, or an active paid membership. Tier = Prime or
         Ultra at the range end, by the best route a person holds: a paid membership, FUSE locked for a
-        year, a free trial, or the legacy FUSE route kept from before tiers v3. Bought = subscription
-        or lock. Revenue is fees plus memberships, as on the Revenue tile; treasury interest and
+        year, a balance held in Earn, a free trial, or the legacy FUSE route kept from before tiers
+        v3. Bought = subscription or lock; held in Earn is counted on its own. Revenue is fees plus memberships, as on the Revenue tile; treasury interest and
         partner card markups are not included.
       </p>
     </div>

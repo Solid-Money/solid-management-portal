@@ -8,6 +8,7 @@ import { User } from "@/types";
 import { CopyButton } from "@/components/ui/copy-button";
 import UserKycCard from "@/components/user/user-kyc-card";
 import UserTierMembershipCard from "@/components/user/user-tier-membership-card";
+import UserTierBalanceCard from "@/components/user/user-tier-balance-card";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRecoveryCard from "@/components/user/user-recovery-card";
 import UserAppPerformanceCard from "@/components/user/user-app-performance-card";
@@ -98,6 +99,8 @@ export default function ContextPanel({ conversationId }: { conversationId: strin
         <div className="space-y-3 [&_[data-slot=card-header]]:flex-wrap [&_[data-slot=card-header]]:gap-2 [&_[data-slot=card]]:shadow-sm">
           <UserKycCard userId={userId} username={username} />
           <UserTierMembershipCard userId={userId} />
+          {/* Compact: summary and tracks; the readings stay on the user page. */}
+          <UserTierBalanceCard userId={userId} compact />
           <UserCashbackCard userId={userId} />
           <UserRecoveryCard
             userId={userId}

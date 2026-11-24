@@ -2,6 +2,7 @@ import { dayLabel } from "@/lib/overview-range";
 import type {
   GoodCustomersCohort,
   GoodCustomersResponse,
+  GoodCustomersRouteCounts,
   GoodCustomersTiers,
 } from "@/types/overview";
 
@@ -77,12 +78,36 @@ export function isGoodCustomersResponse(value: unknown): value is GoodCustomersR
   );
 }
 
+/** Route counts every backend sends. */
 const ROUTE_KEYS = ["paid", "lock", "trial", "legacy"];
+/**
+ * Route counts added later (`balance`, held in Earn): a backend that predates
+ * one omits it, which reads as 0 rather than failing the section.
+ */
+const OPTIONAL_ROUTE_KEYS = ["balance"] as const;
+
+const hasRouteCounts = (value: unknown): boolean =>
+  hasNumbers(value, ROUTE_KEYS) &&
+  isObject(value) &&
+  OPTIONAL_ROUTE_KEYS.every(
+    (key) => value[key] === undefined || value[key] === null || isNumber(value[key]),
+  );
+
+type ReadRouteCounts = Omit<GoodCustomersRouteCounts, "balance"> & {
+  balance?: number | null;
+};
+
+/** Route counts with the later routes filled in as 0 when missing. */
+const withRouteDefaults = (counts: ReadRouteCounts): GoodCustomersRouteCounts => ({
+  ...counts,
+  balance: counts.balance ?? 0,
+});
 
 /**
  * The Tiers section's block, when it has everything the section reads. Checked
  * apart from the rest, so a backend without it (or a bad one) costs the
- * section only, never the tab.
+ * section only, never the tab. Route counts a backend may not send yet come
+ * back as 0.
  */
 export function tiersOf(data: GoodCustomersResponse): GoodCustomersTiers | null {
   const t: unknown = data.tiers;
@@ -94,7 +119,7 @@ export function tiersOf(data: GoodCustomersResponse): GoodCustomersTiers | null 
     (t.source === "snapshot" || t.source === "records") &&
     hasNumbers(members, ["prime", "ultra", "withCard"]) &&
     isObject(members) &&
-    hasNumbers(members.byRoute, ROUTE_KEYS) &&
+    hasRouteCounts(members.byRoute) &&
     hasNumbers(t.bought, ["total", "paid", "lockPrime", "lockUltra", "lastWeek", "primeAnnualUsd"]) &&
     Array.isArray(t.table) &&
     t.table.length === 3 &&
@@ -103,7 +128,7 @@ export function tiersOf(data: GoodCustomersResponse): GoodCustomersTiers | null 
         isObject(row) &&
         typeof row.tier === "string" &&
         hasNumbers(row, ["cardholders", "spenders", "qualified", "spendUsd"]) &&
-        hasNumbers(row.byRoute, ROUTE_KEYS),
+        hasRouteCounts(row.byRoute),
     ) &&
     Array.isArray(t.routes) &&
     t.routes.every(
@@ -122,7 +147,13 @@ export function tiersOf(data: GoodCustomersResponse): GoodCustomersTiers | null 
     hasNumbers(legacy, ["members", "spenders", "spendUsd"]) &&
     isObject(legacy) &&
     (legacy.endsOn === null || typeof legacy.endsOn === "string");
-  return ok ? (t as unknown as GoodCustomersTiers) : null;
+  if (!ok) return null;
+  const tiers = t as unknown as GoodCustomersTiers;
+  return {
+    ...tiers,
+    members: { ...tiers.members, byRoute: withRouteDefaults(tiers.members.byRoute) },
+    table: tiers.table.map((row) => ({ ...row, byRoute: withRouteDefaults(row.byRoute) })),
+  };
 }
 
 /** Spend per spender for a row, or null with no spenders. */

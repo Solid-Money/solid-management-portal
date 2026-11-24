@@ -128,7 +128,10 @@ describe("isGoodCustomersResponse", () => {
 });
 
 
-/** The Tiers block for Nov 3 – 9 2026, as production reads it. */
+/**
+ * The Tiers block for Nov 3 – 9 2026, as production reads it — before the
+ * Hold in Earn route, so nobody holds a tier through it.
+ */
 function tiersBlock(): GoodCustomersTiers {
   const week = (date: string, paid = 0, lock = 0) => ({ date, paid, lock });
   return {
@@ -137,14 +140,14 @@ function tiersBlock(): GoodCustomersTiers {
       prime: 281,
       ultra: 46,
       withCard: 285,
-      byRoute: { paid: 16, lock: 41, trial: 167, legacy: 103 },
+      byRoute: { paid: 16, lock: 41, balance: 0, trial: 167, legacy: 103 },
     },
     bought: { total: 57, paid: 16, lockPrime: 38, lockUltra: 3, lastWeek: 4, primeAnnualUsd: 199 },
     table: [
       {
         tier: "ultra",
         cardholders: 34,
-        byRoute: { paid: 0, lock: 4, trial: 14, legacy: 16 },
+        byRoute: { paid: 0, lock: 4, balance: 0, trial: 14, legacy: 16 },
         spenders: 25,
         qualified: 20,
         spendUsd: 26_603.16,
@@ -152,7 +155,7 @@ function tiersBlock(): GoodCustomersTiers {
       {
         tier: "prime",
         cardholders: 251,
-        byRoute: { paid: 16, lock: 37, trial: 143, legacy: 55 },
+        byRoute: { paid: 16, lock: 37, balance: 0, trial: 143, legacy: 55 },
         spenders: 160,
         qualified: 101,
         spendUsd: 183_427.14,
@@ -160,7 +163,7 @@ function tiersBlock(): GoodCustomersTiers {
       {
         tier: "core",
         cardholders: 4484,
-        byRoute: { paid: 0, lock: 0, trial: 0, legacy: 0 },
+        byRoute: { paid: 0, lock: 0, balance: 0, trial: 0, legacy: 0 },
         spenders: 1218,
         qualified: 475,
         spendUsd: 445_394.86,
@@ -247,5 +250,88 @@ describe("Tiers section", () => {
       status: "watch",
     });
     expect(guardrails(response()).map((r) => r.key)).not.toContain("legacy-ending");
+  });
+});
+
+/** The same block from a backend that counts the Hold in Earn route. */
+function tiersWithBalance(): GoodCustomersTiers {
+  const block = tiersBlock();
+  const [ultra, prime, core] = block.table;
+  return {
+    ...block,
+    members: {
+      ...block.members,
+      byRoute: { paid: 16, lock: 41, balance: 12, trial: 155, legacy: 103 },
+    },
+    table: [
+      { ...ultra, byRoute: { paid: 0, lock: 4, balance: 3, trial: 11, legacy: 16 } },
+      { ...prime, byRoute: { paid: 16, lock: 37, balance: 9, trial: 134, legacy: 55 } },
+      core,
+    ],
+    routes: [
+      block.routes[0],
+      block.routes[1],
+      { route: "balance", cardholders: 12, spenders: 10, qualified: 9, spendUsd: 21_000 },
+      ...block.routes.slice(2),
+    ],
+  };
+}
+
+/** The block as a backend from before the route sends it: no `balance` anywhere. */
+function tiersFromOlderBackend(): unknown {
+  const block = tiersBlock();
+  const drop = (counts: GoodCustomersTiers["members"]["byRoute"]) => {
+    const rest: Partial<typeof counts> = { ...counts };
+    delete rest.balance;
+    return rest;
+  };
+  return {
+    ...block,
+    members: { ...block.members, byRoute: drop(block.members.byRoute) },
+    table: block.table.map((row) => ({ ...row, byRoute: drop(row.byRoute) })),
+  };
+}
+
+describe("Tiers section, held in Earn", () => {
+  it("reads a response without balance as nobody held in Earn", () => {
+    const tiers = tiersOf(response({ tiers: tiersFromOlderBackend() as GoodCustomersTiers }));
+    expect(tiers).not.toBeNull();
+    expect(tiers?.members.byRoute).toEqual({ paid: 16, lock: 41, balance: 0, trial: 167, legacy: 103 });
+    expect(tiers?.table.map((row) => row.byRoute.balance)).toEqual([0, 0, 0]);
+    expect(tiers?.routes.map((row) => row.route)).not.toContain("balance");
+    // Read as 0, the older payload gives the same section as one that sends 0.
+    expect(tiers).toEqual(tiersOf(response({ tiers: tiersBlock() })));
+  });
+
+  it("keeps the balance counts and route row a newer backend sends", () => {
+    const tiers = tiersOf(response({ tiers: tiersWithBalance() }));
+    expect(tiers?.members.byRoute.balance).toBe(12);
+    expect(tiers?.table.map((row) => row.byRoute.balance)).toEqual([3, 9, 0]);
+    expect(tiers?.routes.find((row) => row.route === "balance")).toMatchObject({
+      cardholders: 12,
+      qualified: 9,
+    });
+  });
+
+  it("does not count held in Earn as bought", () => {
+    expect(buyerTotals(tiersWithBalance())).toEqual(buyerTotals(tiersBlock()));
+    expect(memberTotals(tiersWithBalance())).toEqual(memberTotals(tiersBlock()));
+  });
+
+  it("reads a null balance as 0 and refuses one that is not a number", () => {
+    const block = tiersWithBalance();
+    const withNull = {
+      ...block,
+      members: { ...block.members, byRoute: { ...block.members.byRoute, balance: null } },
+    } as unknown as GoodCustomersTiers;
+    expect(tiersOf(response({ tiers: withNull }))?.members.byRoute.balance).toBe(0);
+
+    const broken = {
+      ...block,
+      table: block.table.map((row) => ({ ...row, byRoute: { ...row.byRoute, balance: "3" } })),
+    } as unknown as GoodCustomersTiers;
+    expect(tiersOf(response({ tiers: broken }))).toBeNull();
+    // Still only the section: the tab reads on.
+    expect(isGoodCustomersResponse(response({ tiers: broken }))).toBe(true);
   });
 });
