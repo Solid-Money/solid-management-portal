@@ -2,29 +2,47 @@
 
 import { useState } from "react";
 import api from "@/lib/api";
-import { Play, Calendar, AlertCircle, CheckCircle } from "lucide-react";
+import { isAxiosError } from "axios";
+import { Play, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AtoActivityCleanup } from "@/components/scripts/ato-activity-cleanup";
 import { HiddenActivityRestore } from "@/components/scripts/hidden-activity-restore";
+import { NudgeMigrations } from "@/components/scripts/nudge-migrations";
+
+interface CohortSnapshotRow {
+  date: string;
+  cohortId: string;
+  cohortName: string;
+  count: number;
+  usersWithEmail: number;
+}
+
+interface CohortSnapshotResult {
+  snapshots?: CohortSnapshotRow[];
+}
 
 export default function ScriptsPage() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<CohortSnapshotResult | null>(null);
 
   const handleTriggerCohort = async () => {
     try {
       setLoading(true);
       setResult(null);
 
-      const response = await api.post("/admin/v1/cohort-snapshots/trigger", {});
+      const response = await api.post<CohortSnapshotResult>(
+        "/admin/v1/cohort-snapshots/trigger",
+        {},
+      );
 
       toast.success("Cohort snapshot calculation triggered successfully");
       setResult(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to trigger snapshot:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to trigger snapshot",
-      );
+      const message = isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      toast.error(message || "Failed to trigger snapshot");
     } finally {
       setLoading(false);
     }
@@ -40,6 +58,29 @@ export default function ScriptsPage() {
           </p>
         </div>
       </div>
+
+      <section
+        id="nudge-migrations"
+        aria-labelledby="nudge-migrations-heading"
+        className="rounded-lg bg-white p-6 shadow space-y-5"
+      >
+        <div>
+          <h2
+            id="nudge-migrations-heading"
+            className="text-lg font-medium text-gray-900"
+          >
+            Automated nudges migrations
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-gray-600">
+            Moves the automated pushes and emails from code into the database,
+            where Growth → Automated nudges edits them, and then applies the
+            24 Nov nudge map. Run a dry run first: it lists every nudge it would
+            create or change, field by field. Apply does exactly what the dry
+            run showed, or refuses if anything moved since.
+          </p>
+        </div>
+        <NudgeMigrations />
+      </section>
 
       <section
         id="hidden-activity-restore"
@@ -125,7 +166,7 @@ export default function ScriptsPage() {
           </div>
           <div className="px-4 py-5 sm:p-6">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {result.snapshots?.map((snapshot: any) => (
+              {result.snapshots?.map((snapshot) => (
                 <div
                   key={`${snapshot.date}-${snapshot.cohortId}`}
                   className="bg-gray-50 overflow-hidden rounded-lg border border-gray-200"
