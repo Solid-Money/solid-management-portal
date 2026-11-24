@@ -315,7 +315,7 @@ function NewNudgeForm({
             id={`${id}-priority`}
             type="number"
             min={1}
-            max={9}
+            max={7}
             value={priority}
             onChange={(e) => setPriority(Number(e.target.value))}
           />

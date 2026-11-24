@@ -141,8 +141,8 @@ function NudgeEditorForm({
     ) {
       errors.push("This nudge must always send; it cannot be paused or archived.");
     }
-    if (!Number.isInteger(draft.priority) || draft.priority < 1 || draft.priority > 9) {
-      errors.push("Priority must be a whole number from 1 to 9.");
+    if (!Number.isInteger(draft.priority) || draft.priority < 1 || draft.priority > 7) {
+      errors.push("Priority must be a whole number from 1 to 7.");
     }
     if (
       draft.cooldownDays !== null &&
@@ -352,7 +352,7 @@ function NudgeEditorForm({
               id={`${id}-priority`}
               type="number"
               min={1}
-              max={9}
+              max={7}
               value={draft.priority}
               onChange={(e) => set({ priority: Number(e.target.value) })}
               disabled={!editable}

@@ -45,6 +45,11 @@ export interface NudgeEdge {
   kind: NudgeEdgeKind;
   /** Shown on the edge, e.g. "+24h, no deposit". */
   label?: string;
+  /**
+   * For `suppresses`: how long after this one is sent the target is skipped.
+   * Ignored for the other kinds.
+   */
+  days?: number;
 }
 
 export interface NudgeVariable {

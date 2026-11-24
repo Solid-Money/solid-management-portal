@@ -181,7 +181,13 @@ function Canvas({
             id: edgeId(edge.from, edge),
             source: edge.from,
             target: edge.to,
-            label: edge.label ?? (edge.kind === "then" ? undefined : edge.kind),
+            label:
+              edge.label ??
+              (edge.kind === "suppresses" && edge.days
+                ? `suppresses ${edge.days}d`
+                : edge.kind === "then"
+                  ? undefined
+                  : edge.kind),
             labelStyle: { fontSize: 10, fill: "#374151" },
             labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
             type: "smoothstep",
