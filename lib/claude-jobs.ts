@@ -13,6 +13,9 @@ export function claudeJobsOpen(jobs: ClaudeJob[] | undefined): boolean {
   return !!jobs?.some((job) => OPEN.includes(job.state));
 }
 
+/** When a job's latest ask came in: the order the backend replaces by. */
+const lastAsk = (job: ClaudeJob) => job.lastAskAt ?? job.createdAt;
+
 /**
  * The jobs a task shows a chip for, oldest first: the open ones, and a stuck
  * one for a week (until the asker answers it). A finished or cancelled job
@@ -29,7 +32,7 @@ export function shownClaudeJobs(jobs: ClaudeJob[] | undefined, now = new Date())
         // A job the backend closed as replaced replaces nothing itself.
         other.state !== "cancelled" &&
         other.askedBy.email === stuck.askedBy.email &&
-        other.createdAt > stuck.createdAt,
+        lastAsk(other) > lastAsk(stuck),
     );
   return all
     .filter(
