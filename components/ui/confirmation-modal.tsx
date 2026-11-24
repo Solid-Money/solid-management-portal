@@ -11,6 +11,8 @@ interface ConfirmationModalProps {
   confirmText?: string;
   cancelText?: string;
   isDestructive?: boolean;
+  /** Holds the confirm button until the admin has done what it asks (typed a phrase, say). */
+  confirmDisabled?: boolean;
 }
 
 export default function ConfirmationModal({
@@ -22,6 +24,7 @@ export default function ConfirmationModal({
   confirmText = "Confirm",
   cancelText = "Cancel",
   isDestructive = false,
+  confirmDisabled = false,
 }: ConfirmationModalProps) {
   if (!isOpen) return null;
 
@@ -55,7 +58,8 @@ export default function ConfirmationModal({
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors cursor-pointer ${
+            disabled={confirmDisabled}
+            className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
               isDestructive
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-indigo-600 hover:bg-indigo-700"

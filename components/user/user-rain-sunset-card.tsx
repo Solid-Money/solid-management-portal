@@ -212,7 +212,17 @@ export default function UserRainSunsetCard({ userId }: UserRainSunsetCardProps) 
                         </td>
                         <td className="px-3 py-2 text-xs">
                           {card.cancelledAt ? (
-                            formatDateTime(card.cancelledAt)
+                            <>
+                              {formatDateTime(card.cancelledAt)}
+                              {card.bulkCancelRunId && !card.retiredAt ? (
+                                <span
+                                  className="ml-1 text-gray-400"
+                                  title={`Bulk cancel run ${card.bulkCancelRunId}`}
+                                >
+                                  (closed by the sunset)
+                                </span>
+                              ) : null}
+                            </>
                           ) : card.retiredAt ? (
                             <span
                               className="text-amber-700"

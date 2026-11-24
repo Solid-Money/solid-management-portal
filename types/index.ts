@@ -4018,7 +4018,147 @@ export interface UserRainSunsetState {
     cancelledAt: string | null;
     /** Last error cancelling at Rain; the sweep retries every 30 minutes. */
     cancelError: string | null;
+    /**
+     * The bulk cancel run that closed it, when the sunset closed it without a
+     * move to Wirex. Optional: older backends do not send it.
+     */
+    bulkCancelRunId?: string | null;
   }>;
+}
+
+/**
+ * Rain sunset bulk cancel: an admin previews the Rain cards still held and
+ * what each holds, then confirms closing them at Rain.
+ */
+export type RainSunsetBulkCancelRunStatus =
+  | "previewing"
+  | "ready"
+  | "cancelling"
+  | "completed"
+  | "stopped"
+  | "discarded";
+
+/** Every previewed card, or only those holding $1 or less. */
+export type RainSunsetBulkCancelMode = "all" | "low_balance";
+
+export interface RainSunsetBulkCancelResults {
+  /** Cards the confirmed mode selects. */
+  selected: number;
+  cancelled: number;
+  /** Rain had already closed them; our records now say so too. */
+  alreadyCancelled: number;
+  /** Low-balance mode: held more than $1 when re-read just before closing. */
+  skippedBalance: number;
+  /** Low-balance mode: the balance could not be re-read, so the card stays. */
+  skippedUnreadable: number;
+  /** Moved to Wirex or closed by support since the preview. */
+  skippedNotHeld: number;
+  failed: number;
+  /** Selected but never reached (the run was stopped). */
+  notProcessed: number;
+}
+
+export interface RainSunsetBulkCancelRun {
+  id: string;
+  status: RainSunsetBulkCancelRunStatus;
+  mode: RainSunsetBulkCancelMode | null;
+  /** The low-balance limit the preview grouped against, in USD. */
+  maxBalanceUsd: number;
+  createdBy: string;
+  createdAt: string;
+  previewFinishedAt: string | null;
+  /** A ready preview can be confirmed until then. */
+  previewExpiresAt: string | null;
+  confirmedBy: string | null;
+  confirmedAt: string | null;
+  stoppedBy: string | null;
+  stoppedAt: string | null;
+  finishedAt: string | null;
+  preview: {
+    cards: number;
+    users: number;
+    /** Cards whose balance has been read (or found unreadable). */
+    read: number;
+    low: { cards: number; balanceUsd: number };
+    high: { cards: number; balanceUsd: number };
+    unknown: { cards: number };
+    migrationStarted: number;
+    accountDeleted: number;
+  };
+  /** Null until confirmed. */
+  execution: (RainSunsetBulkCancelResults & { processed: number }) | null;
+}
+
+export interface RainSunsetBulkCancelRunSummary {
+  id: string;
+  status: RainSunsetBulkCancelRunStatus;
+  mode: RainSunsetBulkCancelMode | null;
+  createdBy: string;
+  createdAt: string;
+  confirmedBy: string | null;
+  finishedAt: string | null;
+  results: RainSunsetBulkCancelResults | null;
+}
+
+export interface RainSunsetBulkCancelOverview {
+  run: RainSunsetBulkCancelRun | null;
+  recentRuns: RainSunsetBulkCancelRunSummary[];
+}
+
+export type RainSunsetBalanceBucket = "low" | "high" | "unknown";
+
+export type RainSunsetBulkCancelOutcome =
+  | "cancelled"
+  | "already_cancelled"
+  | "skipped_balance"
+  | "skipped_unreadable"
+  | "skipped_not_held"
+  | "failed";
+
+/** One card in a bulk cancel run. */
+export interface RainSunsetBulkCancelItem {
+  cardId: string;
+  userId: string;
+  username: string | null;
+  email: string | null;
+  country: string | null;
+  /** The account was closed in the app; the card was still open at Rain. */
+  accountDeleted: boolean;
+  /** Started the move to Wirex (a Wirex application exists). */
+  migrationStarted: boolean;
+  cardStatus: string;
+  cardCreatedAt: string | null;
+  /** Null until the preview has read it. */
+  bucket: RainSunsetBalanceBucket | null;
+  /** What the holder can withdraw now. */
+  balanceUsd: number | null;
+  totalCollateralUsd: number | null;
+  spendingPowerUsd: number | null;
+  balanceError: string | null;
+  /** Null until a confirmed run processed it. */
+  outcome: RainSunsetBulkCancelOutcome | null;
+  /** The balance re-read just before closing (low-balance mode). */
+  outcomeBalanceUsd: number | null;
+  outcomeError: string | null;
+  processedAt: string | null;
+}
+
+export type RainSunsetBulkCancelItemFilter =
+  | "all"
+  | "low"
+  | "high"
+  | "unknown"
+  | "unread"
+  | "cancelled"
+  | "skipped"
+  | "failed"
+  | "kept";
+
+export interface RainSunsetBulkCancelItemPage {
+  items: RainSunsetBulkCancelItem[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 /**
