@@ -588,6 +588,8 @@ export interface ClaudeJob {
   rev: number;
   createdAt: string;
   updatedAt: string;
+  /** When the latest ask came in; older backends do not send it (use createdAt). */
+  lastAskAt?: string;
 }
 
 export interface ClaudeJobs {

@@ -73,6 +73,12 @@ describe("Claude's jobs on a task", () => {
     const replacedNewer = job("cancelled", "2026-11-19T11:00:00Z");
     expect(shownClaudeJobs([stuck, replacedNewer], NOW).map((j) => j.id)).toEqual([stuck.id]);
 
+    // An older job reopened by a later answer counts from that answer: a job
+    // made after it but finished before the answer does not hide it.
+    const reopened = { ...job("stuck", "2026-11-19T08:00:00Z"), lastAskAt: "2026-11-19T12:00:00Z" };
+    const finished = job("done", "2026-11-19T11:00:00Z");
+    expect(shownClaudeJobs([reopened, finished], NOW).map((j) => j.id)).toEqual([reopened.id]);
+
     // Someone else's newer tag does not hide your stuck job.
     const other = { ...job("waiting", "2026-11-19T11:30:00Z"), askedBy: { email: "mark@fuse.io", name: "Mark" } };
     expect(shownClaudeJobs([stuck, other], NOW).map((j) => j.state)).toEqual(["stuck", "waiting"]);
