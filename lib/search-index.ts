@@ -36,6 +36,7 @@ import {
   UserCheck,
   Users,
   Wallet,
+  Workflow,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -335,6 +336,18 @@ const GROWTH_AND_CONTENT_ENTRIES: SearchEntry[] = [
   }),
   section("/scripts#cohort-snapshot-script", "Cohort snapshot script", "Content › Scripts", Terminal, {
     keywords: ["run", "trigger", "backfill", "maintenance"],
+  }),
+  section("/scripts#nudge-migrations", "Automated nudges migrations", "Content › Scripts", Terminal, {
+    keywords: ["nudges", "push", "email", "brevo", "migrate", "dry run"],
+  }),
+  section("/nudges?tab=email", "Automated emails", "Growth › Automated nudges", Workflow, {
+    keywords: ["brevo", "template", "nudge", "lifecycle email"],
+  }),
+  section("/nudges?tab=rules", "Nudge rules", "Growth › Automated nudges", Workflow, {
+    keywords: ["frequency cap", "quiet hours", "consent", "marketing"],
+  }),
+  section("/nudges?tab=history", "Nudge history", "Growth › Automated nudges", Workflow, {
+    keywords: ["audit", "changes", "versions", "nudge"],
   }),
   section("/artifacts#add-artifact", "Add a Claude artifact", "Content › Claude Artifacts", Plus, {
     keywords: ["embed", "dashboard", "report"],
