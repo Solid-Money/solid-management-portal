@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { getTierLockReevaluationPreview, reevaluateTierLock } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatFuseExact } from "@/lib/utils";
 import {
   TierLockReevaluationPreview,
   TierLockReevaluationResult,
@@ -14,6 +14,7 @@ import {
   TierLockThresholdsSource,
   TierLockTrancheValueSource,
 } from "@/types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -213,6 +214,13 @@ export default function ReevaluateTierLockDialog({
                   the soFUSE rate dipped, or a lock the app never confirmed.
                 </li>
                 <li>
+                  Or when someone topped a lock up to the next tier and was
+                  dropped back a few hours later: the top-up was sized against
+                  what the older lock had grown to, and that growth was not
+                  protected. Re-evaluating protects each older lock at its value
+                  when the top-up landed.
+                </li>
+                <li>
                   It can only hold a tier up to what was paid for. Nothing is
                   sent on chain and no FUSE moves.
                 </li>
@@ -229,6 +237,10 @@ export default function ReevaluateTierLockDialog({
                 error={pricesError}
                 disabled={mutation.isPending}
               />
+
+              {!previewLoading && preview.data ? (
+                <FloorsPreview preview={preview.data} />
+              ) : null}
 
               <div className="space-y-2">
                 <Label htmlFor="reevaluate-lock-reason">Reason</Label>
@@ -383,6 +395,83 @@ function PricesSection({
   );
 }
 
+/**
+ * What the press would do to each lock's floor, and to the tier it grants.
+ *
+ * The case it makes visible is a top-up: the app sized it against what the
+ * older lock had grown to, so the older lock is protected at that value. Shown
+ * with `formatFuseExact` because the case it exists for is a lock a fraction of
+ * a FUSE under a threshold, which coarser rounding would show as reaching it.
+ */
+function FloorsPreview({ preview }: { preview: TierLockReevaluationPreview }) {
+  // An older backend sends none of this; the press still works without it.
+  if (!preview.locked || !preview.tranches || preview.tranches.length === 0) {
+    return null;
+  }
+
+  const tierChanges =
+    preview.lockTierNow !== undefined &&
+    preview.lockTierAfter !== undefined &&
+    preview.lockTierNow !== preview.lockTierAfter;
+  const anyRaised = preview.tranches.some((tranche) => tranche.raisedByTopUp);
+
+  return (
+    <div className="space-y-2 rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
+      {preview.lockTierNow && preview.lockTierAfter ? (
+        <p>
+          {tierChanges ? (
+            <>
+              The lock grants <strong>{preview.lockTierNow}</strong> now and
+              will grant <strong>{preview.lockTierAfter}</strong>.
+            </>
+          ) : (
+            <>
+              The lock grants <strong>{preview.lockTierNow}</strong> and will
+              keep granting it.
+            </>
+          )}
+          {preview.committedFuseNow !== undefined &&
+          preview.committedFuseAfter !== undefined
+            ? ` Graded at ${formatFuseExact(preview.committedFuseNow)} now, ${formatFuseExact(preview.committedFuseAfter)} after.`
+            : ""}
+        </p>
+      ) : null}
+
+      <ul className="space-y-1.5">
+        {preview.tranches.map((tranche) => (
+          <li
+            // Shares alone are not unique if two locks bought the same count.
+            key={`${tranche.lockedAt}-${tranche.shares}`}
+            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
+          >
+            <span>
+              Locked {formatDateTime(tranche.lockedAt)} · worth{" "}
+              {formatFuseExact(tranche.liveFuse)} today
+            </span>
+            <span className="flex items-center gap-1.5 font-medium text-gray-900">
+              {tranche.floorFuse === null
+                ? "Not recorded"
+                : formatFuseExact(tranche.floorFuse)}
+              {" → "}
+              {formatFuseExact(tranche.floorFuseAfter)}
+              {tranche.raisedByTopUp ? (
+                <Badge variant="info">Top-up protection</Badge>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      {anyRaised ? (
+        <p>
+          Protected at its value when a later lock was added — what the app
+          counted towards that top-up.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** The tier before and after, and every tranche with where its value came from. */
 function ReevaluationOutcome({
   result,
@@ -422,7 +511,7 @@ function ReevaluationOutcome({
       {result.tranches.length > 0 ? (
         <ul className="space-y-2">
           {result.tranches.map((tranche) => (
-            <li key={tranche.shares}>
+            <li key={`${tranche.lockedAt ?? ""}-${tranche.shares}`}>
               <dl className="grid grid-cols-2 gap-3 rounded-md border border-gray-100 bg-gray-50 p-3 text-xs">
                 <div>
                   <dt className="text-gray-500">Worth when locked</dt>
@@ -433,6 +522,22 @@ function ReevaluationOutcome({
                     {SOURCE_LABEL[tranche.source]}
                   </dd>
                 </div>
+                {tranche.protectedFuse ? (
+                  <div className="col-span-2">
+                    <dt className="text-gray-500">
+                      Protected at (value when topped up)
+                    </dt>
+                    <dd className="font-medium text-gray-900">
+                      {formatFuseExact(tranche.protectedFuse)}
+                      {tranche.previousFloorFuse !== undefined &&
+                      tranche.previousFloorFuse !== null &&
+                      tranche.floorFuse !== undefined &&
+                      tranche.floorFuse > tranche.previousFloorFuse
+                        ? ` — was ${formatFuseExact(tranche.previousFloorFuse)}`
+                        : ""}
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt className="text-gray-500">Worth today</dt>
                   <dd className="font-medium text-gray-900">
