@@ -26,6 +26,8 @@ export function shownClaudeJobs(jobs: ClaudeJob[] | undefined, now = new Date())
     all.some(
       (other) =>
         other.id !== stuck.id &&
+        // A job the backend closed as replaced replaces nothing itself.
+        other.state !== "cancelled" &&
         other.askedBy.email === stuck.askedBy.email &&
         other.createdAt > stuck.createdAt,
     );

@@ -68,6 +68,11 @@ describe("Claude's jobs on a task", () => {
     const allStuck = retries.slice(0, 3);
     expect(shownClaudeJobs(allStuck, NOW).map((j) => j.createdAt)).toEqual(["2026-11-19T10:00:00Z"]);
 
+    // A newer job the backend closed as replaced (an answer reopened the
+    // older one, which then got stuck again) does not hide the older one.
+    const replacedNewer = job("cancelled", "2026-11-19T11:00:00Z");
+    expect(shownClaudeJobs([stuck, replacedNewer], NOW).map((j) => j.id)).toEqual([stuck.id]);
+
     // Someone else's newer tag does not hide your stuck job.
     const other = { ...job("waiting", "2026-11-19T11:30:00Z"), askedBy: { email: "mark@fuse.io", name: "Mark" } };
     expect(shownClaudeJobs([stuck, other], NOW).map((j) => j.state)).toEqual(["stuck", "waiting"]);
