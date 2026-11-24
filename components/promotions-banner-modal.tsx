@@ -5,6 +5,7 @@ import { X, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { uploadImageFile } from "@/lib/upload";
 import {
   fetchLatestAppVersion,
   isValidPagePath,
@@ -85,17 +86,7 @@ export default function PromotionsBannerModal({
   const handleImageUpload = async (file: File) => {
     try {
       setUploading(true);
-      const response = await fetch(`/api/upload?filename=${file.name}`, {
-        method: "POST",
-        body: file,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
-      }
-
-      const blob = await response.json();
-      setImageURL(blob.url);
+      setImageURL(await uploadImageFile(file, file.name));
       toast.success("Image uploaded successfully!");
     } catch (error) {
       console.error("Upload failed:", error);
@@ -108,17 +99,7 @@ export default function PromotionsBannerModal({
   const handleMobileImageUpload = async (file: File) => {
     try {
       setUploadingMobile(true);
-      const response = await fetch(`/api/upload?filename=${file.name}`, {
-        method: "POST",
-        body: file,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload mobile image");
-      }
-
-      const blob = await response.json();
-      setMobileImageURL(blob.url);
+      setMobileImageURL(await uploadImageFile(file, file.name));
       toast.success("Mobile image uploaded successfully!");
     } catch (error) {
       console.error("Upload failed:", error);

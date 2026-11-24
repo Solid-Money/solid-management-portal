@@ -5,6 +5,8 @@ import Image from "next/image";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { uploadImageFile } from "@/lib/upload";
+
 const ACCEPTED = "image/svg+xml,image/png,image/webp,image/jpeg";
 const MAX_BYTES = 512 * 1024;
 
@@ -45,14 +47,9 @@ export function ModelLogoInput({
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "") || "model";
-      const response = await fetch(
-        `/api/upload?filename=${encodeURIComponent(`ai-api/logos/${slug}.${extension}`)}`,
-        { method: "POST", body: file },
+      onChange(
+        await uploadImageFile(file, `ai-api/logos/${slug}.${extension}`),
       );
-      if (!response.ok) throw new Error("Upload failed");
-      const blob = (await response.json()) as { url?: string };
-      if (!blob.url) throw new Error("Upload failed");
-      onChange(blob.url);
     } catch {
       toast.error("Couldn't upload the logo. Try again.");
     } finally {
