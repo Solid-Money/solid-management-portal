@@ -166,7 +166,7 @@ function TasksScreen() {
   const rawArea = params.get("area");
 
   const update = useCallback(
-    (changes: Record<string, string | null | undefined>) => {
+    (changes: Record<string, string | null | undefined>, { push = false }: { push?: boolean } = {}) => {
       const next = new URLSearchParams(params.toString());
       // An old ?view=support|radar link moves onto ?board= on the first change.
       if (legacyBoard) {
@@ -182,13 +182,19 @@ function TasksScreen() {
       if (next.get("view") === "open") next.delete("view");
       if (next.get("tab") === "sprint") next.delete("tab");
       const query = next.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+      const url = query ? `${pathname}?${query}` : pathname;
+      if (push) router.push(url, { scroll: false });
+      else router.replace(url, { scroll: false });
     },
     [params, pathname, router, legacyBoard, tab],
   );
 
-  /** Opens a task (or closes it, with null); a link's update to scroll to goes with it. */
-  const openTask = (id: string | null) => update({ task: id, update: null });
+  /**
+   * Opens a task (or closes it, with null); a link's update to scroll to goes
+   * with it. Each open and close is its own step in the browser's history, so
+   * Back after closing a task opens it again.
+   */
+  const openTask = (id: string | null) => update({ task: id, update: null }, { push: true });
 
   /** A top tab: its own board, view and filters start fresh. */
   const goTo = (next: Tab) =>
@@ -333,7 +339,12 @@ function TasksScreen() {
         </>
       )}
 
-      <TaskDrawer taskId={open} focusUpdate={focusUpdate} onClose={() => openTask(null)} />
+      <TaskDrawer
+        taskId={open}
+        focusUpdate={focusUpdate}
+        onClose={() => openTask(null)}
+        onReopen={(id) => openTask(id)}
+      />
       <NewTaskDialog
         open={creating !== null}
         defaultBoard={tab === "support" ? supportBoard : productBoard && productBoard !== "none" ? productBoard : null}
