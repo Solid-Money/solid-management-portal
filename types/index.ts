@@ -3200,6 +3200,19 @@ export interface UserRewardsData {
   cashbackThisMonth: number;
   /** This month's cashback still in escrow, already held to the cap. */
   cashbackPendingThisMonth?: number;
+  /**
+   * The app's "Lifetime cashback" in dollars: everything paid on every card the
+   * user has held, plus what is still in escrow. Euro cashback has its own in
+   * `cashbackLifetimeEur`. Absent on older backends, or when the paid total
+   * couldn't be read.
+   */
+  cashbackLifetime?: number;
+  /**
+   * The same in euros, reported for every user whatever their currency now, so
+   * euros earned before a switch to dollars still count. Never added to
+   * `cashbackLifetime`. Absent on older backends, or when unreadable.
+   */
+  cashbackLifetimeEur?: number;
   /** The monthly cap of the tier held now. */
   maxCashbackMonthly: number;
   /**

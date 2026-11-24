@@ -8,6 +8,7 @@ import {
   formatCashbackMoney,
   formatCashbackTotals,
 } from "@/lib/card-transactions";
+import { lifetimeCashbackValue } from "@/lib/lifetime-cashback";
 import { tierTrialRemaining } from "@/lib/tier-trial";
 import { CashbackCurrency, UserRewardsData } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -141,6 +142,7 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
 
   const rewards = data?.data;
   const month = rewards ? monthCashbackOf(rewards) : undefined;
+  const lifetime = rewards ? lifetimeCashbackValue(rewards) : undefined;
 
   return (
     <Card>
@@ -188,6 +190,13 @@ export default function UserRewardsCard({ userId }: { userId: string }) {
                   label="Cashback this month"
                   value={monthCashbackValue(rewards, month)}
                   hint={monthCashbackHint(rewards, month)}
+                />
+              )}
+              {lifetime && (
+                <Stat
+                  label="Lifetime cashback"
+                  value={lifetime}
+                  hint="Paid on every card, plus pending — as the app shows it"
                 />
               )}
               <Stat
