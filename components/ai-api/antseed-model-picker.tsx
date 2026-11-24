@@ -33,6 +33,7 @@ export interface AntseedPick {
 /** The gateway routes a request naming only a model to the cheapest trusted seller. */
 const CHEAPEST = "cheapest";
 
+/** The multiple the picker starts at when the API has no default markup. */
 const DEFAULT_MULTIPLE = "4";
 
 /**
@@ -40,24 +41,38 @@ const DEFAULT_MULTIPLE = "4";
  * multiple of what a seller charges. The rates are AntSeed's now; they move as
  * sellers come and go, so prices set here stay as typed unless the row is
  * also set to keep following AntSeed at that multiple.
+ *
+ * `defaultMultiple` is the default markup, where the API has one: the picker
+ * starts at it, and a row kept at it follows the default (see `applyPick`).
  */
 export function AntseedModelPicker({
   open,
   onOpenChange,
   onPick,
+  defaultMultiple,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (pick: AntseedPick) => void;
+  defaultMultiple?: string;
 }) {
   const { data, isLoading, isError, isFetching, refetch } =
     useAiApiUpstreamModels(open);
+  const startMultiple = defaultMultiple ?? DEFAULT_MULTIPLE;
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [seller, setSeller] = useState(CHEAPEST);
-  const [multiple, setMultiple] = useState(DEFAULT_MULTIPLE);
+  const [multiple, setMultiple] = useState(startMultiple);
   const [setPrices, setSetPrices] = useState(true);
   const [follow, setFollow] = useState(false);
+  // The picker stays mounted while closed, so the default may have moved since
+  // the multiple was last set: start each opening at the default as it is
+  // now, and leave what the admin types alone while it stays open.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setMultiple(startMultiple);
+  }
 
   // Only models a seller prices: the backend leaves out the rest, and the rows
   // below read the cheapest offer, so none must slip through without one.
@@ -96,7 +111,7 @@ export function AntseedModelPicker({
     setSearch("");
     setSelectedId(null);
     setSeller(CHEAPEST);
-    setMultiple(DEFAULT_MULTIPLE);
+    setMultiple(startMultiple);
     setSetPrices(true);
     setFollow(false);
   };
@@ -301,6 +316,15 @@ export function AntseedModelPicker({
               />
               Keep it at this multiple as AntSeed&apos;s rates move
             </label>
+            {following &&
+            followValid &&
+            defaultMultiple !== undefined &&
+            times === Number(defaultMultiple) ? (
+              <p className="text-xs text-gray-500">
+                That&apos;s the default markup, so the model follows the default:
+                its price moves when the default does.
+              </p>
+            ) : null}
             {!followValid ? (
               <p className="text-xs text-red-600">
                 To keep following AntSeed, the multiple must be 1× to 50×.

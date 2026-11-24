@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Loader2, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -55,6 +55,7 @@ interface ModelDraft {
   enabled: boolean;
   /** Priced from AntSeed's rates, at `markup` times, within the min and max. */
   autoEnabled: boolean;
+  /** Blank follows the default markup, on an API that has one. */
   markup: string;
   minInput: string;
   minOutput: string;
@@ -71,7 +72,19 @@ type ModelTextField = Exclude<
 /** Our price over AntSeed's, as the backend holds it. */
 const MARKUP_RANGE = { min: 1, max: 50 };
 
-/** The markup a row gets when it is first priced from AntSeed: the picker's default. */
+/** A markup typed in, when it is one the backend takes; null otherwise. */
+const markupValue = (text: string): number | null => {
+  if (text.trim() === "") return null;
+  const value = Number(text);
+  return Number.isFinite(value) && value >= MARKUP_RANGE.min && value <= MARKUP_RANGE.max
+    ? value
+    : null;
+};
+
+/**
+ * The markup a row gets when it is first priced from AntSeed, on an older API
+ * with no default markup for it to follow: the picker's default.
+ */
 const DEFAULT_MARKUP = "4";
 
 interface TierDraft {
@@ -89,6 +102,8 @@ interface Draft {
   chargeThresholdUsd: string;
   maxUnpaidUsd: string;
   balanceHeadroomUsd: string;
+  /** Blank only when the API has no default markup (an older one). */
+  defaultMarkup: string;
   models: ModelDraft[];
 }
 
@@ -107,6 +122,7 @@ const toDraft = (settings: AiApiSettings): Draft => ({
   chargeThresholdUsd: String(settings.chargeThresholdUsd),
   maxUnpaidUsd: String(settings.maxUnpaidUsd),
   balanceHeadroomUsd: String(settings.balanceHeadroomUsd),
+  defaultMarkup: priceText(settings.defaultMarkup),
   models: settings.models.map((model) => ({
     id: model.id,
     name: model.name,
@@ -122,7 +138,7 @@ const toDraft = (settings: AiApiSettings): Draft => ({
     officialOutput: priceText(model.officialOutputUsdPerMTok),
     enabled: model.enabled,
     autoEnabled: model.autoPricing?.enabled ?? false,
-    markup: model.autoPricing ? String(model.autoPricing.markup) : "",
+    markup: priceText(model.autoPricing?.markup),
     minInput: priceText(model.autoPricing?.minInputUsdPerMTok),
     minOutput: priceText(model.autoPricing?.minOutputUsdPerMTok),
     maxInput: priceText(model.autoPricing?.maxInputUsdPerMTok),
@@ -170,38 +186,38 @@ const priceLimit = (text: string): number | null => {
 
 /**
  * A row's AntSeed pricing as the API takes it, or what is wrong with it.
- * Off with no markup is no settings; off with one keeps it for next time.
+ * Off, what is set is kept for next time; off with nothing set is no settings.
+ * No markup follows the default markup where the API has one (`followsDefault`);
+ * an older API needs one on every row priced from AntSeed.
  */
 function parseAutoPricing(
   row: ModelDraft,
   label: string,
+  followsDefault: boolean,
   before?: ModelDraft,
 ): { autoPricing?: AiApiAutoPricing } | { error: string } {
-  const parsed = readAutoPricing(row, label);
+  const parsed = readAutoPricing(row, label, followsDefault);
   if (!("error" in parsed) || row.autoEnabled) return parsed;
   // Off, the markup and limits are hidden, so a bad edit to them must not
   // block saving the fixed prices: keep what they were before this edit, off,
   // or nothing when that wasn't valid either. Good ones are kept as typed.
-  const kept = before ? readAutoPricing({ ...before, autoEnabled: false }, label) : {};
+  const kept = before
+    ? readAutoPricing({ ...before, autoEnabled: false }, label, followsDefault)
+    : {};
   return "error" in kept ? {} : kept;
 }
 
 function readAutoPricing(
   row: ModelDraft,
   label: string,
+  followsDefault: boolean,
 ): { autoPricing?: AiApiAutoPricing } | { error: string } {
   const markupText = row.markup.trim();
-  if (markupText === "") {
-    return row.autoEnabled
-      ? { error: `${label}: set a markup to price it from AntSeed.` }
-      : {};
+  const markup = markupValue(markupText);
+  if (markupText === "" && row.autoEnabled && !followsDefault) {
+    return { error: `${label}: set a markup to price it from AntSeed.` };
   }
-  const markup = Number(markupText);
-  if (
-    !Number.isFinite(markup) ||
-    markup < MARKUP_RANGE.min ||
-    markup > MARKUP_RANGE.max
-  ) {
+  if (markupText !== "" && markup === null) {
     return {
       error: `${label}: the markup must be ${MARKUP_RANGE.min}× to ${MARKUP_RANGE.max}× AntSeed's rate.`,
     };
@@ -221,16 +237,17 @@ function readAutoPricing(
   if (minOutput !== null && maxOutput !== null && minOutput > maxOutput) {
     return { error: `${label}: the minimum output price is above the maximum.` };
   }
-  return {
-    autoPricing: {
-      enabled: row.autoEnabled,
-      markup,
-      ...(minInput !== null ? { minInputUsdPerMTok: minInput } : {}),
-      ...(minOutput !== null ? { minOutputUsdPerMTok: minOutput } : {}),
-      ...(maxInput !== null ? { maxInputUsdPerMTok: maxInput } : {}),
-      ...(maxOutput !== null ? { maxOutputUsdPerMTok: maxOutput } : {}),
-    },
+  const autoPricing: AiApiAutoPricing = {
+    enabled: row.autoEnabled,
+    ...(markup !== null ? { markup } : {}),
+    ...(minInput !== null ? { minInputUsdPerMTok: minInput } : {}),
+    ...(minOutput !== null ? { minOutputUsdPerMTok: minOutput } : {}),
+    ...(maxInput !== null ? { maxInputUsdPerMTok: maxInput } : {}),
+    ...(maxOutput !== null ? { maxOutputUsdPerMTok: maxOutput } : {}),
   };
+  // Off with nothing set is nothing to keep.
+  if (!row.autoEnabled && Object.keys(autoPricing).length === 1) return {};
+  return { autoPricing };
 }
 
 /**
@@ -285,6 +302,15 @@ function parseDraft(
   if (Number.isNaN(balanceHeadroom) || balanceHeadroom < 0 || balanceHeadroom > 100) {
     return { error: "Wallet headroom must be $0 to $100." };
   }
+  // Only an API that reports a default markup takes one, and lets a row
+  // priced from AntSeed go without its own.
+  const followsDefault = base.defaultMarkup.trim() !== "";
+  const defaultMarkup = markupValue(draft.defaultMarkup);
+  if (followsDefault && defaultMarkup === null) {
+    return {
+      error: `The default markup must be ${MARKUP_RANGE.min}× to ${MARKUP_RANGE.max}× AntSeed's rate.`,
+    };
+  }
 
   const models: AiApiModelConfig[] = [];
   const ids = new Set<string>();
@@ -328,6 +354,7 @@ function parseDraft(
     const auto = parseAutoPricing(
       row,
       label,
+      followsDefault,
       base.models.find((entry) => entry.id.trim() === id),
     );
     if ("error" in auto) return auto;
@@ -358,6 +385,9 @@ function parseDraft(
       ...(changed("chargeThresholdUsd") ? { chargeThresholdUsd: chargeThreshold } : {}),
       ...(changed("maxUnpaidUsd") ? { maxUnpaidUsd: maxUnpaid } : {}),
       ...(changed("balanceHeadroomUsd") ? { balanceHeadroomUsd: balanceHeadroom } : {}),
+      ...(followsDefault && defaultMarkup !== null && changed("defaultMarkup")
+        ? { defaultMarkup }
+        : {}),
       // The table is saved whole: two admins editing it at once is still last
       // save wins, but an edit elsewhere no longer replaces it.
       ...(changed("models") ? { models } : {}),
@@ -477,6 +507,37 @@ export default function AiApiSettingsEditor() {
     .map((tier) => fromPercentInput(tier.percent))
     .filter((rate): rate is number => rate !== undefined);
   const pricingRun = saved.pricingRun ?? null;
+  // Whether the API has a default markup for rows without their own. An older
+  // one doesn't, and every row priced from AntSeed needs its own there.
+  const followsDefault = saved.defaultMarkup !== undefined;
+  // What a row without its own markup is priced at once saved, so the
+  // previews, the confirmation and the save agree: the default as typed when
+  // this edit changed it (and it is one the API takes), since only then is it
+  // sent; otherwise the default as saved now, which another admin may have
+  // changed since this edit began.
+  const defaultEdited = draft.defaultMarkup !== base.defaultMarkup;
+  const defaultMarkup = followsDefault
+    ? ((defaultEdited ? markupValue(draft.defaultMarkup) : null) ??
+      saved.defaultMarkup ??
+      null)
+    : null;
+  const defaultNet = defaultMarkup !== null ? netMultiple(defaultMarkup, cashbackRates) : null;
+  const ownMarkups = draft.models.filter((model) => model.markup.trim() !== "").length;
+  const followingDefault = draft.models.filter(
+    (model) => model.autoEnabled && model.markup.trim() === "",
+  ).length;
+  // For the save confirmation: the default moving, and rows dropping their own.
+  const defaultChanging =
+    followsDefault && defaultMarkup !== null && defaultMarkup !== saved.defaultMarkup;
+  const markupsCleared = base.models
+    .filter(
+      (before) =>
+        before.markup.trim() !== "" &&
+        draft.models.some(
+          (row) => row.id.trim() === before.id.trim() && row.markup.trim() === "",
+        ),
+    )
+    .map((before) => before.id.trim());
 
   const updateTier = (index: number, patch: Partial<TierDraft>) =>
     setDraft({
@@ -522,11 +583,34 @@ export default function AiApiSettingsEditor() {
       ...(pick.prices ?? {}),
       // Prices picked without following AntSeed are fixed prices: the row
       // stops following. A pick that leaves the prices alone leaves the mode.
+      // Following at the default markup follows the default itself, so the
+      // row moves when the default does instead of holding a copy of it.
       ...(pick.prices
         ? pick.followMarkup
-          ? { autoEnabled: true, markup: pick.followMarkup }
+          ? {
+              autoEnabled: true,
+              markup:
+                defaultMarkup !== null && markupValue(pick.followMarkup) === defaultMarkup
+                  ? ""
+                  : pick.followMarkup,
+            }
           : { autoEnabled: false }
         : {}),
+    });
+  };
+
+  /** Clear every row's own markup, so each follows the default once saved. */
+  const resetMarkups = () => {
+    if (ownMarkups === 0) return;
+    setDraft({
+      ...draft,
+      models: draft.models.map((model) =>
+        model.markup.trim() !== "" ? { ...model, markup: "" } : model,
+      ),
+    });
+    toast.success(`Cleared ${ownMarkups} markup${ownMarkups === 1 ? "" : "s"}`, {
+      description:
+        "Every model priced from AntSeed follows the default markup once you save. Discard undoes it.",
     });
   };
 
@@ -811,6 +895,56 @@ export default function AiApiSettingsEditor() {
           </div>
         </div>
 
+        {followsDefault ? (
+          <div className="flex flex-wrap items-end justify-between gap-4 rounded-md border border-gray-200 p-3">
+            <div className="space-y-1">
+              <Field
+                label="Default markup (× AntSeed)"
+                hint={`For every model priced from AntSeed without a markup of its own${
+                  followingDefault
+                    ? ` (${followingDefault} model${followingDefault === 1 ? "" : "s"} now)`
+                    : ""
+                }. A model's own markup wins over it. Changing it reprices those models as soon as it's saved.`}
+              >
+                <Input
+                  className="w-28"
+                  inputMode="decimal"
+                  aria-label="Default markup (× AntSeed)"
+                  value={draft.defaultMarkup}
+                  disabled={disabled}
+                  onChange={(e) => setDraft({ ...draft, defaultMarkup: e.target.value })}
+                />
+              </Field>
+              {defaultNet !== null && defaultNet < 1 ? (
+                <p className="text-xs text-amber-700">
+                  With {Math.round(Math.max(0, ...cashbackRates) * 100)}% cashback,{" "}
+                  {defaultMarkup}× nets {defaultNet.toFixed(2)}× AntSeed&apos;s rate
+                  before any minimum or maximum: users under their cashback cap
+                  cost us more than they pay.
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={disabled || ownMarkups === 0}
+                onClick={resetMarkups}
+                className="cursor-pointer"
+                title="Clear every model's own markup so each follows the default"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset all markups
+              </Button>
+              <span className="text-xs text-gray-500">
+                {ownMarkups === 0
+                  ? "No model has a markup of its own."
+                  : `${ownMarkups} model${ownMarkups === 1 ? " has its" : "s have their"} own markup.`}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         {freeKeyMissing && (refusedNow.length > 0 || refusalChanges) ? (
           <div className="space-y-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {refusedNow.length > 0 ? (
@@ -917,9 +1051,12 @@ export default function AiApiSettingsEditor() {
                       Users pay {formatRate(rate)}
                     </span>
                   ) : null;
-                const markup = Number(model.markup);
-                const markupSet =
-                  model.markup.trim() !== "" && Number.isFinite(markup);
+                // Its own markup, or the default it follows when it has none.
+                const ownMarkup = model.markup.trim() !== "";
+                const markup = ownMarkup
+                  ? Number(model.markup)
+                  : (defaultMarkup ?? Number.NaN);
+                const markupSet = Number.isFinite(markup);
                 const typed = (text: string) => {
                   const value = Number(text);
                   return text.trim() !== "" && Number.isFinite(value)
@@ -1091,7 +1228,8 @@ export default function AiApiSettingsEditor() {
                           onCheckedChange={(autoEnabled) =>
                             updateModel(index, {
                               autoEnabled,
-                              ...(autoEnabled && !model.markup.trim()
+                              // Blank follows the default, where there is one.
+                              ...(autoEnabled && !followsDefault && !model.markup.trim()
                                 ? { markup: DEFAULT_MARKUP }
                                 : {}),
                             })
@@ -1150,7 +1288,15 @@ export default function AiApiSettingsEditor() {
                       <tr>
                         <td colSpan={15} className="bg-gray-50 px-3 py-3">
                           <div className="flex flex-wrap items-start gap-4">
-                            {limitInput("markup", "Markup (× AntSeed)", DEFAULT_MARKUP)}
+                            {limitInput(
+                              "markup",
+                              "Markup (× AntSeed)",
+                              !followsDefault
+                                ? DEFAULT_MARKUP
+                                : defaultMarkup !== null
+                                  ? `Default ${defaultMarkup}×`
+                                  : "Default",
+                            )}
                             {limitInput("minInput", "Min input", "None")}
                             {limitInput("minOutput", "Min output", "None")}
                             {limitInput(
@@ -1165,6 +1311,11 @@ export default function AiApiSettingsEditor() {
                             )}
                           </div>
                           <p className="mt-2 text-xs text-gray-500">
+                            {followsDefault
+                              ? `Blank markup: the default markup${
+                                  defaultMarkup !== null ? ` (${defaultMarkup}×)` : ""
+                                }, and it moves when the default does. `
+                              : ""}
                             Blank maximum: the official price, or no ceiling
                             when there&apos;s none. A minimum above that ceiling
                             wins; a minimum above a maximum you set can&apos;t
@@ -1190,7 +1341,8 @@ export default function AiApiSettingsEditor() {
                           {net !== null && net < 1 ? (
                             <p className="mt-1 text-xs text-amber-700">
                               With {Math.round(topCashback * 100)}% cashback,{" "}
-                              {model.markup.trim()}× nets {net.toFixed(2)}×
+                              {markup}×{ownMarkup ? "" : " (the default)"} nets{" "}
+                              {net.toFixed(2)}×
                               AntSeed&apos;s rate before any minimum or maximum:
                               users under their cashback cap cost us more than
                               they pay.
@@ -1208,6 +1360,7 @@ export default function AiApiSettingsEditor() {
       </div>
 
       <AntseedModelPicker
+        defaultMultiple={defaultMarkup !== null ? String(defaultMarkup) : undefined}
         open={pickingRow !== null}
         onOpenChange={(open) => {
           if (!open) setPickingRow(null);
@@ -1260,6 +1413,22 @@ export default function AiApiSettingsEditor() {
               }${
                 toPaid.length
                   ? `${toPaid.join(", ")} get${toPaid.length === 1 ? "s" : ""} a price and move${toPaid.length === 1 ? "s" : ""} to the paid AntSeed key: we pay whatever ${toPaid.length === 1 ? "its" : "their"} sellers charge. `
+                  : ""
+              }${
+                defaultChanging
+                  ? `The default markup goes from ${saved.defaultMarkup}× to ${defaultMarkup}×${
+                      followingDefault
+                        ? `: the ${followingDefault} model${followingDefault === 1 ? "" : "s"} following it ${followingDefault === 1 ? "is" : "are"} repriced at once`
+                        : ""
+                    }. `
+                  : ""
+              }${
+                markupsCleared.length
+                  ? `${
+                      markupsCleared.length > 5
+                        ? `${markupsCleared.length} models`
+                        : markupsCleared.join(", ")
+                    } drop${markupsCleared.length === 1 ? "s its" : " their"} own markup and follow${markupsCleared.length === 1 ? "s" : ""} the default${defaultMarkup !== null ? ` (${defaultMarkup}×)` : ""}. `
                   : ""
               }New prices apply to requests made after the change. What has already been used keeps the price it was metered at.${
                 anyAuto

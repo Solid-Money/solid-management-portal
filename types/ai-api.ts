@@ -258,8 +258,11 @@ export interface AiApiModelConfig {
 /** A model priced as a multiple of what AntSeed's sellers typically charge. */
 export interface AiApiAutoPricing {
   enabled: boolean;
-  /** Our price over AntSeed's typical seller rate: 4 is 4×. */
-  markup: number;
+  /**
+   * Our price over AntSeed's typical seller rate: 4 is 4×. Unset, the model
+   * follows the default markup (`AiApiSettings.defaultMarkup`).
+   */
+  markup?: number;
   /** Never below these, USD per million tokens. */
   minInputUsdPerMTok?: number;
   minOutputUsdPerMTok?: number;
@@ -346,6 +349,12 @@ export interface AiApiSettings {
   chargeThresholdUsd: number;
   maxUnpaidUsd: number;
   balanceHeadroomUsd: number;
+  /**
+   * The markup over AntSeed's rate (2 is 2×) for every model priced from
+   * AntSeed without a markup of its own. Absent from an older API, which needs
+   * a markup on every such model.
+   */
+  defaultMarkup?: number;
   /** As saved, with their fixed prices; what users pay now is in `autoPrices`. */
   models: AiApiModelConfig[];
   /** What the pricing pass last read from AntSeed, by model id. Absent from an older API. */
@@ -373,6 +382,7 @@ export interface AiApiSettingsPatch {
   chargeThresholdUsd?: number;
   maxUnpaidUsd?: number;
   balanceHeadroomUsd?: number;
+  defaultMarkup?: number;
   models?: AiApiModelConfig[];
 }
 
