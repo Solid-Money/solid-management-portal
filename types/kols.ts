@@ -99,8 +99,6 @@ export interface KolsOverview {
   kols: Kol[];
   perks: KolPerk[];
   limits: KolLimits;
-  /** Whether this admin is in KOL_ADMIN_EMAILS. */
-  canEdit: boolean;
 }
 
 export type KolPerkGrantSource = "signup" | "add_referrer";

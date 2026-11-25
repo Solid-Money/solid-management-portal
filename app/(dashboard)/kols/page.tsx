@@ -3,7 +3,6 @@
 import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Eye,
   Gift,
   Link2,
   Loader2,
@@ -81,9 +80,9 @@ const TABS = ["kols", "perks"] as const;
  * A perk's code refers a friend to its KOL exactly as the KOL's own code
  * does — every referral reward keeps working — and grants the perk while it
  * runs: a discount on the first year of a membership, free SEPA deposits for
- * the first months up to a cap. Saving is for the admins in KOL_ADMIN_EMAILS;
- * everyone else sees the lists. Nothing is deleted: removing a KOL or
- * switching a perk off stops new grants, and every grant already made stands.
+ * the first months up to a cap. Every admin who can sign in to the portal
+ * can manage KOLs and perks. Nothing is deleted: removing a KOL or switching
+ * a perk off stops new grants, and every grant already made stands.
  */
 export default function KolsPage() {
   return (
@@ -102,7 +101,6 @@ type Confirming =
 function KolsScreen() {
   const { data, isLoading, error } = useKols();
   const [tab, setTab] = useUrlTab(TABS, "kols");
-  const canEdit = data?.canEdit === true;
   const kols = data?.kols ?? [];
   const perks = data?.perks ?? [];
   const activeKols = kols.filter((kol) => kol.status === "active");
@@ -202,20 +200,7 @@ function KolsScreen() {
             SEPA deposits for signups during its window.
           </p>
         </div>
-        {data && !canEdit && (
-          <Badge variant="warning">
-            <Eye className="h-3 w-3" />
-            View only
-          </Badge>
-        )}
       </div>
-
-      {data && !canEdit && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          You can see KOLs and perks but not change them. Changes are limited to
-          the admins in <code>KOL_ADMIN_EMAILS</code>.
-        </div>
-      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -247,17 +232,15 @@ function KolsScreen() {
                     special code.
                   </CardDescription>
                 </div>
-                {canEdit && (
-                  <CardAction>
-                    <Button
-                      onClick={() => setKolDialog({ kol: null })}
-                      className="cursor-pointer"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Add KOL
-                    </Button>
-                  </CardAction>
-                )}
+                <CardAction>
+                  <Button
+                    onClick={() => setKolDialog({ kol: null })}
+                    className="cursor-pointer"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Add KOL
+                  </Button>
+                </CardAction>
               </CardHeader>
               <CardContent>
                 {kols.length === 0 ? (
@@ -338,7 +321,7 @@ function KolsScreen() {
                                   ))}
                                 </div>
                               )}
-                              {canEdit && !removed && (
+                              {!removed && (
                                 <Button
                                   variant="link"
                                   size="xs"
@@ -396,7 +379,7 @@ function KolsScreen() {
                                     <Users className="h-4 w-4" />
                                     View perk signups
                                   </DropdownMenuItem>
-                                  {canEdit && !removed && (
+                                  {!removed && (
                                     <>
                                       <DropdownMenuItem
                                         onSelect={() =>
@@ -432,7 +415,7 @@ function KolsScreen() {
                                       </DropdownMenuItem>
                                     </>
                                   )}
-                                  {canEdit && removed && (
+                                  {removed && (
                                     <DropdownMenuItem onSelect={() => addBack(kol)}>
                                       <UserPlus className="h-4 w-4" />
                                       Add back
@@ -463,17 +446,15 @@ function KolsScreen() {
                     sign up.
                   </CardDescription>
                 </div>
-                {canEdit && (
-                  <CardAction>
-                    <Button
-                      onClick={() => setPerkDialog({ perk: null })}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Create perk
-                    </Button>
-                  </CardAction>
-                )}
+                <CardAction>
+                  <Button
+                    onClick={() => setPerkDialog({ perk: null })}
+                    className="cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create perk
+                  </Button>
+                </CardAction>
               </CardHeader>
               <CardContent>
                 {perks.length === 0 ? (
@@ -537,7 +518,7 @@ function KolsScreen() {
                                     </p>
                                   )}
                                 </>
-                              ) : canEdit ? (
+                              ) : (
                                 <Button
                                   variant="outline"
                                   size="xs"
@@ -547,10 +528,6 @@ function KolsScreen() {
                                   <Link2 className="h-3 w-3" />
                                   Attach
                                 </Button>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">
-                                  Not attached
-                                </span>
                               )}
                             </TableCell>
                             <TableCell className="align-top text-xs whitespace-nowrap">
@@ -600,7 +577,7 @@ function KolsScreen() {
                                 onCheckedChange={() =>
                                   setConfirming({ kind: "toggle", perk })
                                 }
-                                disabled={!canEdit || confirmPending}
+                                disabled={confirmPending}
                                 aria-label={`${perk.code} on`}
                               />
                             </TableCell>
@@ -629,36 +606,32 @@ function KolsScreen() {
                                     <Users className="h-4 w-4" />
                                     View signups
                                   </DropdownMenuItem>
-                                  {canEdit && (
-                                    <>
-                                      <DropdownMenuItem
-                                        onSelect={() => setPerkDialog({ perk })}
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                        Edit
-                                      </DropdownMenuItem>
-                                      {!(perk.kolId && used) && (
-                                        <DropdownMenuItem
-                                          onSelect={() =>
-                                            setAttaching({ mode: "perk", perk })
-                                          }
-                                        >
-                                          <Link2 className="h-4 w-4" />
-                                          {perk.kolId ? "Move to another KOL" : "Attach to KOL"}
-                                        </DropdownMenuItem>
-                                      )}
-                                      {perk.kolId && !used && (
-                                        <DropdownMenuItem
-                                          variant="destructive"
-                                          onSelect={() =>
-                                            setConfirming({ kind: "detach", perk })
-                                          }
-                                        >
-                                          <Unlink className="h-4 w-4" />
-                                          Detach from KOL
-                                        </DropdownMenuItem>
-                                      )}
-                                    </>
+                                  <DropdownMenuItem
+                                    onSelect={() => setPerkDialog({ perk })}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  {!(perk.kolId && used) && (
+                                    <DropdownMenuItem
+                                      onSelect={() =>
+                                        setAttaching({ mode: "perk", perk })
+                                      }
+                                    >
+                                      <Link2 className="h-4 w-4" />
+                                      {perk.kolId ? "Move to another KOL" : "Attach to KOL"}
+                                    </DropdownMenuItem>
+                                  )}
+                                  {perk.kolId && !used && (
+                                    <DropdownMenuItem
+                                      variant="destructive"
+                                      onSelect={() =>
+                                        setConfirming({ kind: "detach", perk })
+                                      }
+                                    >
+                                      <Unlink className="h-4 w-4" />
+                                      Detach from KOL
+                                    </DropdownMenuItem>
                                   )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
