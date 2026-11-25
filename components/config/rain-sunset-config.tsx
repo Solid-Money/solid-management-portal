@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import ConfirmationModal from "@/components/ui/confirmation-modal";
 import { AnalyticsKpiCard } from "@/components/analytics/kpi-card";
 import { FallbackNote, SourceBadge } from "@/components/config/rain-rtf-config";
+import { RainSunsetBulkCancelSection } from "@/components/config/rain-sunset-bulk-cancel";
 import { useUpdateRainSunsetConfig } from "@/hooks/use-general-config";
 import { formatNumber } from "@/lib/utils";
 import type {
@@ -58,6 +59,10 @@ interface RainSunsetConfigProps {
  * hold. The move to Wirex is the user's own: they verify with Sumsub from the
  * app, and their Rain card and Rain account close when the Wirex card is
  * issued. The counts are there so an operator can watch that happen.
+ *
+ * Nothing here closes a Rain card on a date: the closing date is only what the
+ * app announces. The cards of users who never move are closed from "Close Rain
+ * cards" below, after a preview.
  */
 export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
   const update = useUpdateRainSunsetConfig();
@@ -274,6 +279,8 @@ export function RainSunsetConfigSection({ config }: RainSunsetConfigProps) {
           Save
         </button>
       </div>
+
+      <RainSunsetBulkCancelSection />
 
       <ConfirmationModal
         isOpen={confirmingReopen}
