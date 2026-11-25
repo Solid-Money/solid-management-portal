@@ -2500,6 +2500,8 @@ export interface TierBalanceEvaluationResult {
   graceStarted: number;
   graceCleared: number;
   ended: number;
+  /** Users whose evaluation failed this time; caught up at the next close. Absent from older backends. */
+  failed?: number;
 }
 
 export type TierBalanceRunAction = "sample" | "evaluate";

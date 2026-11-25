@@ -61,7 +61,8 @@ export type TierBalanceDraft = {
 
 /**
  * The ranges the backend accepts. `ultraUsd` must also be above `primeUsd`, and
- * `maxMissingDays` below `lookbackDays` — checked in {@link tierBalanceFieldErrors}.
+ * `maxMissingDays` and `graceDays` below `lookbackDays` — checked in
+ * {@link tierBalanceFieldErrors}.
  */
 export const TIER_BALANCE_BOUNDS: Record<
   TierBalanceNumberField,
@@ -189,6 +190,16 @@ export function tierBalanceFieldErrors(
       lookback === 1
         ? "Must be 0 while the lookback is 1 day."
         : `Must be ${rangeText("maxMissingDays", 0, lookback - 1)} — fewer than the lookback.`;
+  }
+
+  // Grace ends a tier once the days below in the lookback outnumber it, so it
+  // must be shorter than the lookback or it could never end one.
+  const grace = values.graceDays;
+  if (lookback !== undefined && grace !== undefined && grace > lookback - 1) {
+    errors.graceDays =
+      lookback === 1
+        ? "Must be 0 while the lookback is 1 day."
+        : `Must be ${rangeText("graceDays", 0, lookback - 1)} — fewer than the lookback.`;
   }
 
   return errors;
@@ -448,7 +459,10 @@ export type TierBalanceRunOutcome = "success" | "warning" | "failed";
 export function tierBalanceRunOutcome(
   result: TierBalanceRunResult,
 ): TierBalanceRunOutcome {
-  if (result.action === "evaluate") return result.evaluated ? "success" : "warning";
+  if (result.action === "evaluate") {
+    if (!result.evaluated) return "warning";
+    return (result.evaluated.failed ?? 0) > 0 ? "warning" : "success";
+  }
   const run = result.run;
   if (!run) return "warning";
   if (run.status === "failed") return "failed";
@@ -464,7 +478,10 @@ export function describeTierBalanceRun(result: TierBalanceRunResult): string {
       `${formatNumber(evaluated.unlocked, 0, 0)} unlocked, ` +
       `${formatNumber(evaluated.graceStarted, 0, 0)} entered grace, ` +
       `${formatNumber(evaluated.graceCleared, 0, 0)} cleared grace, ` +
-      `${formatNumber(evaluated.ended, 0, 0)} ended.`
+      `${formatNumber(evaluated.ended, 0, 0)} ended.` +
+      ((evaluated.failed ?? 0) > 0
+        ? ` ${plural(evaluated.failed ?? 0, "user")} failed and will be caught up at the next close.`
+        : "")
     );
   }
 

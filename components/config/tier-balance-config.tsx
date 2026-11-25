@@ -620,7 +620,8 @@ function TierBalanceBody({
               onBlur={() => settle("graceDays")}
               error={errors.graceDays}
               suffix="days"
-              help="Days below the threshold allowed in the lookback since unlock; the tier ends on the next day below. A drop caused only by price gets the same grace."
+              maxOverride={lookback ? Math.min(lookback - 1, TIER_BALANCE_BOUNDS.graceDays.max) : undefined}
+              help="Days below the threshold allowed in the lookback since unlock; the tier ends on the next day below. A drop caused only by price gets the same grace. Fewer than the lookback."
             />
             <NumberField
               field="reentryDays"

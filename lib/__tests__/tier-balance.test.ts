@@ -92,6 +92,14 @@ describe("tier balance form", () => {
     );
   });
 
+  it("keeps grace shorter than the lookback", () => {
+    const base = toTierBalanceDraft(config());
+    expect(tierBalanceFieldErrors({ ...base, lookbackDays: "8", graceDays: "7" })).toEqual({});
+    expect(
+      tierBalanceFieldErrors({ ...base, lookbackDays: "7", graceDays: "7", maxMissingDays: "0" }).graceDays,
+    ).toBe("Must be between 0 and 6 — fewer than the lookback.");
+  });
+
   it("allows at most one day fewer unmeasured than the lookback", () => {
     const base = toTierBalanceDraft(config());
     expect(tierBalanceFieldErrors({ ...base, maxMissingDays: "29" })).toEqual({});
@@ -261,5 +269,14 @@ describe("tier balance labels", () => {
         evaluated: { day: "2026-11-23", users: 0, unlocked: 0, graceStarted: 0, graceCleared: 0, ended: 0 },
       }),
     ).toBe("success");
+    const withFailures: TierBalanceRunResult = {
+      action: "evaluate",
+      run: null,
+      evaluated: { day: "2026-11-23", users: 3, unlocked: 0, graceStarted: 0, graceCleared: 0, ended: 0, failed: 1 },
+    };
+    expect(tierBalanceRunOutcome(withFailures)).toBe("warning");
+    expect(describeTierBalanceRun(withFailures)).toMatch(
+      /1 user failed and will be caught up at the next close\.$/,
+    );
   });
 });
