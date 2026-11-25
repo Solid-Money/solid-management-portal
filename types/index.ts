@@ -2399,9 +2399,14 @@ export interface TierBalanceConfig {
 
 export type TierBalanceConfigField = keyof TierBalanceConfig;
 
-/** A config save: only the fields that change, with the admin's reason. */
+/**
+ * A config save: only the fields that change, with the admin's reason, and the
+ * revision the preview was computed against. The server refuses the save (409)
+ * when the settings have changed since, so nothing lands that was not previewed.
+ */
 export type TierBalanceConfigUpdate = Partial<TierBalanceConfig> & {
   reason?: string;
+  expectedRevision: string;
 };
 
 export type TierBalanceRunKind = "full" | "watch" | "users";
@@ -2439,6 +2444,8 @@ export interface TierBalanceStateCounts {
 
 export interface TierBalanceAdminOverview {
   config: TierBalanceConfig;
+  /** Fingerprint of `config`. */
+  revision: string;
   updatedAt: string | null;
   status: {
     lastRun: TierBalanceRunView | null;
@@ -2468,6 +2475,8 @@ export interface TierBalanceImpactUser {
 export interface TierBalanceConfigPreview {
   current: TierBalanceConfig;
   proposed: TierBalanceConfig;
+  /** Fingerprint of `current`: sent back as `expectedRevision` to save. */
+  revision: string;
   changes: Array<{ field: TierBalanceConfigField; from: unknown; to: unknown }>;
   impact: {
     asOfDay: string | null;

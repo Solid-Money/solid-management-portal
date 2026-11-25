@@ -98,7 +98,9 @@ export default function UserTierBalanceCard({
             <RefreshCw className={isFetching ? "animate-spin" : undefined} />
             Refresh
           </Button>
-          {data && <ReevaluateTierBalanceDialog userId={userId} />}
+          {/* Keyed by user: a result held open must not carry over when the
+              card switches to another user (support inbox). */}
+          {data && <ReevaluateTierBalanceDialog key={userId} userId={userId} />}
         </CardAction>
       </CardHeader>
 

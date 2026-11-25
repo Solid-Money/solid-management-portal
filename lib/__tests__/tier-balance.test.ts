@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   describeTierBalanceRun,
   formatTierBalanceValue,
+  pendingTierBalanceEdits,
+  releasesTierBalanceToEveryone,
   tierBalanceChanges,
   tierBalanceFieldErrors,
+  tierBalanceRunOutcome,
   toTierBalanceDraft,
+  withTierBalanceEdit,
 } from "@/lib/tier-balance";
 import type { TierBalanceConfig, TierBalanceRunResult } from "@/types";
 
@@ -99,6 +103,68 @@ describe("tier balance form", () => {
   });
 });
 
+describe("tier balance overrides", () => {
+  it("drops an override typed back to the saved value", () => {
+    const saved = config();
+    const edited = withTierBalanceEdit({}, "graceDays", "8", saved);
+    expect(edited).toEqual({ graceDays: "8" });
+    expect(withTierBalanceEdit(edited, "graceDays", "7", saved)).toEqual({});
+    expect(withTierBalanceEdit({}, "enabled", false, saved)).toEqual({ enabled: false });
+    expect(withTierBalanceEdit({ enabled: false }, "enabled", true, saved)).toEqual({});
+    expect(withTierBalanceEdit({ audience: "everyone" }, "audience", "team", saved)).toEqual({});
+  });
+
+  it("keeps a half-typed number as an override while the admin types", () => {
+    expect(withTierBalanceEdit({}, "primeUsd", "7500.", config())).toEqual({ primeUsd: "7500." });
+    expect(withTierBalanceEdit({}, "primeUsd", "", config())).toEqual({ primeUsd: "" });
+  });
+
+  it("after a save, keeps only the edits the save did not cover", () => {
+    // Prime was previewed and saved; Grace was edited while the preview was open.
+    const saved = config({ primeUsd: 8_000 });
+    expect(
+      pendingTierBalanceEdits({ primeUsd: "8000.00", graceDays: "9", enabled: true }, saved),
+    ).toEqual({ graceDays: "9" });
+    // Prime typed again after the preview: still pending.
+    expect(pendingTierBalanceEdits({ primeUsd: "9000" }, saved)).toEqual({ primeUsd: "9000" });
+  });
+});
+
+describe("tier balance release", () => {
+  it("is a release when an enabled route widens to everyone", () => {
+    expect(
+      releasesTierBalanceToEveryone(config(), config({ audience: "everyone" })),
+    ).toBe(true);
+  });
+
+  it("is a release when a route already set to everyone is switched on", () => {
+    expect(
+      releasesTierBalanceToEveryone(
+        config({ enabled: false, audience: "everyone" }),
+        config({ enabled: true, audience: "everyone" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("is not a release for team-only or still-disabled routes, or one already released", () => {
+    expect(
+      releasesTierBalanceToEveryone(config({ enabled: false }), config({ enabled: true })),
+    ).toBe(false);
+    expect(
+      releasesTierBalanceToEveryone(
+        config({ enabled: false }),
+        config({ enabled: false, audience: "everyone" }),
+      ),
+    ).toBe(false);
+    expect(
+      releasesTierBalanceToEveryone(
+        config({ audience: "everyone" }),
+        config({ audience: "everyone", primeUsd: 8_000 }),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("tier balance labels", () => {
   it("formats a preview's from and to values by field", () => {
     expect(formatTierBalanceValue("primeUsd", 7500)).toBe("$7,500");
@@ -141,5 +207,38 @@ describe("tier balance labels", () => {
     expect(describeTierBalanceRun({ action: "evaluate", run: null, evaluated: null })).toBe(
       "The server reported no evaluation.",
     );
+  });
+
+  it("reads a run's outcome from what the server reported", () => {
+    const run = (status: "running" | "completed" | "partial" | "failed"): TierBalanceRunResult => ({
+      action: "sample",
+      evaluated: null,
+      run: {
+        id: "r1",
+        kind: "full",
+        trigger: "admin",
+        status,
+        dayKey: "2026-11-24",
+        startedAt: "2026-11-24T10:00:00.000Z",
+        completedAt: null,
+        stats: { scanned: 0, valued: 0, incomplete: 0, written: 0, aboveFloor: 0 },
+        prices: null,
+        error: status === "failed" ? "RPC down" : null,
+        adminEmail: null,
+      },
+    });
+    expect(tierBalanceRunOutcome(run("completed"))).toBe("success");
+    expect(tierBalanceRunOutcome(run("partial"))).toBe("warning");
+    expect(tierBalanceRunOutcome(run("running"))).toBe("warning");
+    expect(tierBalanceRunOutcome(run("failed"))).toBe("failed");
+    expect(tierBalanceRunOutcome({ action: "sample", run: null, evaluated: null })).toBe("warning");
+    expect(tierBalanceRunOutcome({ action: "evaluate", run: null, evaluated: null })).toBe("warning");
+    expect(
+      tierBalanceRunOutcome({
+        action: "evaluate",
+        run: null,
+        evaluated: { day: "2026-11-23", users: 0, unlocked: 0, graceStarted: 0, graceCleared: 0, ended: 0 },
+      }),
+    ).toBe("success");
   });
 });

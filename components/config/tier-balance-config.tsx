@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Eye,
+  XCircle,
   Gauge,
   Loader2,
   PiggyBank,
@@ -67,13 +68,18 @@ import {
   TIER_BALANCE_TIER_VARIANT,
   describeTierBalanceRun,
   formatTierBalanceValue,
+  pendingTierBalanceEdits,
+  releasesTierBalanceToEveryone,
   tierBalanceChanges,
   tierBalanceFieldErrors,
+  tierBalanceRunOutcome,
   tierBalanceUsd,
   toTierBalanceDraft,
+  withTierBalanceEdit,
   type TierBalanceBooleanField,
   type TierBalanceDraft,
   type TierBalanceNumberField,
+  type TierBalanceRunOutcome,
 } from "@/lib/tier-balance";
 import { cn, formatDateTime, formatNumber } from "@/lib/utils";
 import type {
@@ -227,6 +233,28 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/** A run's outcome as an icon: green done, amber worth a look, red failed. */
+function RunOutcomeIcon({
+  outcome,
+  className,
+}: {
+  outcome: TierBalanceRunOutcome;
+  className: string;
+}) {
+  if (outcome === "failed") {
+    return <XCircle className={cn(className, "text-red-600")} />;
+  }
+  if (outcome === "warning") {
+    return <AlertTriangle className={cn(className, "text-amber-600")} />;
+  }
+  return <CheckCircle2 className={cn(className, "text-emerald-600")} />;
+}
+
+/** The status code of a failed API call, when the server answered. */
+function statusOf(error: unknown): number | undefined {
+  return (error as { response?: { status?: number } })?.response?.status;
+}
+
 /**
  * Config → Rewards → Hold in Earn route (T-314): users unlock Prime or Ultra
  * by holding a USD balance in Earn through a lookback window, next to the paid
@@ -262,39 +290,58 @@ export default function TierBalanceConfigSection() {
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading the route…
         </div>
-      ) : overview.isError ? (
-        isNotAvailable(overview.error) ? (
-          <NotAvailableYet what="The Hold in Earn route" />
-        ) : (
-          <div className="flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            The route&apos;s config could not be loaded.
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void overview.refetch()}
-              className="cursor-pointer"
-            >
-              Retry
-            </Button>
-          </div>
-        )
+      ) : overview.data ? (
+        // A failed refresh keeps the last overview (and a run's result) on
+        // screen with a warning; the error screen is only for a first load.
+        <div className="space-y-4">
+          {overview.isError && !overview.isFetching && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              The route could not be refreshed; showing the last loaded
+              settings and status.
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void overview.refetch()}
+                className="cursor-pointer"
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          <TierBalanceBody
+            overview={overview.data}
+            isRefreshing={overview.isFetching}
+            onRefresh={() => void overview.refetch()}
+            edits={edits}
+            setEdits={setEdits}
+            onSaved={(next) => {
+              queryClient.setQueryData(TIER_BALANCE_OVERVIEW_KEY, next);
+              // Drop what the save covered; keep edits made while the preview
+              // was open, which were not part of it.
+              setEdits((prev) => pendingTierBalanceEdits(prev, next.config));
+            }}
+            onRan={() =>
+              void queryClient.invalidateQueries({
+                queryKey: TIER_BALANCE_OVERVIEW_KEY,
+              })
+            }
+          />
+        </div>
+      ) : isNotAvailable(overview.error) ? (
+        <NotAvailableYet what="The Hold in Earn route" />
       ) : (
-        <TierBalanceBody
-          overview={overview.data}
-          isRefreshing={overview.isFetching}
-          onRefresh={() => void overview.refetch()}
-          edits={edits}
-          setEdits={setEdits}
-          onSaved={(next) => {
-            queryClient.setQueryData(TIER_BALANCE_OVERVIEW_KEY, next);
-            setEdits({});
-          }}
-          onRan={() =>
-            void queryClient.invalidateQueries({
-              queryKey: TIER_BALANCE_OVERVIEW_KEY,
-            })
-          }
-        />
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          The route&apos;s config could not be loaded.
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void overview.refetch()}
+            className="cursor-pointer"
+          >
+            Retry
+          </Button>
+        </div>
       )}
     </ConfigSection>
   );
@@ -332,22 +379,28 @@ function TierBalanceBody({
   const [runAction, setRunAction] = useState<TierBalanceRunAction | null>(null);
   const [lastRun, setLastRun] = useState<TierBalanceRunResult | null>(null);
 
+  // A box set back to the saved value drops its override.
   const set = <K extends keyof TierBalanceDraft>(
     field: K,
     value: TierBalanceDraft[K],
-  ) => setEdits((prev) => ({ ...prev, [field]: value }));
+  ) => setEdits((prev) => withTierBalanceEdit(prev, field, value, saved));
 
   const previewMutation = useMutation({
     mutationFn: async (body: Partial<TierBalanceConfig>) =>
       (await previewTierBalanceConfig(body)).data.data,
-    onSuccess: (preview, body) => setPreviewed({ changes: body, preview }),
+    onSuccess: (preview, body) => {
+      setPreviewed({ changes: body, preview });
+      // The server previewed against newer settings than this page shows
+      // (another admin saved): bring the page up to date behind the dialog.
+      if (preview.revision !== overview.revision) onRefresh();
+    },
     // The API layer toasts the server's reason; the form stays as typed.
   });
 
   // Read from the form so every help line follows what the admin is typing.
   const lookback = errors.lookbackDays ? null : Number(form.lookbackDays);
   const lookbackText = lookback ? `the last ${count(lookback)} days` : "the lookback";
-  const releasing = form.audience === "everyone" && saved.audience !== "everyone";
+  const releasing = releasesTierBalanceToEveryone(saved, form);
 
   return (
     <div className="space-y-4">
@@ -405,7 +458,10 @@ function TierBalanceBody({
         </div>
         {lastRun && (
           <p className="mt-3 flex gap-2 rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
-            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <RunOutcomeIcon
+              outcome={tierBalanceRunOutcome(lastRun)}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0"
+            />
             {describeTierBalanceRun(lastRun)}
           </p>
         )}
@@ -471,16 +527,21 @@ function TierBalanceBody({
             <p>
               {releasing ? (
                 <>
-                  <strong>Everyone releases the route to all users.</strong>{" "}
+                  <strong>Saving this releases the route to all users.</strong>{" "}
                   Once saved, every user who qualifies gets the tier through it
                   and the app shows the route to everyone, not only tagged team
                   members. The preview shows how many would hold a tier.
                 </>
-              ) : (
+              ) : form.enabled ? (
                 <>
                   <strong>The route is released to all users.</strong> Switching
                   back to the team takes it away from everyone who is not
                   tagged.
+                </>
+              ) : (
+                <>
+                  <strong>The audience is everyone.</strong> Turning the route
+                  on releases it to all users, not only tagged team members.
                 </>
               )}
             </p>
@@ -642,6 +703,12 @@ function TierBalanceBody({
           onSaved={(next) => {
             setPreviewed(null);
             onSaved(next);
+          }}
+          onStale={() => {
+            // Saved by someone else since the preview: the server's toast says
+            // so. Close it and reload, so the next preview is against theirs.
+            setPreviewed(null);
+            onRefresh();
           }}
         />
       )}
@@ -883,24 +950,33 @@ function ConfigPreviewDialog({
   preview,
   onClose,
   onSaved,
+  onStale,
 }: {
   changes: Partial<TierBalanceConfig>;
   preview: TierBalanceConfigPreview;
   onClose: () => void;
   onSaved: (next: TierBalanceAdminOverview) => void;
+  /** The settings changed since this preview; the save was refused. */
+  onStale: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const { impact } = preview;
-  const releasing =
-    preview.proposed.audience === "everyone" &&
-    preview.current.audience !== "everyone";
+  // Widening the audience of an enabled route, or switching on a route whose
+  // audience is already everyone.
+  const releasing = releasesTierBalanceToEveryone(
+    preview.current,
+    preview.proposed,
+  );
 
   const mutation = useMutation({
+    // Bound to the preview: the server saves only if the settings are still
+    // the ones this preview (and its release acknowledgement) was computed on.
     mutationFn: async () =>
       (
         await updateTierBalanceConfig({
           ...changes,
+          expectedRevision: preview.revision,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
         })
       ).data.data,
@@ -910,7 +986,11 @@ function ConfigPreviewDialog({
       });
       onSaved(next);
     },
-    // The API layer toasts the server's reason; the dialog stays open.
+    // The API layer toasts the server's reason. A stale preview closes, to
+    // be previewed again; anything else leaves the dialog open to retry.
+    onError: (error) => {
+      if (statusOf(error) === 409) onStale();
+    },
   });
 
   const close = () => {
@@ -1208,10 +1288,22 @@ function RunNowDialog({
       ).data.data,
     onSuccess: (data) => {
       setResult(data);
+      // Refreshes the overview whatever the outcome: a partial or failed run
+      // may still have recorded readings.
       onRan(data);
-      toast.success(
-        action === "sample" ? "Measurement finished" : "Evaluation finished",
-      );
+      const what = action === "sample" ? "Measurement" : "Evaluation";
+      const outcome = tierBalanceRunOutcome(data);
+      if (outcome === "failed") {
+        toast.error(`${what} failed`, {
+          description: data.run?.error ?? undefined,
+        });
+      } else if (outcome === "warning") {
+        toast.warning(`${what} needs a look`, {
+          description: describeTierBalanceRun(data),
+        });
+      } else {
+        toast.success(`${what} finished`);
+      }
     },
     // The API layer toasts the server's reason; the dialog stays open to retry.
   });
@@ -1229,7 +1321,10 @@ function RunNowDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <RunOutcomeIcon
+                  outcome={tierBalanceRunOutcome(result)}
+                  className="h-5 w-5"
+                />
                 {action === "sample" ? "Measurement run" : "Evaluation run"}
               </DialogTitle>
               <DialogDescription>{describeTierBalanceRun(result)}</DialogDescription>

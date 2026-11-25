@@ -214,6 +214,78 @@ export function tierBalanceChanges(
   return changes;
 }
 
+/**
+ * Whether a box holds the saved value, so its override can go. Numbers compare
+ * as text against the saved number's own text: a half-typed "7500." stays an
+ * override while the admin types instead of snapping back to "7500".
+ */
+function holdsSavedValue<K extends TierBalanceConfigField>(
+  field: K,
+  value: TierBalanceDraft[K],
+  saved: TierBalanceConfig,
+): boolean {
+  const current: unknown = saved[field];
+  return typeof value === "string" && field !== "audience"
+    ? value.trim() === String(current)
+    : value === current;
+}
+
+/**
+ * The admin's overrides after setting one box. An override equal to the saved
+ * value is dropped rather than kept: a box typed back to what is saved must
+ * not become a rollback once another admin saves something else there.
+ */
+export function withTierBalanceEdit<K extends TierBalanceConfigField>(
+  edits: Partial<TierBalanceDraft>,
+  field: K,
+  value: TierBalanceDraft[K],
+  saved: TierBalanceConfig,
+): Partial<TierBalanceDraft> {
+  const next = { ...edits };
+  if (holdsSavedValue(field, value, saved)) delete next[field];
+  else next[field] = value;
+  return next;
+}
+
+/**
+ * The overrides still pending after a save: those the saved config now holds
+ * (numbers compared as numbers) are dropped, and edits made while the preview
+ * was open — not part of the save — are kept.
+ */
+export function pendingTierBalanceEdits(
+  edits: Partial<TierBalanceDraft>,
+  saved: TierBalanceConfig,
+): Partial<TierBalanceDraft> {
+  const next: Partial<TierBalanceDraft> = {};
+  for (const [field, value] of Object.entries(edits) as Array<
+    [TierBalanceConfigField, TierBalanceDraft[TierBalanceConfigField]]
+  >) {
+    const savedNow =
+      typeof value === "string" && field !== "audience"
+        ? parsed(value) === saved[field]
+        : value === saved[field];
+    if (!savedNow) Object.assign(next, { [field]: value });
+  }
+  return next;
+}
+
+/** Whether a config grants tiers through the route to every user. */
+function openToEveryone(config: Pick<TierBalanceConfig, "enabled" | "audience">) {
+  return config.enabled && config.audience === "everyone";
+}
+
+/**
+ * Whether going from `current` to `proposed` releases the route to every user:
+ * the audience widening on an enabled route, or a route already set to
+ * everyone being switched on. Mirrors the backend's release warning.
+ */
+export function releasesTierBalanceToEveryone(
+  current: Pick<TierBalanceConfig, "enabled" | "audience">,
+  proposed: Pick<TierBalanceConfig, "enabled" | "audience">,
+): boolean {
+  return !openToEveryone(current) && openToEveryone(proposed);
+}
+
 /** A config value as the preview's change list shows it. */
 export function formatTierBalanceValue(
   field: TierBalanceConfigField,
@@ -346,6 +418,23 @@ const plural = (count: number, word: string) =>
   `${formatNumber(count, 0, 0)} ${word}${count === 1 ? "" : "s"}`;
 
 /** One line on what a "Run now" did, for the admin who started it. */
+export type TierBalanceRunOutcome = "success" | "warning" | "failed";
+
+/**
+ * How a "Run now" went, for its toast and icons: a failed measurement is not a
+ * success, and a partial run or one the server did not report (another run
+ * held the lock) is worth a second look.
+ */
+export function tierBalanceRunOutcome(
+  result: TierBalanceRunResult,
+): TierBalanceRunOutcome {
+  if (result.action === "evaluate") return result.evaluated ? "success" : "warning";
+  const run = result.run;
+  if (!run) return "warning";
+  if (run.status === "failed") return "failed";
+  return run.status === "completed" ? "success" : "warning";
+}
+
 export function describeTierBalanceRun(result: TierBalanceRunResult): string {
   if (result.action === "evaluate") {
     const evaluated = result.evaluated;

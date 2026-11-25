@@ -1245,8 +1245,9 @@ export const previewTierBalanceConfig = (changes: Partial<TierBalanceConfig>) =>
   );
 
 /**
- * Save config changes. Only send what was previewed. The admin identity comes
- * from the Firebase token server-side.
+ * Save config changes. Only send what was previewed, with the preview's
+ * `revision` as `expectedRevision`: the server answers 409 when the settings
+ * changed since. The admin identity comes from the Firebase token server-side.
  */
 export const updateTierBalanceConfig = (body: TierBalanceConfigUpdate) =>
   api.patch<{ data: TierBalanceAdminOverview }>("/admin/v1/tier-balance", body);
