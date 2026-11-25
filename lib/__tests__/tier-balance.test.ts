@@ -4,6 +4,7 @@ import {
   formatTierBalanceValue,
   pendingTierBalanceEdits,
   releasesTierBalanceToEveryone,
+  settleTierBalanceEdit,
   tierBalanceChanges,
   tierBalanceFieldErrors,
   tierBalanceRunOutcome,
@@ -117,6 +118,26 @@ describe("tier balance overrides", () => {
   it("keeps a half-typed number as an override while the admin types", () => {
     expect(withTierBalanceEdit({}, "primeUsd", "7500.", config())).toEqual({ primeUsd: "7500." });
     expect(withTierBalanceEdit({}, "primeUsd", "", config())).toEqual({ primeUsd: "" });
+  });
+
+  it("drops an override equal to the saved number once the box is left", () => {
+    const saved = config();
+    // Typed while focused: kept as text, and the form shows no change.
+    const typed = withTierBalanceEdit({}, "primeUsd", "7500.00", saved);
+    expect(typed).toEqual({ primeUsd: "7500.00" });
+    expect(tierBalanceChanges({ ...toTierBalanceDraft(saved), ...typed }, saved)).toEqual({});
+    // Left: settled away, so another admin's later save is not rolled back.
+    const settled = settleTierBalanceEdit(typed, "primeUsd", saved);
+    expect(settled).toEqual({});
+    const refreshed = config({ primeUsd: 8_000 });
+    expect(
+      tierBalanceChanges({ ...toTierBalanceDraft(refreshed), ...settled }, refreshed),
+    ).toEqual({});
+    // A real change, a half-typed number or another field's edit stays.
+    const kept = { primeUsd: "8000", graceDays: "7." };
+    expect(settleTierBalanceEdit(kept, "primeUsd", saved)).toBe(kept);
+    expect(settleTierBalanceEdit({ primeUsd: "" }, "primeUsd", saved)).toEqual({ primeUsd: "" });
+    expect(settleTierBalanceEdit(kept, "lookbackDays", saved)).toBe(kept);
   });
 
   it("after a save, keeps only the edits the save did not cover", () => {

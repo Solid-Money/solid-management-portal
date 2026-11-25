@@ -269,6 +269,26 @@ export function pendingTierBalanceEdits(
   return next;
 }
 
+/**
+ * The overrides once a box is left: an override that is numerically the saved
+ * value ("7500.00" over 7500) is dropped, so it cannot turn into a rollback
+ * when a refresh brings another admin's save. While the box has focus its text
+ * is kept as typed ({@link withTierBalanceEdit}). Returns `edits` itself when
+ * nothing changes.
+ */
+export function settleTierBalanceEdit(
+  edits: Partial<TierBalanceDraft>,
+  field: TierBalanceConfigField,
+  saved: TierBalanceConfig,
+): Partial<TierBalanceDraft> {
+  if (!(field in edits)) return edits;
+  const kept = pendingTierBalanceEdits({ [field]: edits[field] }, saved);
+  if (field in kept) return edits;
+  const next = { ...edits };
+  delete next[field];
+  return next;
+}
+
 /** Whether a config grants tiers through the route to every user. */
 function openToEveryone(config: Pick<TierBalanceConfig, "enabled" | "audience">) {
   return config.enabled && config.audience === "everyone";

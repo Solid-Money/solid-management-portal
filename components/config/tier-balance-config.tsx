@@ -70,6 +70,7 @@ import {
   formatTierBalanceValue,
   pendingTierBalanceEdits,
   releasesTierBalanceToEveryone,
+  settleTierBalanceEdit,
   tierBalanceChanges,
   tierBalanceFieldErrors,
   tierBalanceRunOutcome,
@@ -141,6 +142,7 @@ function NumberField({
   field,
   value,
   onChange,
+  onBlur,
   error,
   help,
   suffix,
@@ -150,6 +152,8 @@ function NumberField({
   field: TierBalanceNumberField;
   value: string;
   onChange: (value: string) => void;
+  /** Leaving the box: settle an override that is just the saved number. */
+  onBlur?: () => void;
   error?: string;
   help: string;
   suffix: string;
@@ -172,6 +176,7 @@ function NumberField({
           step={step ?? (integer ? "1" : "any")}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
           aria-invalid={error ? true : undefined}
           aria-describedby={`${id}-help`}
         />
@@ -384,6 +389,8 @@ function TierBalanceBody({
     field: K,
     value: TierBalanceDraft[K],
   ) => setEdits((prev) => withTierBalanceEdit(prev, field, value, saved));
+  const settle = (field: TierBalanceNumberField) =>
+    setEdits((prev) => settleTierBalanceEdit(prev, field, saved));
 
   const previewMutation = useMutation({
     mutationFn: async (body: Partial<TierBalanceConfig>) =>
@@ -467,202 +474,218 @@ function TierBalanceBody({
         )}
       </div>
 
-      <Group
-        title="Route and audience"
-        description="Whether the route grants tiers, measures balances and notifies, and who it covers."
+      {/* Locked while a preview is being computed: an edit made then would
+          not be in the preview, and could be lost or saved unseen. The open
+          preview dialog is modal, so the form stays locked until it closes. */}
+      <fieldset
+        disabled={previewMutation.isPending}
+        className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60"
       >
-        <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-          <SwitchField
-            field="enabled"
-            checked={form.enabled}
-            onChange={(value) => set("enabled", value)}
-            help="On: users the audience covers are granted Prime or Ultra once they qualify. Off: the route grants no tier."
-          />
-          <SwitchField
-            field="collectionEnabled"
-            checked={form.collectionEnabled}
-            onChange={(value) => set("collectionEnabled", value)}
-            help="Measures qualifying Earn balances on schedule. Keep it on to build history: the route can only judge days that were measured."
-          />
-          <SwitchField
-            field="notificationsEnabled"
-            checked={form.notificationsEnabled}
-            onChange={(value) => set("notificationsEnabled", value)}
-            help="Push notifications when a tier unlocks, enters grace, clears grace or ends on this route."
-          />
-          <div className="space-y-1.5">
-            <Label htmlFor="tier-balance-audience">
-              {TIER_BALANCE_FIELD_LABELS.audience}
-              <InfoTooltip text="Team: only members tagged “Hold in Earn tier route” on Config → Internal team get the tier or see the route. Everyone: every user." />
-            </Label>
-            <select
-              id="tier-balance-audience"
-              value={form.audience}
-              onChange={(event) =>
-                set("audience", event.target.value as TierBalanceAudience)
-              }
-              className={SELECT_CLASS}
-            >
-              {(["team", "everyone"] as const).map((audience) => (
-                <option key={audience} value={audience}>
-                  {TIER_BALANCE_AUDIENCE_LABELS[audience]}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500">
-              Tag members on{" "}
-              <Link
-                href="/internal-team"
-                className="font-medium text-indigo-600 hover:underline"
+        <Group
+          title="Route and audience"
+          description="Whether the route grants tiers, measures balances and notifies, and who it covers."
+        >
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+            <SwitchField
+              field="enabled"
+              checked={form.enabled}
+              onChange={(value) => set("enabled", value)}
+              help="On: users the audience covers are granted Prime or Ultra once they qualify. Off: the route grants no tier."
+            />
+            <SwitchField
+              field="collectionEnabled"
+              checked={form.collectionEnabled}
+              onChange={(value) => set("collectionEnabled", value)}
+              help="Measures qualifying Earn balances on schedule. Keep it on to build history: the route can only judge days that were measured."
+            />
+            <SwitchField
+              field="notificationsEnabled"
+              checked={form.notificationsEnabled}
+              onChange={(value) => set("notificationsEnabled", value)}
+              help="Push notifications when a tier unlocks, enters grace, clears grace or ends on this route."
+            />
+            <div className="space-y-1.5">
+              <Label htmlFor="tier-balance-audience">
+                {TIER_BALANCE_FIELD_LABELS.audience}
+                <InfoTooltip text="Team: only members tagged “Hold in Earn tier route” on Config → Internal team get the tier or see the route. Everyone: every user." />
+              </Label>
+              <select
+                id="tier-balance-audience"
+                value={form.audience}
+                onChange={(event) =>
+                  set("audience", event.target.value as TierBalanceAudience)
+                }
+                className={SELECT_CLASS}
               >
-                Config → Internal team
-              </Link>
-              .
-            </p>
+                {(["team", "everyone"] as const).map((audience) => (
+                  <option key={audience} value={audience}>
+                    {TIER_BALANCE_AUDIENCE_LABELS[audience]}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500">
+                Tag members on{" "}
+                <Link
+                  href="/internal-team"
+                  className="font-medium text-indigo-600 hover:underline"
+                >
+                  Config → Internal team
+                </Link>
+                .
+              </p>
+            </div>
           </div>
-        </div>
-        {form.audience === "everyone" && (
-          <div className="mt-4 flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              {releasing ? (
-                <>
-                  <strong>Saving this releases the route to all users.</strong>{" "}
-                  Once saved, every user who qualifies gets the tier through it
-                  and the app shows the route to everyone, not only tagged team
-                  members. The preview shows how many would hold a tier.
-                </>
-              ) : form.enabled ? (
-                <>
-                  <strong>The route is released to all users.</strong> Switching
-                  back to the team takes it away from everyone who is not
-                  tagged.
-                </>
-              ) : (
-                <>
-                  <strong>The audience is everyone.</strong> Turning the route
-                  on releases it to all users, not only tagged team members.
-                </>
-              )}
-            </p>
+          {form.audience === "everyone" && (
+            <div className="mt-4 flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                {releasing ? (
+                  <>
+                    <strong>Saving this releases the route to all users.</strong>{" "}
+                    Once saved, every user who qualifies gets the tier through it
+                    and the app shows the route to everyone, not only tagged team
+                    members. The preview shows how many would hold a tier.
+                  </>
+                ) : form.enabled ? (
+                  <>
+                    <strong>The route is released to all users.</strong> Switching
+                    back to the team takes it away from everyone who is not
+                    tagged.
+                  </>
+                ) : (
+                  <>
+                    <strong>The audience is everyone.</strong> Turning the route
+                    on releases it to all users, not only tagged team members.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+        </Group>
+
+        <Group
+          title="Thresholds"
+          description="The balance a tier needs. A tier's threshold is pinned when it unlocks; a lowered threshold applies to members already holding it."
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <NumberField
+              field="primeUsd"
+              value={form.primeUsd}
+              onChange={(value) => set("primeUsd", value)}
+              onBlur={() => settle("primeUsd")}
+              error={errors.primeUsd}
+              suffix="USD"
+              help={`Every measured day in ${lookbackText} must be at or above this to unlock Prime.`}
+            />
+            <NumberField
+              field="ultraUsd"
+              value={form.ultraUsd}
+              onChange={(value) => set("ultraUsd", value)}
+              onBlur={() => settle("ultraUsd")}
+              error={errors.ultraUsd}
+              suffix="USD"
+              help="The same for Ultra. Must be above the Prime threshold."
+            />
           </div>
-        )}
-      </Group>
+        </Group>
 
-      <Group
-        title="Thresholds"
-        description="The balance a tier needs. A tier's threshold is pinned when it unlocks; a lowered threshold applies to members already holding it."
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <NumberField
-            field="primeUsd"
-            value={form.primeUsd}
-            onChange={(value) => set("primeUsd", value)}
-            error={errors.primeUsd}
-            suffix="USD"
-            help={`Every measured day in ${lookbackText} must be at or above this to unlock Prime.`}
-          />
-          <NumberField
-            field="ultraUsd"
-            value={form.ultraUsd}
-            onChange={(value) => set("ultraUsd", value)}
-            error={errors.ultraUsd}
-            suffix="USD"
-            help="The same for Ultra. Must be above the Prime threshold."
-          />
-        </div>
-      </Group>
+        <Group
+          title="Timing"
+          description="How long a balance has to hold, how much slack it gets, and how soon it can come back. Ultra and Prime are tracked separately: an Ultra member who drops below Ultra but stays above Prime goes through Ultra's grace and lands on Prime."
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <NumberField
+              field="lookbackDays"
+              value={form.lookbackDays}
+              onChange={(value) => set("lookbackDays", value)}
+              onBlur={() => settle("lookbackDays")}
+              error={errors.lookbackDays}
+              suffix="days"
+              help="The window a tier is judged on. A day's balance is the lowest measured that UTC day."
+            />
+            <NumberField
+              field="maxMissingDays"
+              value={form.maxMissingDays}
+              onChange={(value) => set("maxMissingDays", value)}
+              onBlur={() => settle("maxMissingDays")}
+              error={errors.maxMissingDays}
+              suffix="days"
+              maxOverride={lookback ? lookback - 1 : undefined}
+              help={`Days in ${lookbackText} that may go unmeasured without blocking an unlock. Fewer than the lookback.`}
+            />
+            <NumberField
+              field="graceDays"
+              value={form.graceDays}
+              onChange={(value) => set("graceDays", value)}
+              onBlur={() => settle("graceDays")}
+              error={errors.graceDays}
+              suffix="days"
+              help="Days below the threshold allowed in the lookback since unlock; the tier ends on the next day below. A drop caused only by price gets the same grace."
+            />
+            <NumberField
+              field="reentryDays"
+              value={form.reentryDays}
+              onChange={(value) => set("reentryDays", value)}
+              onBlur={() => settle("reentryDays")}
+              error={errors.reentryDays}
+              suffix="days"
+              help="After a tier ends on this route, how long before the route can unlock it again."
+            />
+          </div>
+        </Group>
 
-      <Group
-        title="Timing"
-        description="How long a balance has to hold, how much slack it gets, and how soon it can come back. Ultra and Prime are tracked separately: an Ultra member who drops below Ultra but stays above Prime goes through Ultra's grace and lands on Prime."
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <NumberField
-            field="lookbackDays"
-            value={form.lookbackDays}
-            onChange={(value) => set("lookbackDays", value)}
-            error={errors.lookbackDays}
-            suffix="days"
-            help="The window a tier is judged on. A day's balance is the lowest measured that UTC day."
-          />
-          <NumberField
-            field="maxMissingDays"
-            value={form.maxMissingDays}
-            onChange={(value) => set("maxMissingDays", value)}
-            error={errors.maxMissingDays}
-            suffix="days"
-            maxOverride={lookback ? lookback - 1 : undefined}
-            help={`Days in ${lookbackText} that may go unmeasured without blocking an unlock. Fewer than the lookback.`}
-          />
-          <NumberField
-            field="graceDays"
-            value={form.graceDays}
-            onChange={(value) => set("graceDays", value)}
-            error={errors.graceDays}
-            suffix="days"
-            help="Days below the threshold allowed in the lookback since unlock; the tier ends on the next day below. A drop caused only by price gets the same grace."
-          />
-          <NumberField
-            field="reentryDays"
-            value={form.reentryDays}
-            onChange={(value) => set("reentryDays", value)}
-            error={errors.reentryDays}
-            suffix="days"
-            help="After a tier ends on this route, how long before the route can unlock it again."
-          />
-        </div>
-      </Group>
+        <Group
+          title="Measurement"
+          description="Who is re-measured during the day, and how often."
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <NumberField
+              field="sampleIntervalMinutes"
+              value={form.sampleIntervalMinutes}
+              onChange={(value) => set("sampleIntervalMinutes", value)}
+              onBlur={() => settle("sampleIntervalMinutes")}
+              error={errors.sampleIntervalMinutes}
+              suffix="minutes"
+              help="How often watched users are re-measured during the day."
+            />
+            <NumberField
+              field="watchFloorUsd"
+              value={form.watchFloorUsd}
+              onChange={(value) => set("watchFloorUsd", value)}
+              onBlur={() => settle("watchFloorUsd")}
+              error={errors.watchFloorUsd}
+              suffix="USD"
+              help="Users at or above this balance, or with an open state on the route, are re-measured intraday at the interval above."
+            />
+          </div>
+        </Group>
 
-      <Group
-        title="Measurement"
-        description="Who is re-measured during the day, and how often."
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <NumberField
-            field="sampleIntervalMinutes"
-            value={form.sampleIntervalMinutes}
-            onChange={(value) => set("sampleIntervalMinutes", value)}
-            error={errors.sampleIntervalMinutes}
-            suffix="minutes"
-            help="How often watched users are re-measured during the day."
-          />
-          <NumberField
-            field="watchFloorUsd"
-            value={form.watchFloorUsd}
-            onChange={(value) => set("watchFloorUsd", value)}
-            error={errors.watchFloorUsd}
-            suffix="USD"
-            help="Users at or above this balance, or with an open state on the route, are re-measured intraday at the interval above."
-          />
-        </div>
-      </Group>
-
-      <Group
-        title="What counts"
-        description="Vault shares (soUSD, soEUR, soETH, soBTC, soFUSE on Ethereum, Fuse and Base) in the Safe always count. These decide the rest."
-      >
-        <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
-          <SwitchField
-            field="countCreditCollateral"
-            checked={form.countCreditCollateral}
-            onChange={(value) => set("countCreditCollateral", value)}
-            help="Vault shares escrowed as Credit collateral count toward the balance."
-          />
-          <SwitchField
-            field="subtractCreditDebt"
-            checked={form.subtractCreditDebt}
-            onChange={(value) => set("subtractCreditDebt", value)}
-            help="Credit debt is subtracted from the balance."
-          />
-          <SwitchField
-            field="countLockedFuse"
-            checked={form.countLockedFuse}
-            onChange={(value) => set("countLockedFuse", value)}
-            help="soFUSE locked in the tier lock counts toward the balance."
-          />
-        </div>
-      </Group>
+        <Group
+          title="What counts"
+          description="Vault shares (soUSD, soEUR, soETH, soBTC, soFUSE on Ethereum, Fuse and Base) in the Safe always count. These decide the rest."
+        >
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
+            <SwitchField
+              field="countCreditCollateral"
+              checked={form.countCreditCollateral}
+              onChange={(value) => set("countCreditCollateral", value)}
+              help="Vault shares escrowed as Credit collateral count toward the balance."
+            />
+            <SwitchField
+              field="subtractCreditDebt"
+              checked={form.subtractCreditDebt}
+              onChange={(value) => set("subtractCreditDebt", value)}
+              help="Credit debt is subtracted from the balance."
+            />
+            <SwitchField
+              field="countLockedFuse"
+              checked={form.countLockedFuse}
+              onChange={(value) => set("countLockedFuse", value)}
+              help="soFUSE locked in the tier lock counts toward the balance."
+            />
+          </div>
+        </Group>
+      </fieldset>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
