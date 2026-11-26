@@ -566,13 +566,18 @@ export function diffSettings(
   if (Object.keys(cap).length > 0) patch.frequencyCap = cap;
 
   const quiet: NonNullable<NudgeSettingsPatch["quietHours"]> = {};
+  // The zone is validated trimmed, so it is compared and sent trimmed too.
+  const draftQuiet = {
+    ...draft.quietHours,
+    fallbackTimezone: draft.quietHours.fallbackTimezone.trim(),
+  };
   for (const field of ["enabled", "start", "end", "fallbackTimezone"] as const) {
-    if (saved.quietHours[field] !== draft.quietHours[field]) {
-      (quiet as Record<string, unknown>)[field] = draft.quietHours[field];
+    if (saved.quietHours[field] !== draftQuiet[field]) {
+      (quiet as Record<string, unknown>)[field] = draftQuiet[field];
       changes.push({
         field: `quietHours.${field}`,
         from: saved.quietHours[field],
-        to: draft.quietHours[field],
+        to: draftQuiet[field],
       });
     }
   }

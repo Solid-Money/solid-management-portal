@@ -114,10 +114,37 @@ function NudgesScreen() {
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
-      ) : error || !board ? (
-        <p className="text-sm text-red-600">Failed to load the nudges.</p>
+      ) : !board ? (
+        <p className="text-sm text-red-600">
+          Failed to load the nudges.{" "}
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="cursor-pointer underline"
+          >
+            Try again
+          </button>
+        </p>
       ) : (
         <>
+          {/* A failed refresh keeps what was loaded (and any unsaved edit in
+              the editor or the rules) on screen. */}
+          {error ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <span>
+                Couldn&apos;t refresh the nudges; showing what was loaded before.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw className={isFetching ? "animate-spin" : undefined} />
+                Try again
+              </Button>
+            </div>
+          ) : null}
           {!board.migrated ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
               <span>

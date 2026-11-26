@@ -94,14 +94,24 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
   /** Keep the edit, re-applied on top of what is saved now. */
   const reapply = () => {
     const rebased = rebaseSettings(saved, draft, latest);
+    // The admin's own groups carried over keep their rows as they were (a new
+    // row stays new and editable even if its id now matches a saved group);
+    // the saved version's groups get fresh, locked rows.
+    const keptMine =
+      JSON.stringify(saved.suppressionGroups) !== JSON.stringify(draft.suppressionGroups);
     setBaseline(latest);
     setDraft(rebased.draft);
-    setRows(groupRows(rebased.draft.suppressionGroups, latest));
+    if (!keptMine) setRows(groupRows(rebased.draft.suppressionGroups, latest));
     setConflict(false);
     setOverlapping(rebased.overlapping);
   };
 
   const warnings: string[] = [];
+  if (overlapping.length > 0) {
+    warnings.push(
+      `Re-applied on v${saved.version}: ${overlapping.join(", ")} also changed in that version and now hold your value.`
+    );
+  }
   if (saved.marketingEnabled && !draft.marketingEnabled) {
     warnings.push("Every marketing nudge stops sending until this is turned back on.");
   }

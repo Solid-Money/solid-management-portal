@@ -203,8 +203,13 @@ function NudgeEditorForm({
           : "Going live: this nudge starts sending within a minute."
       );
     }
+    if (overlapping.length > 0) {
+      warnings.push(
+        `Re-applied on v${nudge.version}: ${overlapping.join(", ")} also changed in that version and now hold your value.`
+      );
+    }
     return { errors, warnings };
-  }, [draft, nudge, catalog]);
+  }, [draft, nudge, catalog, overlapping]);
 
   const set = (patchDraft: Partial<NudgeDraft>) =>
     setDraft((current) => ({ ...current, ...patchDraft }));

@@ -343,6 +343,21 @@ describe("settings", () => {
     ]);
   });
 
+  it("sends the fallback zone trimmed, as it was validated", () => {
+    const draft: NudgeSettingsView = {
+      ...saved,
+      quietHours: { ...saved.quietHours, fallbackTimezone: "  Europe/Berlin " },
+    };
+    expect(diffSettings(saved, draft).patch).toEqual({
+      quietHours: { fallbackTimezone: "Europe/Berlin" },
+    });
+    const padded: NudgeSettingsView = {
+      ...saved,
+      quietHours: { ...saved.quietHours, fallbackTimezone: " UTC " },
+    };
+    expect(diffSettings(saved, padded)).toEqual({ patch: {}, changes: [] });
+  });
+
   it("validates caps, times and groups", () => {
     expect(settingsIssues(saved)).toEqual([]);
     const bad: NudgeSettingsView = {
