@@ -193,6 +193,9 @@ export default function RewardsConfigPage() {
   );
   const [runningAccrual, setRunningAccrual] = useState(false);
   const [migratingRates, setMigratingRates] = useState(false);
+  // From the Apply click until the refresh that follows it has landed: the
+  // page takes no input for the whole span, not only while the refetch runs.
+  const [applyingMigration, setApplyingMigration] = useState(false);
   const [migrationResult, setMigrationResult] =
     useState<SubscriptionCategoryRatesMigrationResult | null>(null);
   const [accrualResult, setAccrualResult] =
@@ -633,6 +636,7 @@ export default function RewardsConfigPage() {
     }
     try {
       setMigratingRates(true);
+      if (apply) setApplyingMigration(true);
       const response = await api.post<SubscriptionCategoryRatesMigrationResult>(
         "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
         { apply },
@@ -659,6 +663,7 @@ export default function RewardsConfigPage() {
       );
     } finally {
       setMigratingRates(false);
+      setApplyingMigration(false);
     }
   };
 
@@ -704,10 +709,14 @@ export default function RewardsConfigPage() {
   }
 
   return (
-    // While a refresh is in flight the page stays mounted but takes no input:
-    // the response replaces the shared config, so anything typed meanwhile
-    // would be lost.
-    <div className="space-y-6" inert={loading} aria-busy={loading}>
+    // While a migration is applied and the config refreshed after it, the page
+    // stays mounted but takes no input: the refresh replaces the shared config,
+    // so anything typed from the Apply click on would be lost.
+    <div
+      className="space-y-6"
+      inert={loading || applyingMigration}
+      aria-busy={loading || applyingMigration}
+    >
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
