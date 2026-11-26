@@ -20,6 +20,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePushCampaigns } from "@/hooks/use-push-campaigns";
+import {
+  describeFilters,
+  formatLocalSendAt,
+  formatUtcSendAt,
+} from "@/lib/push-campaigns";
 import { formatDateTime, formatNumber } from "@/lib/utils";
 import type {
   PushCampaignStatus,
@@ -31,22 +36,30 @@ const count = (n: number) => formatNumber(n, 0, 0);
 
 const STATUS: Record<
   PushCampaignStatus,
-  { label: string; variant: "success" | "warning" | "danger" }
+  { label: string; variant: "success" | "warning" | "danger" | "info" | "muted" }
 > = {
+  scheduled: { label: "Scheduled", variant: "info" },
   sent: { label: "Sent", variant: "success" },
   sending: { label: "Sending", variant: "warning" },
   failed: { label: "Failed", variant: "danger" },
+  cancelled: { label: "Cancelled", variant: "muted" },
 };
 
 interface CampaignHistoryProps {
   destinations: readonly PushDestination[];
 }
 
-/** Campaigns sent so far, their groups, and where to read their results. */
+/**
+ * Campaigns sent (or failed, or called off) so far, their groups, and where to
+ * read their results. Campaigns still to go out are on the Scheduled tab.
+ */
 export function CampaignHistory({ destinations }: CampaignHistoryProps) {
-  const { data, isLoading, error } = usePushCampaigns();
+  const { data: all, isLoading, error } = usePushCampaigns();
+  const data = all?.filter((c) => c.status !== "scheduled");
   const label = (id: string) =>
     destinations.find((d) => d.id === id)?.label ?? id;
+  const campaignName = (id: string) =>
+    all?.find((c) => c.id === id)?.name ?? id;
 
   if (isLoading) {
     return (
@@ -71,21 +84,39 @@ export function CampaignHistory({ destinations }: CampaignHistoryProps) {
     <div className="space-y-4">
       <MeasuringNote />
       {data.map((campaign) => (
-        <CampaignRow key={campaign.id} campaign={campaign} label={label} />
+        <CampaignRow
+          key={campaign.id}
+          campaign={campaign}
+          label={label}
+          campaignName={campaignName}
+        />
       ))}
     </div>
   );
 }
 
-function CampaignRow({
+/** One campaign: its status, when, who, and its groups. */
+export function CampaignRow({
   campaign,
   label,
+  campaignName,
+  actions,
 }: {
   campaign: PushCampaignSummary;
   label: (destinationId: string) => string;
+  /** A campaign's name by id, for the control groups it leaves out. */
+  campaignName: (id: string) => string;
+  /** Buttons for a campaign that can still be changed. */
+  actions?: React.ReactNode;
 }) {
-  const status = STATUS[campaign.status];
+  const status = STATUS[campaign.status] ?? STATUS.failed;
   const isTest = campaign.variants.length > 1;
+  const isScheduled = campaign.status === "scheduled";
+  const filters = describeFilters(campaign.audienceFilters, campaignName);
+  const excluded = campaign.excluded;
+  const leftOut = excluded
+    ? excluded.tier + excluded.control + excluded.tierUnknown
+    : 0;
 
   return (
     <Card>
@@ -99,26 +130,56 @@ function CampaignRow({
             ) : null}
           </CardTitle>
           <CardDescription>
-            {formatDateTime(campaign.sentAt ?? campaign.createdAt)} ·{" "}
-            {campaign.createdBy}
+            {campaign.sendAt && (isScheduled || !campaign.sentAt)
+              ? `${isScheduled ? "Goes out" : "Was due"} ${formatLocalSendAt(campaign.sendAt)} (${formatUtcSendAt(campaign.sendAt)})`
+              : formatDateTime(campaign.sentAt ?? campaign.createdAt)}
+            {campaign.sendAt && campaign.sentAt ? " · scheduled" : ""} ·{" "}
+            {campaign.updatedBy ?? campaign.createdBy}
             {campaign.reason ? ` · ${campaign.reason}` : ""}
           </CardDescription>
         </div>
-        <div className="flex items-center gap-1 font-mono text-xs text-gray-500">
-          {campaign.slug}
-          <CopyButton value={campaign.slug} />
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-1 font-mono text-xs text-gray-500">
+            {campaign.slug}
+            <CopyButton value={campaign.slug} />
+          </div>
+          {actions}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-gray-500">
-          {count(campaign.requested)} uploaded · {count(campaign.reachable)}{" "}
-          reachable · {count(campaign.unreachable)} without a push device ·{" "}
-          {count(campaign.notFound)} not an open account
-        </p>
+        {isScheduled ? (
+          <p className="text-xs text-gray-500">
+            {count(campaign.requested)} uploaded. Who of them gets it, and the
+            split below, is decided when it goes out.
+          </p>
+        ) : campaign.status === "cancelled" ? (
+          <p className="text-xs text-gray-500">
+            Cancelled
+            {campaign.cancelledAt
+              ? ` ${formatDateTime(campaign.cancelledAt)}`
+              : ""}
+            {campaign.cancelledBy ? ` by ${campaign.cancelledBy}` : ""}. Nothing
+            was sent.
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500">
+            {count(campaign.requested)} uploaded · {count(campaign.reachable)}{" "}
+            reachable · {count(campaign.unreachable)} without a push device ·{" "}
+            {count(campaign.notFound)} not an open account
+            {excluded && leftOut > 0
+              ? ` · left out: ${count(excluded.tier)} by tier, ${count(excluded.control)} in an earlier control group${excluded.tierUnknown > 0 ? `, ${count(excluded.tierUnknown)} tier unreadable` : ""}`
+              : ""}
+          </p>
+        )}
+        {filters ? (
+          <p className="text-xs text-gray-500">Audience: {filters}.</p>
+        ) : null}
         {campaign.error ? (
           <p className="text-xs text-red-600">
-            Stopped: {campaign.error}. Groups already sent to stay sent; the
-            rest got nothing.
+            Stopped: {campaign.error}
+            {campaign.variants.some((v) => v.handedOff > 0)
+              ? " Groups already sent to stay sent; the rest got nothing."
+              : ""}
           </p>
         ) : null}
         <Table>
@@ -155,14 +216,15 @@ function CampaignRow({
                     : label(variant.destinationId)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {count(variant.recipients)}
+                  {isScheduled ? "—" : count(variant.recipients)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {count(variant.handedOff)}
+                  {isScheduled ? "—" : count(variant.handedOff)}
                 </TableCell>
               </TableRow>
             ))}
-            {campaign.controlCount > 0 ? (
+            {campaign.controlCount > 0 ||
+            (isScheduled && campaign.controlPercent > 0) ? (
               <TableRow>
                 <TableCell className="font-medium">
                   Control ({campaign.controlPercent}%)
@@ -171,7 +233,7 @@ function CampaignRow({
                   No push
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {count(campaign.controlCount)}
+                  {isScheduled ? "—" : count(campaign.controlCount)}
                 </TableCell>
                 <TableCell className="text-right text-gray-400">—</TableCell>
               </TableRow>

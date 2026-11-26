@@ -5,6 +5,32 @@
 
 export type PushCampaignVariantKey = "a" | "b" | "c";
 
+/** A tier a campaign can be narrowed to, read when it goes out. */
+export type PushCampaignTier = "core" | "prime" | "ultra";
+
+/**
+ * Who of the uploaded list is left out when the campaign goes out (or now, for
+ * a preview). Absent fields leave nobody out.
+ */
+export interface PushCampaignAudienceFilters {
+  /** Only people whose tier, at send time, is one of these. */
+  tiers?: PushCampaignTier[];
+  /** Read the tier without a free trial: someone on a trial has not bought it. */
+  ignoreTrials?: boolean;
+  /** Leave out the control groups of these campaigns (ids). */
+  excludeControlOf?: string[];
+}
+
+/** Who the filters left out (or would leave out, in a preview). */
+export interface PushCampaignExcluded {
+  /** In the control group of a campaign named in `excludeControlOf`. */
+  control: number;
+  /** Holding a tier the campaign is not for. */
+  tier: number;
+  /** Whose tier could not be read: left out rather than guessed. */
+  tierUnknown: number;
+}
+
 export type PushDestinationGroup =
   | "Home"
   | "Card"
@@ -36,6 +62,10 @@ export interface PushCampaignLimits {
   titleMaxLength: number;
   bodyMaxLength: number;
   nameMaxLength: number;
+  /** Absent from backends before scheduling. */
+  scheduleMinLeadMinutes?: number;
+  scheduleMaxAheadDays?: number;
+  maxExcludedControls?: number;
 }
 
 export interface PushCampaignDestinations {
@@ -52,6 +82,13 @@ export interface PushCampaignDestinations {
   } | null;
   /** Whether the signed-in admin may send (otherwise: preview only). */
   canSend: boolean;
+  /**
+   * Whether the server sends scheduled campaigns. Absent from backends before
+   * scheduling, which cannot schedule at all.
+   */
+  schedulerEnabled?: boolean;
+  /** Tiers a campaign can be narrowed to. Absent before send-time filters. */
+  tiers?: PushCampaignTier[];
   limits: PushCampaignLimits;
 }
 
@@ -66,7 +103,9 @@ export interface PushCampaignPreview {
   notFound: string[];
   /** Open accounts without a device registered for push. */
   unreachable: number;
-  /** Open accounts with one: who the campaign splits into its groups. */
+  /** Open accounts with a device that the filters would leave out, as of now. */
+  excluded?: PushCampaignExcluded;
+  /** Open accounts with one, after the filters: who the campaign splits into its groups. */
   reachable: number;
 }
 
@@ -100,9 +139,25 @@ export interface SendPushCampaignInput {
   variants: PushCampaignVariantInput[];
   controlPercent: number;
   reason?: string;
+  filters?: PushCampaignAudienceFilters;
 }
 
-export type PushCampaignStatus = "sending" | "sent" | "failed";
+/** A campaign to go out later, or the new version of a scheduled one. */
+export interface SchedulePushCampaignInput extends SendPushCampaignInput {
+  /** ISO 8601, UTC. */
+  sendAt: string;
+}
+
+/**
+ * `scheduled` waits for `sendAt` and can still be changed or cancelled;
+ * `cancelled` was called off before it went out.
+ */
+export type PushCampaignStatus =
+  | "scheduled"
+  | "sending"
+  | "sent"
+  | "failed"
+  | "cancelled";
 
 export interface PushCampaignSummary {
   id: string;
@@ -117,6 +172,8 @@ export interface PushCampaignSummary {
     path: string;
     /** `data.type` and FCM analytics label of this variant's pushes. */
     type: string;
+    /** The What's New announcement a `whats_new` variant opens. */
+    whatsNewId?: string;
     whatsNewStep?: number;
     recipients: number;
     /** Handed to the notifications service (not necessarily delivered). */
@@ -128,9 +185,23 @@ export interface PushCampaignSummary {
   notFound: number;
   unreachable: number;
   reachable: number;
+  audienceFilters?: PushCampaignAudienceFilters;
+  /** Who the filters left out when it went out. */
+  excluded?: PushCampaignExcluded;
   createdBy: string;
+  /** Who last changed a scheduled campaign; it goes out in their name. */
+  updatedBy?: string;
   reason?: string;
+  /** When a scheduled campaign goes (or went) out. */
+  sendAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
   createdAt: string;
   sentAt?: string;
   error?: string;
+}
+
+/** A campaign with a scheduled one's uploaded list, for the editor. */
+export interface PushCampaignDetail extends PushCampaignSummary {
+  userIds: string[];
 }

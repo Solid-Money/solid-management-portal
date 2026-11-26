@@ -31,7 +31,7 @@ interface AudienceCardProps {
   parsed: ParsedAudience;
   maxRecipients: number;
   preview: PushCampaignPreview | null;
-  /** The list changed since `preview` was taken. */
+  /** The list or the filters changed since `preview` was taken. */
   previewStale: boolean;
   isPreviewing: boolean;
   disabled: boolean;
@@ -52,6 +52,11 @@ export function AudienceCard({
 }: AudienceCardProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const overLimit = parsed.ids.length > maxRecipients;
+  const leftOut = preview?.excluded
+    ? preview.excluded.tier +
+      preview.excluded.control +
+      preview.excluded.tierUnknown
+    : 0;
 
   const readFile = async (file: File) => {
     if (file.size > MAX_FILE_BYTES) {
@@ -157,8 +162,8 @@ export function AudienceCard({
           <div className="rounded-lg border bg-gray-50 p-3">
             {previewStale ? (
               <p className="mb-2 text-xs text-amber-700">
-                The list changed since this check. Check it again before
-                sending.
+                The list or who is left out changed since this check. Check it
+                again before sending.
               </p>
             ) : null}
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -167,6 +172,16 @@ export function AudienceCard({
               <Stat label="No open account" value={preview.notFoundCount} />
               <Stat label="Ids checked" value={preview.requested} />
             </dl>
+            {leftOut > 0 && preview.excluded ? (
+              <p className="mt-2 text-xs text-gray-500">
+                Left out as of now: {count(preview.excluded.tier)} by tier,{" "}
+                {count(preview.excluded.control)} in an earlier control group
+                {preview.excluded.tierUnknown > 0
+                  ? `, ${count(preview.excluded.tierUnknown)} whose tier couldn't be read`
+                  : ""}
+                . A scheduled campaign checks again when it goes out.
+              </p>
+            ) : null}
             {preview.notFound.length > 0 ? (
               <p
                 className="mt-2 truncate font-mono text-[11px] text-gray-400"

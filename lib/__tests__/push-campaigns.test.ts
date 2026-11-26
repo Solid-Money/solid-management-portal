@@ -3,18 +3,34 @@ import { describe, expect, it } from "vitest";
 import {
   campaignSlug,
   campaignType,
+  controlGroupSources,
+  defaultSendAt,
+  describeFilters,
+  emptyFilters,
   emptyVariant,
   expectedSplit,
+  filtersDraftOf,
+  formatUtcSendAt,
   groupDestinations,
+  localInputToIso,
+  localTimeZoneLabel,
   parseAudience,
   parseCsvRecords,
   parseTestRecipients,
+  sameFilters,
   sameIds,
+  seedFromCampaign,
+  sendTimeProblem,
   splitCsvLine,
+  toFiltersInput,
+  toLocalInput,
   toVariantInput,
   variantProblem,
 } from "@/lib/push-campaigns";
-import type { PushDestination } from "@/types/push-campaigns";
+import type {
+  PushCampaignDetail,
+  PushDestination,
+} from "@/types/push-campaigns";
 
 const A = "000000000000000000000a01";
 const B = "000000000000000000000b02";
@@ -369,5 +385,176 @@ describe("parseTestRecipients", () => {
       A,
       "tester2",
     ]);
+  });
+});
+
+describe("send-time filters", () => {
+  const ALL = ["core", "prime", "ultra"] as const;
+
+  it("sends nothing when they leave nobody out", () => {
+    expect(toFiltersInput(emptyFilters(), ALL)).toBeUndefined();
+    // Every tier ticked is the same as none.
+    expect(
+      toFiltersInput({ ...emptyFilters(), tiers: [...ALL] }, ALL),
+    ).toBeUndefined();
+  });
+
+  it("keeps the tiers in ladder order, with how a trial counts", () => {
+    expect(
+      toFiltersInput(
+        { tiers: ["prime", "core"], ignoreTrials: true, excludeControlOf: [] },
+        ALL,
+      ),
+    ).toEqual({ tiers: ["core", "prime"], ignoreTrials: true });
+  });
+
+  it("names the control groups to leave out", () => {
+    expect(
+      toFiltersInput(
+        { tiers: [], ignoreTrials: true, excludeControlOf: [A] },
+        ALL,
+      ),
+    ).toEqual({ excludeControlOf: [A] });
+  });
+
+  it("compares filters by who they leave out, not by order", () => {
+    expect(
+      sameFilters(
+        { tiers: ["core", "prime"], ignoreTrials: true },
+        { tiers: ["prime", "core"], ignoreTrials: true },
+      ),
+    ).toBe(true);
+    expect(sameFilters(undefined, {})).toBe(true);
+    expect(
+      sameFilters(
+        { tiers: ["core"], ignoreTrials: true },
+        { tiers: ["core"], ignoreTrials: false },
+      ),
+    ).toBe(false);
+    expect(sameFilters({ excludeControlOf: [A] }, undefined)).toBe(false);
+  });
+
+  it("describes them in a sentence", () => {
+    expect(
+      describeFilters(
+        { tiers: ["core"], ignoreTrials: true, excludeControlOf: [A] },
+        () => "BF opening",
+      ),
+    ).toBe(
+      "only Core at send time (free trials not counted); leaving out the control group of BF opening",
+    );
+    expect(describeFilters(undefined, () => "")).toBeNull();
+  });
+
+  it("round-trips a stored campaign's filters through the form", () => {
+    const stored = { tiers: ["prime" as const], ignoreTrials: false };
+    expect(toFiltersInput(filtersDraftOf(stored), ALL)).toEqual(stored);
+  });
+});
+
+describe("send time", () => {
+  const limits = { scheduleMinLeadMinutes: 2, scheduleMaxAheadDays: 60 };
+  const now = new Date("2026-11-27T10:00:00");
+
+  it("reads a datetime-local value in this browser's time zone", () => {
+    const iso = localInputToIso("2026-11-30T09:30");
+    expect(iso).toBe(new Date(2026, 10, 30, 9, 30).toISOString());
+    expect(toLocalInput(iso)).toBe("2026-11-30T09:30");
+    expect(localInputToIso("")).toBeNull();
+    expect(localInputToIso("next monday")).toBeNull();
+  });
+
+  it("refuses a time too soon, too far, or missing", () => {
+    expect(sendTimeProblem("2026-11-27T10:01", limits, now)).toMatch(
+      /at least 2 minutes/,
+    );
+    expect(sendTimeProblem("2026-11-27T09:00", limits, now)).toMatch(
+      /at least 2 minutes/,
+    );
+    expect(sendTimeProblem("2027-02-01T10:00", limits, now)).toMatch(
+      /at most 60 days/,
+    );
+    expect(sendTimeProblem("", limits, now)).toBe("Pick a date and time.");
+    expect(sendTimeProblem("2026-11-30T09:00", limits, now)).toBeNull();
+  });
+
+  it("defaults to a whole hour at least an hour away", () => {
+    expect(defaultSendAt(new Date("2026-11-27T10:20:00"))).toBe(
+      "2026-11-27T12:00",
+    );
+  });
+
+  it("shows the time in UTC too", () => {
+    expect(formatUtcSendAt("2026-11-30T09:00:00.000Z")).toBe(
+      "Mon, Nov 30, 09:00 UTC",
+    );
+  });
+
+  it("names the time zone with its offset", () => {
+    expect(localTimeZoneLabel()).toContain(
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
+  });
+});
+
+describe("editing a scheduled campaign", () => {
+  const scheduled: PushCampaignDetail = {
+    id: "6b0000000000000000000009",
+    name: "BF reminder",
+    slug: "bf_reminder",
+    status: "scheduled",
+    variants: [
+      {
+        key: "a",
+        title: "Your upgrade is still 30% off",
+        destinationId: "whats_new",
+        path: "/?whatsNew=ffffffffffffffffffffffff&whatsNewStep=1",
+        type: "campaign-bf_reminder-a",
+        whatsNewId: "ffffffffffffffffffffffff",
+        whatsNewStep: 1,
+        recipients: 0,
+        handedOff: 0,
+      },
+    ],
+    controlPercent: 0,
+    controlCount: 0,
+    requested: 2,
+    notFound: 0,
+    unreachable: 0,
+    reachable: 0,
+    audienceFilters: { tiers: ["core"], ignoreTrials: true },
+    createdBy: "luka@fuse.io",
+    sendAt: "2026-11-30T09:00:00.000Z",
+    createdAt: "2026-11-26T09:00:00.000Z",
+    userIds: [A, B],
+  };
+
+  it("starts the form from what was scheduled", () => {
+    const seed = seedFromCampaign(scheduled);
+    expect(parseAudience(seed.raw).ids).toEqual([A, B]);
+    expect(seed.variants[0]).toEqual({
+      title: "Your upgrade is still 30% off",
+      body: "",
+      destinationId: "whats_new",
+      whatsNewStep: "1",
+      whatsNewId: "ffffffffffffffffffffffff",
+    });
+    expect(seed.controlOn).toBe(false);
+    expect(seed.filters.tiers).toEqual(["core"]);
+    expect(localInputToIso(seed.sendAt)).toBe("2026-11-30T09:00:00.000Z");
+  });
+
+  it("offers only campaigns that held a control group back, never itself", () => {
+    const sources = controlGroupSources(
+      [
+        { ...scheduled, controlPercent: 10 },
+        { ...scheduled, id: "a", status: "sent", controlPercent: 10 },
+        { ...scheduled, id: "b", status: "sent", controlPercent: 0 },
+        { ...scheduled, id: "c", status: "cancelled", controlPercent: 10 },
+        { ...scheduled, id: "d", status: "failed", controlPercent: 10 },
+      ],
+      scheduled.id,
+    );
+    expect(sources.map((c) => c.id)).toEqual(["a"]);
   });
 });
