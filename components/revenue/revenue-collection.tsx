@@ -9,6 +9,7 @@ import {
   formatUsd,
   tokenFractionDigits,
 } from "@/lib/utils";
+import { rankVaultPayouts } from "@/lib/vault-payouts";
 import type {
   RevenueCollectionDestination,
   RevenueCollectionLine,
@@ -96,17 +97,9 @@ export function VaultCollectionSummary({
   onToggle: () => void;
 }) {
   const accountants = vaults?.accountants ?? [];
-  const payouts = [
-    ...new Set(
-      accountants
-        .map((accountant) => accountant.payoutAddress)
-        .filter((address): address is string => Boolean(address))
-    ),
-  ];
+  // Most money first, not the alphabetically first vault's address.
+  const payouts = rankVaultPayouts(accountants);
   const [payout] = payouts;
-  const payoutAccountant = accountants.find(
-    (accountant) => accountant.payoutAddress === payout
-  );
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
@@ -120,11 +113,12 @@ export function VaultCollectionSummary({
         <>
           <span className="text-gray-400">· paid out to</span>
           <CopyableValue
-            value={payout}
+            value={payout.address}
             label="Payout address"
             truncate
-            href={payoutAccountant?.payoutExplorerUrl ?? undefined}
+            href={payout.explorerUrl ?? undefined}
           />
+          <span className="text-gray-400">({payout.vaults.join(", ")})</span>
           {payouts.length > 1 ? (
             <span className="text-gray-400">+{payouts.length - 1} more</span>
           ) : null}
