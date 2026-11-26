@@ -41,7 +41,11 @@ const CUSTOM = "__custom__";
 
 interface PushFieldsProps {
   value: NudgePushDraft;
-  onChange: (next: NudgePushDraft) => void;
+  /**
+   * Called with an updater, not a value: an upload finishes after the admin
+   * may have typed more, and must merge into the draft as it is by then.
+   */
+  onChange: (update: (current: NudgePushDraft) => NudgePushDraft) => void;
   variables: NudgeVariable[];
   catalog: NudgeCatalogView;
   disabled: boolean;
@@ -87,7 +91,8 @@ export function PushFields({
   );
   const pathInvalid = value.path.trim() !== "" && !isValidAppPath(value.path);
 
-  const set = (patch: Partial<NudgePushDraft>) => onChange({ ...value, ...patch });
+  const set = (patch: Partial<NudgePushDraft>) =>
+    onChange((current) => ({ ...current, ...patch }));
 
   const insertVariable = (name: string) => {
     const token = `{${name}}`;

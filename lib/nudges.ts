@@ -365,10 +365,9 @@ function normalizePath(path: string): { pathname: string; query: string } {
   const entries = [...params.entries()]
     .filter(([key]) => !key.startsWith("utm_"))
     .sort(([a, av], [b, bv]) => (a === b ? av.localeCompare(bv) : a.localeCompare(b)));
-  return {
-    pathname,
-    query: entries.map(([k, v]) => `${k}=${v}`).join("&"),
-  };
+  // Serialised as JSON, not joined back into "k=v&…": a decoded value can
+  // itself hold "&" or "=", and two different queries must never compare equal.
+  return { pathname, query: JSON.stringify(entries) };
 }
 
 /** The catalog destination a path opens, ignoring utm params and order. */
@@ -601,6 +600,18 @@ function describeGroup(group: { id: string; days: number }): string {
   return `${group.id} (${group.days}d)`;
 }
 
+/** Whether this browser knows `zone` as an IANA time zone, e.g. "Europe/Berlin". */
+export function isValidTimeZone(zone: string): boolean {
+  const trimmed = zone.trim();
+  if (!trimmed) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: trimmed });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Problems with the rules that block a save. */
 export function settingsIssues(settings: NudgeSettingsView): string[] {
   const issues: string[] = [];
@@ -620,6 +631,10 @@ export function settingsIssues(settings: NudgeSettingsView): string[] {
   }
   if (!settings.quietHours.fallbackTimezone.trim()) {
     issues.push("Quiet hours need a fallback time zone.");
+  } else if (!isValidTimeZone(settings.quietHours.fallbackTimezone)) {
+    issues.push(
+      `"${settings.quietHours.fallbackTimezone.trim()}" is not a time zone. Use an IANA zone such as Europe/Berlin or UTC.`
+    );
   }
   const ids = new Set<string>();
   for (const group of settings.suppressionGroups) {
@@ -636,6 +651,136 @@ export function settingsIssues(settings: NudgeSettingsView): string[] {
     }
   }
   return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Rebasing an edit onto a newer saved version
+// ---------------------------------------------------------------------------
+
+const TOP_FIELDS = [
+  "name",
+  "description",
+  "status",
+  "category",
+  "priority",
+  "delayMinutes",
+  "cooldownDays",
+  "suppressionGroup",
+  "conditions",
+] as const;
+const PUSH_FIELDS = [
+  "enabled",
+  "title",
+  "body",
+  "path",
+  "destinationId",
+  "imageUrl",
+] as const;
+const EMAIL_FIELDS = ["enabled", "templateId"] as const;
+
+/**
+ * Carry an unsaved edit over to a newer saved version: start from what is
+ * saved now and re-apply only the fields the admin changed from the version
+ * they started on. `overlapping` names the fields both the admin and the newer
+ * version changed (to different values), which the admin's value now replaces.
+ */
+export function rebaseDraft(
+  startedFrom: NudgeView,
+  draft: NudgeDraft,
+  latest: NudgeView
+): { draft: NudgeDraft; overlapping: string[] } {
+  const before = draftFromNudge(startedFrom);
+  const next = draftFromNudge(latest);
+  const overlapping: string[] = [];
+  const carry = (
+    field: string,
+    was: unknown,
+    mine: unknown,
+    theirs: unknown,
+    apply: () => void
+  ) => {
+    if (sameValue(was, mine)) return;
+    if (!sameValue(was, theirs) && !sameValue(theirs, mine)) overlapping.push(field);
+    apply();
+  };
+
+  for (const field of TOP_FIELDS) {
+    carry(field, before[field], draft[field], next[field], () => {
+      (next as unknown as Record<string, unknown>)[field] = draft[field];
+    });
+  }
+  if (before.push && draft.push && next.push) {
+    const push = { ...next.push };
+    for (const field of PUSH_FIELDS) {
+      carry(`push.${field}`, before.push[field], draft.push[field], push[field], () => {
+        (push as unknown as Record<string, unknown>)[field] = draft.push?.[field];
+      });
+    }
+    next.push = push;
+  }
+  if (before.email && draft.email && next.email) {
+    const email = { ...next.email };
+    for (const field of EMAIL_FIELDS) {
+      carry(`email.${field}`, before.email[field], draft.email[field], email[field], () => {
+        (email as unknown as Record<string, unknown>)[field] = draft.email?.[field];
+      });
+    }
+    next.email = email;
+  }
+  return { draft: next, overlapping };
+}
+
+/** The rules as flat fields, for rebasing and comparing. */
+function flatSettings(settings: NudgeSettingsView): Record<string, unknown> {
+  return {
+    marketingEnabled: settings.marketingEnabled,
+    respectMarketingConsent: settings.respectMarketingConsent,
+    "frequencyCap.enabled": settings.frequencyCap.enabled,
+    "frequencyCap.perDay": settings.frequencyCap.perDay,
+    "frequencyCap.perWeek": settings.frequencyCap.perWeek,
+    "quietHours.enabled": settings.quietHours.enabled,
+    "quietHours.start": settings.quietHours.start,
+    "quietHours.end": settings.quietHours.end,
+    "quietHours.fallbackTimezone": settings.quietHours.fallbackTimezone,
+    suppressionGroups: JSON.stringify(settings.suppressionGroups),
+  };
+}
+
+/** The same as rebaseDraft, for the global rules. */
+export function rebaseSettings(
+  startedFrom: NudgeSettingsView,
+  draft: NudgeSettingsView,
+  latest: NudgeSettingsView
+): { draft: NudgeSettingsView; overlapping: string[] } {
+  const was = flatSettings(startedFrom);
+  const mine = flatSettings(draft);
+  const theirs = flatSettings(latest);
+  const next: NudgeSettingsView = {
+    ...latest,
+    frequencyCap: { ...latest.frequencyCap },
+    quietHours: { ...latest.quietHours },
+    suppressionGroups: latest.suppressionGroups.map((g) => ({ ...g })),
+  };
+  const overlapping: string[] = [];
+  for (const field of Object.keys(mine)) {
+    if (sameValue(was[field], mine[field])) continue;
+    if (!sameValue(was[field], theirs[field]) && !sameValue(theirs[field], mine[field])) {
+      overlapping.push(field);
+    }
+    if (field === "suppressionGroups") {
+      next.suppressionGroups = draft.suppressionGroups.map((g) => ({ ...g }));
+    } else if (field.startsWith("frequencyCap.")) {
+      const key = field.slice("frequencyCap.".length) as keyof NudgeSettingsView["frequencyCap"];
+      (next.frequencyCap as Record<string, unknown>)[key] = draft.frequencyCap[key];
+    } else if (field.startsWith("quietHours.")) {
+      const key = field.slice("quietHours.".length) as keyof NudgeSettingsView["quietHours"];
+      (next.quietHours as Record<string, unknown>)[key] = draft.quietHours[key];
+    } else {
+      (next as unknown as Record<string, unknown>)[field] =
+        draft[field as "marketingEnabled" | "respectMarketingConsent"];
+    }
+  }
+  return { draft: next, overlapping };
 }
 
 /** A field change's value, as one line of text. */

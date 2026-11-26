@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -102,9 +102,35 @@ function Canvas({
     [sectionNudges]
   );
 
+  // What a node shows, as of the latest render. A layout finishes after an
+  // await, by which time the copy may have changed: it reads this, not the
+  // nudges it started with.
+  const latestData = useRef({ sectionNudges, channel, collapsedAt });
+  useEffect(() => {
+    latestData.current = { sectionNudges, channel, collapsedAt };
+  }, [sectionNudges, channel, collapsedAt]);
+
   useEffect(() => {
     let cancelled = false;
     const graph = elkGraphInput(sectionNudges, keys, standalone);
+    /** Nodes at `positionOf`, each with its latest data. */
+    const nodesAt = (
+      positionOf: (key: string, index: number) => { x: number; y: number }
+    ): NudgeFlowNode[] => {
+      const latest = latestData.current;
+      const byKey = new Map(latest.sectionNudges.map((n) => [n.key, n]));
+      return sectionNudges.map((laidOut, index) => ({
+        id: laidOut.key,
+        type: "nudge" as const,
+        position: positionOf(laidOut.key, index),
+        data: {
+          nudge: byKey.get(laidOut.key) ?? laidOut,
+          channel: latest.channel,
+          collapsedAt: latest.collapsedAt,
+        },
+      }));
+    };
+    const stacked = (index: number) => ({ x: 0, y: index * (NUDGE_NODE_HEIGHT + 40) });
     elk
       .layout(graph)
       .then((result) => {
@@ -115,17 +141,7 @@ function Canvas({
             { x: child.x ?? 0, y: child.y ?? 0 },
           ])
         );
-        setNodes(
-          sectionNudges.map((nudge, index) => ({
-            id: nudge.key,
-            type: "nudge" as const,
-            position: positions.get(nudge.key) ?? {
-              x: 0,
-              y: index * (NUDGE_NODE_HEIGHT + 40),
-            },
-            data: { nudge, channel, collapsedAt },
-          }))
-        );
+        setNodes(nodesAt((key, index) => positions.get(key) ?? stacked(index)));
         setLaidOut(true);
         setLayoutFailed(false);
         setFitPending(true);
@@ -133,14 +149,7 @@ function Canvas({
       .catch(() => {
         if (cancelled) return;
         setLayoutFailed(true);
-        setNodes(
-          sectionNudges.map((nudge, index) => ({
-            id: nudge.key,
-            type: "nudge" as const,
-            position: { x: 0, y: index * (NUDGE_NODE_HEIGHT + 40) },
-            data: { nudge, channel, collapsedAt },
-          }))
-        );
+        setNodes(nodesAt((_, index) => stacked(index)));
         setLaidOut(true);
         setFitPending(true);
       });

@@ -313,12 +313,24 @@ function PlanView({ plan }: { plan: NudgeMigrationPlan }) {
                     >
                       <TableCell>
                         {expandable ? (
-                          <ChevronRight
-                            className={cn(
-                              "h-4 w-4 text-gray-400 transition-transform",
-                              open && "rotate-90"
-                            )}
-                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              // The row toggles too; don't toggle twice.
+                              e.stopPropagation();
+                              toggle(item.key);
+                            }}
+                            aria-expanded={open}
+                            aria-label={`${open ? "Hide" : "Show"} the changes to ${item.name}`}
+                            className="flex cursor-pointer items-center rounded focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+                          >
+                            <ChevronRight
+                              className={cn(
+                                "h-4 w-4 text-gray-400 transition-transform",
+                                open && "rotate-90"
+                              )}
+                            />
+                          </button>
                         ) : null}
                       </TableCell>
                       <TableCell>

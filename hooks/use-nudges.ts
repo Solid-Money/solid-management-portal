@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -20,6 +21,7 @@ import {
 import type {
   NudgeBoard,
   NudgeCreateRequest,
+  NudgeDetail,
   NudgeMigrationApplyRequest,
   NudgeMigrationId,
   NudgeRestoreVersionRequest,
@@ -29,20 +31,31 @@ import type {
   NudgeView,
 } from "@/types/nudges";
 
+/**
+ * Query keys. What depends on who is asking (edit rights, the admin's view of
+ * the board) is keyed by the signed-in admin, so a second admin signing in on
+ * the same tab never sees the first one's cached answer. Everything sits under
+ * `all`, so one invalidation still covers it.
+ */
 export const NUDGE_KEYS = {
   all: ["nudges"] as const,
-  board: ["nudges", "board"] as const,
-  detail: (key: string) => ["nudges", "detail", key] as const,
-  history: ["nudges", "history"] as const,
+  board: (uid: string) => ["nudges", uid, "board"] as const,
+  detail: (uid: string, key: string) => ["nudges", uid, "detail", key] as const,
+  history: (uid: string) => ["nudges", uid, "history"] as const,
   template: (id: number) => ["nudges", "template", id] as const,
   migrations: ["nudges", "migrations"] as const,
 };
+
+/** Whether a write was refused because someone saved first. */
+export function isVersionConflict(error: unknown): boolean {
+  return isAxiosError(error) && error.response?.status === 409;
+}
 
 /** Every nudge, the rules and the catalog. */
 export function useNudgeBoard() {
   const { user } = useAuth();
   return useQuery({
-    queryKey: NUDGE_KEYS.board,
+    queryKey: NUDGE_KEYS.board(user?.uid ?? ""),
     queryFn: getNudgeBoard,
     enabled: !!user,
     staleTime: 30 * 1000,
@@ -53,7 +66,7 @@ export function useNudgeBoard() {
 export function useNudgeDetail(key: string | null) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: NUDGE_KEYS.detail(key ?? ""),
+    queryKey: NUDGE_KEYS.detail(user?.uid ?? "", key ?? ""),
     queryFn: () => getNudgeDetail(key as string),
     enabled: !!user && !!key,
   });
@@ -63,7 +76,7 @@ export function useNudgeDetail(key: string | null) {
 export function useNudgeHistory(enabled = true) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: NUDGE_KEYS.history,
+    queryKey: NUDGE_KEYS.history(user?.uid ?? ""),
     queryFn: () => getNudgeHistory(100),
     enabled: !!user && enabled,
   });
@@ -106,26 +119,48 @@ function replaceInBoard(
   };
 }
 
-/** After any nudge write: board, its detail and the history are stale. */
+/**
+ * After any nudge write: put the saved nudge into the board and its detail at
+ * once (so an open editor moves to the saved version even if the refetch
+ * fails), then refresh everything, the versions and history included.
+ */
 function useAfterNudgeWrite() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const uid = user?.uid ?? "";
   return (saved?: NudgeView) => {
     if (saved) {
-      queryClient.setQueryData<NudgeBoard>(NUDGE_KEYS.board, (board) =>
+      queryClient.setQueryData<NudgeBoard>(NUDGE_KEYS.board(uid), (board) =>
         replaceInBoard(board, saved)
+      );
+      queryClient.setQueryData<NudgeDetail>(
+        NUDGE_KEYS.detail(uid, saved.key),
+        (detail) => (detail ? { ...detail, nudge: saved } : detail)
       );
     }
     void queryClient.invalidateQueries({ queryKey: NUDGE_KEYS.all });
   };
 }
 
+/** On a version conflict, fetch what is saved now so the admin can re-apply. */
+function useRefreshOnConflict() {
+  const queryClient = useQueryClient();
+  return (error: unknown) => {
+    if (isVersionConflict(error)) {
+      void queryClient.invalidateQueries({ queryKey: NUDGE_KEYS.all });
+    }
+  };
+}
+
 export function useUpdateNudge() {
   const after = useAfterNudgeWrite();
+  const refreshOnConflict = useRefreshOnConflict();
   return useMutation({
     mutationFn: ({ key, input }: { key: string; input: NudgeUpdateRequest }) =>
       updateNudge(key, input),
     retry: false,
     onSuccess: (saved) => after(saved),
+    onError: refreshOnConflict,
   });
 }
 
@@ -157,16 +192,20 @@ export function useRestoreNudgeVersion() {
 
 export function useUpdateNudgeSettings() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const refreshOnConflict = useRefreshOnConflict();
   return useMutation({
     mutationFn: (input: NudgeSettingsUpdateRequest) =>
       updateNudgeSettings(input),
     retry: false,
     onSuccess: (settings) => {
-      queryClient.setQueryData<NudgeBoard>(NUDGE_KEYS.board, (board) =>
-        board ? { ...board, settings } : board
+      queryClient.setQueryData<NudgeBoard>(
+        NUDGE_KEYS.board(user?.uid ?? ""),
+        (board) => (board ? { ...board, settings } : board)
       );
       void queryClient.invalidateQueries({ queryKey: NUDGE_KEYS.all });
     },
+    onError: refreshOnConflict,
   });
 }
 

@@ -134,6 +134,9 @@ function NewNudgeForm({
     if (!Number.isInteger(delayMinutes) || delayMinutes < 0) {
       list.push("The delay must be a whole number of minutes.");
     }
+    if (!Number.isInteger(priority) || priority < 1 || priority > 7) {
+      list.push("The priority must be a whole number from 1 to 7.");
+    }
     if (!withPush && !withEmail) list.push("Add a push, an email or both.");
     if (withPush) {
       for (const issue of pushCopyIssues(push, variables, catalog.limits, [])) {
@@ -158,6 +161,7 @@ function NewNudgeForm({
     taken,
     event,
     delayMinutes,
+    priority,
     withPush,
     withEmail,
     push,

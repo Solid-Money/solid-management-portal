@@ -17,8 +17,11 @@ import {
   insertAt,
   isEditable,
   isValidAppPath,
+  isValidTimeZone,
   missingTemplateParams,
   pushCopyIssues,
+  rebaseDraft,
+  rebaseSettings,
   renderExample,
   settingsIssues,
   slugifyKey,
@@ -253,6 +256,14 @@ describe("destinations", () => {
     expect(destinationForPath("/rewards", destinations)).toBeNull();
   });
 
+  it("keeps query boundaries when comparing", () => {
+    const tricky: NudgeDestinationView[] = [
+      { id: "ab", label: "AB", description: "", path: "/rewards?a=1&b=2", group: "R" },
+    ];
+    expect(destinationForPath("/rewards?b=2&a=1", tricky)?.id).toBe("ab");
+    expect(destinationForPath("/rewards?a=1%26b%3D2", tricky)).toBeNull();
+  });
+
   it("accepts in-app paths only", () => {
     expect(isValidAppPath("/savings?vault=eur")).toBe(true);
     expect(isValidAppPath("https://evil.example")).toBe(false);
@@ -352,6 +363,60 @@ describe("settings", () => {
       'Group "A" needs a whole number of days.',
       'Group id "a-b" is used twice.',
     ]);
+  });
+});
+
+describe("rebasing an unsaved edit onto a newer version", () => {
+  it("keeps the admin's fields and takes everyone else's", () => {
+    const v1 = nudge("a");
+    const mine = draftFromNudge(v1);
+    mine.push = { ...(mine.push as NonNullable<typeof mine.push>), title: "Mine" };
+    mine.priority = 2;
+    const v2 = nudge("a", {
+      version: 2,
+      push: { ...(v1.push as NonNullable<typeof v1.push>), body: "Theirs" },
+      priority: 4,
+    });
+
+    const { draft, overlapping } = rebaseDraft(v1, mine, v2);
+    expect(draft.push?.title).toBe("Mine");
+    expect(draft.push?.body).toBe("Theirs");
+    expect(draft.priority).toBe(2);
+    expect(overlapping).toEqual(["priority"]);
+    expect(diffNudge(v2, draft).changes.map((c) => c.field)).toEqual([
+      "priority",
+      "push.title",
+    ]);
+  });
+
+  it("does the same for the rules", () => {
+    const v3: NudgeSettingsView = {
+      version: 3,
+      marketingEnabled: true,
+      respectMarketingConsent: true,
+      frequencyCap: { enabled: true, perDay: 1, perWeek: 3 },
+      quietHours: { enabled: true, start: "21:00", end: "08:00", fallbackTimezone: "UTC" },
+      suppressionGroups: [],
+      updatedAt: null,
+      updatedBy: null,
+    };
+    const mine = { ...v3, frequencyCap: { ...v3.frequencyCap, perDay: 2 } };
+    const v4 = { ...v3, version: 4, quietHours: { ...v3.quietHours, start: "22:00" } };
+
+    const { draft, overlapping } = rebaseSettings(v3, mine, v4);
+    expect(draft.frequencyCap.perDay).toBe(2);
+    expect(draft.quietHours.start).toBe("22:00");
+    expect(draft.version).toBe(4);
+    expect(overlapping).toEqual([]);
+  });
+});
+
+describe("time zones", () => {
+  it("accepts IANA zones only", () => {
+    expect(isValidTimeZone("Europe/Berlin")).toBe(true);
+    expect(isValidTimeZone(" UTC ")).toBe(true);
+    expect(isValidTimeZone("Not/AZone")).toBe(false);
+    expect(isValidTimeZone("")).toBe(false);
   });
 });
 

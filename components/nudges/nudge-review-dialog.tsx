@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AlertTriangle, Loader2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,11 @@ interface NudgeReviewDialogProps {
   saving: boolean;
   confirmLabel: string;
   destructive?: boolean;
+  /**
+   * Shown above the reason, e.g. "someone saved first" with a way to re-apply
+   * the edit. While set, confirming is blocked: the save would be refused.
+   */
+  notice?: ReactNode;
   onConfirm: (reason: string) => void;
 }
 
@@ -53,6 +58,7 @@ export function NudgeReviewDialog({
   saving,
   confirmLabel,
   destructive = false,
+  notice,
   onConfirm,
 }: NudgeReviewDialogProps) {
   const [reason, setReason] = useState("");
@@ -67,7 +73,7 @@ export function NudgeReviewDialog({
 
   const trimmed = reason.trim();
   const reasonOk = trimmed.length >= reasonMin && trimmed.length <= reasonMax;
-  const canConfirm = reasonOk && errors.length === 0 && !saving;
+  const canConfirm = reasonOk && errors.length === 0 && !saving && !notice;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
@@ -126,6 +132,12 @@ export function NudgeReviewDialog({
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {notice ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {notice}
+          </div>
         ) : null}
 
         <div className="space-y-2">

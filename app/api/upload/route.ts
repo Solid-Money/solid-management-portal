@@ -2,7 +2,11 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
 import { isAdminRequest } from "@/lib/admin-request";
-import { UPLOAD_IMAGE_MAX_BYTES, UPLOAD_IMAGE_TYPES } from "@/lib/upload-limits";
+import {
+  detectImageType,
+  UPLOAD_IMAGE_MAX_BYTES,
+  UPLOAD_IMAGE_TYPES,
+} from "@/lib/upload-limits";
 
 /**
  * Stores an image an admin uploads (promotion banners, What's New images and
@@ -56,11 +60,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "The file is too large" }, { status: 413 });
   }
 
+  // The declared type comes from the file name; the bytes must be an image
+  // too. It is stored as the type found, so a mislabelled image still works.
+  const detectedType = detectImageType(new Uint8Array(body));
+  if (!detectedType) {
+    return NextResponse.json(
+      { error: "The file is not a PNG, JPEG, WebP, GIF, AVIF or SVG image" },
+      { status: 415 },
+    );
+  }
+
   try {
     const blob = await put(filename, body, {
       access: "public",
       addRandomSuffix: true,
-      contentType,
+      contentType: detectedType,
     });
 
     return NextResponse.json(blob);

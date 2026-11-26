@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Loader2 } from "lucide-react";
 
@@ -15,10 +16,14 @@ import {
 } from "@/components/ui/table";
 import { useNudgeHistory } from "@/hooks/use-nudges";
 import { formatChangeValue } from "@/lib/nudges";
+import type { NudgeFieldChange } from "@/types/nudges";
+
+/** How many of an entry's changes show before "Show N more". */
+const PREVIEW = 6;
 
 /** Every change to every nudge and to the rules, newest first. */
 export function NudgeHistory({ onOpen }: { onOpen: (key: string) => void }) {
-  const { data, isLoading, error } = useNudgeHistory();
+  const { data, isLoading, error, refetch, isRefetching } = useNudgeHistory();
 
   if (isLoading) {
     return (
@@ -27,14 +32,41 @@ export function NudgeHistory({ onOpen }: { onOpen: (key: string) => void }) {
       </div>
     );
   }
-  if (error || !data) {
-    return <p className="text-sm text-red-600">Failed to load the history.</p>;
+  // The full error only when nothing was ever loaded: a failed background
+  // refresh keeps the rows already on screen.
+  if (!data) {
+    return (
+      <p className="text-sm text-red-600">
+        Failed to load the history.{" "}
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="cursor-pointer underline"
+        >
+          Try again
+        </button>
+      </p>
+    );
   }
   if (data.length === 0) {
     return <p className="text-sm text-gray-500">No changes yet.</p>;
   }
 
   return (
+    <div className="space-y-2">
+      {error ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Couldn&apos;t refresh the history; showing what was loaded before.{" "}
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={isRefetching}
+            className="cursor-pointer underline disabled:cursor-default disabled:opacity-60"
+          >
+            {isRefetching ? "Refreshing…" : "Try again"}
+          </button>
+        </p>
+      ) : null}
     <div className="rounded-lg border border-gray-200 bg-white">
       <Table>
         <TableHeader>
@@ -77,27 +109,44 @@ export function NudgeHistory({ onOpen }: { onOpen: (key: string) => void }) {
                 {entry.reason ? (
                   <p className="text-gray-800">{entry.reason}</p>
                 ) : null}
-                {entry.changes.length > 0 ? (
-                  <ul className="mt-1 space-y-0.5 text-gray-500">
-                    {entry.changes.slice(0, 6).map((change) => (
-                      <li key={change.field} className="break-words">
-                        <span className="font-mono">{change.field}</span>:{" "}
-                        {formatChangeValue(change.from)} →{" "}
-                        <span className="text-gray-800">
-                          {formatChangeValue(change.to)}
-                        </span>
-                      </li>
-                    ))}
-                    {entry.changes.length > 6 ? (
-                      <li>and {entry.changes.length - 6} more</li>
-                    ) : null}
-                  </ul>
-                ) : null}
+                <ChangeList changes={entry.changes} />
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </div>
+    </div>
+  );
+}
+
+/** An entry's changes: the first few, and a toggle for the rest. */
+function ChangeList({ changes }: { changes: NudgeFieldChange[] }) {
+  const [all, setAll] = useState(false);
+  if (changes.length === 0) return null;
+  const hidden = changes.length - PREVIEW;
+  const shown = all ? changes : changes.slice(0, PREVIEW);
+  return (
+    <ul className="mt-1 space-y-0.5 text-gray-500">
+      {shown.map((change) => (
+        <li key={change.field} className="break-words">
+          <span className="font-mono">{change.field}</span>:{" "}
+          {formatChangeValue(change.from)} →{" "}
+          <span className="text-gray-800">{formatChangeValue(change.to)}</span>
+        </li>
+      ))}
+      {hidden > 0 ? (
+        <li>
+          <button
+            type="button"
+            onClick={() => setAll((v) => !v)}
+            aria-expanded={all}
+            className="cursor-pointer text-indigo-600 hover:underline"
+          >
+            {all ? "Show fewer" : `Show ${hidden} more`}
+          </button>
+        </li>
+      ) : null}
+    </ul>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { NudgeReviewDialog } from "@/components/nudges/nudge-review-dialog";
@@ -18,32 +18,88 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useUpdateNudgeSettings } from "@/hooks/use-nudges";
-import { diffSettings, settingsIssues } from "@/lib/nudges";
+import { isVersionConflict, useUpdateNudgeSettings } from "@/hooks/use-nudges";
+import {
+  diffSettings,
+  isValidTimeZone,
+  rebaseSettings,
+  settingsIssues,
+} from "@/lib/nudges";
 import type { NudgeBoard, NudgeSettingsView } from "@/types/nudges";
+
+/** A row of the groups table: a stable React key, and whether its id is saved. */
+interface GroupRow {
+  rowKey: string;
+  /** The id came from the saved rules, so it can no longer be changed. */
+  locked: boolean;
+}
+
+let groupRowSeq = 0;
+
+/** Rows for `groups`: an id already in `baseline` is locked, any other is new. */
+function groupRows(
+  groups: NudgeSettingsView["suppressionGroups"],
+  baseline: NudgeSettingsView
+): GroupRow[] {
+  const savedIds = new Set(baseline.suppressionGroups.map((g) => g.id));
+  return groups.map((g) => ({
+    rowKey: `group-${(groupRowSeq += 1)}`,
+    locked: savedIds.has(g.id),
+  }));
+}
 
 /**
  * The rules every marketing nudge follows: the marketing switch, consent, the
  * frequency cap, quiet hours and the shared cooldown groups.
  */
 export function NudgeRules({ board }: { board: NudgeBoard }) {
-  // Remounted after a save (new version), so the form starts from it.
-  return (
-    <NudgeRulesForm key={board.settings.version} board={board} />
-  );
+  return <NudgeRulesForm board={board} />;
 }
 
 function NudgeRulesForm({ board }: { board: NudgeBoard }) {
   const id = useId();
-  const saved = board.settings;
+  /** The rules as saved now (refreshes when anyone saves them). */
+  const latest = board.settings;
   const editable = board.canEdit && board.migrated;
-  const [draft, setDraft] = useState<NudgeSettingsView>(saved);
+  // The version this edit started from. The diff, the review and the save's
+  // expectedVersion are all against it, never against whatever arrives later.
+  const [saved, setBaseline] = useState<NudgeSettingsView>(latest);
+  const [draft, setDraft] = useState<NudgeSettingsView>(latest);
+  const [rows, setRows] = useState<GroupRow[]>(() =>
+    groupRows(latest.suppressionGroups, latest)
+  );
   const [reviewing, setReviewing] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [overlapping, setOverlapping] = useState<string[]>([]);
   const update = useUpdateNudgeSettings();
 
   const { patch, changes } = useMemo(() => diffSettings(saved, draft), [saved, draft]);
   const issues = useMemo(() => settingsIssues(draft), [draft]);
   const dirty = changes.length > 0;
+  const behind = latest.version > saved.version;
+
+  /** Start over from `next`, as both the baseline and the draft. */
+  const resetTo = (next: NudgeSettingsView) => {
+    setBaseline(next);
+    setDraft(next);
+    setRows(groupRows(next.suppressionGroups, next));
+    setConflict(false);
+    setOverlapping([]);
+  };
+
+  // Someone saved a newer version while nothing here is unsaved: follow it.
+  // (Adjusted during render, so the old version never flashes.)
+  if (behind && !dirty) resetTo(latest);
+
+  /** Keep the edit, re-applied on top of what is saved now. */
+  const reapply = () => {
+    const rebased = rebaseSettings(saved, draft, latest);
+    setBaseline(latest);
+    setDraft(rebased.draft);
+    setRows(groupRows(rebased.draft.suppressionGroups, latest));
+    setConflict(false);
+    setOverlapping(rebased.overlapping);
+  };
 
   const warnings: string[] = [];
   if (saved.marketingEnabled && !draft.marketingEnabled) {
@@ -51,9 +107,31 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
   }
   if (saved.respectMarketingConsent && !draft.respectMarketingConsent) {
     warnings.push(
-      "Users who declined marketing at signup will start getting marketing nudges."
+      draft.marketingEnabled
+        ? "Users who declined marketing at signup will start getting marketing nudges."
+        : "Users who declined marketing at signup will also get marketing nudges once marketing is turned back on."
+    );
+  } else if (
+    !saved.marketingEnabled &&
+    draft.marketingEnabled &&
+    !draft.respectMarketingConsent
+  ) {
+    warnings.push(
+      "Marketing nudges resume for everyone, including users who declined marketing at signup."
     );
   }
+
+  // A field stays editable while its rule is off if its value is invalid, so
+  // the admin can still correct what would be saved.
+  const capDayOk = Number.isInteger(draft.frequencyCap.perDay) && draft.frequencyCap.perDay >= 1;
+  const capWeekOk =
+    Number.isInteger(draft.frequencyCap.perWeek) &&
+    draft.frequencyCap.perWeek >= 1 &&
+    (!capDayOk || draft.frequencyCap.perWeek >= draft.frequencyCap.perDay);
+  const timeOk = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  const zoneOk = isValidTimeZone(draft.quietHours.fallbackTimezone);
+  const capField = (ok: boolean) => !editable || (!draft.frequencyCap.enabled && ok);
+  const quietField = (ok: boolean) => !editable || (!draft.quietHours.enabled && ok);
 
   const setCap = (patchCap: Partial<NudgeSettingsView["frequencyCap"]>) =>
     setDraft((d) => ({ ...d, frequencyCap: { ...d.frequencyCap, ...patchCap } }));
@@ -69,6 +147,68 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
         i === index ? { ...g, ...patchGroup } : g
       ),
     }));
+  const addGroup = () => {
+    setDraft((d) => ({
+      ...d,
+      suppressionGroups: [...d.suppressionGroups, { id: "", label: "", days: 30 }],
+    }));
+    setRows((r) => [...r, { rowKey: `group-${(groupRowSeq += 1)}`, locked: false }]);
+  };
+  const removeGroup = (index: number) => {
+    setDraft((d) => ({
+      ...d,
+      suppressionGroups: d.suppressionGroups.filter((_, i) => i !== index),
+    }));
+    setRows((r) => r.filter((_, i) => i !== index));
+  };
+
+  const save = (reason: string) => {
+    if (!editable) return;
+    update.mutate(
+      { expectedVersion: saved.version, reason, changes: patch },
+      {
+        onSuccess: (settings) => {
+          setReviewing(false);
+          resetTo(settings);
+          toast.success(`Rules saved as v${settings.version}.`);
+        },
+        onError: (error) => {
+          // Someone saved first: keep the dialog and the edit; the hook fetches
+          // their version, and the admin re-applies this edit on top of it.
+          if (isVersionConflict(error)) setConflict(true);
+        },
+      }
+    );
+  };
+
+  const choices = (onDiscard: () => void) => (
+    <div className="flex flex-wrap gap-2">
+      <Button size="sm" onClick={reapply}>
+        <RefreshCw />
+        Re-apply my changes on v{latest.version}
+      </Button>
+      <Button size="sm" variant="outline" onClick={onDiscard}>
+        Discard mine and load v{latest.version}
+      </Button>
+    </div>
+  );
+
+  const conflictNotice = conflict ? (
+    <div className="space-y-2">
+      <p>
+        Someone saved the rules after you started, so this save was refused.
+        {behind
+          ? ` Their version is v${latest.version}${latest.updatedBy ? `, by ${latest.updatedBy}` : ""}.`
+          : " Loading their version…"}
+      </p>
+      {behind
+        ? choices(() => {
+            resetTo(latest);
+            setReviewing(false);
+          })
+        : null}
+    </div>
+  ) : undefined;
 
   return (
     <div className="space-y-4">
@@ -81,6 +221,24 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
         <p className="text-xs text-gray-500">
           v{saved.version}, last saved by {saved.updatedBy}
           {saved.updatedAt ? ` on ${new Date(saved.updatedAt).toLocaleString()}` : ""}
+        </p>
+      ) : null}
+      {behind && dirty && !reviewing ? (
+        <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p>
+            A newer version of the rules (v{latest.version}
+            {latest.updatedBy ? `, by ${latest.updatedBy}` : ""}) was saved by
+            someone else. Your unsaved changes started from v{saved.version}.
+          </p>
+          {choices(() => resetTo(latest))}
+        </div>
+      ) : null}
+      {overlapping.length > 0 ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Your changes were re-applied on v{saved.version}. These rules were also
+          changed in that version and now hold your value:{" "}
+          <span className="font-mono">{overlapping.join(", ")}</span>. Check them
+          before saving.
         </p>
       ) : null}
 
@@ -132,7 +290,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                 min={1}
                 value={draft.frequencyCap.perDay}
                 onChange={(e) => setCap({ perDay: Number(e.target.value) })}
-                disabled={!editable || !draft.frequencyCap.enabled}
+                disabled={capField(capDayOk)}
               />
             </div>
             <div className="space-y-1.5">
@@ -143,7 +301,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                 min={1}
                 value={draft.frequencyCap.perWeek}
                 onChange={(e) => setCap({ perWeek: Number(e.target.value) })}
-                disabled={!editable || !draft.frequencyCap.enabled}
+                disabled={capField(capWeekOk)}
               />
             </div>
           </div>
@@ -171,7 +329,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                 type="time"
                 value={draft.quietHours.start}
                 onChange={(e) => setQuiet({ start: e.target.value })}
-                disabled={!editable || !draft.quietHours.enabled}
+                disabled={quietField(timeOk(draft.quietHours.start))}
               />
             </div>
             <div className="space-y-1.5">
@@ -181,7 +339,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                 type="time"
                 value={draft.quietHours.end}
                 onChange={(e) => setQuiet({ end: e.target.value })}
-                disabled={!editable || !draft.quietHours.enabled}
+                disabled={quietField(timeOk(draft.quietHours.end))}
               />
             </div>
             <div className="space-y-1.5">
@@ -191,7 +349,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                 value={draft.quietHours.fallbackTimezone}
                 onChange={(e) => setQuiet({ fallbackTimezone: e.target.value })}
                 placeholder="UTC"
-                disabled={!editable || !draft.quietHours.enabled}
+                disabled={quietField(zoneOk)}
               />
             </div>
           </div>
@@ -230,9 +388,9 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                 </TableRow>
               ) : (
                 draft.suppressionGroups.map((group, index) => {
-                  const isNew = !saved.suppressionGroups.some((g) => g.id === group.id);
+                  const row = rows[index];
                   return (
-                    <TableRow key={index}>
+                    <TableRow key={row?.rowKey ?? index}>
                       <TableCell>
                         <Input
                           value={group.id}
@@ -241,7 +399,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                           }
                           className="font-mono"
                           aria-label="Group id"
-                          disabled={!editable || !isNew}
+                          disabled={!editable || (row?.locked ?? false)}
                         />
                       </TableCell>
                       <TableCell>
@@ -266,14 +424,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() =>
-                            setDraft((d) => ({
-                              ...d,
-                              suppressionGroups: d.suppressionGroups.filter(
-                                (_, i) => i !== index
-                              ),
-                            }))
-                          }
+                          onClick={() => removeGroup(index)}
                           aria-label={`Remove group ${group.id}`}
                           disabled={!editable}
                         >
@@ -289,15 +440,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() =>
-              setDraft((d) => ({
-                ...d,
-                suppressionGroups: [
-                  ...d.suppressionGroups,
-                  { id: "", label: "", days: 30 },
-                ],
-              }))
-            }
+            onClick={addGroup}
             disabled={!editable}
           >
             <Plus />
@@ -318,7 +461,7 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
         <div className="flex items-center justify-end gap-2">
           <Button
             variant="outline"
-            onClick={() => setDraft(saved)}
+            onClick={() => resetTo(behind ? latest : saved)}
             disabled={!dirty || update.isPending}
           >
             Discard
@@ -331,7 +474,9 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
       ) : null}
 
       <NudgeReviewDialog
-        open={reviewing}
+        // Closed while the board is read-only; reviewing is kept, so it
+        // reopens if edit rights come back.
+        open={reviewing && editable}
         onOpenChange={setReviewing}
         title="Save the nudge rules"
         description="The rules apply to every nudge sent from now on, within a minute."
@@ -343,17 +488,8 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
         saving={update.isPending}
         confirmLabel={`Save as v${saved.version + 1}`}
         destructive={warnings.length > 0}
-        onConfirm={(reason) =>
-          update.mutate(
-            { expectedVersion: saved.version, reason, changes: patch },
-            {
-              onSuccess: (settings) => {
-                setReviewing(false);
-                toast.success(`Rules saved as v${settings.version}.`);
-              },
-            }
-          )
-        }
+        notice={conflictNotice}
+        onConfirm={save}
       />
     </div>
   );

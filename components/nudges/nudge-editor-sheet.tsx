@@ -1,8 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { isAxiosError } from "axios";
-import { ArrowRight, Hammer, Loader2, Lock, Save } from "lucide-react";
+import { ArrowRight, Hammer, Loader2, Lock, RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmailFields } from "@/components/nudges/email-fields";
@@ -31,7 +30,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { useNudgeDetail, useUpdateNudge } from "@/hooks/use-nudges";
+import {
+  isVersionConflict,
+  useNudgeDetail,
+  useUpdateNudge,
+} from "@/hooks/use-nudges";
 import {
   diffNudge,
   draftFromNudge,
@@ -39,6 +42,7 @@ import {
   isEditable,
   isValidAppPath,
   pushCopyIssues,
+  rebaseDraft,
   type NudgeDraft,
 } from "@/lib/nudges";
 import {
@@ -68,14 +72,15 @@ export function NudgeEditorSheet({ nudgeKey, board, onClose }: NudgeEditorSheetP
     <Sheet open={nudgeKey !== null} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="overflow-y-auto sm:max-w-3xl">
         {nudge ? (
-          // Remounted per nudge and per saved version, so a save or someone
-          // else's change starts the form from what is stored.
+          // Remounted per nudge only. A newer saved version does not reset
+          // the form: the editor decides what to do with an unsaved edit.
           <NudgeEditorForm
-            key={`${nudge.key}:${nudge.version}`}
-            nudge={nudge}
+            key={nudge.key}
+            latest={nudge}
             board={board}
             versions={detail.data?.versions ?? []}
             versionsLoading={detail.isLoading}
+            onReload={() => void detail.refetch()}
           />
         ) : (
           <SheetHeader>
@@ -91,26 +96,60 @@ export function NudgeEditorSheet({ nudgeKey, board, onClose }: NudgeEditorSheetP
 }
 
 function NudgeEditorForm({
-  nudge,
+  latest,
   board,
   versions,
   versionsLoading,
+  onReload,
 }: {
-  nudge: NudgeView;
+  /** The nudge as saved now (refreshes when anyone saves it). */
+  latest: NudgeView;
   board: NudgeBoard;
   versions: NonNullable<ReturnType<typeof useNudgeDetail>["data"]>["versions"];
   versionsLoading: boolean;
+  onReload: () => void;
 }) {
   const id = useId();
   const { catalog, settings } = board;
-  const editable = isEditable(nudge, board.canEdit);
-  const [draft, setDraft] = useState<NudgeDraft>(() => draftFromNudge(nudge));
+  // The version this edit started from. The diff, the review and the save's
+  // expectedVersion are all against it, never against whatever arrives later.
+  const [nudge, setBaseline] = useState<NudgeView>(latest);
+  const [draft, setDraft] = useState<NudgeDraft>(() => draftFromNudge(latest));
   const [reviewing, setReviewing] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [overlapping, setOverlapping] = useState<string[]>([]);
   const update = useUpdateNudge();
+  const editable = isEditable(nudge, board.canEdit);
 
   const { patch, changes } = useMemo(() => diffNudge(nudge, draft), [nudge, draft]);
   const dirty = changes.length > 0;
+  const behind = latest.version > nudge.version;
+
+  // Someone saved a newer version while nothing here is unsaved: follow it.
+  // (Adjusted during render, so the old version never flashes.)
+  if (behind && !dirty) {
+    setBaseline(latest);
+    setDraft(draftFromNudge(latest));
+    setConflict(false);
+    setOverlapping([]);
+  }
+
+  /** Drop the unsaved edit and start again from what is saved now. */
+  const loadLatest = () => {
+    setBaseline(latest);
+    setDraft(draftFromNudge(latest));
+    setConflict(false);
+    setOverlapping([]);
+  };
+
+  /** Keep the edit, re-applied on top of what is saved now. */
+  const reapply = () => {
+    const rebased = rebaseDraft(nudge, draft, latest);
+    setBaseline(latest);
+    setDraft(rebased.draft);
+    setConflict(false);
+    setOverlapping(rebased.overlapping);
+  };
 
   const { errors, warnings } = useMemo(() => {
     const errors: string[] = [];
@@ -171,6 +210,7 @@ function NudgeEditorForm({
     setDraft((current) => ({ ...current, ...patchDraft }));
 
   const save = (reason: string) => {
+    if (!editable) return;
     update.mutate(
       {
         key: nudge.key,
@@ -179,17 +219,51 @@ function NudgeEditorForm({
       {
         onSuccess: (saved) => {
           setReviewing(false);
+          setBaseline(saved);
+          setDraft(draftFromNudge(saved));
+          setOverlapping([]);
           toast.success(`${saved.name} saved as v${saved.version}.`);
         },
         onError: (error) => {
-          if (isAxiosError(error) && error.response?.status === 409) {
-            setReviewing(false);
+          // Someone saved first: keep the dialog and the edit, fetch their
+          // version and offer to re-apply this edit on top of it.
+          if (isVersionConflict(error)) {
             setConflict(true);
+            onReload();
           }
         },
       },
     );
   };
+
+  const conflictNotice = conflict ? (
+    <div className="space-y-2">
+      <p>
+        Someone saved this nudge after you opened it, so this save was refused.
+        {behind
+          ? ` Their version is v${latest.version}${latest.updatedBy ? `, by ${latest.updatedBy}` : ""}.`
+          : " Loading their version…"}
+      </p>
+      {behind ? (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={reapply}>
+            <RefreshCw />
+            Re-apply my changes on v{latest.version}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              loadLatest();
+              setReviewing(false);
+            }}
+          >
+            Discard mine and load v{latest.version}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  ) : undefined;
 
   const flowLabel =
     catalog.flows.find((f) => f.id === nudge.flow)?.label ?? nudge.flow;
@@ -232,10 +306,30 @@ function NudgeEditorForm({
           {nudge.note}
         </p>
       ) : null}
-      {conflict ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Someone saved this nudge after you opened it. Close and reopen it to
-          load their version, then make your change again.
+      {behind && dirty && !reviewing ? (
+        <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p>
+            A newer version (v{latest.version}
+            {latest.updatedBy ? `, by ${latest.updatedBy}` : ""}) was saved by
+            someone else. Your unsaved changes started from v{nudge.version}.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={reapply}>
+              <RefreshCw />
+              Re-apply my changes on v{latest.version}
+            </Button>
+            <Button size="sm" variant="outline" onClick={loadLatest}>
+              Discard mine and load v{latest.version}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {overlapping.length > 0 ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Your changes were re-applied on v{nudge.version}. These fields were
+          also changed in that version and now hold your value:{" "}
+          <span className="font-mono">{overlapping.join(", ")}</span>. Check them
+          before saving.
         </p>
       ) : null}
 
@@ -453,7 +547,11 @@ function NudgeEditorForm({
           <h3 className="text-sm font-semibold text-gray-900">Push</h3>
           <PushFields
             value={draft.push}
-            onChange={(push) => set({ push })}
+            onChange={(update) =>
+              setDraft((current) =>
+                current.push ? { ...current, push: update(current.push) } : current
+              )
+            }
             variables={nudge.variables}
             catalog={catalog}
             disabled={!editable}
@@ -530,7 +628,7 @@ function NudgeEditorForm({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setDraft(draftFromNudge(nudge))}
+              onClick={loadLatest}
               disabled={!dirty || update.isPending}
             >
               Discard
@@ -544,7 +642,7 @@ function NudgeEditorForm({
       ) : null}
 
       <NudgeReviewDialog
-        open={reviewing}
+        open={reviewing && editable}
         onOpenChange={setReviewing}
         title={`Save ${nudge.name}`}
         description="These changes apply to the next sends, within a minute. The reason goes in the history and the audit log."
@@ -556,6 +654,7 @@ function NudgeEditorForm({
         saving={update.isPending}
         confirmLabel={`Save as v${nudge.version + 1}`}
         destructive={draft.status === "archived" && nudge.status !== "archived"}
+        notice={conflictNotice}
         onConfirm={save}
       />
     </div>
