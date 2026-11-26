@@ -394,6 +394,7 @@ const USER_TARGETS: UserTarget[] = [
   { key: "savings", kind: "section", label: "Savings", tab: "overview", anchor: "user-savings", icon: PiggyBank, keywords: ["vault", "sousd", "yield", "apy"] },
   { key: "activity", kind: "section", label: "Activity", tab: "activity", anchor: "user-activity", icon: Activity, keywords: ["transactions", "history", "transfers", "withdrawals"] },
   { key: "deposits", kind: "section", label: "Deposits", tab: "deposits", anchor: "user-deposits", icon: ArrowRightLeft, keywords: ["stuck deposit", "bridge", "workflow"] },
+  { key: "safe-recovery", kind: "section", label: "Funds on other networks", tab: "deposits", anchor: "user-safe-recovery", icon: RefreshCw, keywords: ["wrong network", "plasma", "stuck funds", "rescue", "recover"] },
   { key: "kyc", kind: "section", label: "KYC", tab: "card", anchor: "user-kyc", icon: UserCheck, keywords: ["verification", "didit", "sumsub", "identity", "declined"] },
   { key: "virtual-account", kind: "section", label: "USD virtual account", tab: "card", anchor: "user-virtual-account", icon: Landmark, keywords: ["bank", "iban", "ach", "virtual account"] },
   { key: "card", kind: "section", label: "Card", tab: "card", anchor: "user-card", icon: CreditCard, keywords: ["card id", "wirex", "rain", "status", "holds", "settlements"] },
