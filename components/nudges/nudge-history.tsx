@@ -48,25 +48,34 @@ export function NudgeHistory({ onOpen }: { onOpen: (key: string) => void }) {
       </p>
     );
   }
+
+  // Shown over cached rows, an empty list included: either may be stale.
+  const refreshFailed = error ? (
+    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      Couldn&apos;t refresh the history; showing what was loaded before.{" "}
+      <button
+        type="button"
+        onClick={() => void refetch()}
+        disabled={isRefetching}
+        className="cursor-pointer underline disabled:cursor-default disabled:opacity-60"
+      >
+        {isRefetching ? "Refreshing…" : "Try again"}
+      </button>
+    </p>
+  ) : null;
+
   if (data.length === 0) {
-    return <p className="text-sm text-gray-500">No changes yet.</p>;
+    return (
+      <div className="space-y-2">
+        {refreshFailed}
+        <p className="text-sm text-gray-500">No changes yet.</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-2">
-      {error ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Couldn&apos;t refresh the history; showing what was loaded before.{" "}
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            disabled={isRefetching}
-            className="cursor-pointer underline disabled:cursor-default disabled:opacity-60"
-          >
-            {isRefetching ? "Refreshing…" : "Try again"}
-          </button>
-        </p>
-      ) : null}
+      {refreshFailed}
     <div className="rounded-lg border border-gray-200 bg-white">
       <Table>
         <TableHeader>
