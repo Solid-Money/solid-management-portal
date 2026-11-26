@@ -4,20 +4,28 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/components/auth-provider";
 import {
+  cancelScheduledPushCampaign,
+  getPushCampaign,
   getPushCampaignDestinations,
   getPushCampaigns,
   previewPushCampaignAudience,
+  schedulePushCampaign,
   sendPushCampaign,
   sendPushCampaignTest,
+  updateScheduledPushCampaign,
 } from "@/lib/push-campaigns-api";
 import type {
+  PushCampaignAudienceFilters,
   PushCampaignTestInput,
+  SchedulePushCampaignInput,
   SendPushCampaignInput,
 } from "@/types/push-campaigns";
 
 export const PUSH_CAMPAIGN_KEYS = {
   destinations: ["push-campaigns", "destinations"] as const,
   list: ["push-campaigns", "list"] as const,
+  /** A send or schedule in flight, for `useIsMutating`. */
+  submit: ["push-campaigns", "submit"] as const,
 };
 
 /**
@@ -35,20 +43,42 @@ export function usePushCampaignDestinations() {
   });
 }
 
-/** The most recent campaigns, newest first. */
+/**
+ * The scheduled campaigns, soonest first, then the most recent others.
+ * Refreshed every minute so a scheduled one is seen to go out.
+ */
 export function usePushCampaigns() {
   const { user } = useAuth();
   return useQuery({
     queryKey: PUSH_CAMPAIGN_KEYS.list,
     queryFn: getPushCampaigns,
     enabled: !!user,
+    refetchInterval: 60 * 1000,
   });
 }
 
-/** Who of an uploaded list a campaign would reach. Read-only. */
+/**
+ * Load one campaign with a scheduled one's list, for the editor. A mutation,
+ * not a query: it is fetched fresh each time Edit is pressed, never served
+ * from a cache an edit could start from.
+ */
+export function useLoadPushCampaign() {
+  return useMutation({
+    mutationFn: (id: string) => getPushCampaign(id),
+    retry: false,
+  });
+}
+
+/** Who of an uploaded list a campaign would reach now. Read-only. */
 export function usePreviewPushAudience() {
   return useMutation({
-    mutationFn: (userIds: string[]) => previewPushCampaignAudience(userIds),
+    mutationFn: ({
+      userIds,
+      filters,
+    }: {
+      userIds: string[];
+      filters?: PushCampaignAudienceFilters;
+    }) => previewPushCampaignAudience(userIds, filters),
   });
 }
 
@@ -66,7 +96,43 @@ export function useSendPushCampaignTest() {
 export function useSendPushCampaign() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: PUSH_CAMPAIGN_KEYS.submit,
     mutationFn: (input: SendPushCampaignInput) => sendPushCampaign(input),
+    retry: false,
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: PUSH_CAMPAIGN_KEYS.list }),
+  });
+}
+
+/**
+ * Schedule a new campaign, or save the changes to a scheduled one (`id`).
+ * Never retried, for the same reason as a send.
+ */
+export function useSchedulePushCampaign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: PUSH_CAMPAIGN_KEYS.submit,
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id?: string;
+      input: SchedulePushCampaignInput;
+    }) =>
+      id
+        ? updateScheduledPushCampaign(id, input)
+        : schedulePushCampaign(input),
+    retry: false,
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: PUSH_CAMPAIGN_KEYS.list }),
+  });
+}
+
+/** Call a scheduled campaign off before it goes out. */
+export function useCancelScheduledPushCampaign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => cancelScheduledPushCampaign(id),
     retry: false,
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: PUSH_CAMPAIGN_KEYS.list }),

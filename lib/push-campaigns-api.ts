@@ -1,10 +1,13 @@
 import api from "@/lib/api";
 import type {
+  PushCampaignAudienceFilters,
   PushCampaignDestinations,
+  PushCampaignDetail,
   PushCampaignPreview,
   PushCampaignSummary,
   PushCampaignTestInput,
   PushCampaignTestResult,
+  SchedulePushCampaignInput,
   SendPushCampaignInput,
 } from "@/types/push-campaigns";
 
@@ -20,15 +23,23 @@ export const getPushCampaignDestinations = async () =>
   (await api.get<{ data: PushCampaignDestinations }>(`${base}/destinations`))
     .data.data;
 
-/** The most recent campaigns, newest first. */
+/** The scheduled campaigns, soonest first, then the most recent others. */
 export const getPushCampaigns = async () =>
   (await api.get<{ data: PushCampaignSummary[] }>(base)).data.data;
 
-/** Who of an uploaded list a campaign would reach. Read-only. */
-export const previewPushCampaignAudience = async (userIds: string[]) =>
+/** One campaign, with a scheduled one's uploaded list. */
+export const getPushCampaign = async (id: string) =>
+  (await api.get<{ data: PushCampaignDetail }>(`${base}/${id}`)).data.data;
+
+/** Who of an uploaded list a campaign would reach now, filters applied. Read-only. */
+export const previewPushCampaignAudience = async (
+  userIds: string[],
+  filters?: PushCampaignAudienceFilters,
+) =>
   (
     await api.post<{ data: PushCampaignPreview }>(`${base}/preview`, {
       userIds,
+      ...(filters ? { filters } : {}),
     })
   ).data.data;
 
@@ -44,3 +55,24 @@ export const sendPushCampaignTest = async (input: PushCampaignTestInput) =>
  */
 export const sendPushCampaign = async (input: SendPushCampaignInput) =>
   (await api.post<{ data: PushCampaignSummary }>(base, input)).data.data;
+
+/**
+ * Store a campaign to go out at `sendAt`. Its audience is checked when it goes
+ * out; the name is reserved now (409 when taken).
+ */
+export const schedulePushCampaign = async (input: SchedulePushCampaignInput) =>
+  (await api.post<{ data: PushCampaignSummary }>(`${base}/schedule`, input))
+    .data.data;
+
+/** Replace a scheduled campaign; 409 once it has started going out. */
+export const updateScheduledPushCampaign = async (
+  id: string,
+  input: SchedulePushCampaignInput,
+) =>
+  (await api.patch<{ data: PushCampaignSummary }>(`${base}/${id}`, input)).data
+    .data;
+
+/** Call a scheduled campaign off; 409 once it has started going out. */
+export const cancelScheduledPushCampaign = async (id: string) =>
+  (await api.post<{ data: PushCampaignSummary }>(`${base}/${id}/cancel`)).data
+    .data;

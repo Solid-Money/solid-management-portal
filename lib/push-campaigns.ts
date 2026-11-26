@@ -1,5 +1,9 @@
 import type {
+  PushCampaignAudienceFilters,
+  PushCampaignDetail,
   PushCampaignLimits,
+  PushCampaignSummary,
+  PushCampaignTier,
   PushCampaignVariantInput,
   PushCampaignVariantKey,
   PushDestination,
@@ -320,4 +324,298 @@ export function parseTestRecipients(raw: string): string[] {
         .filter(Boolean),
     ),
   ];
+}
+
+/** The tiers a campaign can be narrowed to, in ladder order. */
+export const TIER_LABELS: Record<PushCampaignTier, string> = {
+  core: "Core",
+  prime: "Prime",
+  ultra: "Ultra",
+};
+
+/** Send-time filters as the form holds them. */
+export interface FiltersDraft {
+  /** Empty: every tier. */
+  tiers: PushCampaignTier[];
+  /** Count someone on a free trial by the tier they would have without it. */
+  ignoreTrials: boolean;
+  /** Earlier campaigns whose control groups are left out. */
+  excludeControlOf: string[];
+}
+
+export const emptyFilters = (): FiltersDraft => ({
+  tiers: [],
+  // Someone trying Prime for free has not bought it: an upgrade push is for them.
+  ignoreTrials: true,
+  excludeControlOf: [],
+});
+
+/**
+ * The filters as the API takes them, or undefined when they leave nobody out.
+ * Every tier picked is the same as none.
+ */
+export function toFiltersInput(
+  draft: FiltersDraft,
+  allTiers: readonly PushCampaignTier[],
+): PushCampaignAudienceFilters | undefined {
+  const tiers =
+    draft.tiers.length > 0 && draft.tiers.length < allTiers.length
+      ? allTiers.filter((t) => draft.tiers.includes(t))
+      : [];
+  const filters: PushCampaignAudienceFilters = {
+    ...(tiers.length > 0 ? { tiers, ignoreTrials: draft.ignoreTrials } : {}),
+    ...(draft.excludeControlOf.length > 0
+      ? { excludeControlOf: [...draft.excludeControlOf] }
+      : {}),
+  };
+  return Object.keys(filters).length > 0 ? filters : undefined;
+}
+
+/** The form's filters for a stored campaign's. */
+export function filtersDraftOf(
+  filters?: PushCampaignAudienceFilters,
+): FiltersDraft {
+  return {
+    tiers: filters?.tiers ? [...filters.tiers] : [],
+    ignoreTrials: filters?.ignoreTrials ?? true,
+    excludeControlOf: filters?.excludeControlOf
+      ? [...filters.excludeControlOf]
+      : [],
+  };
+}
+
+/** Whether two filter inputs leave out the same people. */
+export function sameFilters(
+  a?: PushCampaignAudienceFilters,
+  b?: PushCampaignAudienceFilters,
+): boolean {
+  const key = (f?: PushCampaignAudienceFilters) =>
+    JSON.stringify({
+      tiers: [...(f?.tiers ?? [])].sort(),
+      ignoreTrials: f?.tiers?.length ? !!f.ignoreTrials : false,
+      excludeControlOf: [...(f?.excludeControlOf ?? [])].sort(),
+    });
+  return key(a) === key(b);
+}
+
+/** One line on who the filters leave out, for a campaign card. */
+export function describeFilters(
+  filters: PushCampaignAudienceFilters | undefined,
+  campaignName: (id: string) => string,
+): string | null {
+  if (!filters) return null;
+  const parts: string[] = [];
+  if (filters.tiers?.length) {
+    parts.push(
+      `only ${filters.tiers.map((t) => TIER_LABELS[t]).join(" and ")} at send time` +
+        (filters.ignoreTrials ? " (free trials not counted)" : ""),
+    );
+  }
+  if (filters.excludeControlOf?.length) {
+    parts.push(
+      `leaving out the control group of ${filters.excludeControlOf
+        .map(campaignName)
+        .join(", ")}`,
+    );
+  }
+  return parts.length > 0 ? parts.join("; ") : null;
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * An instant as the value of a `datetime-local` input, in this browser's time
+ * zone (`2026-11-30T10:00`), or "" for none.
+ */
+export function toLocalInput(value?: string | Date | null): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** A `datetime-local` value read in this browser's time zone, as an ISO instant. */
+export function localInputToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/** A send time loaded for editing: as the input shows it, and as stored. */
+export interface StoredSendAt {
+  local: string;
+  iso: string;
+}
+
+/**
+ * The instant a `datetime-local` value stands for. Left as loaded, it is the
+ * stored instant: read back from the local time, one the clocks pass twice
+ * would come out as its first occurrence and could move the send an hour.
+ */
+export function sendAtInstant(
+  value: string,
+  stored?: StoredSendAt,
+): string | null {
+  if (stored && value === stored.local) return stored.iso;
+  return localInputToIso(value);
+}
+
+/**
+ * Whether a `datetime-local` value is a time the clocks pass twice here (when
+ * they go back) or skip (when they go forward), or null for neither.
+ */
+export function localTimeClash(value: string): "repeated" | "skipped" | null {
+  const iso = localInputToIso(value);
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
+  // A skipped time is read as the hour after it, so it reads back differently.
+  if (toLocalInput(new Date(at)) !== value) return "skipped";
+  // A repeated one is read as its first occurrence; the clocks go back by
+  // half an hour, an hour or two.
+  return [30, 60, 120].some(
+    (minutes) => toLocalInput(new Date(at + minutes * 60_000)) === value,
+  )
+    ? "repeated"
+    : null;
+}
+
+/** This browser's time zone, e.g. "Europe/Berlin (GMT+1)", at `at`. */
+export function localTimeZoneLabel(at: Date = new Date()): string {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const offset =
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      timeZoneName: "shortOffset",
+    })
+      .formatToParts(at)
+      .find((part) => part.type === "timeZoneName")?.value ?? "";
+  return offset ? `${zone} (${offset})` : zone;
+}
+
+/** "Mon, Nov 30, 10:00" in this browser's time zone. */
+export function formatLocalSendAt(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(iso));
+}
+
+/** "Mon, Nov 30, 09:00 UTC". */
+export function formatUtcSendAt(iso: string): string {
+  return `${new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  }).format(new Date(iso))} UTC`;
+}
+
+/** The default send time: the next whole hour at least an hour away. */
+export function defaultSendAt(now: Date = new Date()): string {
+  const date = new Date(now);
+  date.setMinutes(0, 0, 0);
+  date.setHours(date.getHours() + 2);
+  return toLocalInput(date);
+}
+
+/**
+ * What is wrong with a send time, or null. Mirrors accounts-service, which
+ * checks it again: at least `minLeadMinutes` ahead, at most `maxAheadDays`.
+ * A time typed in must name one moment; one left as loaded (`stored`) does.
+ */
+export function sendTimeProblem(
+  value: string,
+  limits: Pick<PushCampaignLimits, "scheduleMinLeadMinutes" | "scheduleMaxAheadDays">,
+  now: Date = new Date(),
+  stored?: StoredSendAt,
+): string | null {
+  const iso = sendAtInstant(value, stored);
+  if (!iso) return "Pick a date and time.";
+  const kept = !!stored && value === stored.local;
+  const clash = kept ? null : localTimeClash(value);
+  if (clash === "repeated") {
+    return "The clocks go back then in your time zone, so that time happens twice. Pick a time outside that hour.";
+  }
+  if (clash === "skipped") {
+    return "The clocks go forward then in your time zone, so that time never happens. Pick another time.";
+  }
+  const lead = new Date(iso).getTime() - now.getTime();
+  const minLead = limits.scheduleMinLeadMinutes ?? 2;
+  if (lead < minLead * 60_000) {
+    return `Pick a time at least ${minLead} minutes from now, or send it now.`;
+  }
+  const maxAhead = limits.scheduleMaxAheadDays ?? 60;
+  if (lead > maxAhead * 24 * 60 * 60_000) {
+    return `A campaign can be scheduled at most ${maxAhead} days ahead.`;
+  }
+  return null;
+}
+
+/** What the composer starts from when it edits a scheduled campaign. */
+export interface ComposerSeed {
+  name: string;
+  reason: string;
+  raw: string;
+  variants: VariantDraft[];
+  controlOn: boolean;
+  controlPercent: string;
+  filters: FiltersDraft;
+  sendAt: string;
+  /** The send time as stored, kept while `sendAt` is left as loaded. */
+  storedSendAt?: StoredSendAt;
+}
+
+/** A scheduled campaign as the composer's starting state. */
+export function seedFromCampaign(campaign: PushCampaignDetail): ComposerSeed {
+  const sendAt = toLocalInput(campaign.sendAt);
+  return {
+    name: campaign.name,
+    reason: campaign.reason ?? "",
+    raw: campaign.userIds.join("\n"),
+    variants: campaign.variants.map((v) => ({
+      title: v.title,
+      body: v.body ?? "",
+      destinationId: v.destinationId,
+      whatsNewStep:
+        typeof v.whatsNewStep === "number" ? String(v.whatsNewStep) : "",
+      whatsNewId: v.whatsNewId ?? "",
+    })),
+    controlOn: campaign.controlPercent > 0,
+    controlPercent:
+      campaign.controlPercent > 0 ? String(campaign.controlPercent) : "10",
+    filters: filtersDraftOf(campaign.audienceFilters),
+    sendAt,
+    ...(sendAt && campaign.sendAt
+      ? { storedSendAt: { local: sendAt, iso: campaign.sendAt } }
+      : {}),
+  };
+}
+
+/**
+ * Earlier campaigns whose control group a new one can leave out: with a
+ * control group, not called off, newest first. A scheduled one counts: its
+ * control group exists by the time a later campaign goes out. A failed one
+ * counts only if it stored its control group before failing (`assignedAt`),
+ * the rule accounts-service applies too.
+ */
+export function controlGroupSources(
+  campaigns: readonly PushCampaignSummary[],
+  exceptId?: string,
+): PushCampaignSummary[] {
+  return campaigns.filter(
+    (c) =>
+      c.id !== exceptId &&
+      c.controlPercent > 0 &&
+      (c.status === "sent" ||
+        c.status === "sending" ||
+        c.status === "scheduled" ||
+        (c.status === "failed" && !!c.assignedAt)),
+  );
 }

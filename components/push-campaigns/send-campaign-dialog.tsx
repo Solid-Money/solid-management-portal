@@ -1,6 +1,6 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { CalendarClock, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { campaignType, type ExpectedSplit } from "@/lib/push-campaigns";
+import {
+  campaignType,
+  formatLocalSendAt,
+  formatUtcSendAt,
+  localTimeZoneLabel,
+  type ExpectedSplit,
+} from "@/lib/push-campaigns";
 import { formatNumber } from "@/lib/utils";
 import type {
   PushDestination,
@@ -34,6 +40,10 @@ export interface CampaignToSend {
   slug: string;
   reachable: number;
   split: ExpectedSplit;
+  /** When set, the campaign is scheduled for this instant (ISO) instead of sent now. */
+  sendAt?: string;
+  /** The scheduled campaign this saves changes to. */
+  editingId?: string;
 }
 
 interface SendCampaignDialogProps {
@@ -43,7 +53,10 @@ interface SendCampaignDialogProps {
   onConfirm: (campaign: CampaignToSend) => void;
 }
 
-/** The last look before a campaign goes to real people. */
+/**
+ * The last look before a campaign goes to real people, now or at the time it
+ * is scheduled for.
+ */
 export function SendCampaignDialog({
   campaign,
   destinations,
@@ -59,13 +72,35 @@ export function SendCampaignDialog({
         {campaign ? (
           <>
             <DialogHeader>
-              <DialogTitle>Send “{campaign.input.name}”?</DialogTitle>
+              <DialogTitle>
+                {campaign.editingId
+                  ? `Save the changes to “${campaign.input.name}”?`
+                  : campaign.sendAt
+                    ? `Schedule “${campaign.input.name}”?`
+                    : `Send “${campaign.input.name}”?`}
+              </DialogTitle>
               <DialogDescription>
-                {count(campaign.reachable)} people can receive it.{" "}
-                {campaign.split.control > 0
-                  ? `${count(campaign.split.control)} of them, picked at random, are held back as the control group and get nothing. `
-                  : ""}
-                This cannot be recalled once sent.
+                {campaign.sendAt ? (
+                  <>
+                    Goes out{" "}
+                    <span className="font-medium text-gray-900">
+                      {formatLocalSendAt(campaign.sendAt)}
+                    </span>{" "}
+                    {localTimeZoneLabel(new Date(campaign.sendAt))} (
+                    {formatUtcSendAt(campaign.sendAt)}). Who it reaches is
+                    checked then: as of now {count(campaign.reachable)} people
+                    can receive it, split as below. It can be changed or
+                    cancelled until it goes out.
+                  </>
+                ) : (
+                  <>
+                    {count(campaign.reachable)} people can receive it.{" "}
+                    {campaign.split.control > 0
+                      ? `${count(campaign.split.control)} of them, picked at random, are held back as the control group and get nothing. `
+                      : ""}
+                    This cannot be recalled once sent.
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
 
@@ -75,7 +110,9 @@ export function SendCampaignDialog({
                   <TableHead>Group</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Opens</TableHead>
-                  <TableHead className="text-right">People</TableHead>
+                  <TableHead className="text-right">
+                    {campaign.sendAt ? "People, as of now" : "People"}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -126,8 +163,12 @@ export function SendCampaignDialog({
                 Cancel
               </Button>
               <Button onClick={() => onConfirm(campaign)}>
-                <Send />
-                Send to {count(campaign.split.arms.reduce((a, b) => a + b, 0))}
+                {campaign.sendAt ? <CalendarClock /> : <Send />}
+                {campaign.editingId
+                  ? "Save changes"
+                  : campaign.sendAt
+                    ? "Schedule"
+                    : `Send to ${count(campaign.split.arms.reduce((a, b) => a + b, 0))}`}
               </Button>
             </DialogFooter>
           </>
