@@ -254,6 +254,7 @@ const CONFIG_ENTRIES: SearchEntry[] = [
       ["subscription-discounts", "Subscription discounts", ["netflix", "spotify", "mcc", "category"]],
       ["fuse-staking", "FUSE staking for tier unlock", ["stake", "fuse", "unlock"]],
       ["tier-membership", "Tier membership", ["v3", "tier lock", "prime", "ultra"]],
+      ["tier-balance", "Hold in Earn tier route", ["earn balance", "balance route", "savings", "prime", "ultra", "measurement", "evaluate"]],
     ] as const
   ).map(([id, label, keywords]) =>
     section(`/rewards-config#${id}`, label, "Config › Rewards", Gift, {
@@ -401,6 +402,7 @@ const USER_TARGETS: UserTarget[] = [
   { key: "card-spending", kind: "section", label: "Card spending", tab: "card", anchor: "user-card-spending", icon: Receipt, keywords: ["card transactions", "purchases", "merchants"] },
   { key: "rewards", kind: "section", label: "Rewards and points", tab: "rewards", anchor: "user-rewards", icon: Gift, keywords: ["points", "rewards"] },
   { key: "tier", kind: "section", label: "Tier membership", tab: "rewards", anchor: "user-tier", icon: TrendingUp, keywords: ["tier", "prime", "ultra", "level"] },
+  { key: "tier-balance", kind: "section", label: "Hold in Earn route", tab: "rewards", anchor: "user-tier-balance", icon: PiggyBank, keywords: ["tier", "prime", "ultra", "earn balance", "savings", "grace", "daily readings"] },
   { key: "tier-trial", kind: "section", label: "Tier trial", tab: "rewards", anchor: "user-tier-trial", icon: Sparkles, keywords: ["trial", "gift"] },
   { key: "cashback-rate", kind: "section", label: "Cashback rate", tab: "rewards", anchor: "user-cashback-rate", icon: Gift, keywords: ["override", "percentage"] },
   { key: "referrals", kind: "section", label: "Referrals", tab: "rewards", anchor: "user-referrals", icon: Users, keywords: ["referred by", "referral code", "invites"] },
@@ -420,6 +422,7 @@ const USER_TARGETS: UserTarget[] = [
   { key: "reevaluate-cashback", kind: "action", label: "Re-evaluate failed cashback", tab: "rewards", anchor: "user-rewards-cashback", icon: RefreshCw, keywords: ["retry cashback", "missing cashback"] },
   { key: "gift-trial", kind: "action", label: "Gift a tier trial", tab: "rewards", anchor: "user-tier-trial", icon: Sparkles, keywords: ["prime", "ultra", "extend", "revoke"] },
   { key: "reevaluate-tier", kind: "action", label: "Re-evaluate tier lock", tab: "rewards", anchor: "user-tier", icon: RefreshCw, keywords: ["tier lock", "downgrade"] },
+  { key: "reevaluate-tier-balance", kind: "action", label: "Re-evaluate Hold in Earn route", tab: "rewards", anchor: "user-tier-balance", icon: RefreshCw, keywords: ["earn balance", "prime", "ultra", "grace"] },
   { key: "reevaluate-referral", kind: "action", label: "Re-evaluate referral reward", tab: "rewards", anchor: "user-referrals", icon: RefreshCw, keywords: ["referral reward", "reversed", "expired"] },
   { key: "recover-account", kind: "action", label: "Recover closed account", tab: "overview", anchor: "user-profile", icon: LifeBuoy, keywords: ["reopen", "deleted account", "undelete"] },
   { key: "suspend-account", kind: "action", label: "Suspend account or lift suspension", tab: "overview", anchor: "user-profile", icon: ShieldOff, keywords: ["block user", "ban", "lock account", "unblock user", "unsuspend"] },

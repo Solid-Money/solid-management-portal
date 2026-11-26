@@ -38,7 +38,8 @@ function useRefreshAfterChange() {
  * Which team-only rollouts each active member gets. Being on the team only
  * makes someone internal; the Wirex EUR account, the Credit & Smart spend
  * modes, the new deposit tokens, referral v4, the Apple Pay & Google Pay
- * top-up and the rest are each assigned here, one tag per member.
+ * top-up, the Hold in Earn tier route and the rest are each assigned here, one
+ * tag per member. Labels and descriptions come from the backend's `features`.
  */
 export default function FeatureAccessTable({
   members,

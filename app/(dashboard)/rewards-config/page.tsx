@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   Coins,
@@ -30,6 +30,7 @@ import {
   ToggleField,
 } from "@/components/config/config-fields";
 import ReferralV4ConfigSection from "@/components/config/referral-v4-config";
+import TierBalanceConfigSection from "@/components/config/tier-balance-config";
 import TierEmailModal from "@/components/tier-email-modal";
 import TierUsersModal from "@/components/tier-users-modal";
 import {
@@ -192,10 +193,24 @@ export default function RewardsConfigPage() {
   );
   const [runningAccrual, setRunningAccrual] = useState(false);
   const [migratingRates, setMigratingRates] = useState(false);
+  // From the Apply click until the refresh that follows it has landed: the
+  // page takes no input for the whole span, not only while the refetch runs.
+  const [applyingMigration, setApplyingMigration] = useState(false);
   const [migrationResult, setMigrationResult] =
     useState<SubscriptionCategoryRatesMigrationResult | null>(null);
   const [accrualResult, setAccrualResult] =
     useState<YieldBoostRunResult | null>(null);
+
+  // Whether any section of the shared config has edits the server has not
+  // confirmed. Applying the category-rates migration reloads the whole
+  // document, which would replace them, so Apply waits until there are none.
+  const hasUnsavedConfig = useMemo(
+    () =>
+      !!config &&
+      !!savedConfig &&
+      JSON.stringify(config) !== JSON.stringify(savedConfig),
+    [config, savedConfig],
+  );
 
   const updateCategory = (
     index: number,
@@ -611,8 +626,17 @@ export default function RewardsConfigPage() {
    * nothing and comes back `alreadyApplied`.
    */
   const runCategoryRatesMigration = async (apply: boolean) => {
+    if (apply && hasUnsavedConfig) {
+      // The button is disabled in this case too; this covers a stale click.
+      toast.error("Save your unsaved changes first", {
+        description:
+          "Applying reloads the whole config, which would replace them.",
+      });
+      return;
+    }
     try {
       setMigratingRates(true);
+      if (apply) setApplyingMigration(true);
       const response = await api.post<SubscriptionCategoryRatesMigrationResult>(
         "/admin/v1/rewards-config/subscription-discount/migrate-category-rates",
         { apply },
@@ -639,6 +663,7 @@ export default function RewardsConfigPage() {
       );
     } finally {
       setMigratingRates(false);
+      setApplyingMigration(false);
     }
   };
 
@@ -657,7 +682,11 @@ export default function RewardsConfigPage() {
     );
   };
 
-  if (loading) {
+  // The full-page spinner is for the first load only. A refresh (after the
+  // category-rates migration) keeps the page mounted: the sections render from
+  // `config` and pick up the new values when it lands, and sections with their
+  // own state (the Hold in Earn route's unsaved edits and run result) keep it.
+  if (loading && !config) {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -680,7 +709,14 @@ export default function RewardsConfigPage() {
   }
 
   return (
-    <div className="space-y-6">
+    // While a migration is applied and the config refreshed after it, the page
+    // stays mounted but takes no input: the refresh replaces the shared config,
+    // so anything typed from the Apply click on would be lost.
+    <div
+      className="space-y-6"
+      inert={loading || applyingMigration}
+      aria-busy={loading || applyingMigration}
+    >
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -1934,6 +1970,9 @@ export default function RewardsConfigPage() {
                 onClick={() => runCategoryRatesMigration(true)}
                 disabled={
                   migratingRates ||
+                  // Applying reloads the whole config: unsaved edits on this
+                  // page would be replaced.
+                  hasUnsavedConfig ||
                   // Nothing to apply until a preview has shown changes. This is
                   // belt-and-braces: the backend no-ops an unnecessary apply.
                   !migrationResult ||
@@ -1943,6 +1982,14 @@ export default function RewardsConfigPage() {
               >
                 {migratingRates ? "Working…" : "Apply migration"}
               </button>
+              {hasUnsavedConfig &&
+                migrationResult &&
+                !migrationResult.alreadyApplied && (
+                  <span className="text-sm text-amber-700">
+                    Save the unsaved changes on this page first (or reload it
+                    to discard them): applying reloads the whole config.
+                  </span>
+                )}
               {migrationResult?.alreadyApplied && (
                 <span className="text-sm font-medium text-green-700">
                   ✓ Already migrated — nothing to change
@@ -2347,6 +2394,10 @@ export default function RewardsConfigPage() {
             Save Tier Membership Config
           </button>
         </ConfigSection>
+
+        {/* The third tier route, next to the paid membership and the lock.
+            Its own endpoints, with a server preview before every save. */}
+        <TierBalanceConfigSection />
       </div>
 
       <TierUsersModal

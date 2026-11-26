@@ -288,12 +288,20 @@ export interface GoodCustomersRetention {
   otherSpenders: { people: number; spentAgain: number };
 }
 
-/** How a member holds their tier, counted once each, in this order. */
-export type GoodCustomersTierRoute = "paid" | "lock" | "trial" | "legacy";
+/**
+ * How a member holds their tier, counted once each, by this precedence:
+ * paid > lock > balance (held in Earn) > trial > legacy.
+ */
+export type GoodCustomersTierRoute = "paid" | "lock" | "balance" | "trial" | "legacy";
 
 export interface GoodCustomersRouteCounts {
   paid: number;
   lock: number;
+  /**
+   * Held in Earn. Missing from a backend that predates the route; `tiersOf`
+   * reads it as 0, so this is always a number once the block is checked.
+   */
+  balance: number;
   trial: number;
   legacy: number;
 }
@@ -345,7 +353,7 @@ export interface GoodCustomersTiers {
   };
   /** Ultra, Prime, Core. */
   table: GoodCustomersTierRow[];
-  /** paid, lock, legacy, trial, core. */
+  /** paid, lock, balance, legacy, trial, core; no balance row from an older backend. */
   routes: GoodCustomersRouteRow[];
   /** 13 weeks, oldest first. */
   weeklyBuyers: GoodCustomersBuyersWeek[];

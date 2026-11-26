@@ -62,6 +62,14 @@ import {
   TierLockThresholds,
   TierMembershipView,
   TierTrialView,
+  TierBalanceAdminOverview,
+  TierBalanceConfig,
+  TierBalanceConfigPreview,
+  TierBalanceConfigUpdate,
+  TierBalanceReevaluationPreview,
+  TierBalanceRunRequest,
+  TierBalanceRunResult,
+  TierBalanceUserView,
 } from "@/types";
 
 declare module "axios" {
@@ -433,6 +441,46 @@ export const getTierLockReevaluationPreview = (userId: string) =>
   api.get<{ data: TierLockReevaluationPreview }>(
     `/admin/v1/users/${userId}/tier-lock/reevaluate`,
     { quietErrors: true },
+  );
+
+/** Days of readings the user page asks for: the contract's default window. */
+export const TIER_BALANCE_USER_DAYS = 45;
+
+/**
+ * This user's Hold in Earn route: whether they have access and why, the route
+ * as the app computes it (even without access), their daily readings and
+ * event log, newest first, and the periods the route granted a tier.
+ *
+ * Quiet: a side card on the user page and in the support inbox, which shows
+ * its own state when the read fails (or the backend predates the route).
+ */
+export const getUserTierBalance = (
+  userId: string,
+  days = TIER_BALANCE_USER_DAYS,
+) =>
+  api.get<{ data: TierBalanceUserView }>(
+    `/admin/v1/users/${userId}/tier-balance`,
+    { params: { days }, quietErrors: true },
+  );
+
+/**
+ * What re-evaluating this user's route would do, without doing it: a fresh
+ * chain read of their qualifying Earn balance, and the route before and after.
+ */
+export const getTierBalanceReevaluationPreview = (userId: string) =>
+  api.get<{ data: TierBalanceReevaluationPreview }>(
+    `/admin/v1/users/${userId}/tier-balance/reevaluate`,
+  );
+
+/**
+ * Re-read this user's Earn balance from the chain and apply the route's rules
+ * to it now. The reason is required and lands on the user's audit trail with
+ * the admin's name, which the backend takes from the Firebase token.
+ */
+export const reevaluateTierBalance = (userId: string, reason: string) =>
+  api.post<{ data: TierBalanceReevaluationPreview }>(
+    `/admin/v1/users/${userId}/tier-balance/reevaluate`,
+    { reason },
   );
 
 /**
@@ -1144,8 +1192,9 @@ export const removeInternalTeamMember = (userId: string, reason: string) =>
 
 /**
  * Give an internal team member a feature — the Wirex EUR account, the Credit &
- * Smart spend modes, the new deposit tokens, the AI API, referral v4. Assigning
- * one they already have is a no-op. Audited on the member's profile.
+ * Smart spend modes, the new deposit tokens, the AI API, referral v4, the Hold
+ * in Earn tier route. Assigning one they already have is a no-op. Audited on
+ * the member's profile.
  */
 export const assignInternalTeamFeature = (
   userId: string,
@@ -1170,6 +1219,45 @@ export const restoreInternalTeamMember = (userId: string, note?: string) =>
     `/admin/v1/internal-team/${userId}/restore`,
     note ? { note } : {},
   );
+
+// --- Config → Rewards: Hold in Earn route ----------------------------------
+
+/**
+ * The Hold in Earn route's config and where it stands: the last runs, the next
+ * intraday sample, how much history is collected, and how many users each
+ * state holds — everyone measured, and members who actually hold the tier.
+ *
+ * Quiet: the section says so itself when the backend does not serve it yet.
+ */
+export const getTierBalanceOverview = () =>
+  api.get<{ data: TierBalanceAdminOverview }>("/admin/v1/tier-balance", {
+    quietErrors: true,
+  });
+
+/**
+ * What saving these changes would do — the changes, state counts before and
+ * after, the users whose route tier moves, and warnings — without saving.
+ */
+export const previewTierBalanceConfig = (changes: Partial<TierBalanceConfig>) =>
+  api.post<{ data: TierBalanceConfigPreview }>(
+    "/admin/v1/tier-balance/preview",
+    changes,
+  );
+
+/**
+ * Save config changes. Only send what was previewed, with the preview's
+ * `revision` as `expectedRevision`: the server answers 409 when the settings
+ * changed since. The admin identity comes from the Firebase token server-side.
+ */
+export const updateTierBalanceConfig = (body: TierBalanceConfigUpdate) =>
+  api.patch<{ data: TierBalanceAdminOverview }>("/admin/v1/tier-balance", body);
+
+/**
+ * Run a measurement (`sample`, every user for `scope: "full"`) or the daily
+ * evaluation (`evaluate`) now, instead of waiting for the schedule.
+ */
+export const runTierBalance = (body: TierBalanceRunRequest) =>
+  api.post<{ data: TierBalanceRunResult }>("/admin/v1/tier-balance/run", body);
 
 // --- Config → Countries ----------------------------------------------------
 

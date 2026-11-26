@@ -35,6 +35,12 @@ const TIER_MID = "#8b8fea";
 const TIER_LIGHT = "#c7cbf5";
 const TIER_TRACK = "#e3e5fb";
 const CORE_GREY = "#b8bcc6";
+/**
+ * Held in Earn: the Overview's green (the money-in chart's bank transfers), so
+ * the route reads apart from the indigo bought / trial / legacy shades without
+ * a new colour on the page.
+ */
+const TIER_EARN = "#16a37a";
 
 const TIER_LABELS: Record<GoodCustomersTierRow["tier"], string> = {
   ultra: "Ultra",
@@ -57,7 +63,8 @@ export function TiersSection({ data }: { data: GoodCustomersResponse }) {
           <p className="mt-1 text-[12.5px] text-gray-500">
             Prime and Ultra members on {dayLabel(data.asOf)}, and how they used the card in the{" "}
             {data.definition.windowDays} days to {dayLabel(data.asOf)}. Bought = paid for a membership
-            or locked FUSE for a year.
+            or locked FUSE for a year. Held in Earn = kept a balance in Earn through the route&apos;s
+            lookback.
             {tiers?.source === "records"
               ? " Read from stored records for this day, so legacy members are an upper bound."
               : ""}
@@ -144,6 +151,11 @@ function TierTiles({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodCu
               label: `Bought ${formatCount(members.byRoute.paid + members.byRoute.lock)}`,
               value: members.byRoute.paid + members.byRoute.lock,
               color: OVERVIEW_ACCENT,
+            },
+            {
+              label: `Held in Earn ${formatCount(members.byRoute.balance)}`,
+              value: members.byRoute.balance,
+              color: TIER_EARN,
             },
             { label: `Free trial ${formatCount(members.byRoute.trial)}`, value: members.byRoute.trial, color: TIER_MID },
             { label: `Legacy ${formatCount(members.byRoute.legacy)}`, value: members.byRoute.legacy, color: TIER_LIGHT },
@@ -271,6 +283,7 @@ function TiersTable({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodC
       <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11.5px] text-gray-500">
         <div className="flex gap-3.5">
           <Legend color={OVERVIEW_ACCENT} label="Bought" />
+          <Legend color={TIER_EARN} label="Held in Earn" />
           <Legend color={TIER_MID} label="Free trial" />
           <Legend color={TIER_LIGHT} label="Legacy" />
         </div>
@@ -304,23 +317,28 @@ function TiersTable({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodC
 
 function RouteMix({ row }: { row: GoodCustomersTierRow }) {
   const bought = row.byRoute.paid + row.byRoute.lock;
+  // In the legend's order: bought, held in Earn, free trial, legacy.
   const parts = [
-    { value: bought, color: OVERVIEW_ACCENT },
-    { value: row.byRoute.trial, color: TIER_MID },
-    { value: row.byRoute.legacy, color: TIER_LIGHT },
+    { label: "Bought", value: bought, color: OVERVIEW_ACCENT },
+    { label: "Held in Earn", value: row.byRoute.balance, color: TIER_EARN },
+    { label: "Free trial", value: row.byRoute.trial, color: TIER_MID },
+    { label: "Legacy", value: row.byRoute.legacy, color: TIER_LIGHT },
   ];
   const total = parts.reduce((sum, p) => sum + p.value, 0);
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className="flex items-center gap-2"
+      title={parts.map((p) => `${p.label} ${formatCount(p.value)}`).join(" · ")}
+    >
       <div className="flex h-2 w-[110px] shrink-0 gap-[2px] overflow-hidden rounded bg-[#f1f2f6]">
         {total > 0
-          ? parts.map((p, i) => (
-              <div key={i} style={{ width: `${(p.value / total) * 100}%`, background: p.color }} />
+          ? parts.map((p) => (
+              <div key={p.label} style={{ width: `${(p.value / total) * 100}%`, background: p.color }} />
             ))
           : null}
       </div>
       <span className="text-[11.5px] whitespace-nowrap text-gray-500">
-        {formatCount(bought)} · {formatCount(row.byRoute.trial)} · {formatCount(row.byRoute.legacy)}
+        {parts.map((p) => formatCount(p.value)).join(" · ")}
       </span>
     </div>
   );
@@ -410,6 +428,7 @@ function BuyersTooltip({
 const ROUTE_LABELS: Record<GoodCustomersRouteRow["route"], string> = {
   paid: "Paid membership",
   lock: "Locked FUSE",
+  balance: "Held in Earn",
   legacy: "Legacy",
   trial: "Free trial",
   core: "Core (no tier)",
@@ -418,6 +437,7 @@ const ROUTE_LABELS: Record<GoodCustomersRouteRow["route"], string> = {
 const ROUTE_COLORS: Record<GoodCustomersRouteRow["route"], string> = {
   paid: OVERVIEW_ACCENT,
   lock: OVERVIEW_ACCENT,
+  balance: TIER_EARN,
   legacy: TIER_MID,
   trial: TIER_MID,
   core: CORE_GREY,
@@ -455,13 +475,13 @@ function RoutesCard({ data, tiers }: { data: GoodCustomersResponse; tiers: GoodC
               return (
                 <tr key={row.route} className="border-b border-[#eef0f3] last:border-b-0">
                   <td className="py-2.5 pr-3 font-medium whitespace-nowrap text-gray-900">
-                    {ROUTE_LABELS[row.route]}
+                    {ROUTE_LABELS[row.route] ?? row.route}
                   </td>
                   <td className="w-full py-2.5 pr-3">
                     <div className="h-2 w-full min-w-[120px] overflow-hidden rounded" style={{ background: TIER_TRACK }}>
                       <div
                         className="h-full rounded"
-                        style={{ width: `${(rate ?? 0) * 100}%`, background: ROUTE_COLORS[row.route] }}
+                        style={{ width: `${(rate ?? 0) * 100}%`, background: ROUTE_COLORS[row.route] ?? TIER_MID }}
                       />
                     </div>
                   </td>
