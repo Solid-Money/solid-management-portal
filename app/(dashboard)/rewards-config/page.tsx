@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   Coins,
@@ -197,6 +197,17 @@ export default function RewardsConfigPage() {
     useState<SubscriptionCategoryRatesMigrationResult | null>(null);
   const [accrualResult, setAccrualResult] =
     useState<YieldBoostRunResult | null>(null);
+
+  // Whether any section of the shared config has edits the server has not
+  // confirmed. Applying the category-rates migration reloads the whole
+  // document, which would replace them, so Apply waits until there are none.
+  const hasUnsavedConfig = useMemo(
+    () =>
+      !!config &&
+      !!savedConfig &&
+      JSON.stringify(config) !== JSON.stringify(savedConfig),
+    [config, savedConfig],
+  );
 
   const updateCategory = (
     index: number,
@@ -612,6 +623,14 @@ export default function RewardsConfigPage() {
    * nothing and comes back `alreadyApplied`.
    */
   const runCategoryRatesMigration = async (apply: boolean) => {
+    if (apply && hasUnsavedConfig) {
+      // The button is disabled in this case too; this covers a stale click.
+      toast.error("Save your unsaved changes first", {
+        description:
+          "Applying reloads the whole config, which would replace them.",
+      });
+      return;
+    }
     try {
       setMigratingRates(true);
       const response = await api.post<SubscriptionCategoryRatesMigrationResult>(
@@ -685,7 +704,10 @@ export default function RewardsConfigPage() {
   }
 
   return (
-    <div className="space-y-6">
+    // While a refresh is in flight the page stays mounted but takes no input:
+    // the response replaces the shared config, so anything typed meanwhile
+    // would be lost.
+    <div className="space-y-6" inert={loading} aria-busy={loading}>
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -1939,6 +1961,9 @@ export default function RewardsConfigPage() {
                 onClick={() => runCategoryRatesMigration(true)}
                 disabled={
                   migratingRates ||
+                  // Applying reloads the whole config: unsaved edits on this
+                  // page would be replaced.
+                  hasUnsavedConfig ||
                   // Nothing to apply until a preview has shown changes. This is
                   // belt-and-braces: the backend no-ops an unnecessary apply.
                   !migrationResult ||
@@ -1948,6 +1973,14 @@ export default function RewardsConfigPage() {
               >
                 {migratingRates ? "Working…" : "Apply migration"}
               </button>
+              {hasUnsavedConfig &&
+                migrationResult &&
+                !migrationResult.alreadyApplied && (
+                  <span className="text-sm text-amber-700">
+                    Save the unsaved changes on this page first (or reload it
+                    to discard them): applying reloads the whole config.
+                  </span>
+                )}
               {migrationResult?.alreadyApplied && (
                 <span className="text-sm font-medium text-green-700">
                   ✓ Already migrated — nothing to change
