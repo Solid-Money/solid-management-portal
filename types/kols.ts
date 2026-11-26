@@ -92,7 +92,6 @@ export interface KolLimits {
   maxDays: number;
   codeMinLength: number;
   codeMaxLength: number;
-  lateAddDays: number;
 }
 
 export interface KolsOverview {
