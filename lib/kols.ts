@@ -17,7 +17,6 @@ export const KOL_DEFAULT_LIMITS: KolLimits = {
   maxDays: 366,
   codeMinLength: 6,
   codeMaxLength: 12,
-  lateAddDays: 7,
 };
 
 export const KOL_PERK_NAME_MAX = 80;
