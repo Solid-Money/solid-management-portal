@@ -133,7 +133,10 @@ export function CampaignRow({
             {campaign.sendAt && (isScheduled || !campaign.sentAt)
               ? `${isScheduled ? "Goes out" : "Was due"} ${formatLocalSendAt(campaign.sendAt)} (${formatUtcSendAt(campaign.sendAt)})`
               : formatDateTime(campaign.sentAt ?? campaign.createdAt)}
-            {campaign.sendAt && campaign.sentAt ? " · scheduled" : ""} ·{" "}
+            {campaign.sendAt && campaign.sentAt
+              ? ` · scheduled for ${formatLocalSendAt(campaign.sendAt)}`
+              : ""}{" "}
+            ·{" "}
             {campaign.updatedBy ?? campaign.createdBy}
             {campaign.reason ? ` · ${campaign.reason}` : ""}
           </CardDescription>

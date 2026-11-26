@@ -25,6 +25,8 @@ interface ScheduledCampaignsProps {
   onEdit: (campaign: PushCampaignSummary) => void;
   /** The campaign being opened for editing, while it loads. */
   loadingId?: string | null;
+  /** Why Edit is unavailable right now, if it is. */
+  editBlocker?: string | null;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ScheduledCampaigns({
   canSend,
   onEdit,
   loadingId,
+  editBlocker,
 }: ScheduledCampaignsProps) {
   const { data, isLoading, error } = usePushCampaigns();
   const cancel = useCancelScheduledPushCampaign();
@@ -90,7 +93,8 @@ export function ScheduledCampaigns({
                   variant="outline"
                   size="sm"
                   onClick={() => onEdit(campaign)}
-                  disabled={!!loadingId || cancel.isPending}
+                  disabled={!!loadingId || !!editBlocker || cancel.isPending}
+                  title={editBlocker ?? undefined}
                 >
                   {loadingId === campaign.id ? (
                     <Loader2 className="animate-spin" />

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BellRing, Eye, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  PUSH_CAMPAIGN_KEYS,
   useLoadPushCampaign,
   usePushCampaignDestinations,
   usePushCampaigns,
@@ -19,6 +21,8 @@ import { useUrlTab } from "@/hooks/use-url-tab";
 import { type ComposerSeed, seedFromCampaign } from "@/lib/push-campaigns";
 
 const TABS = ["compose", "scheduled", "history"] as const;
+const SUBMITTING =
+  "Wait for the campaign being sent or scheduled to finish, then edit.";
 
 /**
  * Growth → Push notifications: send one push, or an A/B test of up to three,
@@ -52,6 +56,12 @@ function PushNotificationsScreen() {
     usePushCampaignDestinations();
   const { data: campaigns } = usePushCampaigns();
   const loadForEdit = useLoadPushCampaign();
+  const queryClient = useQueryClient();
+  // Opening an edit remounts the composer, and a send or schedule still in
+  // flight would lose its result (toast, form reset, tab change) with it — a
+  // sender seeing nothing may send again. So Edit waits for it.
+  const submitting =
+    useIsMutating({ mutationKey: PUSH_CAMPAIGN_KEYS.submit }) > 0;
   // A refresh that failed after the settings had loaded. The form stays as it
   // is, so a draft and a send in flight survive it; sending waits until the
   // settings (destinations, the active What's New, who may send) are current.
@@ -61,9 +71,17 @@ function PushNotificationsScreen() {
 
   // The campaign is loaded fresh (with its list) before the composer opens on
   // it, so an edit never starts from a stale copy.
-  const startEdit = (id: string) =>
+  const startEdit = (id: string) => {
+    if (submitting) return;
     loadForEdit.mutate(id, {
       onSuccess: (detail) => {
+        // Read live: one may have started while the campaign loaded.
+        if (
+          queryClient.isMutating({ mutationKey: PUSH_CAMPAIGN_KEYS.submit }) > 0
+        ) {
+          toast.error(SUBMITTING);
+          return;
+        }
         if (detail.status !== "scheduled") {
           toast.error(
             `“${detail.name}” has already gone out or was cancelled.`,
@@ -79,6 +97,7 @@ function PushNotificationsScreen() {
         setTab("compose");
       },
     });
+  };
 
   const resetComposer = () => {
     setEditing(null);
@@ -152,7 +171,8 @@ function PushNotificationsScreen() {
             {/* Kept mounted while the other tabs are open, so a draft survives
                 a look at past campaigns and a send in flight still reports
                 back. Remounted after a send or schedule, and to edit a
-                scheduled campaign, so each starts from a clean form. */}
+                scheduled campaign (never while one is in flight), so each
+                starts from a clean form. */}
             <TabsContent
               value="compose"
               forceMount
@@ -182,6 +202,7 @@ function PushNotificationsScreen() {
                 destinations={config.destinations}
                 canSend={config.canSend}
                 loadingId={loadForEdit.isPending ? loadForEdit.variables : null}
+                editBlocker={submitting ? SUBMITTING : null}
                 onEdit={(campaign) => startEdit(campaign.id)}
               />
             </TabsContent>

@@ -24,6 +24,8 @@ interface AudienceFiltersCardProps {
   tiers: readonly PushCampaignTier[];
   /** Earlier campaigns with a control group to leave out. */
   controlSources: readonly PushCampaignSummary[];
+  /** Every campaign listed, to name a ticked one no longer offered. */
+  campaigns: readonly PushCampaignSummary[];
   maxExcludedControls: number;
   disabled: boolean;
 }
@@ -38,9 +40,16 @@ export function AudienceFiltersCard({
   onChange,
   tiers,
   controlSources,
+  campaigns,
   maxExcludedControls,
   disabled,
 }: AudienceFiltersCardProps) {
+  // Ticked, then no longer offered: cancelled or failed since (the send would
+  // be refused), or older than the campaigns listed (still fine). Shown, so it
+  // can be unticked; otherwise it would be sent unseen.
+  const unlisted = filters.excludeControlOf
+    .filter((id) => !controlSources.some((c) => c.id === id))
+    .map((id) => ({ id, campaign: campaigns.find((c) => c.id === id) }));
   const toggleTier = (tier: PushCampaignTier, on: boolean) =>
     onChange({
       ...filters,
@@ -120,7 +129,7 @@ export function AudienceFiltersCard({
           <p className="text-sm font-medium text-gray-900">
             Leave out the control group of
           </p>
-          {controlSources.length === 0 ? (
+          {controlSources.length === 0 && unlisted.length === 0 ? (
             <p className="text-xs text-gray-500">
               No earlier campaign held a control group back.
             </p>
@@ -155,6 +164,29 @@ export function AudienceFiltersCard({
                   </div>
                 );
               })}
+              {unlisted.map(({ id, campaign }) => (
+                <div key={id} className="flex items-start gap-2">
+                  <Checkbox
+                    id={`push-exclude-${id}`}
+                    checked
+                    onCheckedChange={(on) => toggleControl(id, on === true)}
+                    disabled={disabled}
+                  />
+                  <Label
+                    htmlFor={`push-exclude-${id}`}
+                    className="font-normal leading-snug"
+                  >
+                    {campaign?.name ?? <span className="font-mono">{id}</span>}
+                    <span className="text-xs text-amber-700">
+                      {" "}
+                      ·{" "}
+                      {campaign
+                        ? `${campaign.status === "cancelled" || campaign.status === "failed" ? campaign.status : "no longer offered"}: untick it, or the send is refused`
+                        : "older than the campaigns listed"}
+                    </span>
+                  </Label>
+                </div>
+              ))}
             </div>
           )}
           <p className="text-xs text-gray-500">

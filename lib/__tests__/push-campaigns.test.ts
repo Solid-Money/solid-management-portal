@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   campaignSlug,
@@ -13,6 +13,7 @@ import {
   formatUtcSendAt,
   groupDestinations,
   localInputToIso,
+  localTimeClash,
   localTimeZoneLabel,
   parseAudience,
   parseCsvRecords,
@@ -20,6 +21,7 @@ import {
   sameFilters,
   sameIds,
   seedFromCampaign,
+  sendAtInstant,
   sendTimeProblem,
   splitCsvLine,
   toFiltersInput,
@@ -556,5 +558,55 @@ describe("editing a scheduled campaign", () => {
       scheduled.id,
     );
     expect(sources.map((c) => c.id)).toEqual(["a"]);
+  });
+
+  describe("around a clock change (New York)", () => {
+    const limits = { scheduleMinLeadMinutes: 2, scheduleMaxAheadDays: 60 };
+    const now = new Date("2027-10-01T12:00:00Z");
+    let zone: string | undefined;
+    beforeAll(() => {
+      zone = process.env.TZ;
+      process.env.TZ = "America/New_York";
+    });
+    afterAll(() => {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    });
+
+    it("tells a repeated or skipped local time from an ordinary one", () => {
+      // Clocks go back from 02:00 to 01:00 on 7 Nov 2027, forward from 02:00
+      // to 03:00 on 14 Mar 2027.
+      expect(localTimeClash("2027-11-07T01:30")).toBe("repeated");
+      expect(localTimeClash("2027-03-14T02:30")).toBe("skipped");
+      expect(localTimeClash("2027-11-07T03:30")).toBeNull();
+      expect(localTimeClash("")).toBeNull();
+    });
+
+    it("keeps the stored instant when the time is left as loaded", () => {
+      // 06:30 UTC is the second 01:30 that night; read back from the local
+      // time it would be the first, an hour earlier.
+      const seed = seedFromCampaign({
+        ...scheduled,
+        sendAt: "2027-11-07T06:30:00.000Z",
+      });
+      expect(seed.sendAt).toBe("2027-11-07T01:30");
+      expect(localInputToIso(seed.sendAt)).toBe("2027-11-07T05:30:00.000Z");
+      expect(sendAtInstant(seed.sendAt, seed.storedSendAt)).toBe(
+        "2027-11-07T06:30:00.000Z",
+      );
+      expect(
+        sendTimeProblem(seed.sendAt, limits, now, seed.storedSendAt),
+      ).toBeNull();
+    });
+
+    it("refuses a repeated or skipped time typed in", () => {
+      expect(sendTimeProblem("2027-11-07T01:30", limits, now)).toMatch(
+        /happens twice/,
+      );
+      expect(sendTimeProblem("2027-03-14T02:30", limits, now)).toMatch(
+        /never happens/,
+      );
+      expect(sendTimeProblem("2027-11-07T03:30", limits, now)).toBeNull();
+    });
   });
 });

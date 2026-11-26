@@ -24,6 +24,8 @@ import type {
 export const PUSH_CAMPAIGN_KEYS = {
   destinations: ["push-campaigns", "destinations"] as const,
   list: ["push-campaigns", "list"] as const,
+  /** A send or schedule in flight, for `useIsMutating`. */
+  submit: ["push-campaigns", "submit"] as const,
 };
 
 /**
@@ -94,6 +96,7 @@ export function useSendPushCampaignTest() {
 export function useSendPushCampaign() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: PUSH_CAMPAIGN_KEYS.submit,
     mutationFn: (input: SendPushCampaignInput) => sendPushCampaign(input),
     retry: false,
     onSettled: () =>
@@ -108,6 +111,7 @@ export function useSendPushCampaign() {
 export function useSchedulePushCampaign() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: PUSH_CAMPAIGN_KEYS.submit,
     mutationFn: ({
       id,
       input,

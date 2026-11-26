@@ -48,12 +48,12 @@ import {
   type FiltersDraft,
   formatLocalSendAt,
   formatUtcSendAt,
-  localInputToIso,
   localTimeZoneLabel,
   parseAudience,
   parseTestRecipients,
   sameFilters,
   sameIds,
+  sendAtInstant,
   sendTimeProblem,
   toFiltersInput,
   toVariantInput,
@@ -185,8 +185,12 @@ export function PushCampaignComposer({
     name.trim().length >= NAME_MIN_LENGTH &&
     name.trim().length <= limits.nameMaxLength &&
     slug.length >= NAME_MIN_LENGTH;
-  const sendAtIso = scheduleOn ? localInputToIso(sendAt) : null;
-  const timeProblem = scheduleOn ? sendTimeProblem(sendAt, limits) : null;
+  // An edit that leaves the time alone sends at the time stored, to the minute.
+  const stored = seed?.storedSendAt;
+  const sendAtIso = scheduleOn ? sendAtInstant(sendAt, stored) : null;
+  const timeProblem = scheduleOn
+    ? sendTimeProblem(sendAt, limits, new Date(), stored)
+    : null;
 
   const staleReason =
     "Push settings couldn't be refreshed. Retry above before sending.";
@@ -348,6 +352,7 @@ export function PushCampaignComposer({
           onChange={setFilters}
           tiers={tiers}
           controlSources={controlSources}
+          campaigns={campaigns ?? []}
           maxExcludedControls={
             limits.maxExcludedControls ?? DEFAULT_MAX_EXCLUDED_CONTROLS
           }

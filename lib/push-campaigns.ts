@@ -441,6 +441,44 @@ export function localInputToIso(value: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+/** A send time loaded for editing: as the input shows it, and as stored. */
+export interface StoredSendAt {
+  local: string;
+  iso: string;
+}
+
+/**
+ * The instant a `datetime-local` value stands for. Left as loaded, it is the
+ * stored instant: read back from the local time, one the clocks pass twice
+ * would come out as its first occurrence and could move the send an hour.
+ */
+export function sendAtInstant(
+  value: string,
+  stored?: StoredSendAt,
+): string | null {
+  if (stored && value === stored.local) return stored.iso;
+  return localInputToIso(value);
+}
+
+/**
+ * Whether a `datetime-local` value is a time the clocks pass twice here (when
+ * they go back) or skip (when they go forward), or null for neither.
+ */
+export function localTimeClash(value: string): "repeated" | "skipped" | null {
+  const iso = localInputToIso(value);
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
+  // A skipped time is read as the hour after it, so it reads back differently.
+  if (toLocalInput(new Date(at)) !== value) return "skipped";
+  // A repeated one is read as its first occurrence; the clocks go back by
+  // half an hour, an hour or two.
+  return [30, 60, 120].some(
+    (minutes) => toLocalInput(new Date(at + minutes * 60_000)) === value,
+  )
+    ? "repeated"
+    : null;
+}
+
 /** This browser's time zone, e.g. "Europe/Berlin (GMT+1)", at `at`. */
 export function localTimeZoneLabel(at: Date = new Date()): string {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -490,14 +528,24 @@ export function defaultSendAt(now: Date = new Date()): string {
 /**
  * What is wrong with a send time, or null. Mirrors accounts-service, which
  * checks it again: at least `minLeadMinutes` ahead, at most `maxAheadDays`.
+ * A time typed in must name one moment; one left as loaded (`stored`) does.
  */
 export function sendTimeProblem(
   value: string,
   limits: Pick<PushCampaignLimits, "scheduleMinLeadMinutes" | "scheduleMaxAheadDays">,
   now: Date = new Date(),
+  stored?: StoredSendAt,
 ): string | null {
-  const iso = localInputToIso(value);
+  const iso = sendAtInstant(value, stored);
   if (!iso) return "Pick a date and time.";
+  const kept = !!stored && value === stored.local;
+  const clash = kept ? null : localTimeClash(value);
+  if (clash === "repeated") {
+    return "The clocks go back then in your time zone, so that time happens twice. Pick a time outside that hour.";
+  }
+  if (clash === "skipped") {
+    return "The clocks go forward then in your time zone, so that time never happens. Pick another time.";
+  }
   const lead = new Date(iso).getTime() - now.getTime();
   const minLead = limits.scheduleMinLeadMinutes ?? 2;
   if (lead < minLead * 60_000) {
@@ -520,10 +568,13 @@ export interface ComposerSeed {
   controlPercent: string;
   filters: FiltersDraft;
   sendAt: string;
+  /** The send time as stored, kept while `sendAt` is left as loaded. */
+  storedSendAt?: StoredSendAt;
 }
 
 /** A scheduled campaign as the composer's starting state. */
 export function seedFromCampaign(campaign: PushCampaignDetail): ComposerSeed {
+  const sendAt = toLocalInput(campaign.sendAt);
   return {
     name: campaign.name,
     reason: campaign.reason ?? "",
@@ -540,7 +591,10 @@ export function seedFromCampaign(campaign: PushCampaignDetail): ComposerSeed {
     controlPercent:
       campaign.controlPercent > 0 ? String(campaign.controlPercent) : "10",
     filters: filtersDraftOf(campaign.audienceFilters),
-    sendAt: toLocalInput(campaign.sendAt),
+    sendAt,
+    ...(sendAt && campaign.sendAt
+      ? { storedSendAt: { local: sendAt, iso: campaign.sendAt } }
+      : {}),
   };
 }
 
