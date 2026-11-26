@@ -108,7 +108,10 @@ export default function ReevaluateTierBalanceDialog({
 
   // Held while the preview is read — first time and every reopening — so the
   // confirm is never pressed on a cached reading of a balance that has moved.
-  const previewLoading = preview.isPending || preview.isFetching;
+  // A fetch paused offline counts too: it is not fetching, but the reading on
+  // screen is still the cached one.
+  const previewLoading =
+    preview.isPending || preview.isFetching || preview.isPaused;
   const canConfirm =
     !mutation.isPending &&
     !previewLoading &&

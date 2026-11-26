@@ -658,7 +658,11 @@ export default function RewardsConfigPage() {
     );
   };
 
-  if (loading) {
+  // The full-page spinner is for the first load only. A refresh (after the
+  // category-rates migration) keeps the page mounted: the sections render from
+  // `config` and pick up the new values when it lands, and sections with their
+  // own state (the Hold in Earn route's unsaved edits and run result) keep it.
+  if (loading && !config) {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>

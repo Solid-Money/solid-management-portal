@@ -321,10 +321,19 @@ export default function TierBalanceConfigSection() {
             edits={edits}
             setEdits={setEdits}
             onSaved={(next) => {
-              queryClient.setQueryData(TIER_BALANCE_OVERVIEW_KEY, next);
-              // Drop what the save covered; keep edits made while the preview
-              // was open, which were not part of it.
-              setEdits((prev) => pendingTierBalanceEdits(prev, next.config));
+              // A refresh still in flight was read before the save: cancel it
+              // first, so its older response cannot land on top of the saved
+              // settings.
+              void queryClient
+                .cancelQueries({ queryKey: TIER_BALANCE_OVERVIEW_KEY })
+                .then(() => {
+                  queryClient.setQueryData(TIER_BALANCE_OVERVIEW_KEY, next);
+                  // Drop what the save covered; keep edits made while the
+                  // preview was open, which were not part of it.
+                  setEdits((prev) =>
+                    pendingTierBalanceEdits(prev, next.config),
+                  );
+                });
             }}
             onRan={() =>
               void queryClient.invalidateQueries({
