@@ -774,7 +774,10 @@ export type WalletFailureSource =
   // Wirex card refunds owed from the Card Refund Payout Wallet on Base.
   | "card_refund_payout"
   | "referral_payout"
-  | "user_activity";
+  | "user_activity"
+  // Wirex SEPA deposits owed from the Wirex Bank Deposit Payout Wallet on Base:
+  // waiting on the wallet, retrying, or handed to an operator.
+  | "bank_deposit_payout";
 
 export type WalletForecastSource =
   | "cashback"
