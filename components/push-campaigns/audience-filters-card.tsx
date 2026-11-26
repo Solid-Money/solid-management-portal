@@ -44,9 +44,10 @@ export function AudienceFiltersCard({
   maxExcludedControls,
   disabled,
 }: AudienceFiltersCardProps) {
-  // Ticked, then no longer offered: cancelled or failed since (the send would
-  // be refused), or older than the campaigns listed (still fine). Shown, so it
-  // can be unticked; otherwise it would be sent unseen.
+  // Ticked, then no longer offered: cancelled since, failed before storing its
+  // control group, or changed to hold none back (the send would be refused),
+  // or older than the campaigns listed (still fine). Shown, so it can be
+  // unticked; otherwise it would be sent unseen.
   const unlisted = filters.excludeControlOf
     .filter((id) => !controlSources.some((c) => c.id === id))
     .map((id) => ({ id, campaign: campaigns.find((c) => c.id === id) }));
@@ -159,6 +160,9 @@ export function AudienceFiltersCard({
                           ? `scheduled ${formatDateTime(campaign.sendAt ?? campaign.createdAt)}`
                           : formatDateTime(campaign.sentAt ?? campaign.createdAt)}{" "}
                         · {campaign.controlPercent}% control
+                        {campaign.status === "failed"
+                          ? " · failed after storing it"
+                          : ""}
                       </span>
                     </Label>
                   </div>

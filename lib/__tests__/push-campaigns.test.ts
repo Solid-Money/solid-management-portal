@@ -554,10 +554,18 @@ describe("editing a scheduled campaign", () => {
         { ...scheduled, id: "b", status: "sent", controlPercent: 0 },
         { ...scheduled, id: "c", status: "cancelled", controlPercent: 10 },
         { ...scheduled, id: "d", status: "failed", controlPercent: 10 },
+        // Failed after storing every row: its control group exists.
+        {
+          ...scheduled,
+          id: "e",
+          status: "failed",
+          controlPercent: 10,
+          assignedAt: "2026-11-26T10:00:00.000Z",
+        },
       ],
       scheduled.id,
     );
-    expect(sources.map((c) => c.id)).toEqual(["a"]);
+    expect(sources.map((c) => c.id)).toEqual(["a", "e"]);
   });
 
   describe("around a clock change (New York)", () => {

@@ -198,6 +198,11 @@ export interface PushCampaignSummary {
   cancelledAt?: string;
   createdAt: string;
   sentAt?: string;
+  /**
+   * When every recipient row, control group included, was stored. A failed
+   * campaign with it still has a control group a later one can leave out.
+   */
+  assignedAt?: string;
   error?: string;
 }
 

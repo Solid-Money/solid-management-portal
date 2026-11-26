@@ -599,9 +599,11 @@ export function seedFromCampaign(campaign: PushCampaignDetail): ComposerSeed {
 }
 
 /**
- * Earlier campaigns whose control group a new one can leave out: not called
- * off or failed, with a control group, newest first. A scheduled one counts:
- * its control group exists by the time a later campaign goes out.
+ * Earlier campaigns whose control group a new one can leave out: with a
+ * control group, not called off, newest first. A scheduled one counts: its
+ * control group exists by the time a later campaign goes out. A failed one
+ * counts only if it stored its control group before failing (`assignedAt`),
+ * the rule accounts-service applies too.
  */
 export function controlGroupSources(
   campaigns: readonly PushCampaignSummary[],
@@ -611,6 +613,9 @@ export function controlGroupSources(
     (c) =>
       c.id !== exceptId &&
       c.controlPercent > 0 &&
-      (c.status === "sent" || c.status === "sending" || c.status === "scheduled"),
+      (c.status === "sent" ||
+        c.status === "sending" ||
+        c.status === "scheduled" ||
+        (c.status === "failed" && !!c.assignedAt)),
   );
 }
