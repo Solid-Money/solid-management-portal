@@ -26,6 +26,7 @@ import UserCardPanel from "@/components/user/user-card-panel";
 import UserCardCreditCard from "@/components/user/user-card-credit-card";
 import UserCashbackCard from "@/components/user/user-cashback-card";
 import UserRtfCard from "@/components/user/user-rtf-card";
+import UserSafeRecoveryCard from "@/components/user/user-safe-recovery-card";
 import UserAuditLogCard from "@/components/user/user-audit-log-card";
 import UserAppPerformanceCard from "@/components/user/user-app-performance-card";
 import UserErrorsCard from "@/components/user/user-errors-card";
@@ -300,9 +301,15 @@ export default function UserDetailPage({
           )}
         </TabsContent>
 
-        <TabsContent value="deposits">
+        <TabsContent value="deposits" className="space-y-4">
           <SectionAnchor id="user-deposits">
             <DepositSummaryCard userId={id} />
+          </SectionAnchor>
+          {/* "I sent it on Plasma and it never arrived": funds in the user's
+              own Safe on a network the app does not run on. Read live from
+              the chain; the user moves them back from the app. */}
+          <SectionAnchor id="user-safe-recovery">
+            <UserSafeRecoveryCard userId={id} />
           </SectionAnchor>
         </TabsContent>
 

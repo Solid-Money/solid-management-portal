@@ -18,6 +18,7 @@ import {
   RelinkCardRequest,
   RelinkCardResult,
   RainRtfStatus,
+  SafeRecoveryAdminUser,
   IssueTierTrialRequest,
   IssueTierTrialResult,
   InternalTeamFeatureKey,
@@ -250,6 +251,16 @@ export const getCardAuditHistory = (userId: string) =>
  */
 export const getUserRtf = (userId: string) =>
   api.get<{ data: RainRtfStatus }>(`/admin/v1/users/${userId}/rtf`);
+
+/**
+ * Funds in this user's Safe on networks the app does not run on (Plasma), read
+ * live from the chain, with the recoveries the user started from the app.
+ * Read-only: only the user's passkey can move these funds.
+ */
+export const getUserSafeRecovery = (userId: string) =>
+  api.get<{ data: SafeRecoveryAdminUser }>(
+    `/admin/v1/users/${userId}/safe-recovery`,
+  );
 
 /**
  * What the issue-card dialog opens with: the card this user holds today, and

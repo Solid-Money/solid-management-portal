@@ -4801,3 +4801,83 @@ export type ListedTokenChanges = Partial<
     | "swapOnly"
   >
 >;
+
+/**
+ * Funds in a user's Safe on networks the app does not run on (someone sent to
+ * their Solid address on Plasma), from `GET /admin/v1/users/:id/safe-recovery`.
+ * The user moves them back from the app's Rescue tokens screen with their
+ * passkey; the Safe Recovery Relayer sends the transaction and pays its gas.
+ */
+export type SafeRecoveryStatus =
+  | "awaiting_signature"
+  | "submitting"
+  | "submitted"
+  | "succeeded"
+  | "failed"
+  | "expired";
+
+export interface SafeRecoveryView {
+  id: string;
+  chainId: number;
+  network: string;
+  tokenAddress: string;
+  symbol: string;
+  decimals: number;
+  /** Base units. */
+  amount: string;
+  amountFormatted: string;
+  /** The user's rhino.fi address on that network, paying their Safe on Base. */
+  destinationAddress: string;
+  status: SafeRecoveryStatus;
+  transactionHash?: string;
+  explorerUrl?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SafeRecoveryBalance {
+  chainId: number;
+  network: string;
+  safeAddress: string;
+  tokenAddress: string;
+  symbol: string;
+  decimals: number;
+  amount: string;
+  amountFormatted: string;
+  recovery?: SafeRecoveryView;
+}
+
+/** A balance that could not be read just now: not known to be empty. */
+export interface SafeRecoveryUnreadable {
+  chainId: number;
+  network: string;
+  tokenAddress: string;
+  symbol: string;
+}
+
+export interface SafeRecoveryNetworkStatus {
+  chainId: number;
+  name: string;
+  nativeSymbol: string;
+  explorerUrl: string;
+  /** The relayer's gas balance there; absent when it could not be read. */
+  relayerBalance?: string;
+}
+
+export interface SafeRecoveryAdminUser {
+  /** False when switched off or the relayer key is not set. */
+  enabled: boolean;
+  relayerAddress?: string;
+  safeAddress?: string;
+  networks: SafeRecoveryNetworkStatus[];
+  balances: SafeRecoveryBalance[];
+  /**
+   * Balances that could not be read, so are missing from `balances` for that
+   * reason rather than for being empty. Absent from older backends.
+   */
+  unavailableBalances?: SafeRecoveryUnreadable[];
+  recoveries: SafeRecoveryView[];
+  /** Path in the app where the user moves the funds. */
+  appPath: string;
+}
