@@ -175,15 +175,16 @@ export default function UserSafeRecoveryCard({ userId }: { userId: string }) {
                   </span>
                   <CopyableValue value={rescueLink} />
                 </div>
-                {!overview.enabled ? (
-                  <p className="text-xs text-amber-700">
-                    Recovery is switched off on this backend
-                    (SAFE_RECOVERY_ENABLED, SAFE_RECOVERY_RELAYER_PRIVATE_KEY),
-                    so the link shows nothing to move until it is on.
-                  </p>
-                ) : null}
               </div>
             )}
+
+            {!overview.enabled ? (
+              <p className="text-xs text-amber-700">
+                Recovery is switched off on this backend (SAFE_RECOVERY_ENABLED,
+                SAFE_RECOVERY_RELAYER_PRIVATE_KEY), so the user cannot move
+                anything from the app until it is on.
+              </p>
+            ) : null}
 
             {unreadable.length > 0 ? (
               <div className="space-y-2">
