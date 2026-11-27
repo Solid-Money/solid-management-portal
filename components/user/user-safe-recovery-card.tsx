@@ -112,6 +112,7 @@ export default function UserSafeRecoveryCard({ userId }: { userId: string }) {
 
   const overview = data?.data;
   const networkNames = overview?.networks.map((n) => n.name).join(", ");
+  const unreadable = overview?.unavailableBalances ?? [];
   const rescueLink = overview
     ? `${REFERRAL_APP_URL}${overview.appPath}`
     : undefined;
@@ -144,9 +145,11 @@ export default function UserSafeRecoveryCard({ userId }: { userId: string }) {
           <div className="space-y-3">
             {overview.balances.length === 0 ? (
               <p className="text-sm text-gray-500">
-                {overview.safeAddress
-                  ? `Nothing in this user's Solid wallet on ${networkNames}.`
-                  : "This user has no Safe yet."}
+                {!overview.safeAddress
+                  ? "This user has no Safe yet."
+                  : unreadable.length > 0
+                    ? `Nothing found in this user's Solid wallet on ${networkNames}, but not every balance could be read just now (below).`
+                    : `Nothing in this user's Solid wallet on ${networkNames}.`}
               </p>
             ) : (
               <div className="space-y-2">
@@ -181,6 +184,25 @@ export default function UserSafeRecoveryCard({ userId }: { userId: string }) {
                 ) : null}
               </div>
             )}
+
+            {unreadable.length > 0 ? (
+              <div className="space-y-2">
+                {unreadable.map((item) => (
+                  <div
+                    key={`${item.chainId}:${item.tokenAddress}`}
+                    className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white p-2.5"
+                  >
+                    <span className="font-mono text-xs font-medium text-gray-900">
+                      {item.symbol} on {item.network}
+                    </span>
+                    <Badge variant="muted">Could not read</Badge>
+                  </div>
+                ))}
+                <p className="text-xs text-gray-500">
+                  The network did not answer; reload to read these again.
+                </p>
+              </div>
+            ) : null}
 
             {overview.recoveries.length > 0 ? (
               <div className="space-y-2">

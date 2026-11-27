@@ -4848,6 +4848,14 @@ export interface SafeRecoveryBalance {
   recovery?: SafeRecoveryView;
 }
 
+/** A balance that could not be read just now: not known to be empty. */
+export interface SafeRecoveryUnreadable {
+  chainId: number;
+  network: string;
+  tokenAddress: string;
+  symbol: string;
+}
+
 export interface SafeRecoveryNetworkStatus {
   chainId: number;
   name: string;
@@ -4864,6 +4872,11 @@ export interface SafeRecoveryAdminUser {
   safeAddress?: string;
   networks: SafeRecoveryNetworkStatus[];
   balances: SafeRecoveryBalance[];
+  /**
+   * Balances that could not be read, so are missing from `balances` for that
+   * reason rather than for being empty. Absent from older backends.
+   */
+  unavailableBalances?: SafeRecoveryUnreadable[];
   recoveries: SafeRecoveryView[];
   /** Path in the app where the user moves the funds. */
   appPath: string;
