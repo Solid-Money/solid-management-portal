@@ -91,7 +91,7 @@ function isJpeg(bytes: Uint8Array): boolean {
       if (length < 6 || components < 1 || length !== 6 + 2 * components) return false;
       // Walk the entropy-coded data forward to the first EOI, which ends the
       // image (bytes after it are tolerated). There must be data before it.
-      // Inside the data, FF 00 is a stuffed byte and FF D0-D7 a restart;
+      // Inside the data, FF 00 is a stuffed byte and FF D0-D7 a restart (no data);
       // other markers (e.g. a progressive JPEG's next DHT/SOS) are segments.
       let i = at + 2 + length;
       let sawData = false;
@@ -103,9 +103,11 @@ function isJpeg(bytes: Uint8Array): boolean {
         }
         if (i + 1 >= bytes.length) return false;
         const next = bytes[i + 1];
-        if (next === 0x00 || (next >= 0xd0 && next <= 0xd7)) {
-          sawData = true;
+        if (next === 0x00) {
+          sawData = true; // a stuffed 0xFF data byte
           i += 2;
+        } else if (next >= 0xd0 && next <= 0xd7) {
+          i += 2; // a restart marker: not data in itself
         } else if (next === 0xff) {
           i += 1; // fill byte
         } else if (next === 0xd9) {

@@ -65,6 +65,13 @@ describe("detectImageType", () => {
     expect(
       detectImageType(bytes(jpeg.subarray(0, scanEnd), [0xff, 0xd9, 0xff, 0xd9]))
     ).toBeNull();
+    expect(
+      detectImageType(bytes(jpeg.subarray(0, scanEnd), [0xff, 0xd9, 0x00, 0xff, 0xd9]))
+    ).toBeNull();
+    // A restart marker alone is not scan data.
+    expect(
+      detectImageType(bytes(jpeg.subarray(0, scanEnd), [0xff, 0xd0, 0xff, 0xd9]))
+    ).toBeNull();
     // A valid JPEG with trailing bytes after its EOI is still accepted.
     expect(detectImageType(bytes(jpeg, [0, 0, 0, 0]))).toBe("image/jpeg");
   });
