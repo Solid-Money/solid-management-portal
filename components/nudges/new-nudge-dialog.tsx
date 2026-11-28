@@ -100,6 +100,7 @@ function NewNudgeForm({
   const [conditions, setConditions] = useState<string[]>([]);
   const [category, setCategory] = useState<NudgeCategory>("marketing");
   const [priority, setPriority] = useState(5);
+  const [uploading, setUploading] = useState(false);
   const [cooldownDays, setCooldownDays] = useState<number | null>(null);
   const [group, setGroup] = useState<string | null>(null);
   const [withPush, setWithPush] = useState(true);
@@ -137,6 +138,7 @@ function NewNudgeForm({
     if (!Number.isInteger(priority) || priority < 1 || priority > 7) {
       list.push("The priority must be a whole number from 1 to 7.");
     }
+    if (withPush && uploading) list.push("Wait for the image upload to finish.");
     if (!withPush && !withEmail) list.push("Add a push, an email or both.");
     if (withPush) {
       for (const issue of pushCopyIssues(push, variables, catalog.limits, [])) {
@@ -162,6 +164,7 @@ function NewNudgeForm({
     event,
     delayMinutes,
     priority,
+    uploading,
     withPush,
     withEmail,
     push,
@@ -398,6 +401,7 @@ function NewNudgeForm({
             disabled={false}
             hideEnabled
             nudgeKey={effectiveKey || "new-nudge"}
+            onUploadingChange={setUploading}
           />
         ) : null}
       </div>

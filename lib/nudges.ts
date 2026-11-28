@@ -746,7 +746,8 @@ function flatSettings(settings: NudgeSettingsView): Record<string, unknown> {
     "quietHours.enabled": settings.quietHours.enabled,
     "quietHours.start": settings.quietHours.start,
     "quietHours.end": settings.quietHours.end,
-    "quietHours.fallbackTimezone": settings.quietHours.fallbackTimezone,
+    // Trimmed, as diffSettings saves it: padding alone is not an edit.
+    "quietHours.fallbackTimezone": settings.quietHours.fallbackTimezone.trim(),
     suppressionGroups: JSON.stringify(settings.suppressionGroups),
   };
 }
@@ -779,7 +780,7 @@ export function rebaseSettings(
       (next.frequencyCap as Record<string, unknown>)[key] = draft.frequencyCap[key];
     } else if (field.startsWith("quietHours.")) {
       const key = field.slice("quietHours.".length) as keyof NudgeSettingsView["quietHours"];
-      (next.quietHours as Record<string, unknown>)[key] = draft.quietHours[key];
+      (next.quietHours as Record<string, unknown>)[key] = mine[field];
     } else {
       (next as unknown as Record<string, unknown>)[field] =
         draft[field as "marketingEnabled" | "respectMarketingConsent"];

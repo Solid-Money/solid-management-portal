@@ -81,6 +81,8 @@ export function NudgeEditorSheet({ nudgeKey, board, onClose }: NudgeEditorSheetP
             versions={detail.data?.versions ?? []}
             versionsLoading={detail.isLoading}
             onReload={() => void detail.refetch()}
+            reloading={detail.isFetching}
+            reloadFailed={detail.isError && !detail.isFetching}
           />
         ) : (
           <SheetHeader>
@@ -101,6 +103,8 @@ function NudgeEditorForm({
   versions,
   versionsLoading,
   onReload,
+  reloading,
+  reloadFailed,
 }: {
   /** The nudge as saved now (refreshes when anyone saves it). */
   latest: NudgeView;
@@ -108,6 +112,9 @@ function NudgeEditorForm({
   versions: NonNullable<ReturnType<typeof useNudgeDetail>["data"]>["versions"];
   versionsLoading: boolean;
   onReload: () => void;
+  /** Whether the nudge is being fetched again, and whether that failed. */
+  reloading: boolean;
+  reloadFailed: boolean;
 }) {
   const id = useId();
   const { catalog, settings } = board;
@@ -118,6 +125,9 @@ function NudgeEditorForm({
   const [reviewing, setReviewing] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [overlapping, setOverlapping] = useState<string[]>([]);
+  // An image upload in flight: a save now would leave the image out, and its
+  // reset would then drop the image when the upload lands.
+  const [uploading, setUploading] = useState(false);
   const update = useUpdateNudge();
   const editable = isEditable(nudge, board.canEdit);
 
@@ -203,13 +213,14 @@ function NudgeEditorForm({
           : "Going live: this nudge starts sending within a minute."
       );
     }
+    if (uploading) errors.push("Wait for the image upload to finish.");
     if (overlapping.length > 0) {
       warnings.push(
         `Re-applied on v${nudge.version}: ${overlapping.join(", ")} also changed in that version and now hold your value.`
       );
     }
     return { errors, warnings };
-  }, [draft, nudge, catalog, overlapping]);
+  }, [draft, nudge, catalog, overlapping, uploading]);
 
   const set = (patchDraft: Partial<NudgeDraft>) =>
     setDraft((current) => ({ ...current, ...patchDraft }));
@@ -247,8 +258,16 @@ function NudgeEditorForm({
         Someone saved this nudge after you opened it, so this save was refused.
         {behind
           ? ` Their version is v${latest.version}${latest.updatedBy ? `, by ${latest.updatedBy}` : ""}.`
-          : " Loading their version…"}
+          : reloadFailed
+            ? " Their version couldn't be loaded."
+            : " Loading their version…"}
       </p>
+      {!behind && reloadFailed ? (
+        <Button size="sm" variant="outline" onClick={onReload} disabled={reloading}>
+          <RefreshCw className={reloading ? "animate-spin" : undefined} />
+          Try again
+        </Button>
+      ) : null}
       {behind ? (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={reapply}>
@@ -561,6 +580,7 @@ function NudgeEditorForm({
             catalog={catalog}
             disabled={!editable}
             nudgeKey={nudge.key}
+            onUploadingChange={setUploading}
           />
         </section>
       ) : (

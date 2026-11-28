@@ -53,6 +53,11 @@ interface PushFieldsProps {
   hideEnabled?: boolean;
   /** Used for the uploaded image's file name. */
   nudgeKey: string;
+  /**
+   * Told when an image upload starts and ends, so the parent can hold a save
+   * until the uploaded image is in the draft it sends.
+   */
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
 /**
@@ -67,6 +72,7 @@ export function PushFields({
   disabled,
   hideEnabled = false,
   nudgeKey,
+  onUploadingChange,
 }: PushFieldsProps) {
   const id = useId();
   const titleRef = useRef<HTMLInputElement>(null);
@@ -147,6 +153,7 @@ export function PushFields({
       return;
     }
     setUploading(true);
+    onUploadingChange?.(true);
     try {
       const extension = file.name.split(".").pop()?.toLowerCase() || "png";
       const url = await uploadImageFile(file, `nudges/${nudgeKey}.${extension}`);
@@ -157,6 +164,7 @@ export function PushFields({
       );
     } finally {
       setUploading(false);
+      onUploadingChange?.(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   };

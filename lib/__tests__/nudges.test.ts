@@ -426,6 +426,31 @@ describe("rebasing an unsaved edit onto a newer version", () => {
   });
 });
 
+describe("rebasing a padded time zone", () => {
+  it("treats padding alone as no edit, so their zone wins", () => {
+    const v3: NudgeSettingsView = {
+      version: 3,
+      marketingEnabled: true,
+      respectMarketingConsent: true,
+      frequencyCap: { enabled: true, perDay: 1, perWeek: 3 },
+      quietHours: { enabled: true, start: "21:00", end: "08:00", fallbackTimezone: "UTC" },
+      suppressionGroups: [],
+      updatedAt: null,
+      updatedBy: null,
+    };
+    const mine = { ...v3, quietHours: { ...v3.quietHours, fallbackTimezone: " UTC " } };
+    const v4 = { ...v3, version: 4, quietHours: { ...v3.quietHours, fallbackTimezone: "Europe/Berlin" } };
+    const rebased = rebaseSettings(v3, mine, v4);
+    expect(rebased.draft.quietHours.fallbackTimezone).toBe("Europe/Berlin");
+    expect(rebased.overlapping).toEqual([]);
+
+    const real = { ...v3, quietHours: { ...v3.quietHours, fallbackTimezone: " Asia/Dubai " } };
+    const carried = rebaseSettings(v3, real, v4);
+    expect(carried.draft.quietHours.fallbackTimezone).toBe("Asia/Dubai");
+    expect(carried.overlapping).toEqual(["quietHours.fallbackTimezone"]);
+  });
+});
+
 describe("time zones", () => {
   it("accepts IANA zones only", () => {
     expect(isValidTimeZone("Europe/Berlin")).toBe(true);

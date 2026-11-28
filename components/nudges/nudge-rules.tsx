@@ -18,7 +18,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isVersionConflict, useUpdateNudgeSettings } from "@/hooks/use-nudges";
+import {
+  isVersionConflict,
+  useNudgeBoard,
+  useUpdateNudgeSettings,
+} from "@/hooks/use-nudges";
 import {
   diffSettings,
   isValidTimeZone,
@@ -72,6 +76,9 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
   const [conflict, setConflict] = useState(false);
   const [overlapping, setOverlapping] = useState<string[]>([]);
   const update = useUpdateNudgeSettings();
+  // The page's board query: after a 409 its refetch brings the newer rules.
+  const boardQuery = useNudgeBoard();
+  const reloadFailed = boardQuery.isError && !boardQuery.isFetching;
 
   const { patch, changes } = useMemo(() => diffSettings(saved, draft), [saved, draft]);
   const issues = useMemo(() => settingsIssues(draft), [draft]);
@@ -209,8 +216,21 @@ function NudgeRulesForm({ board }: { board: NudgeBoard }) {
         Someone saved the rules after you started, so this save was refused.
         {behind
           ? ` Their version is v${latest.version}${latest.updatedBy ? `, by ${latest.updatedBy}` : ""}.`
-          : " Loading their version…"}
+          : reloadFailed
+            ? " Their version couldn't be loaded."
+            : " Loading their version…"}
       </p>
+      {!behind && reloadFailed ? (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void boardQuery.refetch()}
+          disabled={boardQuery.isFetching}
+        >
+          <RefreshCw className={boardQuery.isFetching ? "animate-spin" : undefined} />
+          Try again
+        </Button>
+      ) : null}
       {behind
         ? choices(() => {
             resetTo(latest);
