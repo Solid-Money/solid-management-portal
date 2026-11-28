@@ -160,6 +160,7 @@ function isWebp(bytes: Uint8Array): boolean {
    */
   const hasImage = (from: number, end: number, frames: boolean): boolean => {
     let at = from;
+    let sawFrame = false;
     while (at + 8 <= end) {
       const type = ascii(bytes, at, 4);
       const size = u32(bytes, at + 4, true);
@@ -167,12 +168,13 @@ function isWebp(bytes: Uint8Array): boolean {
       if (data + size > end) return false;
       if (type === "VP8 " || type === "VP8L") return isBitstream(type, data, size);
       if (frames && type === "ANMF") {
+        // Every frame must hold a valid image, not just the first.
         if (size < 24 || !hasImage(data + 16, data + size, false)) return false;
-        return true;
+        sawFrame = true;
       }
       at = data + size + (size % 2);
     }
-    return false;
+    return sawFrame;
   };
 
   const first = ascii(bytes, 12, 4);

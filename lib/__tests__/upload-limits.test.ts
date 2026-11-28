@@ -71,6 +71,28 @@ describe("detectImageType", () => {
     );
   });
 
+  it("refuses an animated WebP whose later frame is malformed", () => {
+    const anim = fixtureBytes("webpAnimated");
+    const view = new DataView(anim.buffer, anim.byteOffset);
+    // Find the second ANMF frame and corrupt the bitstream header of its image.
+    let at = 12;
+    const frames: number[] = [];
+    while (at + 8 <= anim.length) {
+      const type = String.fromCharCode(...anim.subarray(at, at + 4));
+      const size = view.getUint32(at + 4, true);
+      if (type === "ANMF") frames.push(at);
+      at += 8 + size + (size % 2);
+    }
+    expect(frames.length).toBeGreaterThanOrEqual(2);
+    const broken = new Uint8Array(anim);
+    // ANMF data: 16-byte frame header, then the image chunk (8-byte header).
+    const imageData = frames[1] + 8 + 16 + 8;
+    broken[imageData] ^= 0xff;
+    broken[imageData + 3] ^= 0xff;
+    expect(detectImageType(anim)).toBe("image/webp");
+    expect(detectImageType(broken)).toBeNull();
+  });
+
   it("accepts AVIF padding boxes before meta", () => {
     const avif = fixtureBytes("avif");
     const ftypSize = new DataView(avif.buffer, avif.byteOffset).getUint32(0);
