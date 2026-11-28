@@ -29,7 +29,7 @@ import {
   type NudgePushDraft,
 } from "@/lib/nudges";
 import { uploadImageFile } from "@/lib/upload";
-import { UPLOAD_IMAGE_MAX_BYTES, UPLOAD_IMAGE_TYPES } from "@/lib/upload-limits";
+import { PUSH_IMAGE_TYPES, UPLOAD_IMAGE_MAX_BYTES } from "@/lib/upload-limits";
 import { cn } from "@/lib/utils";
 import type {
   NudgeCatalogView,
@@ -144,7 +144,7 @@ export function PushFields({
   };
 
   const upload = async (file: File) => {
-    if (!UPLOAD_IMAGE_TYPES.includes(file.type)) {
+    if (!PUSH_IMAGE_TYPES.includes(file.type)) {
       toast.error("Use a PNG, JPEG, WebP, GIF or AVIF image.");
       return;
     }
@@ -360,7 +360,7 @@ export function PushFields({
           <input
             ref={fileRef}
             type="file"
-            accept={UPLOAD_IMAGE_TYPES.filter((t) => t !== "image/svg+xml").join(",")}
+            accept={PUSH_IMAGE_TYPES.join(",")}
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];

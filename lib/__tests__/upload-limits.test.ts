@@ -19,6 +19,8 @@ const EXPECTED = {
   gif: "image/gif",
   webp: "image/webp",
   webpLossy: "image/webp",
+  webpAlpha: "image/webp",
+  webpAnimated: "image/webp",
   avif: "image/avif",
 } as const;
 
@@ -44,6 +46,29 @@ describe("detectImageType", () => {
     // A PNG with its header chunk but no image data.
     const png = fixtureBytes("png");
     expect(detectImageType(bytes(png.subarray(0, 33), png.subarray(png.length - 12)))).toBeNull();
+  });
+
+  it("refuses an AVIF with metadata but no image data", () => {
+    const avif = fixtureBytes("avif");
+    const view = new DataView(avif.buffer, avif.byteOffset);
+    const ftyp = view.getUint32(0);
+    const meta = view.getUint32(ftyp);
+    expect(detectImageType(avif.subarray(0, ftyp + meta))).toBeNull();
+    // The same, with the mdat kept but emptied.
+    expect(
+      detectImageType(bytes(avif.subarray(0, ftyp + meta), [0, 0, 0, 8], "mdat"))
+    ).toBeNull();
+  });
+
+  it("refuses an extended WebP whose image chunk is empty or not a bitstream", () => {
+    const vp8x = bytes("VP8X", [10, 0, 0, 0], new Array(10).fill(0));
+    const riff = (body: Uint8Array) =>
+      bytes("RIFF", [(body.length + 4) & 255, ((body.length + 4) >> 8) & 255, 0, 0], "WEBP", body);
+    expect(detectImageType(riff(bytes(vp8x, "VP8L", [0, 0, 0, 0])))).toBeNull();
+    expect(detectImageType(riff(bytes(vp8x, "VP8L", [6, 0, 0, 0], [0, 1, 2, 3, 4, 5])))).toBeNull();
+    expect(detectImageType(riff(bytes(vp8x, "VP8L", [6, 0, 0, 0], [0x2f, 1, 2, 3, 4, 5])))).toBe(
+      "image/webp"
+    );
   });
 
   it("accepts AVIF padding boxes before meta", () => {

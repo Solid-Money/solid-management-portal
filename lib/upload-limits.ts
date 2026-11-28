@@ -14,6 +14,9 @@ export const UPLOAD_IMAGE_TYPES = [
   "image/svg+xml",
 ];
 
+/** Image types a push can carry: phones don't render SVG in notifications. */
+export const PUSH_IMAGE_TYPES = UPLOAD_IMAGE_TYPES.filter((t) => t !== "image/svg+xml");
+
 /** Vercel caps a route body at about 4.5 MB; stay under it. */
 export const UPLOAD_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 
@@ -127,9 +130,11 @@ function isGif(bytes: Uint8Array): boolean {
 }
 
 /**
- * WebP: a RIFF container no longer than the file, whose first chunk fits in
- * it and is a VP8 frame (start code), a VP8L stream (signature) or a VP8X
- * header followed by image data.
+ * WebP: a RIFF container no longer than the file, holding image data. A
+ * simple file is one VP8 (lossy) or VP8L (lossless) chunk. An extended file
+ * starts with VP8X and carries that chunk later, or ANMF frames that each
+ * wrap one. Every image chunk must fit in the RIFF and start with its
+ * bitstream header: the VP8 frame start code or the VP8L signature byte.
  */
 function isWebp(bytes: Uint8Array): boolean {
   if (bytes.length < 20 || ascii(bytes, 0, 4) !== "RIFF" || ascii(bytes, 8, 4) !== "WEBP") {
@@ -137,56 +142,98 @@ function isWebp(bytes: Uint8Array): boolean {
   }
   const riffEnd = 8 + u32(bytes, 4, true);
   if (riffEnd < 20 || riffEnd > bytes.length) return false;
-  const chunk = (at: number) => ({ type: ascii(bytes, at, 4), size: u32(bytes, at + 4, true) });
-  const first = chunk(12);
-  if (20 + first.size > riffEnd) return false;
-  if (first.type === "VP8 ") {
-    return first.size >= 10 && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a;
-  }
-  if (first.type === "VP8L") return first.size >= 5 && bytes[20] === 0x2f;
-  if (first.type !== "VP8X" || first.size !== 10) return false;
-  // Extended: walk the chunks after VP8X (each padded to an even size).
-  let at = 30;
-  while (at + 8 <= riffEnd) {
-    const { type, size } = chunk(at);
-    if (at + 8 + size > riffEnd) return false;
-    if (type === "VP8 " || type === "VP8L" || type === "ANMF") return true;
-    at += 8 + size + (size % 2);
-  }
-  return false;
+
+  /** Whether a VP8/VP8L chunk's data at `data` (of `size` bytes) is one. */
+  const isBitstream = (type: string, data: number, size: number): boolean => {
+    if (type === "VP8 ") {
+      return (
+        size >= 10 && bytes[data + 3] === 0x9d && bytes[data + 4] === 0x01 && bytes[data + 5] === 0x2a
+      );
+    }
+    if (type === "VP8L") return size >= 5 && bytes[data] === 0x2f;
+    return false;
+  };
+  /**
+   * Walk the chunks from `from` to `end` (each padded to an even size) and
+   * report whether an image chunk among them is valid; `frames` also looks
+   * inside ANMF frames (whose data is a 16-byte header, then chunks).
+   */
+  const hasImage = (from: number, end: number, frames: boolean): boolean => {
+    let at = from;
+    while (at + 8 <= end) {
+      const type = ascii(bytes, at, 4);
+      const size = u32(bytes, at + 4, true);
+      const data = at + 8;
+      if (data + size > end) return false;
+      if (type === "VP8 " || type === "VP8L") return isBitstream(type, data, size);
+      if (frames && type === "ANMF") {
+        if (size < 24 || !hasImage(data + 16, data + size, false)) return false;
+        return true;
+      }
+      at = data + size + (size % 2);
+    }
+    return false;
+  };
+
+  const first = ascii(bytes, 12, 4);
+  const firstSize = u32(bytes, 16, true);
+  if (20 + firstSize > riffEnd) return false;
+  if (first === "VP8 " || first === "VP8L") return isBitstream(first, 20, firstSize);
+  if (first !== "VP8X" || firstSize !== 10) return false;
+  return hasImage(30, riffEnd, true);
 }
 
 /**
  * AVIF (ISO BMFF): top-level boxes that exactly fill the file, starting with
- * an ftyp naming avif/avis and holding a meta box. Padding boxes (free,
- * skip) and others may sit anywhere after ftyp.
+ * an ftyp naming avif/avis, with a meta box and image data: a non-empty mdat,
+ * or an idat inside meta. Padding boxes (free, skip) and others may sit
+ * anywhere after ftyp.
  */
 function isAvif(bytes: Uint8Array): boolean {
-  let at = 0;
-  let sawMeta = false;
-  while (at + 8 <= bytes.length) {
+  /** The box at `at` (bounded by `end`): its type, header and total size. */
+  const box = (at: number, end: number) => {
+    if (at + 8 > end) return null;
     let size = u32(bytes, at);
-    const type = ascii(bytes, at + 4, 4);
     let header = 8;
     if (size === 1) {
-      if (at + 16 > bytes.length) return false;
+      if (at + 16 > end) return null;
       size = u32(bytes, at + 8) * 2 ** 32 + u32(bytes, at + 12);
       header = 16;
     } else if (size === 0) {
-      size = bytes.length - at; // runs to the end of the file
+      size = end - at; // runs to the end of its parent
     }
-    if (size < header || at + size > bytes.length) return false;
+    if (size < header || at + size > end) return null;
+    return { type: ascii(bytes, at + 4, 4), header, size };
+  };
+
+  let at = 0;
+  let sawMeta = false;
+  let sawData = false;
+  while (at < bytes.length) {
+    const b = box(at, bytes.length);
+    if (!b) return false;
     if (at === 0) {
-      if (type !== "ftyp" || size < 16) return false;
+      if (b.type !== "ftyp" || b.size < 16) return false;
       const brands = [ascii(bytes, 8, 4)];
-      for (let b = 16; b + 4 <= size; b += 4) brands.push(ascii(bytes, b, 4));
+      for (let i = 16; i + 4 <= b.size; i += 4) brands.push(ascii(bytes, i, 4));
       if (!brands.some((brand) => brand === "avif" || brand === "avis")) return false;
-    } else if (type === "meta") {
+    } else if (b.type === "meta") {
       sawMeta = true;
+      // meta is a full box: 4 bytes of version and flags, then its children.
+      const end = at + b.size;
+      let child = at + b.header + 4;
+      while (child < end) {
+        const c = box(child, end);
+        if (!c) return false;
+        if (c.type === "idat" && c.size > c.header) sawData = true;
+        child += c.size;
+      }
+    } else if (b.type === "mdat" && b.size > b.header) {
+      sawData = true;
     }
-    at += size;
+    at += b.size;
   }
-  return at === bytes.length && sawMeta;
+  return sawMeta && sawData;
 }
 
 /**

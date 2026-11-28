@@ -281,6 +281,7 @@ function NudgeEditorForm({
               loadLatest();
               setReviewing(false);
             }}
+            disabled={uploading}
           >
             Discard mine and load v{latest.version}
           </Button>
@@ -342,7 +343,7 @@ function NudgeEditorForm({
               <RefreshCw />
               Re-apply my changes on v{latest.version}
             </Button>
-            <Button size="sm" variant="outline" onClick={loadLatest}>
+            <Button size="sm" variant="outline" onClick={loadLatest} disabled={uploading}>
               Discard mine and load v{latest.version}
             </Button>
           </div>
@@ -654,7 +655,9 @@ function NudgeEditorForm({
             <Button
               variant="outline"
               onClick={loadLatest}
-              disabled={!dirty || update.isPending}
+              // An upload in flight would land in the fresh draft and make it
+              // dirty again, so Discard waits for it.
+              disabled={!dirty || update.isPending || uploading}
             >
               Discard
             </Button>
