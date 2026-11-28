@@ -89,11 +89,33 @@ function isJpeg(bytes: Uint8Array): boolean {
       // Scan header: component count, 2 bytes per component, then 3 bytes.
       const components = bytes[at + 4];
       if (length < 6 || components < 1 || length !== 6 + 2 * components) return false;
-      // Entropy-coded data runs to the EOI (bytes after it are tolerated),
-      // and there must be some of it.
-      const dataStart = at + 2 + length;
-      for (let i = bytes.length - 2; i > dataStart; i--) {
-        if (bytes[i] === 0xff && bytes[i + 1] === 0xd9) return true;
+      // Walk the entropy-coded data forward to the first EOI, which ends the
+      // image (bytes after it are tolerated). There must be data before it.
+      // Inside the data, FF 00 is a stuffed byte and FF D0-D7 a restart;
+      // other markers (e.g. a progressive JPEG's next DHT/SOS) are segments.
+      let i = at + 2 + length;
+      let sawData = false;
+      while (i < bytes.length) {
+        if (bytes[i] !== 0xff) {
+          sawData = true;
+          i += 1;
+          continue;
+        }
+        if (i + 1 >= bytes.length) return false;
+        const next = bytes[i + 1];
+        if (next === 0x00 || (next >= 0xd0 && next <= 0xd7)) {
+          sawData = true;
+          i += 2;
+        } else if (next === 0xff) {
+          i += 1; // fill byte
+        } else if (next === 0xd9) {
+          return sawData;
+        } else {
+          if (i + 4 > bytes.length) return false;
+          const segment = (bytes[i + 2] << 8) | bytes[i + 3];
+          if (segment < 2 || i + 2 + segment > bytes.length) return false;
+          i += 2 + segment;
+        }
       }
       return false;
     }

@@ -16,6 +16,7 @@ const bytes = (...parts: (number[] | string | Uint8Array)[]): Uint8Array =>
 const EXPECTED = {
   png: "image/png",
   jpeg: "image/jpeg",
+  jpegProgressive: "image/jpeg",
   gif: "image/gif",
   webp: "image/webp",
   webpLossy: "image/webp",
@@ -60,6 +61,12 @@ describe("detectImageType", () => {
     }
     const scanEnd = sos + 2 + ((jpeg[sos + 2] << 8) | jpeg[sos + 3]);
     expect(detectImageType(bytes(jpeg.subarray(0, scanEnd), [0xff, 0xd9]))).toBeNull();
+    // The first EOI ends the image: a second one after it adds no scan data.
+    expect(
+      detectImageType(bytes(jpeg.subarray(0, scanEnd), [0xff, 0xd9, 0xff, 0xd9]))
+    ).toBeNull();
+    // A valid JPEG with trailing bytes after its EOI is still accepted.
+    expect(detectImageType(bytes(jpeg, [0, 0, 0, 0]))).toBe("image/jpeg");
   });
 
   it("refuses an AVIF with metadata but no image data", () => {
