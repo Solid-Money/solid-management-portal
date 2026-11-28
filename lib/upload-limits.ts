@@ -75,12 +75,24 @@ function isJpeg(bytes: Uint8Array): boolean {
     const length = (bytes[at + 2] << 8) | bytes[at + 3];
     if (length < 2 || at + 2 + length > bytes.length) return false;
     if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      // Frame header: precision, height, width, components, then 3 bytes per
+      // component. A width of 0 or no components is no image.
+      const components = bytes[at + 9];
+      const width = (bytes[at + 7] << 8) | bytes[at + 8];
+      if (length < 8 || components < 1 || length !== 8 + 3 * components || width === 0) {
+        return false;
+      }
       sawFrame = true;
     }
     if (marker === 0xda) {
       if (!sawFrame) return false;
-      // Entropy-coded data runs to the EOI (bytes after it are tolerated).
-      for (let i = bytes.length - 2; i >= at + 2 + length; i--) {
+      // Scan header: component count, 2 bytes per component, then 3 bytes.
+      const components = bytes[at + 4];
+      if (length < 6 || components < 1 || length !== 6 + 2 * components) return false;
+      // Entropy-coded data runs to the EOI (bytes after it are tolerated),
+      // and there must be some of it.
+      const dataStart = at + 2 + length;
+      for (let i = bytes.length - 2; i > dataStart; i--) {
         if (bytes[i] === 0xff && bytes[i + 1] === 0xd9) return true;
       }
       return false;

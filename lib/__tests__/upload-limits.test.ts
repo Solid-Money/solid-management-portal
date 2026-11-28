@@ -48,6 +48,20 @@ describe("detectImageType", () => {
     expect(detectImageType(bytes(png.subarray(0, 33), png.subarray(png.length - 12)))).toBeNull();
   });
 
+  it("refuses a JPEG with empty frame and scan headers or no scan data", () => {
+    expect(
+      detectImageType(bytes([0xff, 0xd8, 0xff, 0xc0, 0, 2, 0xff, 0xda, 0, 2, 0xff, 0xd9]))
+    ).toBeNull();
+    // A real frame and scan header, but the EOI follows the scan header at once.
+    const jpeg = fixtureBytes("jpeg");
+    let sos = 2;
+    while (!(jpeg[sos] === 0xff && jpeg[sos + 1] === 0xda)) {
+      sos += 2 + ((jpeg[sos + 2] << 8) | jpeg[sos + 3]);
+    }
+    const scanEnd = sos + 2 + ((jpeg[sos + 2] << 8) | jpeg[sos + 3]);
+    expect(detectImageType(bytes(jpeg.subarray(0, scanEnd), [0xff, 0xd9]))).toBeNull();
+  });
+
   it("refuses an AVIF with metadata but no image data", () => {
     const avif = fixtureBytes("avif");
     const view = new DataView(avif.buffer, avif.byteOffset);
