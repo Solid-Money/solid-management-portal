@@ -31,6 +31,9 @@ const ABILITIES = [
   "Reply to customers and message them first",
   "Write internal notes and @mention agents",
   "Assign, snooze, escalate, resolve and reopen cases",
+  "Read the automated nudges, their rules and history",
+  "Change a nudge's copy, timing or Brevo template once you confirm it",
+  "Pause and resume nudges, and send a nudge test to yourself",
 ];
 
 /**
@@ -131,8 +134,8 @@ function ConnectClaude() {
     <Panel title="Connect Claude to Solid Support">
       <p className="text-sm text-gray-700">
         <span className="font-medium">{clientName}</span> wants to work the
-        support inbox as <span className="font-medium">{email}</span>. It will
-        be able to:
+        support inbox and the automated nudges as{" "}
+        <span className="font-medium">{email}</span>. It will be able to:
       </p>
       <ul className="mt-3 space-y-1.5 text-sm text-gray-700">
         {ABILITIES.map((ability) => (

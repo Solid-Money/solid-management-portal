@@ -1,44 +1,11 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
+import { isAdminRequest } from "@/lib/admin-request";
 import { VIDEO_MAX_BYTES, VIDEO_TYPE } from "@/lib/whats-new";
-
-// The local admins service only in development; a deployment without the
-// variable refuses uploads rather than asking localhost who is an admin.
-const ADMIN_API_BASE_URL =
-  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL ||
-  (process.env.NODE_ENV === "development"
-    ? "http://localhost:5009"
-    : undefined);
 
 /** Every What's New video is stored under this prefix. */
 const VIDEO_PATH_PREFIX = "whats-new/";
-
-/**
- * Whether the request comes from a signed-in admin. The admins service already
- * verifies Firebase tokens and the allowed email domain, so the token is
- * checked by asking it for the very list this video is uploaded for.
- */
-const isAdmin = async (authorization: string | null): Promise<boolean> => {
-  if (!authorization?.startsWith("Bearer ")) return false;
-  if (!ADMIN_API_BASE_URL) {
-    console.error(
-      "[whats-new/video-upload] NEXT_PUBLIC_ADMIN_API_BASE_URL is not set",
-    );
-    return false;
-  }
-
-  try {
-    const response = await fetch(`${ADMIN_API_BASE_URL}/admin/v1/whats-new`, {
-      headers: { Authorization: authorization },
-      cache: "no-store",
-    });
-    return response.ok;
-  } catch (error) {
-    console.error("[whats-new/video-upload] Admin check failed:", error);
-    return false;
-  }
-};
 
 /**
  * Hands the browser a short-lived token to upload a What's New video straight
@@ -63,7 +30,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         if (!pathname.startsWith(VIDEO_PATH_PREFIX)) {
           throw new Error("Videos are uploaded under whats-new/");
         }
-        if (!(await isAdmin(request.headers.get("authorization")))) {
+        if (
+          !(await isAdminRequest(
+            request.headers.get("authorization"),
+            "whats-new/video-upload",
+          ))
+        ) {
           throw new Error("Sign in as an admin to upload videos");
         }
 

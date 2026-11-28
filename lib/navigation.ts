@@ -38,6 +38,7 @@ import {
   Users,
   UsersRound,
   Wallet,
+  Workflow,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -336,6 +337,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description:
           "Targeted pushes and A/B tests to an uploaded user list, opening any screen",
         icon: BellRing,
+      },
+      {
+        href: "/nudges",
+        label: "Automated nudges",
+        description:
+          "Every automated push and email as a journey graph: copy, Brevo templates, timing and rules",
+        icon: Workflow,
       },
       {
         href: "/referrals",

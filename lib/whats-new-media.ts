@@ -1,6 +1,7 @@
 import { upload } from "@vercel/blob/client";
 
 import { auth } from "@/lib/firebase";
+import { uploadImageFile } from "@/lib/upload";
 
 /**
  * Browser-only helpers for What's New media: read an upload's size and length
@@ -114,18 +115,8 @@ const baseName = (fileName: string) =>
     .slice(0, 60) || "whats-new";
 
 /** Images and posters: through `/api/upload`, as the carousel always has. */
-export const uploadImage = async (
-  file: Blob,
-  fileName: string,
-): Promise<string> => {
-  const response = await fetch(
-    `/api/upload?filename=${encodeURIComponent(fileName)}`,
-    { method: "POST", body: file },
-  );
-  if (!response.ok) throw new Error("Failed to upload image");
-  const blob = (await response.json()) as { url: string };
-  return blob.url;
-};
+export const uploadImage = (file: Blob, fileName: string): Promise<string> =>
+  uploadImageFile(file, fileName);
 
 export const uploadPoster = (poster: Blob, videoFileName: string) =>
   uploadImage(poster, `${baseName(videoFileName)}-poster.jpg`);
